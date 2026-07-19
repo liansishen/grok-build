@@ -35,6 +35,11 @@ static AUTO_MODE: AtomicBool = AtomicBool::new(false);
 /// session (minimal mode — no theming).
 static TERMINAL_NATIVE_LOCK: AtomicBool = AtomicBool::new(false);
 
+/// Fullscreen transparent canvas (`[ui].transparent_bg` / `GROK_TRANSPARENT_BG`).
+/// Lazily seeded once from env + disk so `Theme::current()` stays cheap.
+static TRANSPARENT_BG: AtomicBool = AtomicBool::new(false);
+static TRANSPARENT_BG_LOADED: AtomicBool = AtomicBool::new(false);
+
 /// Decode the u8 stored in `CURRENT` back to a `ThemeKind`. Falls
 /// back to `GrokNight` if the byte is somehow out of range (which
 /// can't happen via `set` — the discriminant is always a valid
@@ -118,6 +123,45 @@ pub fn set_terminal_native_lock(locked: bool) {
     } else {
         xai_grok_markdown::ColorLevel::TrueColor
     });
+}
+
+// -- Transparent canvas (fullscreen Acrylic / Mica) ---------------------------
+
+/// Whether fullscreen themes should leave canvas backgrounds as `Color::Reset`.
+///
+/// Precedence matches [`xai_grok_shared::ui_config::UiConfig::transparent_bg_enabled`]:
+/// env `GROK_TRANSPARENT_BG` → `[ui].transparent_bg` → `false`.
+#[must_use]
+pub fn transparent_bg_enabled() -> bool {
+    if !TRANSPARENT_BG_LOADED.load(Ordering::Acquire) {
+        let enabled = resolve_transparent_bg();
+        TRANSPARENT_BG.store(enabled, Ordering::Relaxed);
+        TRANSPARENT_BG_LOADED.store(true, Ordering::Release);
+    }
+    TRANSPARENT_BG.load(Ordering::Relaxed)
+}
+
+/// Force the transparent-bg cache (tests / runtime settings).
+pub fn set_transparent_bg(enabled: bool) {
+    TRANSPARENT_BG.store(enabled, Ordering::Relaxed);
+    TRANSPARENT_BG_LOADED.store(true, Ordering::Release);
+}
+
+fn resolve_transparent_bg() -> bool {
+    let ui = xai_grok_shared::ui_config::UiConfig {
+        transparent_bg: load_transparent_bg_from_disk(),
+        ..Default::default()
+    };
+    ui.transparent_bg_enabled()
+}
+
+fn load_transparent_bg_from_disk() -> Option<bool> {
+    let root = xai_grok_config::load_effective_config_disk_only().ok()?;
+    let table = root.as_table()?;
+    table
+        .get("ui")
+        .and_then(|ui| ui.get("transparent_bg"))
+        .and_then(|v| v.as_bool())
 }
 
 // -- Auto-mode ---------------------------------------------------------------
@@ -278,6 +322,8 @@ pub fn reset_for_test() {
     LOADED.store(false, Ordering::Release);
     AUTO_MODE.store(false, Ordering::Relaxed);
     set_terminal_native_lock(false);
+    TRANSPARENT_BG.store(false, Ordering::Relaxed);
+    TRANSPARENT_BG_LOADED.store(false, Ordering::Release);
     *AUTO_THEME_CONFIG.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
@@ -354,6 +400,31 @@ mod tests {
                 ThemeKind::GrokDay,
                 "unlocking restores the cached kind"
             );
+        });
+    }
+
+    #[test]
+    fn set_transparent_bg_is_honored_by_theme_current() {
+        use ratatui::style::Color;
+        with_test_env(|| {
+            set(ThemeKind::GrokNight);
+            set_transparent_bg(false);
+            assert!(!transparent_bg_enabled());
+            let solid = super::super::Theme::current();
+
+            set_transparent_bg(true);
+            assert!(transparent_bg_enabled());
+            let theme = super::super::Theme::current();
+            // Only assert the transparent path relative to the solid theme so
+            // ColorLevel::None / NO_COLOR environments (which Reset everything)
+            // don't false-fail the off case.
+            assert_eq!(theme.bg_base, Color::Reset);
+            assert_eq!(theme.bg_dark, Color::Reset);
+            assert_eq!(theme.bg_base, solid.with_transparent_canvas().bg_base);
+            // Hover remains elevated unless the whole palette was already Reset.
+            if !matches!(solid.bg_hover, Color::Reset) {
+                assert!(!matches!(theme.bg_hover, Color::Reset));
+            }
         });
     }
 

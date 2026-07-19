@@ -148,6 +148,13 @@ pub struct UiConfig {
     /// `"fullscreen"` | `"minimal"`; unset → product default fullscreen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_mode: Option<String>,
+    /// When `true`, fullscreen themes leave canvas backgrounds as
+    /// `Color::Reset` so the terminal's own background (including Acrylic /
+    /// Mica transparency) shows through. Elevated surfaces (hover, selection)
+    /// keep theme colors. Unset/`false` = solid theme backgrounds (default).
+    /// Env override: `GROK_TRANSPARENT_BG=1`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transparent_bg: Option<bool>,
     /// Retired hidden opt-in for terminal-like double/triple-click word/line
     /// selection. Superseded by `keep_text_selection = "word_select"`. Still
     /// read only when `keep_text_selection` is unset; Settings clears this on
@@ -213,6 +220,16 @@ impl ContextualHints {
 
 const DEFAULT_MAX_THOUGHTS_WIDTH: u16 = 120;
 
+/// Parse `GROK_TRANSPARENT_BG` when set. Returns `None` if unset or unrecognized.
+fn env_transparent_bg() -> Option<bool> {
+    let raw = std::env::var("GROK_TRANSPARENT_BG").ok()?;
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
 fn deserialize_keep_text_selection<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -271,6 +288,7 @@ impl Default for UiConfig {
             prompt_suggestions: None,
             cursor_blink: None,
             screen_mode: None,
+            transparent_bg: None,
             double_click_action: None,
             contextual_hints: ContextualHints::default(),
             display_refresh: DisplayRefreshSettings::default(),
@@ -305,6 +323,22 @@ impl UiConfig {
             .unwrap_or(Self::PAGE_FLIP_ON_SEND_DEFAULT)
     }
 
+    /// Default for [`Self::transparent_bg`] when unset (and no env override).
+    pub const TRANSPARENT_BG_DEFAULT: bool = false;
+
+    /// Whether fullscreen should leave canvas backgrounds transparent so the
+    /// terminal profile (including Acrylic/Mica) shows through.
+    ///
+    /// Precedence: `GROK_TRANSPARENT_BG` env (`1`/`true`/`yes`/`on` vs
+    /// `0`/`false`/`no`/`off`) → `[ui].transparent_bg` → default `false`.
+    pub fn transparent_bg_enabled(&self) -> bool {
+        if let Some(v) = env_transparent_bg() {
+            return v;
+        }
+        self.transparent_bg
+            .unwrap_or(Self::TRANSPARENT_BG_DEFAULT)
+    }
+
     /// True when the highlight should not timer-dismiss (`hold` / `word_select`,
     /// or legacy duration 0).
     pub fn keep_text_selection_enabled(&self) -> bool {
@@ -327,6 +361,25 @@ mod tests {
             ..Default::default()
         };
         assert!(!off.page_flip_on_send_enabled());
+    }
+
+    #[test]
+    fn transparent_bg_defaults_off_and_config_on() {
+        // Env may be set in the process; only assert config-only when env is unset.
+        if env_transparent_bg().is_none() {
+            assert!(!UiConfig::default().transparent_bg_enabled());
+            let on = UiConfig {
+                transparent_bg: Some(true),
+                ..Default::default()
+            };
+            assert!(on.transparent_bg_enabled());
+        }
+    }
+
+    #[test]
+    fn transparent_bg_deserializes_from_json() {
+        let ui: UiConfig = serde_json::from_str(r#"{"transparent_bg": true}"#).unwrap();
+        assert_eq!(ui.transparent_bg, Some(true));
     }
 
     #[test]

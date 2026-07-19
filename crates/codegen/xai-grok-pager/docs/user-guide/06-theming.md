@@ -342,3 +342,21 @@ Each theme defines the following color slots that are used throughout the TUI:
 **Markdown:** heading colors (`md_heading_h1`-`md_heading_h6`), `md_code`, `md_code_bg`, `md_text`, `md_muted`, `md_task_checked`, `md_task_unchecked`, `link_fg`
 
 The theme system manages these slots internally and quantizes them automatically for your terminal.
+
+## Transparent canvas (Acrylic / Mica)
+
+Fullscreen themes paint a solid `bg_base` by default, which covers the terminal's semi-transparent profile. To leave canvas backgrounds as the terminal default (so Windows Terminal Acrylic/Mica shows through) while keeping themed accents:
+
+```toml
+[ui]
+transparent_bg = true
+```
+
+Or set the environment variable for a single launch:
+
+```powershell
+$env:GROK_TRANSPARENT_BG = "1"
+grok
+```
+
+Elevated surfaces (hover, selection, highlight) keep theme colors. Minimal mode already uses a fully terminal-native palette and does not need this setting.
