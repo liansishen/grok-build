@@ -28,6 +28,13 @@ pub(crate) const MAX_THOUGHTS_WIDTH_MAX: i64 = 500;
 /// definition and the live-wrap-preview gate in the int stepper.
 pub(crate) const MAX_THOUGHTS_WIDTH_KEY: &str = "max_thoughts_width";
 
+/// Registry key for usage-refresh interval (minutes).
+pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_KEY: &str = "usage_refresh_interval_minutes";
+/// Default periodic billing refresh for the prompt usage status.
+pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT: i64 = 5;
+pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_MIN: i64 = 1;
+pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_MAX: i64 = 60;
+
 // ---------------------------------------------------------------------------
 // Theme choice catalogs.
 //
@@ -911,6 +918,32 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 default: ui_default.max_thoughts_width as i64,
                 min: MAX_THOUGHTS_WIDTH_MIN,
                 max: MAX_THOUGHTS_WIDTH_MAX,
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        // SHELL-owned: how often to refresh usage data shown left of the model name.
+        SettingMeta {
+            key: USAGE_REFRESH_INTERVAL_MINUTES_KEY,
+            category: SettingCategory::Advanced,
+            owner: SettingOwner::Shell,
+            label: "Usage refresh interval",
+            description: "How often to refresh weekly/monthly usage in the prompt (1–60 minutes, default 5). Also refreshes when a turn completes.",
+            keywords: &[
+                "usage",
+                "billing",
+                "credit",
+                "limit",
+                "refresh",
+                "interval",
+                "poll",
+                "weekly",
+                "reset",
+            ],
+            kind: SettingKind::Int {
+                default: USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT,
+                min: USAGE_REFRESH_INTERVAL_MINUTES_MIN,
+                max: USAGE_REFRESH_INTERVAL_MINUTES_MAX,
             },
             restart_required: false,
             hidden_in_minimal: false,

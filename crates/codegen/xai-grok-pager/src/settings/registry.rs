@@ -700,6 +700,11 @@ pub fn current_value_for(
         )),
         // max_thoughts_width: `u16` widened to `i64`.
         "max_thoughts_width" => Some(SettingValue::Int(ui.max_thoughts_width as i64)),
+        "usage_refresh_interval_minutes" => Some(SettingValue::Int(
+            ui.usage_refresh_interval_minutes
+                .unwrap_or(crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT as u8)
+                as i64,
+        )),
         // coding_data_sharing: inverts the `_opt_out` bool.
         "coding_data_sharing" => Some(SettingValue::Enum(if pager.coding_data_sharing_opt_out {
             "opt-out"
@@ -926,6 +931,17 @@ mod tests {
                     assert_eq!(
                         *default, ui.max_thoughts_width as i64,
                         "max_thoughts_width default drifts from UiConfig::default()",
+                    );
+                }
+                ("usage_refresh_interval_minutes", SettingKind::Int { default, .. }) => {
+                    assert_eq!(
+                        *default,
+                        crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT,
+                        "usage_refresh_interval_minutes default drifts",
+                    );
+                    assert_eq!(
+                        ui.usage_refresh_interval_minutes, None,
+                        "UiConfig default must leave usage_refresh_interval_minutes unset",
                     );
                 }
                 // coding_data_sharing: no UiConfig field; default pinned

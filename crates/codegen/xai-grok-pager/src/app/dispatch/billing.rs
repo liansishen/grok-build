@@ -358,10 +358,10 @@ pub(super) fn handle_billing_fetched(
     // `Resolved` updates the cached rule, `Cleared` resets it to unknown
     // (no credits), `Unchanged` keeps the last-known-good (fetch failed).
     apply_auto_topup(&mut app.auto_topup, &autotopup);
-    app.billing_poll_wanted = balance
-        .as_ref()
-        .map(|b| b.usage_pct >= 99.0)
-        .unwrap_or(false);
+    // Keep periodic silent refresh so the prompt usage status stays current
+    // (interval from `[ui].usage_refresh_interval_minutes`, default 5 min).
+    // Near-limit still benefits from turn-end fetches + this poll loop.
+    app.billing_poll_wanted = true;
     if let Some(tier) = subscription_tier {
         app.subscription_tier = Some(tier);
     }

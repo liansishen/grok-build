@@ -865,6 +865,10 @@ choice_oscura_midnight = "Oscura Midnight"
 label = "Ask-Question timeout"
 description = "When on, the ask_user_question tool will time out after a set period \\ of time instead of infinitely blocking."
 
+[settings.usage_refresh_interval_minutes]
+label = "Usage refresh interval"
+description = "How often to refresh weekly/monthly usage in the prompt (1–60 minutes, default 5). Also refreshes when a turn completes."
+
 [settings.vim_mode]
 label = "Vim scrollback navigation"
 description = "Enable vim keys (h/j/k/l, gg/G, /) for navigating the scrollback. Does not affect the input prompt."
@@ -1245,6 +1249,8 @@ auto_topup = "Auto topup: {amount}"
 max_monthly_topup = "Max monthly topup: {amount}"
 auto_topup_disabled = "Auto topup: disabled"
 payg = "Pay-as-you-go: {used} used of {cap} limit"
+prompt_status = "{label}: {pct}% · reset {time}"
+prompt_status_pct = "{label}: {pct}%"
 
 [welcome]
 quit = "quit"
@@ -1286,3 +1292,4 @@ warning_line2 = "posing security risks."
 [worktree]
 new_title = "New Worktree"
 name_optional = "Name (optional): "
+

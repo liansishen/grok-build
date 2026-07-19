@@ -1109,6 +1109,14 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "usage_refresh_interval_minutes" => {
+            let SettingValue::Int(i) = value else {
+                return Err(kind_mismatch("usage_refresh_interval_minutes", "Int", &value));
+            };
+            xai_grok_shell::util::config::set_usage_refresh_interval_minutes(i)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "show_tips" => {
             let SettingValue::Bool(b) = value else {
                 return Err(kind_mismatch("show_tips", "Bool", &value));

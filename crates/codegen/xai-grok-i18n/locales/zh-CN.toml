@@ -865,6 +865,10 @@ choice_oscura_midnight = "Oscura Midnight"
 label = "提问超时"
 description = "开启后，ask_user_question 工具会在设定时间后超时，而不是无限阻塞。"
 
+[settings.usage_refresh_interval_minutes]
+label = "用量刷新间隔"
+description = "提示栏中每周/每月用量的刷新间隔（1–60 分钟，默认 5）。回合完成时也会立即刷新。"
+
 [settings.vim_mode]
 label = "Vim 回滚导航"
 description = "使用 vim 键（h/j/k/l、gg/G、/）浏览回滚区。不影响输入框。"
@@ -1245,6 +1249,8 @@ auto_topup = "自动充值：{amount}"
 max_monthly_topup = "每月充值上限：{amount}"
 auto_topup_disabled = "自动充值：已关闭"
 payg = "按量付费：已用 {used} / 上限 {cap}"
+prompt_status = "{label}: {pct}% · 重置 {time}"
+prompt_status_pct = "{label}: {pct}%"
 
 [welcome]
 quit = "退出"
@@ -1286,3 +1292,4 @@ warning_line2 = "存在安全风险。"
 [worktree]
 new_title = "新建工作树"
 name_optional = "名称（可选）："
+

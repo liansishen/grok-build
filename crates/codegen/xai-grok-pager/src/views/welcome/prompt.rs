@@ -79,6 +79,7 @@ mod tests {
             model_name: "test",
             flags: &[],
             multiline: false,
+            usage_status: None,
             usage_warning: None,
             usage_warning_critical: false,
         };

@@ -559,39 +559,39 @@ fn billing_fetched_none_balance_clears_cached() {
     // Seed a known balance + polling, as a prior successful fetch would.
     dispatch_billing(&mut app, Some(test_bal(80.0)), true, None);
     app.billing_poll_wanted = true;
-    // A response carrying no billing config clears the cached balance and
-    // polling so the status bar agrees with the "No billing data" message
-    // (parse/transport failures route to BillingError, not here).
+    // A response carrying no billing config clears the cached balance so the
+    // status bar agrees with the "No billing data" message. Periodic polling
+    // stays armed so a later period can repopulate the prompt usage status.
     dispatch_billing(&mut app, None, false, None);
     assert!(
         app.credit_balance.is_none(),
         "None balance should clear the cached credit balance"
     );
     assert!(
-        !app.billing_poll_wanted,
-        "None balance should disable billing polling"
+        app.billing_poll_wanted,
+        "periodic usage refresh remains armed after empty billing payload"
     );
 }
 
 #[test]
-fn billing_fetched_high_usage_enables_poll() {
+fn billing_fetched_enables_poll_for_prompt_status() {
     let mut app = test_app_with_agent();
     assert!(!app.billing_poll_wanted);
-    dispatch_billing(&mut app, Some(test_bal(99.5)), true, None);
+    dispatch_billing(&mut app, Some(test_bal(50.0)), true, None);
     assert!(
         app.billing_poll_wanted,
-        "usage >= 99% should enable billing polling"
+        "any successful billing fetch should keep periodic usage refresh armed"
     );
 }
 
 #[test]
-fn billing_fetched_low_usage_disables_poll() {
+fn billing_fetched_keeps_poll_at_low_usage() {
     let mut app = test_app_with_agent();
     app.billing_poll_wanted = true;
     dispatch_billing(&mut app, Some(test_bal(50.0)), true, None);
     assert!(
-        !app.billing_poll_wanted,
-        "usage < 99% should disable billing polling"
+        app.billing_poll_wanted,
+        "usage below 99% still keeps periodic refresh for the prompt status line"
     );
 }
 

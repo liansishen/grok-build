@@ -45,6 +45,28 @@ impl CreditBalance {
             _ => xai_grok_i18n::t("usage.usage"),
         }
     }
+
+    /// Compact status for the prompt info line (left of model name):
+    /// e.g. `Weekly limit: 45% · reset Mar 31, 12:00`.
+    pub fn prompt_status_line(&self) -> String {
+        let pct = self.usage_pct.floor() as i64;
+        let pct_s = pct.to_string();
+        let label = self.usage_label();
+        match &self.period_end_display {
+            Some(time) if !time.is_empty() => xai_grok_i18n::t_fmt(
+                "usage.prompt_status",
+                &[
+                    ("label", label),
+                    ("pct", pct_s.as_str()),
+                    ("time", time.as_str()),
+                ],
+            ),
+            _ => xai_grok_i18n::t_fmt(
+                "usage.prompt_status_pct",
+                &[("label", label), ("pct", pct_s.as_str())],
+            ),
+        }
+    }
 }
 
 /// Auto top-up rule data used by the `/usage` summary.
@@ -430,6 +452,34 @@ mod tests {
             format_usage_summary(&b, None),
             "Monthly limit: 91%\nNext reset: June 30, 16:00"
         );
+    }
+
+    #[test]
+    fn prompt_status_line_includes_pct_and_reset() {
+        let bal = CreditBalance {
+            period_type: Some("USAGE_PERIOD_TYPE_WEEKLY".into()),
+            period_end_display: Some("Mar 31, 12:00".into()),
+            ..bal(45.6)
+        };
+        let s = bal.prompt_status_line();
+        assert!(s.contains("45%"), "floored pct: {s}");
+        assert!(s.contains("Mar 31, 12:00"), "reset time: {s}");
+        assert!(
+            s.contains("Weekly") || s.contains("每周"),
+            "period label: {s}"
+        );
+    }
+
+    #[test]
+    fn prompt_status_line_without_reset_omits_time() {
+        let bal = CreditBalance {
+            period_type: Some("USAGE_PERIOD_TYPE_MONTHLY".into()),
+            period_end_display: None,
+            ..bal(10.0)
+        };
+        let s = bal.prompt_status_line();
+        assert!(s.contains("10%"), "{s}");
+        assert!(!s.to_ascii_lowercase().contains("reset"), "{s}");
     }
 
     // ── usage_label / period type ────────────────────────────────────

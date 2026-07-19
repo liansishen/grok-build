@@ -698,6 +698,7 @@ pub fn render_welcome(
                 model_name: params.model_name,
                 flags: params.flags,
                 multiline: false,
+                usage_status: None,
                 usage_warning: None,
                 usage_warning_critical: false,
             };
@@ -2109,10 +2110,15 @@ fn render_welcome_done(
             Some((text, critical)) => (Some(text), critical),
             None => (None, false),
         };
+        let usage_status_owned = p
+            .credit_balance
+            .filter(|_| p.usage_visible)
+            .map(|bal| bal.prompt_status_line());
         let usage_info = PromptInfo {
             model_name: p.model_name,
             flags: p.flags,
             multiline: false,
+            usage_status: usage_status_owned.as_deref(),
             usage_warning: usage_warning_text.as_deref(),
             usage_warning_critical,
         };

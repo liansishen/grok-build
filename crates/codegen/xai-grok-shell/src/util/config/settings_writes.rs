@@ -146,6 +146,13 @@ pub async fn set_max_thoughts_width(value: i64) -> Result<()> {
     update_config(|cfg| cfg.ui.max_thoughts_width = clamped).await
 }
 
+/// Persist `[ui].usage_refresh_interval_minutes` via `update_config`.
+/// Defensively clamps to `[1, 60]` at the shell boundary.
+pub async fn set_usage_refresh_interval_minutes(value: i64) -> Result<()> {
+    let clamped = value.clamp(1, 60) as u8;
+    update_config(|cfg| cfg.ui.usage_refresh_interval_minutes = Some(clamped)).await
+}
+
 /// Persist `[ui].scroll_speed` via `update_config`.
 /// Defensively clamps to `[1, 100]` at the shell boundary.
 pub async fn set_scroll_speed(value: i64) -> Result<()> {

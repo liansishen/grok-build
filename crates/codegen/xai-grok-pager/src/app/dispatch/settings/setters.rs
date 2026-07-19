@@ -2035,6 +2035,55 @@ pub(in crate::app::dispatch) fn set_max_thoughts_width(app: &mut AppView, new: i
     }]
 }
 
+// ---------------------------------------------------------------------------
+// usage_refresh_interval_minutes — SHELL-owned Option<u8> minutes.
+// ---------------------------------------------------------------------------
+
+fn clamp_usage_refresh_interval_minutes(value: i64) -> i64 {
+    value.clamp(
+        crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_MIN,
+        crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_MAX,
+    )
+}
+
+pub(super) fn set_usage_refresh_interval_minutes_inner(app: &mut AppView, value: i64) {
+    let clamped = clamp_usage_refresh_interval_minutes(value) as u8;
+    app.current_ui.usage_refresh_interval_minutes = Some(clamped);
+}
+
+/// Outer dispatcher for `Action::SetUsageRefreshIntervalMinutes`.
+pub(in crate::app::dispatch) fn set_usage_refresh_interval_minutes(
+    app: &mut AppView,
+    new: i64,
+) -> Vec<Effect> {
+    let prev = app
+        .current_ui
+        .usage_refresh_interval_minutes
+        .unwrap_or(crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT as u8)
+        as i64;
+    let clamped = clamp_usage_refresh_interval_minutes(new);
+    if prev == clamped && app.current_ui.usage_refresh_interval_minutes.is_some() {
+        return vec![];
+    }
+    set_usage_refresh_interval_minutes_inner(app, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "usage_refresh_interval_minutes",
+        value = clamped,
+        "setting changed",
+    );
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.usage_refresh_interval_minutes.label"),
+        &clamped.to_string(),
+    ));
+    vec![Effect::PersistSetting {
+        key: "usage_refresh_interval_minutes",
+        value: crate::settings::SettingValue::Int(clamped),
+        rollback_value: crate::settings::SettingValue::Int(prev),
+    }]
+}
+
 // `auto_compact_threshold_percent` setter was removed alongside its
 // registry entry. Mirror field stays for compat.
 

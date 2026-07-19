@@ -1450,7 +1450,20 @@ pub(crate) async fn run(
     // iteration so it is popped on every close path.
     let mut gboom_keyboard_pushed = false;
 
-    const BILLING_POLL_INTERVAL: Duration = Duration::from_secs(30);
+    /// Default / configured minutes for usage refresh (see settings).
+    fn billing_poll_interval(app: &AppView) -> Duration {
+        let mins = app
+            .current_ui
+            .usage_refresh_interval_minutes
+            .unwrap_or(
+                crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT as u8,
+            )
+            .clamp(
+                crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_MIN as u8,
+                crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_MAX as u8,
+            );
+        Duration::from_secs(u64::from(mins) * 60)
+    }
     let mut billing_poll_at: Option<Instant> = None;
 
     const GATE_POLL_INTERVAL: Duration = Duration::from_secs(30);
@@ -2040,7 +2053,7 @@ pub(crate) async fn run(
 
                         // Schedule/clear poll timers.
                         if app.billing_poll_wanted && billing_poll_at.is_none() {
-                            billing_poll_at = Some(Instant::now() + BILLING_POLL_INTERVAL);
+                            billing_poll_at = Some(Instant::now() + billing_poll_interval(&app));
                         } else if !app.billing_poll_wanted {
                             billing_poll_at = None;
                         }
@@ -2217,7 +2230,7 @@ pub(crate) async fn run(
                     }
                 }
                 if app.billing_poll_wanted {
-                    billing_poll_at = Some(Instant::now() + BILLING_POLL_INTERVAL);
+                    billing_poll_at = Some(Instant::now() + billing_poll_interval(&app));
                 }
             }
 
