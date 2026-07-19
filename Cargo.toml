@@ -325,6 +325,9 @@ zstd = "0.13"
 [profile.release]
 incremental = true
 panic = "abort"
+# Windows MSVC hits LNK1318 (PDB size limit) on this binary if debuginfo is on.
+debug = 0
+strip = "symbols"
 
 # Hardened release profile for shipping to end users (alpha + stable).
 # Use `cargo build --profile release-dist` for distribution builds.

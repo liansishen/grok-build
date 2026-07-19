@@ -428,6 +428,10 @@ impl AgentViewLayout {
     }
 }
 /// Fill the screen area with base background and outer padding.
+///
+/// When `theme.bg_base` is [`Color::Reset`] (transparent canvas / minimal
+/// palette), still apply the style so cells carry an explicit default
+/// background rather than leftover buffer contents from a previous frame.
 pub fn fill_background(
     buf: &mut Buffer,
     area: Rect,

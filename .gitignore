@@ -1,3 +1,13 @@
 /target
 **/*.rs.bk
 .DS_Store
+
+# Local Windows build tooling (protoc 29.3 win64 zip extract)
+/tools/
+
+# Build / link debug logs
+build-*.log
+*.log
+
+# Windows reserved-name artifact from bad protoc redirects
+**/NUL

@@ -301,14 +301,42 @@ impl Theme {
         // explicit gate on the legacy-Windows arm, `ansi16_chrome_overrides`
         // would repaint `Color::Reset` slots with named ANSI colors and
         // partially defeat the user's opt-out on ConHost.
-        if level.has_color()
+        let theme = if level.has_color()
             && (level == color_support::ColorLevel::Basic
                 || (crate::glyphs::is_legacy_windows_console() && !level.has_truecolor()))
         {
             adapted.ansi16_chrome_overrides(dark)
         } else {
             adapted
+        };
+        // Fullscreen transparent canvas: leave solid theme accents, but do not
+        // paint opaque RGB on the terminal default background (Acrylic / Mica).
+        if cache::transparent_bg_enabled() {
+            theme.with_transparent_canvas()
+        } else {
+            theme
         }
+    }
+
+    /// Clear canvas-class backgrounds to [`Color::Reset`] so the terminal
+    /// profile (including semi-transparent Acrylic/Mica) shows through.
+    ///
+    /// Elevated surfaces (`bg_light` / `bg_highlight` / `bg_hover` /
+    /// `bg_visual`) keep their theme colors so selection and hover still
+    /// read. Diff insert/delete **foregrounds** are unchanged; only their
+    /// row bands become transparent (same as the minimal palette).
+    #[must_use]
+    pub fn with_transparent_canvas(mut self) -> Self {
+        use ratatui::style::Color;
+        self.bg_base = Color::Reset;
+        self.bg_dark = Color::Reset;
+        self.bg_terminal = Color::Reset;
+        self.scrollbar_bg = Color::Reset;
+        self.md_code_bg = Color::Reset;
+        self.paste_bg = Color::Reset;
+        self.diff_delete_bg = Color::Reset;
+        self.diff_insert_bg = Color::Reset;
+        self
     }
 
     /// Get the currently active theme kind.
@@ -704,6 +732,32 @@ mod tests {
         assert!(Theme::rosepine_moon().is_dark());
         assert!(Theme::oscura_midnight().is_dark());
         assert!(!Theme::grokday().is_dark());
+    }
+
+    #[test]
+    fn with_transparent_canvas_resets_canvas_keeps_accents() {
+        use ratatui::style::Color;
+        let solid = Theme::groknight();
+        assert!(!matches!(solid.bg_base, Color::Reset));
+        let t = solid.with_transparent_canvas();
+        assert_eq!(t.bg_base, Color::Reset);
+        assert_eq!(t.bg_dark, Color::Reset);
+        assert_eq!(t.bg_terminal, Color::Reset);
+        assert_eq!(t.scrollbar_bg, Color::Reset);
+        assert_eq!(t.md_code_bg, Color::Reset);
+        assert_eq!(t.paste_bg, Color::Reset);
+        assert_eq!(t.diff_delete_bg, Color::Reset);
+        assert_eq!(t.diff_insert_bg, Color::Reset);
+        // Elevated surfaces stay theme-colored for hover/selection contrast.
+        assert!(!matches!(t.bg_light, Color::Reset));
+        assert!(!matches!(t.bg_highlight, Color::Reset));
+        assert!(!matches!(t.bg_hover, Color::Reset));
+        assert!(!matches!(t.bg_visual, Color::Reset));
+        // Accents and text keep truecolor theme values.
+        assert_eq!(t.accent_assistant, solid.accent_assistant);
+        assert_eq!(t.text_primary, solid.text_primary);
+        assert_eq!(t.diff_delete_fg, solid.diff_delete_fg);
+        assert!(t.diff_uses_line_fg());
     }
 
     #[test]
