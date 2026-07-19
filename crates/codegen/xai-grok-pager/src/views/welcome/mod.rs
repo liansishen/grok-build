@@ -50,7 +50,10 @@ fn quit_hint_spans(theme: &Theme) -> Vec<Span<'static>> {
                 .fg(theme.accent_user)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("  quit", Style::default().fg(theme.gray)),
+        Span::styled(
+            format!("  {}", xai_grok_i18n::t("welcome.quit")),
+            Style::default().fg(theme.gray),
+        ),
     ]
 }
 

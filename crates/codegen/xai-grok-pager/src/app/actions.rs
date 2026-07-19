@@ -505,6 +505,9 @@ pub enum Action {
     /// Set the voice STT language (catalog code or `auto`). SHELL-owned; persisted
     /// to `[ui].voice_stt_language`. Takes effect for the next voice capture.
     SetVoiceSttLanguage(String),
+    /// Set the UI language (`auto` | `en` | `zh-CN`). SHELL-owned; persisted to
+    /// `[ui].language`. Live-applied via `xai_grok_i18n::set_locale`.
+    SetUiLanguage(String),
     /// Toggle timestamp display on messages.
     ToggleTimestamps,
     /// Toggle compact mode (reduce user message padding).

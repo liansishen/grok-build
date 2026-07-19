@@ -95,6 +95,7 @@ xai-grok-config = { workspace = true }
 # backend instead, so cpal -> alsa-sys never reaches the static musl binary
 # (cpal is target-gated to non-Linux inside xai-grok-voice).
 xai-grok-voice = { path = "../xai-grok-voice", default-features = false, features = ["audio"] }
+xai-grok-i18n = { workspace = true }
 xai-grok-shell = { workspace = true }
 xai-grok-workspace = { workspace = true }
 xai-token-estimation = { workspace = true }

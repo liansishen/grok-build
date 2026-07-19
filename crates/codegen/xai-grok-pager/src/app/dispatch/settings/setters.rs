@@ -257,6 +257,48 @@ pub(in crate::app::dispatch) fn set_voice_stt_language(
     }]
 }
 
+/// Apply UI language preference into `app.current_ui` and the process-wide
+/// i18n locale. Called by the commit path AND by rollback.
+pub(super) fn set_ui_language_inner(app: &mut AppView, canonical: &str) {
+    app.current_ui.language = Some(canonical.to_string());
+    let locale = xai_grok_i18n::resolve_locale(Some(canonical));
+    xai_grok_i18n::set_locale(locale);
+}
+
+/// Set the UI language. SHELL-owned; persists to `[ui].language` via
+/// `Effect::PersistSetting`. Live-applied (no restart).
+pub(in crate::app::dispatch) fn set_ui_language(app: &mut AppView, value: String) -> Vec<Effect> {
+    let canonical = crate::settings::canonical_ui_language(Some(&value));
+    let prev = crate::settings::canonical_ui_language(app.current_ui.language.as_deref());
+    if prev == canonical && app.current_ui.language.as_deref() == Some(canonical) {
+        return vec![];
+    }
+    set_ui_language_inner(app, canonical);
+    refresh_open_settings_modals(app);
+    let locale = xai_grok_i18n::resolve_locale(Some(canonical));
+    tracing::info!(
+        target: "settings",
+        key = "language",
+        value = canonical,
+        locale = locale.as_str(),
+        "setting changed"
+    );
+    let name = if canonical == xai_grok_i18n::LANGUAGE_AUTO {
+        format!("System ({})", locale.display_name())
+    } else {
+        locale.display_name().to_string()
+    };
+    app.show_toast(&xai_grok_i18n::t_fmt(
+        "toast.language_set",
+        &[("name", &name)],
+    ));
+    vec![Effect::PersistSetting {
+        key: "language",
+        value: crate::settings::SettingValue::Enum(canonical),
+        rollback_value: crate::settings::SettingValue::Enum(prev),
+    }]
+}
+
 /// State-only mutation for `vim_mode`. Propagates to every in-process
 /// agent so background subagents and side panes pick up the change
 /// without restart. The cache mirror lets new agents created later

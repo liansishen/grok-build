@@ -1,0 +1,31 @@
+# English is the source of truth for message keys.
+# Nested tables flatten to dotted keys (e.g. [welcome] quit → "welcome.quit").
+
+[welcome]
+quit = "quit"
+resume_session = "Resume session"
+new_session = "New session"
+settings = "Settings"
+
+[settings.category]
+appearance = "Appearance"
+mouse = "Mouse"
+editor = "Editor & Input"
+agent = "Agent & Approval"
+privacy = "Privacy"
+models = "Models"
+session = "Session"
+advanced = "Advanced"
+
+[settings.language]
+label = "UI language"
+description = "Language for the Grok Build interface. System follows your OS locale when Chinese or English is detected."
+choice_auto = "System"
+choice_auto_desc = "Follow the operating system language."
+choice_en = "English"
+choice_en_desc = "English interface."
+choice_zh_cn = "简体中文"
+choice_zh_cn_desc = "Simplified Chinese interface."
+
+[toast]
+language_set = "UI language: {name}"

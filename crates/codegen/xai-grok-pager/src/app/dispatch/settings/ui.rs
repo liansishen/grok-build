@@ -12,7 +12,7 @@ use super::setters::{
     set_screen_mode_inner, set_scroll_lines_inner, set_scroll_mode_inner, set_scroll_speed_inner,
     set_show_thinking_blocks_inner, set_show_tips_inner, set_simple_mode_inner, set_theme_inner,
     set_timeline_inner, set_timestamps, set_timestamps_inner, set_vim_mode_inner,
-    set_voice_capture_mode_inner, set_voice_stt_language_inner,
+    set_ui_language_inner, set_voice_capture_mode_inner, set_voice_stt_language_inner,
 };
 use crate::app::actions::{Action, Effect};
 use crate::app::app_view::{ActiveView, AppView};
@@ -836,6 +836,7 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("voice_stt_language", SettingValue::Enum(s)) => {
             Some(Action::SetVoiceSttLanguage((*s).to_string()))
         }
+        ("language", SettingValue::Enum(s)) => Some(Action::SetUiLanguage((*s).to_string())),
         // fork_secondary_model: empty → Clear, non-empty is skew guard.
         ("fork_secondary_model", SettingValue::String(s)) => {
             if s.is_empty() {
@@ -1098,6 +1099,9 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
                 app,
                 crate::settings::canonical_voice_stt_language(Some(s)),
             );
+        }
+        ("language", SettingValue::Enum(s)) => {
+            set_ui_language_inner(app, crate::settings::canonical_ui_language(Some(s)));
         }
         // show_tips / auto_update: if rollback equals the effective
         // default, restore to None (keeps mirror in sync with disk).

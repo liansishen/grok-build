@@ -60,14 +60,14 @@ impl SettingCategory {
     /// Section-header label as rendered in the modal.
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Appearance => "Appearance",
-            Self::Mouse => "Mouse",
-            Self::Editor => "Editor & Input",
-            Self::Agent => "Agent & Approval",
-            Self::Privacy => "Privacy",
-            Self::Models => "Models",
-            Self::Session => "Session",
-            Self::Advanced => "Advanced",
+            Self::Appearance => xai_grok_i18n::t("settings.category.appearance"),
+            Self::Mouse => xai_grok_i18n::t("settings.category.mouse"),
+            Self::Editor => xai_grok_i18n::t("settings.category.editor"),
+            Self::Agent => xai_grok_i18n::t("settings.category.agent"),
+            Self::Privacy => xai_grok_i18n::t("settings.category.privacy"),
+            Self::Models => xai_grok_i18n::t("settings.category.models"),
+            Self::Session => xai_grok_i18n::t("settings.category.session"),
+            Self::Advanced => xai_grok_i18n::t("settings.category.advanced"),
         }
     }
 }
@@ -327,6 +327,12 @@ pub fn canonical_voice_stt_language(value: Option<&str>) -> &'static str {
     xai_grok_voice::canonicalize_stt_language(value)
 }
 
+/// Canonical UI language preference (`auto` | `en` | `zh-CN`).
+/// Unset / empty → `auto` (system locale).
+pub fn canonical_ui_language(value: Option<&str>) -> &'static str {
+    xai_grok_i18n::canonicalize_language(value)
+}
+
 /// Canonicalize a raw hunk-tracker mode to a registry choice. Case-insensitive
 /// and trimmed; `disabled` aliases `off`; unknown/blank/`None` → `agent_only`.
 pub fn canonical_hunk_tracker_mode(value: Option<&str>) -> &'static str {
@@ -575,6 +581,10 @@ pub fn current_value_for(
                 .as_deref()
                 .unwrap_or(&pager.voice_stt_language),
         )))),
+        // SHELL — UI language preference (not voice STT).
+        "language" => Some(SettingValue::Enum(canonical_ui_language(
+            ui.language.as_deref(),
+        ))),
         // Theme: unknown disk values fall through to canonical default.
         // auto_dark/light additionally filter out "auto" (circular ref).
         "theme" => Some(SettingValue::Enum(
@@ -990,6 +1000,18 @@ mod tests {
                         *default,
                         canonical_voice_stt_language(ui.voice_stt_language.as_deref()),
                         "voice_stt_language default drifts from UiConfig::default()",
+                    );
+                }
+                // language (UI): Option<String>; None → "auto".
+                ("language", SettingKind::Enum { default, .. }) => {
+                    assert_eq!(
+                        ui.language, None,
+                        "test assumes UiConfig::default().language is None",
+                    );
+                    assert_eq!(
+                        *default,
+                        canonical_ui_language(ui.language.as_deref()),
+                        "language default drifts from UiConfig::default()",
                     );
                 }
                 // hunk_tracker_mode: Option<String>; None → "agent_only".

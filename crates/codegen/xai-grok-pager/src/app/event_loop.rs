@@ -1285,6 +1285,9 @@ pub(crate) async fn run(
         app.voice_config.language =
             crate::settings::canonical_voice_stt_language(Some(pref)).to_string();
     }
+    // Product UI language (`[ui].language` / `GROK_LANGUAGE`). Must run after
+    // `current_ui` is hydrated so the first painted frame uses the right catalog.
+    xai_grok_i18n::apply_from_config(app.current_ui.language.as_deref());
     // Resolve the per-tip contextual hints now that `current_ui` is hydrated and
     // propagate the prompt-relevant tips to any agents built at startup. New
     // agents adopt the gates at creation; settings toggles re-apply at runtime.

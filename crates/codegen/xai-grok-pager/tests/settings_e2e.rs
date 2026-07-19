@@ -65,6 +65,7 @@ const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "hunk_tracker_mode",
     "voice_capture_mode",
     "voice_stt_language",
+    "language",
     // Contextual-hints group + its per-tip child toggles (exercised via the
     // group sub-sheet, not as top-level rows).
     "contextual_hints",
@@ -1929,6 +1930,7 @@ fn defaults_round_trip_through_registry() {
             "hunk_tracker_mode" => SettingValue::Enum("agent_only"),
             "voice_capture_mode" => SettingValue::Enum("hold"),
             "voice_stt_language" => SettingValue::Enum("en"),
+            "language" => SettingValue::Enum("auto"),
             "plan_mode" => SettingValue::Enum("off"),
             "show_tips" => SettingValue::Bool(true),
             "auto_update" => SettingValue::Bool(true),
@@ -6263,6 +6265,78 @@ fn mouse_click_on_voice_stt_language_indicator_opens_picker_in_one_click() {
     match &s.mode() {
         SettingsModalMode::PickingEnum { key, .. } => assert_eq!(*key, "voice_stt_language"),
         _ => panic!("value click on voice_stt_language must enter PickingEnum"),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// language (SHELL Enum, Appearance) — UI locale, not voice STT
+// ---------------------------------------------------------------------------
+
+#[test]
+fn enter_on_language_row_enters_picking_enum() {
+    let mut s = make_state();
+    navigate_to(&mut s, "language");
+    let outcome = handle_settings_key(&mut s, &press(KeyCode::Enter));
+    assert!(
+        matches!(outcome, SettingsKeyOutcome::Changed),
+        "Enter on language row must transition to PickingEnum, got {outcome:?}"
+    );
+    match &s.mode() {
+        SettingsModalMode::PickingEnum {
+            key,
+            original_value,
+            ..
+        } => {
+            assert_eq!(*key, "language");
+            assert_eq!(
+                original_value,
+                &SettingValue::Enum("auto"),
+                "default UiConfig language → original 'auto'"
+            );
+        }
+        other => panic!("expected PickingEnum mode, got {other:?}"),
+    }
+}
+
+#[test]
+fn language_picker_enter_dispatches_set_commit() {
+    let mut s = make_state();
+    navigate_to(&mut s, "language");
+    let _ = handle_settings_key(&mut s, &press(KeyCode::Enter));
+    // choices: auto, en, zh-CN — one Down → en
+    let _ = handle_settings_key(&mut s, &press(KeyCode::Down));
+    let outcome = handle_settings_key(&mut s, &press(KeyCode::Enter));
+    match outcome {
+        SettingsKeyOutcome::Action(Action::SetUiLanguage(code)) => {
+            assert_eq!(code, "en", "second choice is English");
+        }
+        other => panic!("expected Action::SetUiLanguage commit, got {other:?}"),
+    }
+    assert!(
+        matches!(s.mode(), SettingsModalMode::Browse),
+        "Enter commit must return to Browse"
+    );
+}
+
+#[test]
+fn mouse_click_on_language_indicator_opens_picker_in_one_click() {
+    let mut s = make_state();
+    synth_rects(&mut s);
+    let row_y = row_idx_for(&s, "language") as u16;
+
+    let outcome = handle_settings_mouse(
+        &mut s,
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        72,
+        row_y,
+    );
+    assert!(
+        matches!(outcome, SettingsKeyOutcome::Changed),
+        "value click must open picker in one click, got: {outcome:?}",
+    );
+    match &s.mode() {
+        SettingsModalMode::PickingEnum { key, .. } => assert_eq!(*key, "language"),
+        _ => panic!("value click on language must enter PickingEnum"),
     }
 }
 
