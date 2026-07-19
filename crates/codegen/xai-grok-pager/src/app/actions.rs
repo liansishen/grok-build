@@ -551,6 +551,8 @@ pub enum Action {
     /// Commit the max-thoughts-width (column budget for the thoughts panel).
     /// Payload is `i64`; clamped to `u16` at the shell helper boundary.
     SetMaxThoughtsWidth(i64),
+    /// Minutes between silent billing/usage refreshes for the prompt status line.
+    SetUsageRefreshIntervalMinutes(i64),
     /// Commit the fork-secondary model. Typed `ModelId` payload,
     /// persisted to `[ui].fork_secondary_model`. Rebroadcast via
     /// `ConfigUpdate::Ui` so running agents pick up the change.

@@ -2224,6 +2224,13 @@ impl AgentView {
         let usage_warning_text: Option<String> = warning.as_ref().map(|(t, _)| t.clone());
         let usage_warning = usage_warning_text.as_deref();
         let usage_warning_critical = warning.is_some_and(|(_, critical)| critical);
+        // Always-visible compact usage (weekly/monthly % + reset) left of model.
+        let usage_status_owned = self
+            .credit_balance
+            .as_ref()
+            .filter(|_| usage_visible && !self.chat_kind)
+            .map(|bal| bal.prompt_status_line());
+        let usage_status = usage_status_owned.as_deref();
         let model_label = match self.session.models.reasoning_effort {
             Some(eff) => format!("{model_id} ({eff})"),
             None => model_id,
@@ -2233,6 +2240,7 @@ impl AgentView {
                 model_name: &model_label,
                 flags: mode_flags,
                 multiline,
+                usage_status,
                 usage_warning,
                 usage_warning_critical,
             },
@@ -2243,6 +2251,7 @@ impl AgentView {
                     model_name: &editing_label,
                     flags: mode_flags,
                     multiline,
+                    usage_status,
                     usage_warning,
                     usage_warning_critical,
                 }
@@ -2253,6 +2262,7 @@ impl AgentView {
                 model_name: label,
                 flags: &[],
                 multiline: false,
+                usage_status,
                 usage_warning,
                 usage_warning_critical,
             }

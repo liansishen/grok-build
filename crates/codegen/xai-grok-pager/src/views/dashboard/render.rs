@@ -2707,6 +2707,7 @@ fn paint_dispatch_config_badge(
         model_name: &model_label,
         flags: &flags,
         multiline: state.multiline_mode,
+        usage_status: None,
         usage_warning: None,
         usage_warning_critical: false,
     };

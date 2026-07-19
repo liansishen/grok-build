@@ -7,6 +7,7 @@ use super::setters::{
     set_default_selected_permission_inner, set_display_refresh_auto_cadence_inner,
     set_fork_secondary_model_inner, set_group_tool_verbs_inner, set_hunk_tracker_mode_inner,
     set_invert_scroll_inner, set_keep_text_selection_inner, set_max_thoughts_width_inner,
+    set_usage_refresh_interval_minutes_inner,
     set_multiline_mode, set_page_flip_on_send_inner, set_prompt_suggestions_inner,
     set_remember_tool_approvals_inner, set_render_mermaid_inner, set_respect_manual_folds_inner,
     set_screen_mode_inner, set_scroll_lines_inner, set_scroll_mode_inner, set_scroll_speed_inner,
@@ -823,6 +824,9 @@ pub(in crate::app::dispatch) fn action_for_reset(
         }
         // max_thoughts_width: direct round-trip.
         ("max_thoughts_width", SettingValue::Int(i)) => Some(Action::SetMaxThoughtsWidth(*i)),
+        ("usage_refresh_interval_minutes", SettingValue::Int(i)) => {
+            Some(Action::SetUsageRefreshIntervalMinutes(*i))
+        }
         // coding_data_sharing: "opt-in" / "opt-out" → bool.
         // Both arms needed (registry default is "opt-out").
         ("coding_data_sharing", SettingValue::Enum("opt-in")) => {
@@ -1050,6 +1054,9 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         }
         // max_thoughts_width: direct inner call.
         ("max_thoughts_width", SettingValue::Int(i)) => set_max_thoughts_width_inner(app, *i),
+        ("usage_refresh_interval_minutes", SettingValue::Int(i)) => {
+            set_usage_refresh_interval_minutes_inner(app, *i)
+        }
         // scroll_speed: direct inner call (clamp handled by inner).
         ("scroll_speed", SettingValue::Int(i)) => set_scroll_speed_inner(app, *i as u8),
         // scroll_mode: restore the cache mirror to the canonical value.

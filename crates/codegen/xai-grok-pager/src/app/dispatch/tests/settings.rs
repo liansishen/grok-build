@@ -1282,6 +1282,9 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
         "max_thoughts_width" => {
             let _ = dispatch(Action::SetMaxThoughtsWidth(200), app);
         }
+        "usage_refresh_interval_minutes" => {
+            let _ = dispatch(Action::SetUsageRefreshIntervalMinutes(10), app);
+        }
         "coding_data_sharing" => {
             let _ = dispatch(Action::SetCodingDataSharing { opted_in: true }, app);
         }
