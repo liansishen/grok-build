@@ -26,7 +26,7 @@ impl SlashCommand for ShareCommand {
     fn run(&self, ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
         // Check if we have an active session
         if ctx.session_id.is_none() {
-            return CommandResult::Error("No active session to share".to_string());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_session_share").to_string());
         }
 
         CommandResult::Action(Action::ShareSession)

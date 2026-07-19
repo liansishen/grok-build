@@ -888,7 +888,7 @@ pub(in crate::app::dispatch) fn set_compact_mode(app: &mut AppView, new: bool) -
     // Turning the setting off while the short-terminal derivation holds keeps
     // the UI compact; say so instead of implying the layout will loosen.
     if !new && crate::views::agent::effective_compact(false, app.last_known_terminal_rows) {
-        app.show_toast("\u{2713} Compact mode: off (auto-compact active on small terminal)");
+        app.show_toast(xai_grok_i18n::t("toast.compact_auto"));
     } else {
         app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.compact_mode.label"), new));
     }
@@ -1759,7 +1759,7 @@ pub(in crate::app::dispatch) fn clear_default_model(app: &mut AppView) -> Vec<Ef
             "setting changed (startup-window clear — pager mirror was already None; \
              persist proceeds to ensure disk state matches user intent)",
         );
-        app.show_toast("\u{2713} Default model: cleared");
+        app.show_toast(xai_grok_i18n::t("toast.default_model_cleared"));
         return vec![Effect::PersistSetting {
             key: "default_model",
             value: crate::settings::SettingValue::String(String::new()),
@@ -1775,7 +1775,7 @@ pub(in crate::app::dispatch) fn clear_default_model(app: &mut AppView) -> Vec<Ef
         "setting changed",
     );
     refresh_open_settings_modals(app);
-    app.show_toast("\u{2713} Default model: cleared");
+    app.show_toast(xai_grok_i18n::t("toast.default_model_cleared"));
     vec![Effect::PersistSetting {
         key: "default_model",
         value: crate::settings::SettingValue::String(String::new()),
@@ -1881,7 +1881,7 @@ pub(in crate::app::dispatch) fn clear_fork_secondary_model(app: &mut AppView) ->
     let prev_id_str = app.current_ui.fork_secondary_model.clone();
     if prev_id_str == baseline {
         // Idempotent: already at baseline.
-        app.show_toast("\u{2713} Fork secondary model: already at default");
+        app.show_toast(xai_grok_i18n::t("toast.fork_model_default"));
         return vec![];
     }
     tracing::info!(
@@ -1893,7 +1893,7 @@ pub(in crate::app::dispatch) fn clear_fork_secondary_model(app: &mut AppView) ->
     );
     set_fork_secondary_model_inner(app, baseline);
     refresh_open_settings_modals(app);
-    app.show_toast("\u{2713} Fork secondary model: cleared");
+    app.show_toast(xai_grok_i18n::t("toast.fork_model_cleared"));
     vec![Effect::PersistSetting {
         key: "fork_secondary_model",
         // Persist payload is the empty-sentinel — the shell helper

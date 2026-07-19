@@ -2894,12 +2894,12 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                 id: 0,
             },
             Shortcut {
-                label: "Space/Enter toggle",
+                label: xai_grok_i18n::t("settings.modal.footer.space_enter_toggle"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc back",
+                label: xai_grok_i18n::t("settings.modal.footer.esc_back"),
                 clickable: false,
                 id: 0,
             },

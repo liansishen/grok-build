@@ -1,4 +1,4 @@
-# Locale catalog (merged phase1 + remaining)
+# Locale catalog (merged)
 [actions.BashMode]
 label = "shell"
 description = "Shell mode (type ! on empty prompt)"
@@ -279,6 +279,12 @@ description = "Toggle always-approve"
 label = "麦克风"
 description = "Voice dictation (Ctrl+Space / F8)"
 
+[agents]
+no_found = "未找到智能体"
+no_matching = "无匹配智能体"
+delete_persona = "删除角色"
+delete_persona_confirm = "删除角色「{name}」？"
+
 [auth]
 browser_open_header = "将打开浏览器窗口进行身份验证。"
 device_header = "在浏览器中批准以完成登录。"
@@ -294,10 +300,24 @@ go_back = "返回"
 submit = "提交"
 show_full_url = "无法复制？点击此处显示完整 URL。"
 select_url_hint = "请用鼠标选中下方 URL 并手动复制。"
+copy_prefix = "若未打开，请点击"
+copy_here = "此处"
+copy_suffix = "复制。"
+copy_unverified = "已发送复制—请确认粘贴"
 
 [dashboard]
 empty = "暂无智能体"
 title = "智能体仪表盘"
+empty_prompt = "暂无智能体，输入提示以开始。"
+loading_sessions = "正在加载会话…"
+no_matching_rows = "无匹配行。"
+loading = "加载中…"
+no_activity = "暂无活动"
+failed = "失败"
+sign_in = "请登录以打开仪表盘"
+disabled = "此配置中已禁用智能体仪表盘"
+trust_first = "请先回答目录信任问题以打开仪表盘"
+open_to_change_location = "打开仪表盘（/dashboard）以更改位置"
 
 [docs.01]
 title = "入门"
@@ -359,6 +379,69 @@ desc = "自动化与 CI/CD 的非交互 CLI"
 title = "智能体模式与 IDE 集成"
 desc = "ACP stdio、WebSocket 中继与 SDK 集成"
 
+[extensions]
+select_option = "选择一个选项"
+save_auth = "保存并认证"
+processing = "处理中…"
+
+[hint]
+send = "发送"
+expand = "展开"
+copy = "复制"
+kill = "终止"
+send_now = "立即发送"
+nav = "导航"
+quit = "退出"
+cancel = "取消"
+stop = "停止"
+shortcuts = "快捷键"
+prompt = "提示"
+scrollback = "回滚"
+
+[import]
+claude_title = "导入 Claude 设置"
+permissions = "权限"
+mcp_servers = "MCP 服务器"
+esc_cancel = "Esc 取消"
+
+[memory]
+no_file = "未选择文件"
+
+[modal]
+new_session = "新会话"
+agent_dashboard = "智能体仪表盘"
+always_approve_mode = "始终批准模式"
+keyboard_shortcuts = "键盘快捷键"
+howto_guides = "使用指南"
+commands = "命令"
+resume_session = "恢复会话"
+pick_model = "选择模型"
+save_and_send = "保存并发送？"
+save_changes = "保存更改？"
+reset_setting = "重置设置？"
+subagents_running = "子智能体仍在运行。要停止它们吗？"
+tip_docs = "提示 · 向 Grok 询问文档…"
+stop_running = "停止运行"
+continue_to_run = "继续运行"
+always_stop = "始终停止"
+always_continue = "始终继续"
+
+[modal.footer]
+enter_select = "Enter 选择"
+esc_close = "Esc 关闭"
+
+[modal.section]
+session = "会话"
+
+[pane]
+no_todos = "暂无待办。"
+no_tasks = "暂无任务或智能体。"
+no_bundled = "暂无捆绑项。"
+no_progress = "暂无进度项"
+
+[permission.args]
+expand_hint = "… Ctrl-F 展开"
+
 [permission.default]
 always_allow_all_sessions = "所有会话始终允许"
 allow_once = "允许一次"
@@ -368,8 +451,63 @@ reject = "拒绝"
 [permission.hint]
 choose_scope = "使用 ← → 选择权限范围"
 
+[permission.mcp]
+all_tools_from = "来自 {server} 的全部工具"
+
+[permission.option]
+yes = "是"
+yes_proceed = "是，继续"
+yes_allow_once = "是，允许一次"
+reject_once = "否，并告诉 Grok 该怎么做"
+enable_always_approve = "是，并不再询问任何操作（始终批准模式）"
+allow_edits_session = "是，本会话允许所有编辑"
+always_allow_bash = "是，并不再询问 bash 命令"
+reject_always_bash = "否，且不运行 bash 命令"
+
+[permission.prefix]
+always_allow = "始终允许："
+never_allow = "永不允许："
+
 [permission.reject_once]
 placeholder = "不，拒绝（可输入反馈）"
+
+[permission.title]
+allow = "允许？"
+allow_execute = "允许执行？"
+allow_edit = "允许编辑？"
+allow_delete = "允许删除？"
+allow_bin = "允许 `{bin}`？"
+allow_edit_path = "允许编辑 {path}？"
+allow_named = "允许 {name}？"
+
+[persona]
+saved = "已保存"
+save_failed = "保存失败：{error}"
+no_source = "无源文件"
+
+[plan]
+waiting_approval = "等待计划批准"
+no_plan_approve = "尚未编写计划 — 批准或请求修改"
+
+[rewind]
+loading = "正在加载回退点…"
+cancel_and_rewind = "取消回合并回退"
+confirm = "确认回退"
+
+[scrollback]
+thinking = "思考中…"
+thought = "思考"
+for_time = " 用时 {time}"
+turn_completed = "回合已完成。"
+turn_cancelled = "回合已被用户取消…"
+compacting = "上下文已用 {n}%。正在压缩…"
+compaction_failed = "压缩失败。"
+retry_failed = "重试失败：{error}"
+system_prompt = "系统提示"
+reasoning_overhead = "推理/开销"
+tool_definitions = "工具定义"
+compact_tip = "提示：运行 /compact 释放上下文"
+credit_limit = "你已达到额度上限。"
 
 [settings.auto_dark_theme]
 label = "自动深色主题"
@@ -491,6 +629,10 @@ restart_pill = "需重启"
 no_matches_for = "无匹配"
 tip_long = "提示 · 问 Grok：「把主题改成 grokday」或「紧凑模式是什么？」"
 tip_short = "提示 · 让 Grok 帮你改设置"
+err_empty = "值不能为空"
+err_whitespace = "值不能包含空白"
+err_catalog_loading = "模型目录仍在加载 — 请重试"
+err_unknown_model = "未知模型：\"{buffer}\""
 
 [settings.modal.footer]
 nav_jk = "↑/↓/j/k 导航"
@@ -514,6 +656,8 @@ y_reset = "y 重置"
 n_cancel = "n 取消"
 f2_cancel = "F2 取消"
 type_to_edit = "输入编辑"
+space_enter_toggle = "Space/Enter 切换"
+esc_back = "Esc 返回"
 
 [settings.multiline_mode]
 label = "多行输入"
@@ -676,6 +820,16 @@ description = "打开使用指南或在线 Build 文档"
 [slash.effort]
 description = "设置当前模型的推理强度"
 
+[slash.err]
+no_active_session = "无活动会话"
+no_active_session_export = "无活动会话可导出"
+no_active_session_share = "无活动会话可分享"
+no_active_session_view = "无活动会话可查看"
+no_active_model = "无活动模型"
+usage_model = "用法：/model <名称> [effort]"
+usage_rename = "用法：/rename <新标题>"
+no_release_notes = "无发行说明（离线）。"
+
 [slash.expand]
 description = "完整展开打印最近折叠的块（极简模式）"
 
@@ -828,9 +982,15 @@ prefix = "已排队 · "
 enter = "Enter"
 suffix = " 立即发送"
 
+[tips.ssh_wrap]
+full = "通过 SSH？在本地运行 grok wrap ssh <主机> 以转发剪贴板并恢复终端"
+
 [tips.undo]
 prefix = "输入已清空 · "
 suffix = " 撤销"
+
+[tips.word_select]
+full = "想双击选词？/settings → 文本选择 · Ctrl+Y：立即启用"
 
 [toast]
 language_set = "界面语言：{name}"
@@ -842,6 +1002,56 @@ copied = "已复制！"
 no_active_session = "无活动会话"
 mermaid = "✓ Mermaid: {value}"
 theme = "✓ 主题: {name}"
+always_approve_on = "⚠ 始终批准已开启：所有工具操作将自动执行"
+always_approve_on_plan = "⚠ 始终批准已开启：计划模式仍会阻止文件编辑，直到退出计划模式"
+already_plan_mode = "已在计划模式。使用 /view-plan 查看当前计划。"
+plan_mode = "计划模式"
+always_approve = "始终批准"
+reconnected = "已重新连接。"
+session_restored = "会话已恢复。进行中的工具与终端已丢失。"
+session_restore_failed = "会话恢复失败。已保留现有记录。"
+reconnecting = "正在重连，请稍候…"
+voice_pipeline_failed = "语音管道无法启动 — 请重启 grok"
+voice_stopped = "语音已停止 — 管道已结束"
+opening_app = "正在用默认应用打开…"
+could_not_open_file = "无法打开文件"
+loading_video = "正在加载视频…"
+browser_unavailable = "浏览器不可用 - URL 已显示在上方"
+editing_queued = "正在编辑排队提示：Enter 保存，Esc 丢弃"
+cant_send_mid_turn = "回合中无法发送 — 将在当前回合结束后运行"
+queued_gone = "排队提示已不在队列中"
+images_shared_queue = "编辑共享排队提示时无法附加图片"
+diagram_not_ready = "图表尚未就绪"
+rendering_diagram = "正在渲染图表…"
+could_not_render_diagram = "无法渲染图表"
+no_turn_running = "当前无运行中的回合 — 就绪后将发送提示"
+cant_send_now = "现在无法发送 — 将在当前回合结束后运行"
+no_plan_yet = "尚未编写计划。"
+plan_revision_sent = "计划修订已发送。"
+no_comments = "没有可发送的评论。"
+plan_feedback_sent = "计划反馈已发送。"
+couldnt_load_image = "无法加载图片预览"
+couldnt_save_image = "无法保存粘贴的图片"
+recap_disabled = "会话回顾未启用"
+no_input_events = "尚未记录输入事件。"
+ffmpeg_required = "视频播放需要 ffmpeg"
+interjection_sent = "插话已发送"
+external_sessions_cant_delete = "无法删除外部会话"
+chat_delete_unsupported = "尚不支持删除聊天会话"
+deleting_session = "正在删除会话…"
+session_deleted = "会话已删除"
+sharing_disabled = "分享已禁用"
+zdr_enabled = "✗ 无法更改：已启用零数据保留"
+data_sharing_admin = "✗ 数据共享由团队管理员控制"
+no_undoable = "没有可撤销的提示"
+images_removed_skill = "已移除图片（技能提示）"
+nothing_to_jump = "暂无可跳转内容"
+fork_session_only = "/fork 仅在会话内可用"
+fork_still_creating = "无法分叉：会话仍在创建中"
+default_model_cleared = "✓ 默认模型：已清除"
+fork_model_cleared = "✓ 分叉次级模型：已清除"
+fork_model_default = "✓ 分叉次级模型：已是默认"
+compact_auto = "✓ 紧凑模式：关（小终端自动紧凑仍生效）"
 
 [tool.prefix]
 list = "列表 "
@@ -905,6 +1115,7 @@ refresh = "[刷新]"
 tier_free = "免费"
 beta = "Beta"
 login_with = "使用 {label} 登录"
+press_again = "再按一次以{label}"
 
 [welcome.picker]
 back = "返回"
@@ -919,3 +1130,7 @@ no = "否，退出"
 question = "是否信任此目录中的内容？"
 warning_line1 = "Grok Build 可能在此目录中运行命令或修改内容，"
 warning_line2 = "存在安全风险。"
+
+[worktree]
+new_title = "新建工作树"
+name_optional = "名称（可选）："

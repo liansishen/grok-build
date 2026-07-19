@@ -30,8 +30,7 @@ pub(crate) const WORD_SELECT_TIP_TICKS: u16 = 600;
 /// the tip so the long TTL cannot shadow a kill→yank sequence.
 pub(crate) const WORD_SELECT_ACCEPT_CHORD: &str = "Ctrl+Y";
 
-/// Build "Want double-click to select? /settings → Text selection · Ctrl+Y:
-/// enable now", seen-gated to [`WORD_SELECT_TIP_SEEN_CAP`] shows per session
+/// Build xai_grok_i18n::t("tips.word_select.full"), seen-gated to [`WORD_SELECT_TIP_SEEN_CAP`] shows per session
 /// (in-memory).
 ///
 /// Fires when double-click runs the fold/nav path (default `flash` / `hold`)

@@ -181,7 +181,7 @@ impl TodoCounts {
 
 fn empty_placeholder_message(todos_empty: bool, counts: TodoCounts) -> String {
     if todos_empty {
-        return "No todo items.".into();
+        return xai_grok_i18n::t("pane.no_todos").into();
     }
     match (counts.completed, counts.cancelled) {
         (_, 0) => "All done.".into(),
@@ -538,7 +538,7 @@ mod tests {
     fn empty_todos_message() {
         assert_eq!(
             empty_placeholder_message(true, TodoCounts::default()),
-            "No todo items."
+            xai_grok_i18n::t("pane.no_todos")
         );
     }
 

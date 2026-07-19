@@ -808,7 +808,7 @@ pub fn render_peek_panel(
         if let Some(PeekLiveTailArgs { scrollback }) = live_tail {
             if middle_h > 0 {
                 if scrollback.is_empty() {
-                    if let Some(hint) = empty_hint.or(Some("No activity yet")) {
+                    if let Some(hint) = empty_hint.or(Some(xai_grok_i18n::t("dashboard.no_activity"))) {
                         let trunc = truncate_str(hint, inner.width as usize);
                         buf.set_string(
                             inner.x,

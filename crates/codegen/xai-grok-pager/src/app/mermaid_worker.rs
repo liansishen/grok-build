@@ -1098,7 +1098,7 @@ impl AgentView {
                 self.session.session_id.as_ref().map(|s| s.0.as_ref()),
                 Some(serde_json::json!({ "action": action.log_label() })),
             );
-            self.show_toast("Diagram not ready yet");
+            self.show_toast(xai_grok_i18n::t("toast.diagram_not_ready"));
             return;
         };
 
@@ -1160,7 +1160,7 @@ impl AgentView {
                 self.session.session_id.as_ref().map(|s| s.0.as_ref()),
                 Some(serde_json::json!({ "action": action.log_label() })),
             );
-            self.show_toast("Could not render diagram");
+            self.show_toast(xai_grok_i18n::t("toast.could_not_render_diagram"));
         }
     }
 
@@ -1196,7 +1196,7 @@ impl AgentView {
                             self.session.session_id.as_ref().map(|s| s.0.as_ref()),
                             Some(serde_json::json!({ "action": action.log_label() })),
                         );
-                        self.show_toast("Could not render diagram");
+                        self.show_toast(xai_grok_i18n::t("toast.could_not_render_diagram"));
                     }
                 }
             }

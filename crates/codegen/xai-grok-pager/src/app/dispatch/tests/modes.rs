@@ -481,7 +481,7 @@ fn set_yolo_mode_on_under_plan_uses_plan_aware_toast() {
         .as_ref()
         .map(|(s, _)| s.clone())
         .expect("toast must be set");
-    assert_eq!(toast, YOLO_ON_UNDER_PLAN_TOAST);
+    assert_eq!(toast, yolo_on_under_plan_toast());
 
     // Pending (optimistic) plan state counts too — same as the flag renderer.
     let mut app = test_app_with_agent();
@@ -492,7 +492,7 @@ fn set_yolo_mode_on_under_plan_uses_plan_aware_toast() {
         .as_ref()
         .map(|(s, _)| s.clone())
         .expect("toast must be set");
-    assert_eq!(toast, YOLO_ON_UNDER_PLAN_TOAST);
+    assert_eq!(toast, yolo_on_under_plan_toast());
 
     // Without plan mode the standard destructive toast is unchanged.
     let mut app = test_app_with_agent();
@@ -526,7 +526,7 @@ fn set_permission_mode_always_approve_under_plan_uses_plan_aware_toast() {
         .as_ref()
         .map(|(s, _)| s.clone())
         .expect("toast must be set");
-    assert_eq!(toast, YOLO_ON_UNDER_PLAN_TOAST);
+    assert_eq!(toast, yolo_on_under_plan_toast());
 }
 
 #[test]

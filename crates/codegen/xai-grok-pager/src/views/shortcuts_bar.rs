@@ -181,7 +181,8 @@ impl Widget for ShortcutsBar<'_> {
         // If pending confirmation, show only "press again to {label}"
         if let Some(pending) = &self.pending_confirmation {
             let key_text = pending.shortcut.display();
-            let label = format!("press again to {}", pending.label);
+            let label =
+                xai_grok_i18n::t_fmt("welcome.press_again", &[("label", pending.label)]);
 
             let mut x = area.x;
 

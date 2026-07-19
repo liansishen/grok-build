@@ -691,7 +691,7 @@ pub fn render_welcome(
     let mut result = match params.auth_state {
         AuthState::Pending { error } => {
             let label = params.login_label.unwrap_or("grok.com");
-            let login_text = format!("Login with {}", label);
+            let login_text = xai_grok_i18n::t_fmt("welcome.login_with", &[("label", label)]);
             let menu = [("l", login_text.as_str()), ("q", xai_grok_i18n::t("welcome.quit_menu"))];
             let msg = error.as_deref().map(|e| (e, theme.accent_error));
             let info = PromptInfo {
@@ -1733,7 +1733,7 @@ fn render_welcome_done(
     let gate_menu;
     let owned_menu;
     let menu_items: &[(&str, &str)] = if !p.has_access {
-        gate_menu = [(key_g, cta), (key_l, xai_grok_i18n::t("welcome.logout")), (key_q, "Quit")];
+        gate_menu = [(key_g, cta), (key_l, xai_grok_i18n::t("welcome.logout")), (key_q, xai_grok_i18n::t("welcome.quit_menu"))];
         &gate_menu
     } else {
         let (key_w, key_s, key_q, key_i_with_x) = (
@@ -1759,7 +1759,7 @@ fn render_welcome_done(
         if show_changelog_action {
             items.push(("", xai_grok_i18n::t("welcome.changelog")));
         }
-        items.push((key_q, "Quit"));
+        items.push((key_q, xai_grok_i18n::t("welcome.quit_menu")));
         owned_menu = items;
         owned_menu.as_slice()
     };
@@ -2361,7 +2361,7 @@ pub(crate) fn render_session_picker(
     if !ctx.chat_mode {
         default_shortcuts.push(HintItem {
             keys: vec![],
-            label: "worktree".into(),
+            label: xai_grok_i18n::t("welcome.picker.worktree").into(),
             custom_display: Some(worktree_shortcut),
             description: None,
             pinned: false,

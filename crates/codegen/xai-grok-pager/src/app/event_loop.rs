@@ -1794,7 +1794,7 @@ pub(crate) async fn run(
             } else if app.voice_cmd_tx.is_none() {
                 app.voice_state = VoiceState::Idle;
                 app.voice_ui_active = false;
-                app.show_toast("Voice pipeline could not start — restart grok");
+                app.show_toast(xai_grok_i18n::t("toast.voice_pipeline_failed"));
             } else {
                 // Defensive: a queued start with the pipeline already up (which
                 // shouldn't occur) — drop it so we don't re-enter every tick.
@@ -2617,11 +2617,11 @@ pub(crate) async fn run(
 
                 if pending.agent_ids.is_empty() {
                     // Nothing was reloaded (no open sessions at reconnect).
-                    app.show_toast("Reconnected.");
+                    app.show_toast(xai_grok_i18n::t("toast.reconnected"));
                 } else if restored {
-                    app.show_toast("Session restored. In-progress tools and terminals were lost.");
+                    app.show_toast(xai_grok_i18n::t("toast.session_restored"));
                 } else {
-                    app.show_toast("Session restore failed. Kept the existing transcript.");
+                    app.show_toast(xai_grok_i18n::t("toast.session_restore_failed"));
                 }
 
                 // Re-trigger the queue drain suppressed during the outage: every
@@ -2681,7 +2681,7 @@ pub(crate) async fn run(
                         // Pipeline is gone: drop any session/interim entirely.
                         app.voice_reset();
                         if was_listening {
-                            app.show_toast("Voice stopped — pipeline ended");
+                            app.show_toast(xai_grok_i18n::t("toast.voice_stopped"));
                         }
                         presenter.request(false);
                     }

@@ -30,8 +30,7 @@ const SSH_WRAP_TIP_SEEN_CAP: u32 = 1;
 /// the TTL pauses while occluded instead of burning off-screen.
 pub(crate) const SSH_WRAP_TIP_TICKS: u16 = 300;
 
-/// Build "Over SSH? Run `grok wrap ssh <host>` locally for clipboard +
-/// terminal restore", seen-gated to [`SSH_WRAP_TIP_SEEN_CAP`] show per
+/// Build xai_grok_i18n::t("tips.ssh_wrap.full"), seen-gated to [`SSH_WRAP_TIP_SEEN_CAP`] show per
 /// session (in-memory). Ambient: it is about the session's transport, not
 /// the draft, so submitting a prompt right after session load must not
 /// retire it, and occlusion pauses (not burns) its TTL.

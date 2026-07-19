@@ -21,7 +21,7 @@ use crate::scrollback::block::RenderBlock;
 /// On completion, TaskResult::ShareSessionComplete shows the URL in scrollback.
 pub(super) fn dispatch_share_session(app: &mut AppView) -> Vec<Effect> {
     if !app.sharing_enabled {
-        app.show_toast("Sharing is disabled");
+        app.show_toast(xai_grok_i18n::t("toast.sharing_disabled"));
         return vec![];
     }
     let ActiveView::Agent(id) = app.active_view else {
@@ -118,7 +118,7 @@ pub(super) fn set_coding_data_sharing_inner(app: &mut AppView, opted_in: bool) {
 pub(super) fn set_coding_data_sharing(app: &mut AppView, opted_in: bool) -> Vec<Effect> {
     // ── Guard 1: Enterprise ZDR ──────────────────────────────────────
     if app.is_zdr {
-        app.show_toast("\u{2717} Cannot change: Zero Data Retention enabled");
+        app.show_toast(xai_grok_i18n::t("toast.zdr_enabled"));
         return vec![];
     }
     // ── Guard 2: Non-admin team member ───────────────────────────────
@@ -128,7 +128,7 @@ pub(super) fn set_coding_data_sharing(app: &mut AppView, opted_in: bool) -> Vec<
             .as_deref()
             .is_some_and(|r| r.eq_ignore_ascii_case("admin"));
         if !is_admin {
-            app.show_toast("\u{2717} Data sharing is controlled by your team admin");
+            app.show_toast(xai_grok_i18n::t("toast.data_sharing_admin"));
             return vec![];
         }
     }

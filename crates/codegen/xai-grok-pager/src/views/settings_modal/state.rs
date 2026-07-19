@@ -1002,9 +1002,9 @@ pub(super) fn validate_string(
         StringValidator::Any => None,
         StringValidator::NonEmptyToken => {
             if buffer.is_empty() {
-                Some("Value cannot be empty".to_string())
+                Some(xai_grok_i18n::t("settings.modal.err_empty").to_string())
             } else if buffer.chars().any(|c| c.is_whitespace()) {
-                Some("Value cannot contain whitespace".to_string())
+                Some(xai_grok_i18n::t("settings.modal.err_whitespace").to_string())
             } else {
                 None
             }
@@ -1016,7 +1016,7 @@ pub(super) fn validate_string(
             }
             // Reject if the model catalog hasn't loaded yet.
             if available_models.is_empty() {
-                return Some("Model catalog still loading — try again".to_string());
+                return Some(xai_grok_i18n::t("settings.modal.err_catalog_loading").to_string());
             }
             let matched = available_models
                 .iter()

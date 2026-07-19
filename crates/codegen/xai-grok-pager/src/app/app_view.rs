@@ -2643,7 +2643,7 @@ impl AppView {
                 } else {
                     def.default_key
                 };
-                self.pending_action = Some(PendingAction::new(action, shortcut, def.label));
+                self.pending_action = Some(PendingAction::new(action, shortcut, def.label_t()));
                 return InputOutcome::Changed;
             }
         }
@@ -2705,7 +2705,7 @@ impl AppView {
             } else {
                 action
             };
-            self.pending_action = Some(PendingAction::new(action, shortcut, def.label));
+            self.pending_action = Some(PendingAction::new(action, shortcut, def.label_t()));
             InputOutcome::Changed
         } else {
             InputOutcome::Action(action)
@@ -2725,7 +2725,7 @@ impl AppView {
         };
         if def.requires_confirmation {
             let shortcut = KeyShortcut::from(*key);
-            self.pending_action = Some(PendingAction::new(Action::Quit, shortcut, def.label));
+            self.pending_action = Some(PendingAction::new(Action::Quit, shortcut, def.label_t()));
             InputOutcome::Changed
         } else {
             InputOutcome::Action(Action::Quit)
@@ -2746,7 +2746,7 @@ impl AppView {
         if def.requires_confirmation {
             let shortcut = KeyShortcut::from(*key);
             self.pending_action =
-                Some(PendingAction::new(Action::ExitSession, shortcut, def.label));
+                Some(PendingAction::new(Action::ExitSession, shortcut, def.label_t()));
             InputOutcome::Changed
         } else {
             InputOutcome::Action(Action::ExitSession)
@@ -4782,7 +4782,7 @@ impl AppView {
                         agent.toast = None;
                     }
                     None => {
-                        agent.show_toast("Video playback requires ffmpeg");
+                        agent.show_toast(xai_grok_i18n::t("toast.ffmpeg_required"));
                     }
                 }
                 needs_redraw = true;

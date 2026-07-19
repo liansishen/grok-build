@@ -74,7 +74,7 @@ pub(crate) fn location_line_at(theme: &Theme, cwd: &Path) -> Line<'static> {
     // (accent_user) before the path when the cwd is a linked worktree.
     if info.as_ref().is_some_and(|i| i.is_worktree) {
         parts.push(Span::styled(
-            "worktree ",
+            xai_grok_i18n::t("welcome.picker.worktree").to_string() + " ",
             Style::default().fg(theme.accent_user),
         ));
     }

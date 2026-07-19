@@ -14155,6 +14155,7 @@ dependencies = [
  "xai-grok-config-types",
  "xai-grok-env",
  "xai-grok-hooks",
+ "xai-grok-i18n",
  "xai-grok-mcp",
  "xai-grok-paths",
  "xai-grok-sandbox",

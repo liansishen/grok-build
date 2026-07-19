@@ -1170,7 +1170,7 @@ impl TasksPane {
                 let theme = Theme::current();
                 if self.show_done {
                     let span = Span::styled(
-                        "No tasks or agents.",
+                        xai_grok_i18n::t("pane.no_tasks"),
                         Style::default().fg(theme.gray_bright),
                     );
                     buf.set_span(inner.x, inner.y, &span, inner.width);

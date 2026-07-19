@@ -51,7 +51,7 @@ impl SlashCommand for ExportCommand {
 
     fn run(&self, ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         if ctx.session_id.is_none() {
-            return CommandResult::Error("No active session to export".to_string());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_session_export").to_string());
         }
 
         let trimmed = args.trim();

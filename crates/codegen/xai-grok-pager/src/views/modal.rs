@@ -142,10 +142,10 @@ impl CancelTurnChoice {
     ];
     pub fn label(&self) -> &'static str {
         match self {
-            Self::StopRunning => "Stop running",
-            Self::ContinueToRun => "Continue to run",
-            Self::AlwaysStop => "Always stop",
-            Self::AlwaysContinue => "Always continue",
+            Self::StopRunning => xai_grok_i18n::t("modal.stop_running"),
+            Self::ContinueToRun => xai_grok_i18n::t("modal.continue_to_run"),
+            Self::AlwaysStop => xai_grok_i18n::t("modal.always_stop"),
+            Self::AlwaysContinue => xai_grok_i18n::t("modal.always_continue"),
         }
     }
 }
@@ -369,12 +369,12 @@ pub enum PaletteCommand {
 pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
     let mut entries = vec![
         PaletteEntry {
-            label: "Session".into(),
+            label: xai_grok_i18n::t("modal.section.session").into(),
             shortcut: String::new(),
-            command: PaletteCommand::SectionHeader("Session".into()),
+            command: PaletteCommand::SectionHeader(xai_grok_i18n::t("modal.section.session").into()),
         },
         PaletteEntry {
-            label: "New Session".into(),
+            label: xai_grok_i18n::t("modal.new_session").into(),
             shortcut: "Ctrl+N".into(),
             command: PaletteCommand::NewSession,
         },
@@ -384,7 +384,7 @@ pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
             command: PaletteCommand::NewSessionInWorktree,
         },
         PaletteEntry {
-            label: "Agent Dashboard".into(),
+            label: xai_grok_i18n::t("modal.agent_dashboard").into(),
             shortcut: "/dashboard".into(),
             command: PaletteCommand::SlashCommand("/dashboard".into()),
         },
@@ -454,7 +454,7 @@ pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
             command: PaletteCommand::SlashCommand("/model ".into()),
         },
         PaletteEntry {
-            label: "Always Approve Mode".into(),
+            label: xai_grok_i18n::t("modal.always_approve_mode").into(),
             shortcut: "/always-approve".into(),
             command: PaletteCommand::SlashCommand("/always-approve".into()),
         },
@@ -524,7 +524,7 @@ pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
             command: PaletteCommand::OpenSettings,
         },
         PaletteEntry {
-            label: "Keyboard Shortcuts".into(),
+            label: xai_grok_i18n::t("modal.keyboard_shortcuts").into(),
             shortcut: if crate::actions::ctrl_dot_unreliable() {
                 "Ctrl+X".into()
             } else {
@@ -533,12 +533,12 @@ pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
             command: PaletteCommand::KeyboardShortcuts,
         },
         PaletteEntry {
-            label: "How-to Guides".into(),
+            label: xai_grok_i18n::t("modal.howto_guides").into(),
             shortcut: "/docs".into(),
             command: PaletteCommand::HowTo,
         },
         PaletteEntry {
-            label: "Quit".into(),
+            label: xai_grok_i18n::t("welcome.quit_menu").into(),
             shortcut: "Ctrl+Q".into(),
             command: PaletteCommand::Quit,
         },
@@ -619,9 +619,9 @@ impl ActiveModal {
         match self {
             ActiveModal::EditConfirm { .. } => {
                 if drain_blocked {
-                    "Save and send?"
+                    xai_grok_i18n::t("modal.save_and_send")
                 } else {
-                    "Save changes?"
+                    xai_grok_i18n::t("modal.save_changes")
                 }
             }
             ActiveModal::CommandPalette { .. } => "Commands",
@@ -638,10 +638,10 @@ impl ActiveModal {
             },
             ActiveModal::DocPicker { .. } => "How-to Guides",
             ActiveModal::DocViewer { title, .. } => title.as_str(),
-            ActiveModal::ShortcutsHelp { .. } => "Keyboard Shortcuts",
+            ActiveModal::ShortcutsHelp { .. } => xai_grok_i18n::t("modal.keyboard_shortcuts"),
             ActiveModal::MemoryBrowser { .. } => "Memory",
             ActiveModal::Settings { .. } => crate::views::settings_modal::MODAL_TITLE,
-            ActiveModal::ResetSettingsConfirm { .. } => "Reset setting?",
+            ActiveModal::ResetSettingsConfirm { .. } => xai_grok_i18n::t("modal.reset_setting"),
             ActiveModal::RememberNoteReview { .. } => "Memory Note",
         }
     }
@@ -851,7 +851,7 @@ pub fn render_cancel_turn_panel(
         content_x,
         y,
         &Line::from(Span::styled(
-            "Subagents are still running. Stop them?",
+            xai_grok_i18n::t("modal.subagents_running"),
             title_style,
         )),
         content_w as u16,
@@ -1039,12 +1039,12 @@ pub fn render_doc_picker_overlay(
             id: 0,
         },
         Shortcut {
-            label: "Enter select",
+            label: xai_grok_i18n::t("modal.footer.enter_select"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Esc close",
+            label: xai_grok_i18n::t("modal.footer.esc_close"),
             clickable: false,
             id: 0,
         },

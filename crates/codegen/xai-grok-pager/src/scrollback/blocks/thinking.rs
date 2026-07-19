@@ -17,7 +17,7 @@ use super::quote_bar::QuoteBarStrip;
 ///
 /// Uses [`MarkdownContent`] for incremental markdown rendering with cached
 /// word-wrapping, plus special display modes:
-/// - **Collapsed**: Shows "Thought" or "Thought for Xs" if time is set
+/// - **Collapsed**: Shows xai_grok_i18n::t("scrollback.thought") or "Thought for Xs" if time is set
 /// - **Truncated** (default): Shows "…" + last N lines
 /// - **Expanded**: Full content
 #[derive(Debug, Clone)]
@@ -160,7 +160,7 @@ impl ThinkingBlock {
         })
     }
 
-    /// Build the header line: "Thinking..." (running) or "Thought for Xs" (done).
+    /// Build the header line: xai_grok_i18n::t("scrollback.thinking") (running) or "Thought for Xs" (done).
     ///
     /// Respects muted_collapsed: when collapsed and muting is on, uses muted style.
     /// When the entry is selected, the muted treatment is suppressed and
@@ -186,14 +186,14 @@ impl ThinkingBlock {
         let detail_style = theme.muted();
 
         if ctx.is_running {
-            Line::from(Span::styled("Thinking…", label_style))
+            Line::from(Span::styled(xai_grok_i18n::t("scrollback.thinking"), label_style))
         } else if let Some(time_str) = self.format_time() {
             Line::from(vec![
-                Span::styled("Thought", label_style),
+                Span::styled(xai_grok_i18n::t("scrollback.thought"), label_style),
                 Span::styled(format!(" for {time_str}"), detail_style),
             ])
         } else {
-            Line::from(Span::styled("Thought", label_style))
+            Line::from(Span::styled(xai_grok_i18n::t("scrollback.thought"), label_style))
         }
     }
 
@@ -347,7 +347,7 @@ impl ThinkingBlock {
     }
 
     /// Placeholder for empty thinking block — shows the same header
-    /// as collapsed mode ("Thinking…" or "Thought for Xs").
+    /// as collapsed mode (xai_grok_i18n::t("scrollback.thinking") or "Thought for Xs").
     fn render_empty_placeholder(&self, ctx: &BlockContext) -> BlockOutput {
         self.render_collapsed(ctx)
     }

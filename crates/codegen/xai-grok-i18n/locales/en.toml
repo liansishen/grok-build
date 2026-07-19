@@ -1,4 +1,4 @@
-# Locale catalog (merged phase1 + remaining)
+# Locale catalog (merged)
 [actions.BashMode]
 label = "shell"
 description = "Shell mode (type ! on empty prompt)"
@@ -279,6 +279,12 @@ description = "Toggle always-approve"
 label = "mic"
 description = "Voice dictation (Ctrl+Space / F8)"
 
+[agents]
+no_found = "No agents found"
+no_matching = "No matching agents"
+delete_persona = "Delete Persona"
+delete_persona_confirm = "Delete persona '{name}'?"
+
 [auth]
 browser_open_header = "A browser window will open for authentication."
 device_header = "Approve in your browser to finish signing in."
@@ -294,10 +300,24 @@ go_back = "go back"
 submit = "submit"
 show_full_url = "Copying not working? Click here to show full URL."
 select_url_hint = "Select the URL below with your mouse and copy manually."
+copy_prefix = "If it doesn't open, click "
+copy_here = "here"
+copy_suffix = " to copy."
+copy_unverified = "copy sent—verify paste"
 
 [dashboard]
 empty = "No agents yet"
 title = "Agent Dashboard"
+empty_prompt = "No agents yet, type a prompt to start one."
+loading_sessions = "Loading sessions…"
+no_matching_rows = "No matching rows."
+loading = "Loading…"
+no_activity = "No activity yet"
+failed = "Failed"
+sign_in = "Sign in to open the dashboard"
+disabled = "Agent dashboard is disabled in this configuration"
+trust_first = "Answer the folder-trust question to open the dashboard"
+open_to_change_location = "Open the dashboard (/dashboard) to change location"
 
 [docs.01]
 title = "Getting Started"
@@ -359,6 +379,69 @@ desc = "Non-interactive CLI for automation and CI/CD"
 title = "Agent Mode and IDE Integration"
 desc = "ACP stdio transport, WebSocket relay, SDK integration"
 
+[extensions]
+select_option = "Select an option"
+save_auth = "Save and authenticate"
+processing = "Processing..."
+
+[hint]
+send = "send"
+expand = "expand"
+copy = "copy"
+kill = "kill"
+send_now = "send now"
+nav = "nav"
+quit = "quit"
+cancel = "cancel"
+stop = "stop"
+shortcuts = "shortcuts"
+prompt = "prompt"
+scrollback = "scrollback"
+
+[import]
+claude_title = "Import Claude settings"
+permissions = "Permissions"
+mcp_servers = "MCP servers"
+esc_cancel = "Esc cancel"
+
+[memory]
+no_file = "No file selected"
+
+[modal]
+new_session = "New Session"
+agent_dashboard = "Agent Dashboard"
+always_approve_mode = "Always Approve Mode"
+keyboard_shortcuts = "Keyboard Shortcuts"
+howto_guides = "How-to Guides"
+commands = "Commands"
+resume_session = "Resume session"
+pick_model = "Pick model"
+save_and_send = "Save and send?"
+save_changes = "Save changes?"
+reset_setting = "Reset setting?"
+subagents_running = "Subagents are still running. Stop them?"
+tip_docs = "Tip · Ask Grok about the docs…"
+stop_running = "Stop running"
+continue_to_run = "Continue to run"
+always_stop = "Always stop"
+always_continue = "Always continue"
+
+[modal.footer]
+enter_select = "Enter select"
+esc_close = "Esc close"
+
+[modal.section]
+session = "Session"
+
+[pane]
+no_todos = "No todo items."
+no_tasks = "No tasks or agents."
+no_bundled = "No bundled items."
+no_progress = "No progress items yet"
+
+[permission.args]
+expand_hint = "… Ctrl-F to expand"
+
 [permission.default]
 always_allow_all_sessions = "Always allow on all sessions"
 allow_once = "Allow once"
@@ -368,8 +451,63 @@ reject = "Reject"
 [permission.hint]
 choose_scope = "Use ← → to choose permission scope"
 
+[permission.mcp]
+all_tools_from = "all tools from {server}"
+
+[permission.option]
+yes = "Yes"
+yes_proceed = "Yes, proceed"
+yes_allow_once = "Yes, allow once"
+reject_once = "No, and tell Grok what to do differently"
+enable_always_approve = "Yes, and don't ask again for anything (always-approve mode)"
+allow_edits_session = "Yes, allow all edits during this session"
+always_allow_bash = "Yes, and don't ask again for bash commands"
+reject_always_bash = "No, and don't run bash commands"
+
+[permission.prefix]
+always_allow = "Always allow:"
+never_allow = "Never allow:"
+
 [permission.reject_once]
 placeholder = "No, reject (type to add feedback)"
+
+[permission.title]
+allow = "Allow?"
+allow_execute = "Allow Execute?"
+allow_edit = "Allow Edit?"
+allow_delete = "Allow Delete?"
+allow_bin = "Allow `{bin}`?"
+allow_edit_path = "Allow Edit to {path}?"
+allow_named = "Allow {name}?"
+
+[persona]
+saved = "Saved"
+save_failed = "Save failed: {error}"
+no_source = "No source file"
+
+[plan]
+waiting_approval = "Waiting on plan approval"
+no_plan_approve = "No plan written — approve or request changes"
+
+[rewind]
+loading = "Loading rewind points..."
+cancel_and_rewind = "Cancel turn and rewind"
+confirm = "Confirm rewind"
+
+[scrollback]
+thinking = "Thinking…"
+thought = "Thought"
+for_time = " for {time}"
+turn_completed = "Turn completed."
+turn_cancelled = "Turn cancelled by user…"
+compacting = "Context {n}% full. Compacting…"
+compaction_failed = "Compaction failed."
+retry_failed = "Retry failed: {error}"
+system_prompt = "System prompt"
+reasoning_overhead = "Reasoning/overhead"
+tool_definitions = "Tool definitions"
+compact_tip = "Tip: run /compact to free context"
+credit_limit = "You've hit your credit limit."
 
 [settings.auto_dark_theme]
 label = "Auto dark theme"
@@ -491,6 +629,10 @@ restart_pill = "restart"
 no_matches_for = "No matches for"
 tip_long = "Tip · Ask Grok: \"change theme to grokday\" or \"what does compact mode do?\""
 tip_short = "Tip · Ask Grok to change a setting"
+err_empty = "Value cannot be empty"
+err_whitespace = "Value cannot contain whitespace"
+err_catalog_loading = "Model catalog still loading — try again"
+err_unknown_model = "Unknown model: \"{buffer}\""
 
 [settings.modal.footer]
 nav_jk = "↑/↓/j/k nav"
@@ -514,6 +656,8 @@ y_reset = "y reset"
 n_cancel = "n cancel"
 f2_cancel = "F2 cancel"
 type_to_edit = "type to edit"
+space_enter_toggle = "Space/Enter toggle"
+esc_back = "Esc back"
 
 [settings.multiline_mode]
 label = "Multiline"
@@ -676,6 +820,16 @@ description = "Open How-to Guides or online Build docs"
 [slash.effort]
 description = "Set reasoning effort for the current model"
 
+[slash.err]
+no_active_session = "No active session"
+no_active_session_export = "No active session to export"
+no_active_session_share = "No active session to share"
+no_active_session_view = "No active session to view"
+no_active_model = "No active model"
+usage_model = "Usage: /model <name> [effort]"
+usage_rename = "Usage: /rename <new title>"
+no_release_notes = "No release notes available (offline)."
+
 [slash.expand]
 description = "Re-print the last collapsed block, fully expanded (minimal mode)"
 
@@ -828,9 +982,15 @@ prefix = "Queued · "
 enter = "Enter"
 suffix = " to send now"
 
+[tips.ssh_wrap]
+full = "Over SSH? Run grok wrap ssh <host> locally for clipboard + terminal restore"
+
 [tips.undo]
 prefix = "Input cleared · "
 suffix = " to undo"
+
+[tips.word_select]
+full = "Want double-click to select? /settings → Text selection · Ctrl+Y: enable now"
 
 [toast]
 language_set = "UI language: {name}"
@@ -842,6 +1002,56 @@ copied = "Copied!"
 no_active_session = "No active session"
 mermaid = "✓ Mermaid: {value}"
 theme = "✓ Theme: {name}"
+always_approve_on = "⚠ Always-approve ON: all tool actions auto-run"
+always_approve_on_plan = "⚠ Always-approve ON: plan mode still blocks file edits until you exit plan mode"
+already_plan_mode = "Already in plan mode. Use /view-plan to view the current plan."
+plan_mode = "Plan mode"
+always_approve = "Always-approve"
+reconnected = "Reconnected."
+session_restored = "Session restored. In-progress tools and terminals were lost."
+session_restore_failed = "Session restore failed. Kept the existing transcript."
+reconnecting = "Reconnecting, please wait..."
+voice_pipeline_failed = "Voice pipeline could not start — restart grok"
+voice_stopped = "Voice stopped — pipeline ended"
+opening_app = "Opening in default app…"
+could_not_open_file = "Could not open file"
+loading_video = "Loading video…"
+browser_unavailable = "Browser unavailable - URL shown above"
+editing_queued = "Editing a queued prompt: press Enter to save, Esc to discard"
+cant_send_mid_turn = "Can't send this mid-turn — it runs when the current turn ends"
+queued_gone = "Queued prompt is no longer in the queue"
+images_shared_queue = "Images can't be attached when editing a shared queued prompt"
+diagram_not_ready = "Diagram not ready yet"
+rendering_diagram = "Rendering diagram…"
+could_not_render_diagram = "Could not render diagram"
+no_turn_running = "No turn running — prompt will send when ready"
+cant_send_now = "Can't send this now — it runs when the current turn ends"
+no_plan_yet = "No plan written yet."
+plan_revision_sent = "Plan revision sent."
+no_comments = "No comments to send."
+plan_feedback_sent = "Plan feedback sent."
+couldnt_load_image = "Couldn't load image preview"
+couldnt_save_image = "Couldn't save pasted image"
+recap_disabled = "Session recap is not enabled"
+no_input_events = "No input events recorded yet."
+ffmpeg_required = "Video playback requires ffmpeg"
+interjection_sent = "Interjection sent"
+external_sessions_cant_delete = "External sessions can't be deleted"
+chat_delete_unsupported = "Deleting chat conversations isn't supported yet"
+deleting_session = "Deleting session…"
+session_deleted = "Session deleted"
+sharing_disabled = "Sharing is disabled"
+zdr_enabled = "✗ Cannot change: Zero Data Retention enabled"
+data_sharing_admin = "✗ Data sharing is controlled by your team admin"
+no_undoable = "No undoable prompts"
+images_removed_skill = "Images removed (skill prompt)"
+nothing_to_jump = "Nothing to jump to yet"
+fork_session_only = "/fork only works inside a session"
+fork_still_creating = "Cannot fork: session is still being created"
+default_model_cleared = "✓ Default model: cleared"
+fork_model_cleared = "✓ Fork secondary model: cleared"
+fork_model_default = "✓ Fork secondary model: already at default"
+compact_auto = "✓ Compact mode: off (auto-compact active on small terminal)"
 
 [tool.prefix]
 list = "List "
@@ -905,6 +1115,7 @@ refresh = "[Refresh]"
 tier_free = "Free"
 beta = "Beta"
 login_with = "Login with {label}"
+press_again = "press again to {label}"
 
 [welcome.picker]
 back = "back"
@@ -919,3 +1130,7 @@ no = "No, quit"
 question = "Do you trust the contents of this directory?"
 warning_line1 = "Grok Build may run or modify contents in this directory,"
 warning_line2 = "posing security risks."
+
+[worktree]
+new_title = "New Worktree"
+name_optional = "Name (optional): "

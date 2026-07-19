@@ -487,7 +487,7 @@ pub(super) fn dispatch_dump_input_log(app: &mut AppView) -> Vec<Effect> {
     };
 
     if agent.input_log.entry_count() == 0 {
-        agent.show_toast("No input events recorded yet.");
+        agent.show_toast(xai_grok_i18n::t("toast.no_input_events"));
         return vec![];
     }
 

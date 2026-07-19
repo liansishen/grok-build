@@ -1079,11 +1079,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 return vec![];
             }
             if crate::app::foreign_sessions::is_foreign_picker_source(&source) {
-                app.show_toast("External sessions can't be deleted");
+                app.show_toast(xai_grok_i18n::t("toast.external_sessions_cant_delete"));
                 return vec![];
             }
             if source == "conversation" {
-                app.show_toast("Deleting chat conversations isn't supported yet");
+                app.show_toast(xai_grok_i18n::t("toast.chat_delete_unsupported"));
                 return vec![];
             }
             if !matches!(source.as_str(), "local" | "remote" | "both")

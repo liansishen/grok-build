@@ -554,11 +554,10 @@ pub fn render_permission_view(
         let hint_style = Style::default()
             .fg(theme.text_secondary)
             .add_modifier(Modifier::DIM);
-        let hint_line = Line::from(vec![
-            Span::styled("Use ", hint_style),
-            Span::styled("\u{2190} \u{2192}", hint_style),
-            Span::styled(" to choose permission scope", hint_style),
-        ]);
+        let hint_line = Line::from(vec![Span::styled(
+            xai_grok_i18n::t("permission.hint.choose_scope"),
+            hint_style,
+        )]);
         buf.set_line(content_x, y, &hint_line, content_width);
         y += 1;
     }
@@ -1736,7 +1735,7 @@ fn build_reject_once_line<'a>(
     } else {
         // Placeholder.
         (
-            "No, reject (type to add feedback)".to_string(),
+            xai_grok_i18n::t("permission.reject_once.placeholder").to_string(),
             Style::default().fg(theme.gray).bg(row_bg),
         )
     };
@@ -1787,7 +1786,7 @@ fn dynamic_option_label(
             let scope_text = match scope.selected {
                 McpScope::Tool => perm.display_name(),
                 McpScope::Server => match scope.server_prefix.as_deref() {
-                    Some(s) => format!("all tools from {}", mcp_titleize_segment(s)),
+                    Some(s) => xai_grok_i18n::t_fmt("permission.mcp.all_tools_from", &[("server", &mcp_titleize_segment(s))]),
                     None => perm.display_name(),
                 },
             };

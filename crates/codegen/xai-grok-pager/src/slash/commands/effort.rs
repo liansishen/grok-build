@@ -57,7 +57,7 @@ impl SlashCommand for EffortCommand {
     fn run(&self, ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         let trimmed = args.trim();
         let Some(model_id) = ctx.models.current.clone() else {
-            return CommandResult::Error("No active model".into());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_model").into());
         };
 
         if trimmed.is_empty() {
