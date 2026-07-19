@@ -15,6 +15,14 @@ const CACHE_TTL: Duration = Duration::from_secs(54 * 60);
 /// Cold-miss budget on the `session/load` critical path (warm/stale served instantly).
 const COLD_FETCH_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_LOCALE: &str = "en";
+
+/// UI language for remote catalogs: follows product locale (`en` / `zh-CN`).
+fn ui_locale() -> &'static str {
+    match xai_grok_i18n::current_locale() {
+        xai_grok_i18n::Locale::ZhCn => "zh-CN",
+        xai_grok_i18n::Locale::En => "en",
+    }
+}
 /// Process-wide flag set by the pager when started with `--chat` so initialize
 /// and early UI seed the chat `/rest/modes` catalog instead of build models.
 pub const GROK_CHAT_MODE_ENV: &str = "GROK_CHAT_MODE";
@@ -63,7 +71,7 @@ impl ChatModesManager {
         let Some(user_id) = self.current_user_id() else {
             return empty_state();
         };
-        let locale = DEFAULT_LOCALE;
+        let locale = ui_locale();
         {
             let guard = self.inner.cache.read();
             if let Some(c) = guard.as_ref()
@@ -157,7 +165,7 @@ impl ChatModesManager {
         let Some(user_id) = self.current_user_id() else {
             return;
         };
-        self.spawn_refresh(user_id, DEFAULT_LOCALE);
+        self.spawn_refresh(user_id, ui_locale());
     }
 }
 fn empty_state() -> acp::SessionModelState {

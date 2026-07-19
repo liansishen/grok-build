@@ -35,7 +35,7 @@ pub(crate) fn queue_block_text(agent: &AgentView) -> String {
     }
 
     if rows.is_empty() {
-        "Queue is empty.".to_string()
+        xai_grok_i18n::t("status.queue_empty").to_string()
     } else {
         let header = format!(
             "Queued prompt{} ({}):",

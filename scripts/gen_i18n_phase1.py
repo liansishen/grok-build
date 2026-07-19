@@ -52,16 +52,53 @@ def parse_settings() -> list[tuple[str, str, str]]:
 
 
 def parse_slash() -> dict[str, str]:
+    """Parse slash descriptions from current tree or git revision with English literals."""
+    import subprocess
+
     slash_dir = ROOT / "crates/codegen/xai-grok-pager/src/slash/commands"
     out: dict[str, str] = {}
-    for f in slash_dir.glob("*.rs"):
-        content = f.read_text(encoding="utf-8")
+
+    def extract(content: str) -> None:
         names = re.findall(r'fn name\(&self\)[^{]*\{\s*"([^"]+)"', content)
         descs = re.findall(
             r'fn description\(&self\)[^{]*\{\s*"((?:\\.|[^"])*)"', content
         )
         for n, d in zip(names, descs):
             out[f"slash.{n}.description"] = d.replace('\\"', '"')
+
+    for f in slash_dir.glob("*.rs"):
+        extract(f.read_text(encoding="utf-8"))
+    if out:
+        return out
+    # Descriptions already use t(); recover English from commit before i18n slash patch.
+    for rev in ("1baf29b", "HEAD~5"):
+        try:
+            listing = subprocess.check_output(
+                [
+                    "git",
+                    "ls-tree",
+                    "-r",
+                    "--name-only",
+                    rev,
+                    "crates/codegen/xai-grok-pager/src/slash/commands",
+                ],
+                cwd=ROOT,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            continue
+        for rel in listing.splitlines():
+            if not rel.endswith(".rs"):
+                continue
+            try:
+                content = subprocess.check_output(
+                    ["git", "show", f"{rev}:{rel}"], cwd=ROOT, text=True
+                )
+            except subprocess.CalledProcessError:
+                continue
+            extract(content)
+        if out:
+            break
     return out
 
 

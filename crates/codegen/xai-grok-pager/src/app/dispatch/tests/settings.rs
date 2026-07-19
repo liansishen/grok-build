@@ -3390,7 +3390,7 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
     );
     {
         let agent = app.agents.get_mut(&id).unwrap();
-        agent.show_toast("Copied!");
+        agent.show_toast(xai_grok_i18n::t("toast.copied"));
         assert_eq!(
             agent.toast.as_ref().map(|(m, _)| m.as_str()),
             Some("Copied!"),

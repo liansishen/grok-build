@@ -1,227 +1,4 @@
-# English is the source of truth for message keys.
-# Nested tables flatten to dotted keys (e.g. [welcome] quit → "welcome.quit").
-
-[settings.category]
-appearance = "Appearance"
-mouse = "Mouse"
-editor = "Editor & Input"
-agent = "Agent & Approval"
-privacy = "Privacy"
-models = "Models"
-session = "Session"
-advanced = "Advanced"
-
-[toast]
-language_set = "UI language: {name}"
-
-[settings.compact_mode]
-label = "Compact mode"
-description = "Reduce padding around messages for more content density. \\ Auto-enabled while the terminal is 20 rows or shorter."
-
-[settings.screen_mode]
-label = "Default screen mode"
-description = "How plain grok opens next time: Fullscreen (default when unset) or \\ Minimal. Writes [ui] screen_mode in config.toml. Restart required. \\ Switch this session only with /minimal or /fullscreen."
-choice_fullscreen = "Fullscreen"
-choice_fullscreen_desc = "Open plain grok in the standard fullscreen TUI. Default when unset."
-choice_minimal = "Minimal"
-choice_minimal_desc = "Open plain grok in scrollback-native (minimal) mode."
-
-[settings.show_timestamps]
-label = "Show timestamps"
-description = "Show clock time next to user messages and agent responses."
-
-[settings.show_timeline]
-label = "Timeline sidebar"
-description = "Per-turn tick rail in place of the scrollbar: hover previews a turn, click jumps to it."
-
-[settings.page_flip_on_send]
-label = "Snap prompt to top on send"
-description = "When you send a prompt, scroll it to the top of the screen so the \\ response starts on a fresh page (default). Turn off to leave the scroll \\ position unchanged when you send."
-
-[settings.simple_mode]
-label = "Disable vim input mode"
-description = "Use plain readline-style input instead of vim keys in the prompt. Experimental."
-
-[settings.vim_mode]
-label = "Vim scrollback navigation"
-description = "Enable vim keys (h/j/k/l, gg/G, /) for navigating the scrollback. Does not affect the input prompt."
-
-[settings.language]
-label = "UI language"
-description = "Language for the Grok Build interface. System follows your OS locale when Chinese or English is detected."
-choice_auto = "System"
-choice_auto_desc = "Follow the operating system language."
-choice_en = "English"
-choice_en_desc = "English interface."
-choice_zh_cn = "简体中文"
-choice_zh_cn_desc = "Simplified Chinese interface."
-
-[settings.theme]
-label = "Theme"
-description = "Color theme for the pager UI."
-choice_auto_desc = "Follow system dark/light appearance."
-choice_grokday_desc = "Light theme for bright environments."
-choice_groknight_desc = "Neutral dark with magenta accent."
-choice_oscura_midnight_desc = "Deep dark with warm accents; needs truecolor."
-choice_rosepine_moon_desc = "Muted dark with mauve accents; needs truecolor."
-choice_tokyonight_desc = "Dark + blue-tinted; needs truecolor."
-
-[settings.auto_dark_theme]
-label = "Auto dark theme"
-description = "Theme to use when the system is in dark mode (only with theme=auto)."
-
-[settings.auto_light_theme]
-label = "Auto light theme"
-description = "Theme to use when the system is in light mode (only with theme=auto)."
-
-[settings.render_mermaid]
-label = "Render Mermaid diagrams"
-description = "How ```mermaid code blocks are shown: auto/on add a clickable row to \\ open the rendered diagram; off shows the raw source."
-
-[settings.permission_mode]
-label = "Permission mode"
-description = "Default uses the agent's built-in behavior; \\ Ask prompts for each tool action; \\ Auto uses an LLM classifier for risky tools; \\ Always approve grants all permissions automatically."
-choice_always_approve = "Always approve"
-choice_always_approve_desc = "Auto-approve every tool action. Skips ALL permission prompts."
-choice_ask = "Ask"
-choice_ask_desc = "Prompt for permission before tool actions."
-choice_auto = "Auto"
-choice_auto_desc = "LLM classifier approves safe tools; dangerous actions may still prompt or deny."
-choice_default = "Default"
-choice_default_desc = "Use the agent's default permission behavior (currently equivalent to Ask)."
-
-[settings.remember_tool_approvals]
-label = "Remember tool approvals"
-description = "Show \"Always allow\" options in permission prompts so you can stop \\ being re-asked about a specific command or tool. Applies in ask and \\ auto; Always-approve still skips all prompts. Restart required."
-
-[settings.multiline_mode]
-label = "Multiline"
-description = "When on, Enter inserts a newline and Shift+Enter sends. Resets each session."
-
-[settings.default_model]
-label = "Default model"
-description = "Model used for new sessions. Changing this also switches the active session. Pick `(no override)` to clear."
-
-[settings.show_thinking_blocks]
-label = "Show thinking blocks"
-description = "Show agent thinking/reasoning blocks in the scrollback while streaming."
-
-[settings.prompt_suggestions]
-label = "Prompt suggestions"
-description = "After each turn, predict your likely next prompt and show it as \\ ghost text in the input (Tab to accept). Uses a small model call \\ per turn."
-
-[settings.respect_manual_folds]
-label = "Respect manual folds"
-description = "Keep manually folded blocks as-is while streaming and stop \\ auto-scroll when expanding a block. Experimental."
-
-[settings.group_tool_verbs]
-label = "Group tool calls"
-description = "Fold consecutive read/search/list tool calls and subagent rows into \\ one summary row; finished thoughts fold into the group too."
-
-[settings.collapsed_edit_blocks]
-label = "Collapsed edit blocks"
-description = "Show edits as one-line +N/-M diffstat summaries and merge \\ back-to-back edits to the same file into one block; expand a \\ row to see the diffs."
-
-[settings.display_refresh_auto_cadence]
-label = "Match display refresh rate"
-description = "On high-refresh displays, the TUI will stream/scroll faster \\ to match the display. Off keeps the classic ~60 Hz cadence. \\ Restart required."
-
-[settings.scroll_speed]
-label = "Scroll speed"
-description = "Mouse-wheel and trackpad scroll speed multiplier (1-100). Higher = faster."
-
-[settings.scroll_mode]
-label = "Scroll input"
-description = "Force wheel or trackpad scroll behavior when auto-detection \\ misreads your device."
-
-[settings.scroll_lines]
-label = "Scroll lines"
-description = "Lines per scroll tick for both wheel and trackpad (1-10). \\ Until set, each terminal's own profile applies."
-
-[settings.invert_scroll]
-label = "Invert scroll"
-description = "Reverse vertical scroll direction (natural scrolling)."
-
-[settings.keep_text_selection]
-label = "Text selection"
-description = "How long in-app selection stays on screen and what double-click does (fold vs. select & copy a word). For your terminal or multiplexer's own selection, hold Shift while dragging (native copy)."
-
-[settings.coding_data_sharing]
-label = "Coding data sharing"
-description = "Controls whether SpaceXAI may retain and train on coding session \\ data. Does not affect product analytics; see Configuration and \\ Monitoring docs."
-
-[settings.default_selected_permission]
-label = "Default selected permission"
-description = "Which row the cursor preselects on permission prompts."
-
-[settings.toolset.ask_user_question.timeout_enabled]
-label = "Ask-Question timeout"
-description = "When on, the ask_user_question tool will time out after a set period \\ of time instead of infinitely blocking."
-
-[settings.plan_mode]
-label = "Plan mode"
-description = "When on, the agent summarises a plan before running tools or making edits."
-choice_off = "Off"
-choice_off_desc = "Agent runs tools and edits files directly (default)."
-choice_on = "On"
-choice_on_desc = "Agent summarises a plan and asks for approval before running tools."
-
-[settings.show_tips]
-label = "Show tips"
-description = "Show the tip-of-the-day banner on startup. Restart required."
-
-[settings.contextual_hints]
-label = "Show contextual hints"
-description = "Show brief, in-context keyboard hints as you work; \\ toggle each one individually."
-
-[settings.auto_update]
-label = "Auto-update"
-description = "Automatically download and install pager updates on startup. \\ Restart required."
-
-[settings.hunk_tracker_mode]
-label = "Hunk tracker"
-description = "Which file changes the agent tracks as hunks. \\ Off disables tracking (and LOC stats) entirely. \\ Restart required."
-
-[settings.voice_capture_mode]
-label = "Voice capture"
-description = "How the voice chord (Ctrl+Space / F8) behaves: Toggle \\ (press to start/stop) or Hold to talk (hold to record, \\ release to stop; needs a Kitty-protocol terminal)."
-
-[settings.voice_stt_language]
-label = "Voice language"
-description = "Speech-to-text language for voice dictation (Grok STT). \\ English by default; System uses your locale when supported. \\ Sets formatting language for numbers and currencies."
-
-[settings.contextual_hints.undo]
-label = "Undo"
-description = "Remind you that Ctrl+Z restores the prompt after you clear it."
-
-[settings.contextual_hints.plan_mode]
-label = "Plan mode"
-description = "Suggest plan mode (Shift+Tab) when your prompt looks like a \\ planning request."
-
-[settings.contextual_hints.image_input]
-label = "Image input"
-description = "Offer to paste an image when one is on the clipboard and the \\ model accepts images."
-
-[settings.contextual_hints.send_now]
-label = "Send now"
-description = "After you queue a follow-up mid-turn, remind you that Enter \\ on an empty prompt sends the top queued item now."
-
-[settings.contextual_hints.small_screen]
-label = "Small screen"
-description = "Suggest /compact-mode once per run when the terminal \\ is short on rows."
-
-[settings.contextual_hints.word_select]
-label = "Word select"
-description = "After double-clicking conversation text while Text selection \\ is fold/nav, remind you that Word select lives in Settings."
-
-[settings.contextual_hints.ssh_wrap]
-label = "SSH wrap"
-description = "At session load over SSH, recommend `grok wrap ssh` for \\ clipboard forwarding and terminal restore."
-
-[settings.fork_secondary_model]
-label = "Fork secondary model"
-description = "Model used for the secondary agent when forking. Pick `(no override)` to clear."
-
+# Locale catalog (merged phase1 + remaining)
 [actions.BashMode]
 label = "shell"
 description = "Shell mode (type ! on empty prompt)"
@@ -518,6 +295,70 @@ submit = "submit"
 show_full_url = "Copying not working? Click here to show full URL."
 select_url_hint = "Select the URL below with your mouse and copy manually."
 
+[dashboard]
+empty = "No agents yet"
+title = "Agent Dashboard"
+
+[docs.01]
+title = "Getting Started"
+desc = "Installation, first launch, and basic interaction"
+
+[docs.02]
+title = "Authentication"
+desc = "Browser login, API keys, OIDC, external auth providers"
+
+[docs.03]
+title = "Keyboard Shortcuts"
+desc = "Complete reference for all TUI key bindings"
+
+[docs.04]
+title = "Slash Commands"
+desc = "All / commands for session management, models, memory, hooks"
+
+[docs.05]
+title = "Configuration"
+desc = "config.toml, pager.toml, environment variables, file locations"
+
+[docs.06]
+title = "Theming and Appearance"
+desc = "Themes, color support, pager.toml customization"
+
+[docs.07]
+title = "MCP Servers"
+desc = "Setting up external tool integrations via MCP"
+
+[docs.08]
+title = "Skills"
+desc = "Creating and using reusable prompt packages"
+
+[docs.09]
+title = "Plugins and Marketplace"
+desc = "Installing, managing, and creating plugin packages"
+
+[docs.10]
+title = "Hooks"
+desc = "Project lifecycle scripts for pre/post tool-use events"
+
+[docs.11]
+title = "Custom Models"
+desc = "BYOK, Ollama, OpenAI-compatible endpoints"
+
+[docs.12]
+title = "Project Rules (AGENTS.md)"
+desc = "Per-directory instructions and precedence rules"
+
+[docs.13]
+title = "Memory"
+desc = "Cross-session knowledge persistence and search"
+
+[docs.14]
+title = "Headless Mode and Scripting"
+desc = "Non-interactive CLI for automation and CI/CD"
+
+[docs.15]
+title = "Agent Mode and IDE Integration"
+desc = "ACP stdio transport, WebSocket relay, SDK integration"
+
 [permission.default]
 always_allow_all_sessions = "Always allow on all sessions"
 allow_once = "Allow once"
@@ -530,9 +371,117 @@ choose_scope = "Use ← → to choose permission scope"
 [permission.reject_once]
 placeholder = "No, reject (type to add feedback)"
 
+[settings.auto_dark_theme]
+label = "Auto dark theme"
+description = "Theme to use when the system is in dark mode (only with theme=auto)."
+
+[settings.auto_light_theme]
+label = "Auto light theme"
+description = "Theme to use when the system is in light mode (only with theme=auto)."
+
+[settings.auto_update]
+label = "Auto-update"
+description = "Automatically download and install pager updates on startup. \\ Restart required."
+
+[settings.category]
+appearance = "Appearance"
+mouse = "Mouse"
+editor = "Editor & Input"
+agent = "Agent & Approval"
+privacy = "Privacy"
+models = "Models"
+session = "Session"
+advanced = "Advanced"
+
+[settings.coding_data_sharing]
+label = "Coding data sharing"
+description = "Controls whether SpaceXAI may retain and train on coding session \\ data. Does not affect product analytics; see Configuration and \\ Monitoring docs."
+
+[settings.collapsed_edit_blocks]
+label = "Collapsed edit blocks"
+description = "Show edits as one-line +N/-M diffstat summaries and merge \\ back-to-back edits to the same file into one block; expand a \\ row to see the diffs."
+
+[settings.compact_mode]
+label = "Compact mode"
+description = "Reduce padding around messages for more content density. \\ Auto-enabled while the terminal is 20 rows or shorter."
+
+[settings.contextual_hints]
+label = "Show contextual hints"
+description = "Show brief, in-context keyboard hints as you work; \\ toggle each one individually."
+
+[settings.contextual_hints.image_input]
+label = "Image input"
+description = "Offer to paste an image when one is on the clipboard and the \\ model accepts images."
+
+[settings.contextual_hints.plan_mode]
+label = "Plan mode"
+description = "Suggest plan mode (Shift+Tab) when your prompt looks like a \\ planning request."
+
+[settings.contextual_hints.send_now]
+label = "Send now"
+description = "After you queue a follow-up mid-turn, remind you that Enter \\ on an empty prompt sends the top queued item now."
+
+[settings.contextual_hints.small_screen]
+label = "Small screen"
+description = "Suggest /compact-mode once per run when the terminal \\ is short on rows."
+
+[settings.contextual_hints.ssh_wrap]
+label = "SSH wrap"
+description = "At session load over SSH, recommend `grok wrap ssh` for \\ clipboard forwarding and terminal restore."
+
+[settings.contextual_hints.undo]
+label = "Undo"
+description = "Remind you that Ctrl+Z restores the prompt after you clear it."
+
+[settings.contextual_hints.word_select]
+label = "Word select"
+description = "After double-clicking conversation text while Text selection \\ is fold/nav, remind you that Word select lives in Settings."
+
+[settings.default_model]
+label = "Default model"
+description = "Model used for new sessions. Changing this also switches the active session. Pick `(no override)` to clear."
+
+[settings.default_selected_permission]
+label = "Default selected permission"
+description = "Which row the cursor preselects on permission prompts."
+
+[settings.display_refresh_auto_cadence]
+label = "Match display refresh rate"
+description = "On high-refresh displays, the TUI will stream/scroll faster \\ to match the display. Off keeps the classic ~60 Hz cadence. \\ Restart required."
+
 [settings.dynamic_enum]
 no_override = "(no override)"
 no_override_desc = "Inherit the default model (no per-user override)."
+
+[settings.fork_secondary_model]
+label = "Fork secondary model"
+description = "Model used for the secondary agent when forking. Pick `(no override)` to clear."
+
+[settings.group_tool_verbs]
+label = "Group tool calls"
+description = "Fold consecutive read/search/list tool calls and subagent rows into \\ one summary row; finished thoughts fold into the group too."
+
+[settings.hunk_tracker_mode]
+label = "Hunk tracker"
+description = "Which file changes the agent tracks as hunks. \\ Off disables tracking (and LOC stats) entirely. \\ Restart required."
+
+[settings.invert_scroll]
+label = "Invert scroll"
+description = "Reverse vertical scroll direction (natural scrolling)."
+
+[settings.keep_text_selection]
+label = "Text selection"
+description = "How long in-app selection stays on screen and what double-click does (fold vs. select & copy a word). For your terminal or multiplexer's own selection, hold Shift while dragging (native copy)."
+
+[settings.language]
+label = "UI language"
+description = "Language for the Grok Build interface. System follows your OS locale when Chinese or English is detected."
+choice_auto = "System"
+choice_auto_desc = "Follow the operating system language."
+choice_en = "English"
+choice_en_desc = "English interface."
+choice_zh_cn = "简体中文"
+choice_zh_cn_desc = "Simplified Chinese interface."
 
 [settings.modal]
 title = "Settings"
@@ -540,6 +489,8 @@ value_on = "on"
 value_off = "off"
 restart_pill = "restart"
 no_matches_for = "No matches for"
+tip_long = "Tip · Ask Grok: \"change theme to grokday\" or \"what does compact mode do?\""
+tip_short = "Tip · Ask Grok to change a setting"
 
 [settings.modal.footer]
 nav_jk = "↑/↓/j/k nav"
@@ -548,6 +499,140 @@ enter_edit = "Enter edit"
 slash_search = "/ search"
 reset = "d reset"
 close = "F2/Esc close"
+top_bottom = "g/G top/btm"
+enter_toggle = "Enter toggle"
+expand = "→ expand"
+type_to_filter = "type to filter"
+nav = "↑/↓ nav"
+backspace_edit = "Backspace edit"
+enter_commit = "Enter commit"
+esc_clear = "Esc clear"
+nav_try = "↑/↓ try"
+esc_revert = "Esc revert"
+esc_cancel = "Esc cancel"
+y_reset = "y reset"
+n_cancel = "n cancel"
+f2_cancel = "F2 cancel"
+type_to_edit = "type to edit"
+
+[settings.multiline_mode]
+label = "Multiline"
+description = "When on, Enter inserts a newline and Shift+Enter sends. Resets each session."
+
+[settings.page_flip_on_send]
+label = "Snap prompt to top on send"
+description = "When you send a prompt, scroll it to the top of the screen so the \\ response starts on a fresh page (default). Turn off to leave the scroll \\ position unchanged when you send."
+
+[settings.permission_mode]
+label = "Permission mode"
+description = "Default uses the agent's built-in behavior; \\ Ask prompts for each tool action; \\ Auto uses an LLM classifier for risky tools; \\ Always approve grants all permissions automatically."
+choice_always_approve = "Always approve"
+choice_always_approve_desc = "Auto-approve every tool action. Skips ALL permission prompts."
+choice_ask = "Ask"
+choice_ask_desc = "Prompt for permission before tool actions."
+choice_auto = "Auto"
+choice_auto_desc = "LLM classifier approves safe tools; dangerous actions may still prompt or deny."
+choice_default = "Default"
+choice_default_desc = "Use the agent's default permission behavior (currently equivalent to Ask)."
+
+[settings.plan_mode]
+label = "Plan mode"
+description = "When on, the agent summarises a plan before running tools or making edits."
+choice_off = "Off"
+choice_off_desc = "Agent runs tools and edits files directly (default)."
+choice_on = "On"
+choice_on_desc = "Agent summarises a plan and asks for approval before running tools."
+
+[settings.prompt_suggestions]
+label = "Prompt suggestions"
+description = "After each turn, predict your likely next prompt and show it as \\ ghost text in the input (Tab to accept). Uses a small model call \\ per turn."
+
+[settings.remember_tool_approvals]
+label = "Remember tool approvals"
+description = "Show \"Always allow\" options in permission prompts so you can stop \\ being re-asked about a specific command or tool. Applies in ask and \\ auto; Always-approve still skips all prompts. Restart required."
+
+[settings.render_mermaid]
+label = "Render Mermaid diagrams"
+description = "How ```mermaid code blocks are shown: auto/on add a clickable row to \\ open the rendered diagram; off shows the raw source."
+
+[settings.respect_manual_folds]
+label = "Respect manual folds"
+description = "Keep manually folded blocks as-is while streaming and stop \\ auto-scroll when expanding a block. Experimental."
+
+[settings.screen_mode]
+label = "Default screen mode"
+description = "How plain grok opens next time: Fullscreen (default when unset) or \\ Minimal. Writes [ui] screen_mode in config.toml. Restart required. \\ Switch this session only with /minimal or /fullscreen."
+choice_fullscreen = "Fullscreen"
+choice_fullscreen_desc = "Open plain grok in the standard fullscreen TUI. Default when unset."
+choice_minimal = "Minimal"
+choice_minimal_desc = "Open plain grok in scrollback-native (minimal) mode."
+
+[settings.scroll_lines]
+label = "Scroll lines"
+description = "Lines per scroll tick for both wheel and trackpad (1-10). \\ Until set, each terminal's own profile applies."
+
+[settings.scroll_mode]
+label = "Scroll input"
+description = "Force wheel or trackpad scroll behavior when auto-detection \\ misreads your device."
+
+[settings.scroll_speed]
+label = "Scroll speed"
+description = "Mouse-wheel and trackpad scroll speed multiplier (1-100). Higher = faster."
+
+[settings.show_thinking_blocks]
+label = "Show thinking blocks"
+description = "Show agent thinking/reasoning blocks in the scrollback while streaming."
+
+[settings.show_timeline]
+label = "Timeline sidebar"
+description = "Per-turn tick rail in place of the scrollbar: hover previews a turn, click jumps to it."
+
+[settings.show_timestamps]
+label = "Show timestamps"
+description = "Show clock time next to user messages and agent responses."
+
+[settings.show_tips]
+label = "Show tips"
+description = "Show the tip-of-the-day banner on startup. Restart required."
+
+[settings.simple_mode]
+label = "Disable vim input mode"
+description = "Use plain readline-style input instead of vim keys in the prompt. Experimental."
+
+[settings.theme]
+label = "Theme"
+description = "Color theme for the pager UI."
+choice_auto_desc = "Follow system dark/light appearance."
+choice_grokday_desc = "Light theme for bright environments."
+choice_groknight_desc = "Neutral dark with magenta accent."
+choice_oscura_midnight_desc = "Deep dark with warm accents; needs truecolor."
+choice_rosepine_moon_desc = "Muted dark with mauve accents; needs truecolor."
+choice_tokyonight_desc = "Dark + blue-tinted; needs truecolor."
+
+[settings.toolset.ask_user_question.timeout_enabled]
+label = "Ask-Question timeout"
+description = "When on, the ask_user_question tool will time out after a set period \\ of time instead of infinitely blocking."
+
+[settings.vim_mode]
+label = "Vim scrollback navigation"
+description = "Enable vim keys (h/j/k/l, gg/G, /) for navigating the scrollback. Does not affect the input prompt."
+
+[settings.voice_capture_mode]
+label = "Voice capture"
+description = "How the voice chord (Ctrl+Space / F8) behaves: Toggle \\ (press to start/stop) or Hold to talk (hold to record, \\ release to stop; needs a Kitty-protocol terminal)."
+
+[settings.voice_stt_language]
+label = "Voice language"
+description = "Speech-to-text language for voice dictation (Grok STT). \\ English by default; System uses your locale when supported. \\ Sets formatting language for numbers and currencies."
+
+[shortcuts.category]
+essentials = "Essentials"
+input = "Input"
+conversation_nav = "Conversation Navigation"
+conversation_action = "Conversation Actions"
+panels = "Panels"
+session = "Session"
+dashboard = "Dashboard"
 
 [slash.always-approve]
 description = "Toggle always-approve mode (skip all permission prompts)"
@@ -726,6 +811,10 @@ description = "View the current plan"
 [slash.vim-mode]
 description = "Toggle vim-style scrollback keybindings (j/k, h/l, g/G, y/Y, …)"
 
+[status]
+queue_empty = "Queue is empty."
+no_tasks = "No background tasks."
+
 [tips]
 plan_nudge = "Planning? Check out plan mode via "
 small_screen = "Tight on space? Try /compact-mode"
@@ -742,6 +831,29 @@ suffix = " to send now"
 [tips.undo]
 prefix = "Input cleared · "
 suffix = " to undo"
+
+[toast]
+language_set = "UI language: {name}"
+check = "✓"
+setting_changed = "✓ {label}: {value}"
+already_default = "{label}: already at default"
+mouse_reporting_on = "Mouse reporting on"
+copied = "Copied!"
+no_active_session = "No active session"
+mermaid = "✓ Mermaid: {value}"
+theme = "✓ Theme: {name}"
+
+[tool.prefix]
+list = "List "
+edit = "Edit "
+creating = "Creating "
+read = "Read "
+run = "Run "
+search = "Search "
+fetch = "Fetch "
+memory_search = "Memory Search "
+web_search = "Web search "
+web_fetch = "Web fetch "
 
 [turn.activity]
 cancelling = "Cancelling…"
@@ -807,4 +919,3 @@ no = "No, quit"
 question = "Do you trust the contents of this directory?"
 warning_line1 = "Grok Build may run or modify contents in this directory,"
 warning_line2 = "posing security risks."
-

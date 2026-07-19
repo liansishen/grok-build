@@ -36,7 +36,7 @@ pub(super) fn dispatch_interject(
     agent.ephemeral_tip.clear_on_submit();
 
     let Some(session_id) = agent.session.session_id.clone() else {
-        agent.show_toast("No active session");
+        agent.show_toast(xai_grok_i18n::t("toast.no_active_session"));
         return vec![];
     };
 
@@ -123,7 +123,7 @@ pub(super) fn dispatch_send_prompt_now(
     agent.ephemeral_tip.clear_on_submit();
 
     let Some(session_id) = agent.session.session_id.clone() else {
-        agent.show_toast("No active session");
+        agent.show_toast(xai_grok_i18n::t("toast.no_active_session"));
         return vec![];
     };
 

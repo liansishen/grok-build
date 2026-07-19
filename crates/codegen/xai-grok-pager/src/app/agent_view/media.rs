@@ -482,7 +482,7 @@ impl AgentView {
                     tracing::debug!("copy image failed: {e}");
                 }
             });
-            self.show_toast("Copied image");
+            self.show_toast(xai_grok_i18n::t("toast.copied"));
             return Some(InputOutcome::Changed);
         }
 

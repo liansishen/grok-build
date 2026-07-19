@@ -772,7 +772,7 @@ impl EditToolCallBlock {
             error: None,
             started_at: None,
             elapsed_ms: None,
-            prefix: "Edit ",
+            prefix: "Edit ",  // localized at render via tool.prefix.edit
             summary_untrusted: false,
             change_counts,
             highlight: EditHighlightPhase::HunkOnly,
@@ -905,7 +905,13 @@ impl EditToolCallBlock {
             theme.muted()
         };
 
-        let prefix = self.prefix;
+        let prefix = if self.prefix == "Edit " {
+            xai_grok_i18n::t("tool.prefix.edit")
+        } else if self.prefix == "Creating " {
+            xai_grok_i18n::t("tool.prefix.creating")
+        } else {
+            self.prefix
+        };
 
         // Build the suffix spans first so we can reserve space for them.
         // The suffix (diffstat / "(N edits)") renders only on the collapsed

@@ -255,7 +255,7 @@ impl SearchToolCallBlock {
             theme.fg(theme.path)
         };
 
-        let mut spans = vec![Span::styled("Search ".to_string(), bold_style)];
+        let mut spans = vec![Span::styled(xai_grok_i18n::t("tool.prefix.search").to_string(), bold_style)];
 
         // Search term: either promoted glob or quoted pattern
         if self.is_trivial_pattern()
@@ -327,7 +327,7 @@ impl SearchToolCallBlock {
         }
     }
 
-    /// Header line with only the search term span selectable (exclude "Search " prefix).
+    /// Header line with only the search term span selectable (exclude xai_grok_i18n::t("tool.prefix.search") prefix).
     ///
     /// Span 0 is always the label; span 1 is the pattern/glob. Later "in path"
     /// and summary spans stay non-selectable so copy yields the search term.

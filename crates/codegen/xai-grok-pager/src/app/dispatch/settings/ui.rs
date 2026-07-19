@@ -25,8 +25,15 @@ use agent_client_protocol as acp;
 
 /// Format a "✓ Label: value" success toast.
 pub(in crate::app::dispatch) fn save_success_toast(label: &str, on: bool) -> String {
-    let value = if on { "on" } else { "off" };
-    format!("\u{2713} {label}: {value}")
+    let value = if on {
+        xai_grok_i18n::t("settings.modal.value_on")
+    } else {
+        xai_grok_i18n::t("settings.modal.value_off")
+    };
+    xai_grok_i18n::t_fmt(
+        "toast.setting_changed",
+        &[("label", label), ("value", value)],
+    )
 }
 
 /// Refresh every open settings modal's `ui_snapshot` + `pager_snapshot`
@@ -368,7 +375,7 @@ pub(in crate::app::dispatch) fn dispatch_confirm_reset_setting(
                     "reset skipped — setting already at default",
                 );
                 with_active_agent(app, |agent| {
-                    agent.show_toast(&format!("{}: already at default", meta.label));
+                    agent.show_toast(&xai_grok_i18n::t_fmt("toast.already_default", &[("label", meta.label_t())]));
                 });
                 return vec![];
             }

@@ -24,12 +24,24 @@ pub struct DocEntry {
 
 impl From<&Doc> for DocEntry {
     fn from(d: &Doc) -> Self {
+        let (title, description) = localized_doc_meta(d);
         Self {
-            title: d.title.into(),
-            description: d.description.into(),
+            title: title.into(),
+            description: description.into(),
             content: d.content,
         }
     }
+}
+
+fn localized_doc_meta(d: &Doc) -> (&'static str, &'static str) {
+    // Map guide file basename prefix → catalog keys docs.NN.{title,desc}
+    let num = d.filename.get(..2).unwrap_or("");
+    let title_key = xai_grok_i18n::intern_key(&format!("docs.{num}.title"));
+    let desc_key = xai_grok_i18n::intern_key(&format!("docs.{num}.desc"));
+    (
+        xai_grok_i18n::t_or(title_key, d.title),
+        xai_grok_i18n::t_or(desc_key, d.description),
+    )
 }
 
 // ── Static doc tables ────────────────────────────────────────────────────────

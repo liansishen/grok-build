@@ -208,8 +208,8 @@ impl ExecuteToolCallBlock {
                 } else {
                     theme.primary().add_modifier(Modifier::BOLD)
                 };
-                let mut spans = vec![Span::styled("Run ".to_string(), label_style)];
-                let mut hang = UnicodeWidthStr::width("Run ");
+                let mut spans = vec![Span::styled(xai_grok_i18n::t("tool.prefix.run").to_string(), label_style)];
+                let mut hang = UnicodeWidthStr::width(xai_grok_i18n::t("tool.prefix.run"));
                 if self.bash_mode {
                     spans.push(Span::styled("(user) ".to_string(), theme.muted()));
                     hang += UnicodeWidthStr::width("(user) ");
@@ -303,7 +303,7 @@ impl ExecuteToolCallBlock {
         } else {
             theme.primary().add_modifier(Modifier::BOLD)
         };
-        let mut spans = vec![Span::styled("Run ", label_style)];
+        let mut spans = vec![Span::styled(xai_grok_i18n::t("tool.prefix.run"), label_style)];
         if self.bash_mode {
             // Same style as session event messages (e.g. "Worked for 2.3s")
             spans.push(Span::styled("(user) ", theme.muted()));
@@ -347,7 +347,7 @@ impl ExecuteToolCallBlock {
     /// Uses precomputed `header_display` when set; `self.command` stays full.
     ///
     /// Returns `(line, prefix_span_count)` — prefix spans are not selectable
-    /// (`"Run "` / `"(user) "` / `"$ "`).
+    /// (`xai_grok_i18n::t("tool.prefix.run")` / `"(user) "` / `"$ "`).
     fn header_lines(
         &self,
         theme: &Theme,
@@ -836,11 +836,11 @@ mod tests {
         assert_eq!(headers.len(), 2);
         let title = line_text(&headers[0].0);
         let cmd = line_text(&headers[1].0);
-        // Leading "Run " on the description is stripped (Label already has it).
+        // Leading xai_grok_i18n::t("tool.prefix.run") on the description is stripped (Label already has it).
         assert_eq!(title, "Run the unit test suite");
         assert!(cmd.starts_with("$ "), "cmd={cmd:?}");
         assert!(cmd.contains("cargo test --lib"), "cmd={cmd:?}");
-        // Prefix span counts: "Run " only on title; "$ " on command.
+        // Prefix span counts: xai_grok_i18n::t("tool.prefix.run") only on title; "$ " on command.
         assert_eq!(headers[0].1, 1);
         assert_eq!(headers[1].1, 1);
     }
@@ -884,7 +884,7 @@ mod tests {
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, false, false);
         assert_eq!(headers.len(), 1);
         let text = line_text(&headers[0].0);
-        assert!(text.starts_with("Run "), "header={text:?}");
+        assert!(text.starts_with(xai_grok_i18n::t("tool.prefix.run")), "header={text:?}");
         assert!(text.contains("echo hi"), "header={text:?}");
     }
 
@@ -928,7 +928,7 @@ mod tests {
         );
         let first = line_text(&lines[0].content);
         assert!(
-            first.starts_with("Run "),
+            first.starts_with(xai_grok_i18n::t("tool.prefix.run")),
             "Label soft-wrap first row needs Run prefix: {first:?}"
         );
         assert!(
@@ -969,7 +969,7 @@ mod tests {
         assert_eq!(headers.len(), 2);
         let title = line_text(&headers[0].0);
         assert_eq!(title, "Run (user) List files");
-        assert_eq!(headers[0].1, 2); // "Run " + "(user) "
+        assert_eq!(headers[0].1, 2); // xai_grok_i18n::t("tool.prefix.run") + "(user) "
     }
 
     #[test]

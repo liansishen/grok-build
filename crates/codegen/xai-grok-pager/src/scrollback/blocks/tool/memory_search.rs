@@ -85,7 +85,7 @@ impl MemorySearchToolCallBlock {
             theme.fg(theme.command)
         };
 
-        let prefix = "Memory Search ";
+        let prefix = xai_grok_i18n::t("tool.prefix.memory_search");
         let count = self.results.len();
         let suffix = if count > 0 {
             let s = if count == 1 { "" } else { "s" };

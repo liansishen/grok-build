@@ -333,22 +333,22 @@ fn build_reset_confirm_shortcuts() -> Vec<Shortcut<'static>> {
     use crate::views::modal::{RESET_CONFIRM_NO_ID, RESET_CONFIRM_YES_ID};
     vec![
         Shortcut {
-            label: "y reset",
+            label: xai_grok_i18n::t("settings.modal.footer.y_reset"),
             clickable: true,
             id: RESET_CONFIRM_YES_ID,
         },
         Shortcut {
-            label: "n cancel",
+            label: xai_grok_i18n::t("settings.modal.footer.n_cancel"),
             clickable: true,
             id: RESET_CONFIRM_NO_ID,
         },
         Shortcut {
-            label: "Esc cancel",
+            label: xai_grok_i18n::t("settings.modal.footer.esc_cancel"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "F2 cancel",
+            label: xai_grok_i18n::t("settings.modal.footer.f2_cancel"),
             clickable: false,
             id: 0,
         },
@@ -2723,22 +2723,22 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
     match &state.state.mode {
         SettingsMode::Browse => {
             let enter_label = match state.focused_setting() {
-                Some((_, meta)) if matches!(meta.kind, SettingKind::Bool { .. }) => "Enter toggle",
-                _ => "Enter edit",
+                Some((_, meta)) if matches!(meta.kind, SettingKind::Bool { .. }) => xai_grok_i18n::t("settings.modal.footer.enter_toggle"),
+                _ => xai_grok_i18n::t("settings.modal.footer.enter_edit"),
             };
             let mut shortcuts = vec![
                 Shortcut {
-                    label: "\u{2191}/\u{2193}/j/k nav",
+                    label: xai_grok_i18n::t("settings.modal.footer.nav_jk"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "g/G top/btm",
+                    label: xai_grok_i18n::t("settings.modal.footer.top_bottom"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "Space toggle",
+                    label: xai_grok_i18n::t("settings.modal.footer.space_toggle"),
                     clickable: false,
                     id: 0,
                 },
@@ -2748,22 +2748,22 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                     id: 0,
                 },
                 Shortcut {
-                    label: "\u{2192} expand",
+                    label: xai_grok_i18n::t("settings.modal.footer.expand"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "/ search",
+                    label: xai_grok_i18n::t("settings.modal.footer.slash_search"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "d reset",
+                    label: xai_grok_i18n::t("settings.modal.footer.reset"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "F2/Esc close",
+                    label: xai_grok_i18n::t("settings.modal.footer.close"),
                     clickable: false,
                     id: 0,
                 },
@@ -2775,27 +2775,27 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
         }
         SettingsMode::FilterFocused => vec![
             Shortcut {
-                label: "type to filter",
+                label: xai_grok_i18n::t("settings.modal.footer.type_to_filter"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "\u{2191}/\u{2193} nav",
+                label: xai_grok_i18n::t("settings.modal.footer.nav"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Backspace edit",
+                label: xai_grok_i18n::t("settings.modal.footer.backspace_edit"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Enter commit",
+                label: xai_grok_i18n::t("settings.modal.footer.enter_commit"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc clear",
+                label: xai_grok_i18n::t("settings.modal.footer.esc_clear"),
                 clickable: false,
                 id: 0,
             },
@@ -2806,11 +2806,11 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
         } => {
             // Labels depend on whether the Enum supports live preview.
             let nav_label = if *sp {
-                "\u{2191}/\u{2193} try"
+                xai_grok_i18n::t("settings.modal.footer.nav_try")
             } else {
-                "\u{2191}/\u{2193} nav"
+                xai_grok_i18n::t("settings.modal.footer.nav")
             };
-            let esc_label = if *sp { "Esc revert" } else { "Esc cancel" };
+            let esc_label = if *sp { xai_grok_i18n::t("settings.modal.footer.esc_revert") } else { xai_grok_i18n::t("settings.modal.footer.esc_cancel") };
             vec![
                 Shortcut {
                     label: nav_label,
@@ -2818,7 +2818,7 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                     id: 0,
                 },
                 Shortcut {
-                    label: "Enter commit",
+                    label: xai_grok_i18n::t("settings.modal.footer.enter_commit"),
                     clickable: false,
                     id: 0,
                 },
@@ -2828,7 +2828,7 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                     id: 0,
                 },
                 Shortcut {
-                    label: "d reset",
+                    label: xai_grok_i18n::t("settings.modal.footer.reset"),
                     clickable: false,
                     id: 0,
                 },
@@ -2849,17 +2849,17 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                     id: 0,
                 },
                 Shortcut {
-                    label: "Enter commit",
+                    label: xai_grok_i18n::t("settings.modal.footer.enter_commit"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "Esc cancel",
+                    label: xai_grok_i18n::t("settings.modal.footer.esc_cancel"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "d reset",
+                    label: xai_grok_i18n::t("settings.modal.footer.reset"),
                     clickable: false,
                     id: 0,
                 },
@@ -2867,7 +2867,7 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
         }
         SettingsMode::EditingString { .. } => vec![
             Shortcut {
-                label: "type to edit",
+                label: xai_grok_i18n::t("settings.modal.footer.type_to_edit"),
                 clickable: false,
                 id: 0,
             },
@@ -2877,19 +2877,19 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                 id: 0,
             },
             Shortcut {
-                label: "Enter commit",
+                label: xai_grok_i18n::t("settings.modal.footer.enter_commit"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc cancel",
+                label: xai_grok_i18n::t("settings.modal.footer.esc_cancel"),
                 clickable: false,
                 id: 0,
             },
         ],
         SettingsMode::PickingGroup { .. } => vec![
             Shortcut {
-                label: "\u{2191}/\u{2193}/j/k nav",
+                label: xai_grok_i18n::t("settings.modal.footer.nav_jk"),
                 clickable: false,
                 id: 0,
             },

@@ -180,7 +180,7 @@ impl ReadToolCallBlock {
             ]);
         }
 
-        let prefix = "Read ";
+        let prefix = xai_grok_i18n::t("tool.prefix.read");
         let range_suffix = self
             .line_range
             .map(|r| {
@@ -231,7 +231,7 @@ impl ReadToolCallBlock {
 
     /// Header line with only the path (or skill name) span selectable.
     ///
-    /// Spans: `["Read ", path, optional_range_suffix, optional_extra_suffix]`
+    /// Spans: `[xai_grok_i18n::t("tool.prefix.read"), path, optional_range_suffix, optional_extra_suffix]`
     /// or `["Skill ", skill_name]`. Prefix/suffixes excluded (no `selection_text`
     /// override). Attaches a semantic filesystem target for non-skill paths.
     fn header_block_line(&self, line: Line<'static>, cwd: Option<&std::path::Path>) -> BlockLine {
@@ -507,7 +507,7 @@ mod tests {
             .map(|s| s.content.as_ref())
             .collect();
         assert!(
-            text.starts_with("Read "),
+            text.starts_with(xai_grok_i18n::t("tool.prefix.read")),
             "expected 'Read ...' got '{text}'"
         );
         assert!(text.contains("main.rs"));
@@ -598,7 +598,7 @@ mod tests {
             "main.rs",
             "copy/highlight should match the painted path span, not 'Read …'"
         );
-        assert_eq!(header.content.spans[0].content.as_ref(), "Read ");
+        assert_eq!(header.content.spans[0].content.as_ref(), xai_grok_i18n::t("tool.prefix.read"));
         assert!(header.selection_text.is_none());
     }
 

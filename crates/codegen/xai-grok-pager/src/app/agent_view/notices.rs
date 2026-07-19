@@ -378,7 +378,7 @@ mod mouse_off_banner_tests {
         );
 
         // A transient toast still wins over the sticky banner, regardless of pane.
-        view.show_toast("Copied!");
+        view.show_toast(xai_grok_i18n::t("toast.copied"));
         assert_eq!(view.active_toast_message(), Some("Copied!"));
     }
 
