@@ -23,6 +23,7 @@ members = [
     "crates/codegen/xai-grok-env",
     "crates/codegen/xai-grok-hooks",
     "crates/codegen/xai-grok-http",
+    "crates/codegen/xai-grok-i18n",
     "crates/codegen/xai-grok-markdown",
     "crates/codegen/xai-grok-markdown-core",
     "crates/codegen/xai-grok-mcp",
@@ -284,6 +285,7 @@ xai-grok-config = { path = "crates/codegen/xai-grok-config" }
 xai-grok-config-types = { path = "crates/codegen/xai-grok-config-types" }
 xai-grok-env = { path = "crates/codegen/xai-grok-env" }
 xai-grok-http = { path = "crates/codegen/xai-grok-http" }
+xai-grok-i18n = { path = "crates/codegen/xai-grok-i18n" }
 xai-grok-markdown = { path = "crates/codegen/xai-grok-markdown" }
 xai-grok-markdown-core = { path = "crates/codegen/xai-grok-markdown-core" }
 xai-grok-mcp = { path = "crates/codegen/xai-grok-mcp" }

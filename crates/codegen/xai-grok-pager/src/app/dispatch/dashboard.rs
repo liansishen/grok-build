@@ -107,21 +107,21 @@ pub(super) fn dispatch_open_dashboard(app: &mut AppView) -> Vec<Effect> {
     use crate::views::dashboard::dashboard_enabled;
 
     if !dashboard_enabled() {
-        app.show_toast("Agent dashboard is disabled in this configuration");
+        app.show_toast(xai_grok_i18n::t("dashboard.disabled"));
         return vec![];
     }
     // Gate behind auth. Until login completes, the
     // backend rejects new sessions; activating the dashboard view
     // visually dismisses the auth UI. Toast and stay put.
     if !matches!(app.auth_state, crate::app::app_view::AuthState::Done) {
-        app.show_toast("Sign in to open the dashboard");
+        app.show_toast(xai_grok_i18n::t("dashboard.sign_in"));
         return vec![];
     }
     // Same rationale for folder trust: opening the dashboard would visually
     // dismiss the trust question with the folder still unanswered. Toast and
     // stay put (mirrors the auth gate above) so the question is resolved first.
     if matches!(app.trust_state, TrustState::Pending { .. }) {
-        app.show_toast("Answer the folder-trust question to open the dashboard");
+        app.show_toast(xai_grok_i18n::t("dashboard.trust_first"));
         return vec![];
     }
     // Edge case 24: idempotent toggle — opening from the dashboard view
@@ -786,7 +786,7 @@ pub(super) fn dispatch_dashboard_open_location_picker(app: &mut AppView) -> Vec<
         // Gate on the dashboard being the *foreground* view (not merely
         // `app.dashboard.is_some()`, which stays true for the rest of the
         // session once the dashboard has been opened even once).
-        app.show_toast("Open the dashboard (/dashboard) to change location");
+        app.show_toast(xai_grok_i18n::t("dashboard.open_to_change_location"));
         return vec![];
     }
     // Idempotent — re-triggering while open keeps the current query.
@@ -862,7 +862,7 @@ pub(super) fn dispatch_dashboard_change_location(app: &mut AppView, input: Strin
     // overlay) would otherwise silently change the process cwd, since
     // `app.dashboard` stays `Some` for the rest of the session once opened.
     if !matches!(app.active_view, ActiveView::AgentDashboard) {
-        app.show_toast("Open the dashboard (/dashboard) to change location");
+        app.show_toast(xai_grok_i18n::t("dashboard.open_to_change_location"));
         return vec![];
     }
     let path = match resolve_location_input(&input, &app.cwd).filter(|p| p.is_dir()) {

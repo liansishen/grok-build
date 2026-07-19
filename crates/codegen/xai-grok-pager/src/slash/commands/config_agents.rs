@@ -16,7 +16,7 @@ impl SlashCommand for ConfigAgentsCommand {
     }
 
     fn description(&self) -> &str {
-        "Manage agent definitions"
+        xai_grok_i18n::t("slash.config-agents.description")
     }
 
     fn usage(&self) -> &str {

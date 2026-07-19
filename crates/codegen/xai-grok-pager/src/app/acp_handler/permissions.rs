@@ -258,8 +258,11 @@ fn build_permission_display(
             .map(|t| t.to_string())
             .unwrap_or_else(
                 || match bash_highlights.and_then(|h| h.highlighted_words.first()) {
-                    Some(bin) => format!("Allow `{bin}`?"),
-                    None => "Allow Execute?".to_string(),
+                    Some(bin) => xai_grok_i18n::t_fmt(
+                        "permission.title.allow_bin",
+                        &[("bin", bin.as_str())],
+                    ),
+                    None => xai_grok_i18n::t("permission.title.allow_execute").to_string(),
                 },
             )
     } else if is_edit_permission(req) {
@@ -271,26 +274,22 @@ fn build_permission_display(
             .and_then(|v| v.get("file_path"))
             .and_then(|v| v.as_str());
         if let Some(path) = file_path {
-            format!("Allow Edit to {}?", path)
+            xai_grok_i18n::t_fmt("permission.title.allow_edit_path", &[("path", path)])
         } else if let Some(ref t) = req.tool_call.fields.title {
-            format!(
-                "Allow {}?",
-                xai_grok_workspace::permission::mcp_pretty_name_if_qualified(t)
-            )
+            let name = xai_grok_workspace::permission::mcp_pretty_name_if_qualified(t);
+            xai_grok_i18n::t_fmt("permission.title.allow_named", &[("name", name.as_str())])
         } else {
-            "Allow Edit?".to_string()
+            xai_grok_i18n::t("permission.title.allow_edit").to_string()
         }
     } else if let Some(ref t) = req.tool_call.fields.title {
-        format!(
-            "Allow {}?",
-            xai_grok_workspace::permission::mcp_pretty_name_if_qualified(t)
-        )
+        let name = xai_grok_workspace::permission::mcp_pretty_name_if_qualified(t);
+        xai_grok_i18n::t_fmt("permission.title.allow_named", &[("name", name.as_str())])
     } else {
         match req.tool_call.fields.kind {
-            Some(acp::ToolKind::Edit) => "Allow Edit?".to_string(),
-            Some(acp::ToolKind::Execute) => "Allow Execute?".to_string(),
-            Some(acp::ToolKind::Delete) => "Allow Delete?".to_string(),
-            _ => "Allow?".to_string(),
+            Some(acp::ToolKind::Edit) => xai_grok_i18n::t("permission.title.allow_edit").to_string(),
+            Some(acp::ToolKind::Execute) => xai_grok_i18n::t("permission.title.allow_execute").to_string(),
+            Some(acp::ToolKind::Delete) => xai_grok_i18n::t("permission.title.allow_delete").to_string(),
+            _ => xai_grok_i18n::t("permission.title.allow").to_string(),
         }
     };
 

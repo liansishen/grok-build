@@ -14,7 +14,7 @@ impl SlashCommand for AnnouncementsCommand {
     }
 
     fn description(&self) -> &str {
-        "Show or hide announcements"
+        xai_grok_i18n::t("slash.announcements.description")
     }
 
     fn usage(&self) -> &str {

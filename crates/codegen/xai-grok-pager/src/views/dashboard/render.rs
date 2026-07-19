@@ -110,7 +110,7 @@ pub fn render_dashboard(
     roster: &[crate::app::roster::RosterEntry],
     // Whether the local on-disk session roster is still being fetched
     // (non-leader mode). When true and there's nothing to show yet, the
-    // empty body reads "Loading sessions…" instead of the "no agents
+    // empty body reads xai_grok_i18n::t("dashboard.loading_sessions") instead of the "no agents
     // yet" hint so a fresh open doesn't flash an empty-looking screen.
     dashboard_sessions_loading: bool,
     // Promo upgrade CTA to paint in the header after the location label
@@ -2544,7 +2544,7 @@ fn render_no_match(buf: &mut Buffer, area: Rect, theme: &Theme, filter: &Filter)
         return;
     }
     let hint = match filter {
-        Filter::None => "No matching rows.".to_string(),
+        Filter::None => xai_grok_i18n::t("dashboard.no_matching_rows").to_string(),
         Filter::Agent(n) => format!("No agents match `a:{n}` — press Esc to clear the filter."),
         Filter::State(s) => format!(
             "No agents in state `{}` — press Esc to clear the filter.",
@@ -2575,9 +2575,9 @@ fn render_empty_state(buf: &mut Buffer, area: Rect, theme: &Theme, loading: bool
     // session roster is still being fetched we show a loading hint so a
     // fresh open doesn't flash the "no agents" copy before rows land.
     let line = if loading {
-        "Loading sessions…"
+        xai_grok_i18n::t("dashboard.loading_sessions")
     } else {
-        "No agents yet, type a prompt to start one."
+        xai_grok_i18n::t("dashboard.empty_prompt")
     };
     let truncated = truncate_str(line, area.width.saturating_sub(2) as usize);
     // See `render_no_match` for the precedence rationale.
@@ -4287,7 +4287,7 @@ mod tests {
         render_empty_state(&mut buf, Rect::new(0, 0, 80, 10), &theme, false);
         let content = buf_to_text(&buf);
         assert!(
-            content.contains("No agents yet, type a prompt to start one."),
+            content.contains(xai_grok_i18n::t("dashboard.empty_prompt")),
             "expected empty-state hint, got: {content:?}"
         );
     }

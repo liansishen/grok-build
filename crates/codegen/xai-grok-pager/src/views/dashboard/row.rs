@@ -816,7 +816,7 @@ fn top_level_activity(agent: &AgentView, state: RowState) -> Option<String> {
             } else if let Some(activity) = agent.resolve_turn_activity() {
                 Some(sanitize(&format_activity_label(&activity)))
             } else if agent.session.loading_replay {
-                Some("Loading…".to_string())
+                Some(xai_grok_i18n::t("dashboard.loading").to_string())
             } else if let Some(bg) = background_work_label(agent) {
                 Some(bg)
             } else {
@@ -1978,7 +1978,7 @@ mod tests {
         let row = top_level_row(AgentId(0), &agent, false, false, None);
         assert_eq!(
             row.activity.as_deref(),
-            Some("Loading…"),
+            Some(xai_grok_i18n::t("dashboard.loading")),
             "loading-replay activity must win over the background label",
         );
     }

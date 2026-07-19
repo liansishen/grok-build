@@ -37,6 +37,25 @@ pub(crate) const MAX_THOUGHTS_WIDTH_KEY: &str = "max_thoughts_width";
 // Bounded by `MAX_PICKER_CHOICES`.
 // ---------------------------------------------------------------------------
 
+/// UI language catalog (`[ui].language`). Product names stay as-is.
+const UI_LANGUAGE_CHOICES: &[EnumChoice] = &[
+    EnumChoice {
+        canonical: "auto",
+        display: "System",
+        description: "Follow the operating system language.",
+    },
+    EnumChoice {
+        canonical: "en",
+        display: "English",
+        description: "English interface.",
+    },
+    EnumChoice {
+        canonical: "zh-CN",
+        display: "简体中文",
+        description: "Simplified Chinese interface.",
+    },
+];
+
 /// Full theme catalog including the "auto" meta-variant. Used by `theme` only.
 const THEME_CHOICES: &[EnumChoice] = &[
     EnumChoice {
@@ -663,6 +682,33 @@ pub fn default_settings() -> Vec<SettingMeta> {
             ],
             kind: SettingKind::Bool {
                 default: ui_default.vim_mode.unwrap_or(false),
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        // --- UI language -----------------------------------------------------
+        // SHELL-owned, persisted to `[ui].language`. Live-applied via
+        // `xai_grok_i18n::set_locale` (no restart). Distinct from voice STT.
+        SettingMeta {
+            key: "language",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shell,
+            label: "UI language",
+            description: "Language for the Grok Build interface. System follows your OS locale when Chinese or English is detected.",
+            keywords: &[
+                "language",
+                "locale",
+                "i18n",
+                "l10n",
+                "chinese",
+                "english",
+                "中文",
+                "ui",
+            ],
+            kind: SettingKind::Enum {
+                default: "auto",
+                choices: UI_LANGUAGE_CHOICES,
+                supports_preview: false,
             },
             restart_required: false,
             hidden_in_minimal: false,

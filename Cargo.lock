@@ -13175,6 +13175,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "xai-grok-i18n"
+version = "0.1.0"
+dependencies = [
+ "toml",
+]
+
+[[package]]
 name = "xai-grok-markdown"
 version = "0.1.0"
 dependencies = [
@@ -13370,6 +13377,7 @@ dependencies = [
  "xai-grok-agent",
  "xai-grok-announcements",
  "xai-grok-config",
+ "xai-grok-i18n",
  "xai-grok-markdown",
  "xai-grok-mermaid",
  "xai-grok-pager-pty-harness",
@@ -13510,6 +13518,7 @@ dependencies = [
  "vte 0.15.0",
  "windows-sys 0.59.0",
  "xai-grok-config",
+ "xai-grok-i18n",
  "xai-grok-markdown",
  "xai-grok-paths",
  "xai-grok-shared",
@@ -13763,6 +13772,7 @@ dependencies = [
  "xai-grok-config-types",
  "xai-grok-hooks",
  "xai-grok-http",
+ "xai-grok-i18n",
  "xai-grok-mcp",
  "xai-grok-memory",
  "xai-grok-models",
@@ -14145,6 +14155,7 @@ dependencies = [
  "xai-grok-config-types",
  "xai-grok-env",
  "xai-grok-hooks",
+ "xai-grok-i18n",
  "xai-grok-mcp",
  "xai-grok-paths",
  "xai-grok-sandbox",

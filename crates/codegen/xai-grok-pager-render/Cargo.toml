@@ -8,6 +8,7 @@ license = "Apache-2.0"
 # TTY safety
 dunce = { workspace = true }
 xai-tty-utils = { workspace = true }
+xai-grok-i18n = { workspace = true }
 
 # Rendering
 ratatui = { workspace = true, features = [

@@ -16,7 +16,7 @@ impl SlashCommand for FindCommand {
     }
 
     fn description(&self) -> &str {
-        "Search the conversation scrollback"
+        xai_grok_i18n::t("slash.find.description")
     }
 
     fn session_scoped(&self) -> bool {

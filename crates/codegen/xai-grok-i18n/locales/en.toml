@@ -1,0 +1,1136 @@
+# Locale catalog (merged)
+[actions.BashMode]
+label = "shell"
+description = "Shell mode (type ! on empty prompt)"
+
+[actions.CancelTurn]
+label = "cancel"
+description = "Cancel turn"
+
+[actions.Collapse]
+label = "fold"
+description = "Collapse selected entry"
+
+[actions.CommandPalette]
+label = "commands"
+description = "Command palette"
+
+[actions.CopyBlockContent]
+label = "copy"
+description = "Copy content"
+
+[actions.CopyBlockMeta]
+label = "copy cmd"
+description = "Copy command / path"
+
+[actions.CycleMode]
+label = "mode"
+description = "Cycle mode (Normal / Plan / Always-approve)"
+
+[actions.DashboardBeginRename]
+label = "rename"
+description = "Rename agent"
+
+[actions.DashboardCycleMode]
+label = "mode"
+description = "Cycle dispatch mode"
+
+[actions.DashboardExit]
+label = "exit"
+description = "Close dashboard"
+
+[actions.DashboardOpenLocationPicker]
+label = "location"
+description = "Change working directory for new agents"
+
+[actions.DashboardOverlayExit]
+label = "close overlay"
+description = "Back to dashboard"
+
+[actions.DashboardOverlayNext]
+label = "next session"
+description = "Next session"
+
+[actions.DashboardOverlayPrev]
+label = "prev session"
+description = "Previous session"
+
+[actions.DashboardOverlayStop]
+label = "stop"
+description = "Stop agent, close session (back to dashboard)"
+
+[actions.DashboardReorderDown]
+label = "reorder down"
+description = "Reorder agent down"
+
+[actions.DashboardReorderUp]
+label = "reorder up"
+description = "Reorder agent up"
+
+[actions.DashboardSelectNext]
+label = "next"
+description = "Select next row"
+
+[actions.DashboardSelectPrev]
+label = "prev"
+description = "Select previous row"
+
+[actions.DashboardShortcutsHelp]
+label = "shortcuts"
+description = "Show shortcuts overlay"
+
+[actions.DashboardStop]
+label = "stop"
+description = "Stop / Close agent"
+
+[actions.DashboardToggleAutoApprove]
+label = "always-approve"
+description = "Toggle always-approve"
+
+[actions.DashboardToggleGrouping]
+label = "group"
+description = "Toggle row grouping"
+
+[actions.DashboardTogglePin]
+label = "pin"
+description = "Pin / unpin agent"
+
+[actions.DashboardToggleWorktree]
+label = "worktree"
+description = "Toggle worktree mode for new agents"
+
+[actions.EnableVoiceMode]
+label = "voice mode"
+description = "Start voice dictation (Ctrl+Space / F8)"
+
+[actions.Expand]
+label = "fold"
+description = "Expand selected entry"
+
+[actions.ExpandAllThinking]
+label = "expand/collapse thinking"
+description = "Toggle all thinking blocks"
+
+[actions.FocusPrompt]
+label = "prompt"
+description = "Focus prompt"
+
+[actions.FocusScrollback]
+label = "scrollback"
+description = "Focus scrollback"
+
+[actions.GotoBottom]
+label = "bottom"
+description = "Go to bottom"
+
+[actions.GotoTop]
+label = "top/btm"
+description = "Go to top"
+
+[actions.HalfPageDown]
+label = "half page down"
+description = "Scroll down half page"
+
+[actions.HalfPageUp]
+label = "half page up"
+description = "Scroll up half page"
+
+[actions.InterjectPrompt]
+label = "send now"
+description = "Send now while running (cancels the current turn)"
+
+[actions.KillBgTask]
+label = "kill"
+description = "Kill background task"
+
+[actions.ModelPicker]
+label = "model"
+description = "Pick model"
+
+[actions.NewSession]
+label = "new"
+description = "New session"
+
+[actions.NextResponse]
+label = "response"
+description = "Next response"
+
+[actions.NextTurn]
+label = "turn"
+description = "Next turn"
+
+[actions.OpenBlockViewer]
+label = "view"
+description = "Open in viewer"
+
+[actions.OpenDashboard]
+label = "dashboard"
+description = "Open the Agent Dashboard"
+
+[actions.OpenExtensions]
+label = "extensions"
+description = "Open extensions"
+
+[actions.OpenNextLink]
+label = "link"
+description = "Next link"
+
+[actions.OpenPrevLink]
+label = "link"
+description = "Previous link"
+
+[actions.OpenSessions]
+label = "sessions"
+description = "Open sessions"
+
+[actions.OpenSettings]
+label = "settings"
+description = "Open the settings modal"
+
+[actions.PageDown]
+label = "page down"
+description = "Scroll down one page"
+
+[actions.PageUp]
+label = "page up"
+description = "Scroll up one page"
+
+[actions.PrevResponse]
+label = "response"
+description = "Previous response"
+
+[actions.PrevTurn]
+label = "turn"
+description = "Previous turn"
+
+[actions.Quit]
+label = "quit"
+description = "Quit"
+
+[actions.Rewind]
+label = "rewind"
+description = "Rewind to selected turn"
+
+[actions.ScrollDown]
+label = "scroll down"
+description = "Scroll down one line"
+
+[actions.ScrollUp]
+label = "scroll up"
+description = "Scroll up one line"
+
+[actions.SelectNext]
+label = "nav"
+description = "Select next entry"
+
+[actions.SelectPrev]
+label = "nav"
+description = "Select previous entry"
+
+[actions.SendPrompt]
+label = "send"
+description = "Send"
+
+[actions.SendToBackground]
+label = "send to bg"
+description = "Send running task to background"
+
+[actions.ShortcutsHelp]
+label = "shortcuts"
+description = "Keyboard shortcuts"
+
+[actions.ToggleExpandAll]
+label = "all"
+description = "Expand all / collapse all"
+
+[actions.ToggleFold]
+label = "fold"
+description = "Expand / collapse"
+
+[actions.ToggleMouseCapture]
+label = "mouse reporting"
+description = "Toggle mouse reporting (native copy/paste)"
+
+[actions.ToggleMultiline]
+label = "multiline"
+description = "Toggle multiline"
+
+[actions.ToggleQueue]
+label = "queue"
+description = "Toggle prompt queue"
+
+[actions.ToggleRaw]
+label = "raw"
+description = "Toggle raw markdown"
+
+[actions.ToggleTasks]
+label = "tasks"
+description = "Toggle tasks pane"
+
+[actions.ToggleTodos]
+label = "todos"
+description = "Toggle todo pane"
+
+[actions.ToggleYolo]
+label = "yolo"
+description = "Toggle always-approve"
+
+[actions.VoiceToggle]
+label = "mic"
+description = "Voice dictation (Ctrl+Space / F8)"
+
+[agents]
+no_found = "No agents found"
+no_matching = "No matching agents"
+delete_persona = "Delete Persona"
+delete_persona_confirm = "Delete persona '{name}'?"
+
+[auth]
+browser_open_header = "A browser window will open for authentication."
+device_header = "Approve in your browser to finish signing in."
+device_code_caption = "Make sure your browser shows this code."
+copied = "copied!"
+copy_failed = "copy failed"
+waiting_login = "Waiting for login to complete..."
+waiting_approval = "Waiting for approval..."
+waiting_url = "Waiting for auth URL..."
+connecting = "Connecting..."
+paste_token_placeholder = "Paste your token here..."
+go_back = "go back"
+submit = "submit"
+show_full_url = "Copying not working? Click here to show full URL."
+select_url_hint = "Select the URL below with your mouse and copy manually."
+copy_prefix = "If it doesn't open, click "
+copy_here = "here"
+copy_suffix = " to copy."
+copy_unverified = "copy sent—verify paste"
+
+[dashboard]
+empty = "No agents yet"
+title = "Agent Dashboard"
+empty_prompt = "No agents yet, type a prompt to start one."
+loading_sessions = "Loading sessions…"
+no_matching_rows = "No matching rows."
+loading = "Loading…"
+no_activity = "No activity yet"
+failed = "Failed"
+sign_in = "Sign in to open the dashboard"
+disabled = "Agent dashboard is disabled in this configuration"
+trust_first = "Answer the folder-trust question to open the dashboard"
+open_to_change_location = "Open the dashboard (/dashboard) to change location"
+
+[docs.01]
+title = "Getting Started"
+desc = "Installation, first launch, and basic interaction"
+
+[docs.02]
+title = "Authentication"
+desc = "Browser login, API keys, OIDC, external auth providers"
+
+[docs.03]
+title = "Keyboard Shortcuts"
+desc = "Complete reference for all TUI key bindings"
+
+[docs.04]
+title = "Slash Commands"
+desc = "All / commands for session management, models, memory, hooks"
+
+[docs.05]
+title = "Configuration"
+desc = "config.toml, pager.toml, environment variables, file locations"
+
+[docs.06]
+title = "Theming and Appearance"
+desc = "Themes, color support, pager.toml customization"
+
+[docs.07]
+title = "MCP Servers"
+desc = "Setting up external tool integrations via MCP"
+
+[docs.08]
+title = "Skills"
+desc = "Creating and using reusable prompt packages"
+
+[docs.09]
+title = "Plugins and Marketplace"
+desc = "Installing, managing, and creating plugin packages"
+
+[docs.10]
+title = "Hooks"
+desc = "Project lifecycle scripts for pre/post tool-use events"
+
+[docs.11]
+title = "Custom Models"
+desc = "BYOK, Ollama, OpenAI-compatible endpoints"
+
+[docs.12]
+title = "Project Rules (AGENTS.md)"
+desc = "Per-directory instructions and precedence rules"
+
+[docs.13]
+title = "Memory"
+desc = "Cross-session knowledge persistence and search"
+
+[docs.14]
+title = "Headless Mode and Scripting"
+desc = "Non-interactive CLI for automation and CI/CD"
+
+[docs.15]
+title = "Agent Mode and IDE Integration"
+desc = "ACP stdio transport, WebSocket relay, SDK integration"
+
+[extensions]
+select_option = "Select an option"
+save_auth = "Save and authenticate"
+processing = "Processing..."
+
+[hint]
+send = "send"
+expand = "expand"
+copy = "copy"
+kill = "kill"
+send_now = "send now"
+nav = "nav"
+quit = "quit"
+cancel = "cancel"
+stop = "stop"
+shortcuts = "shortcuts"
+prompt = "prompt"
+scrollback = "scrollback"
+
+[import]
+claude_title = "Import Claude settings"
+permissions = "Permissions"
+mcp_servers = "MCP servers"
+esc_cancel = "Esc cancel"
+
+[memory]
+no_file = "No file selected"
+
+[modal]
+new_session = "New Session"
+agent_dashboard = "Agent Dashboard"
+always_approve_mode = "Always Approve Mode"
+keyboard_shortcuts = "Keyboard Shortcuts"
+howto_guides = "How-to Guides"
+commands = "Commands"
+resume_session = "Resume session"
+pick_model = "Pick model"
+save_and_send = "Save and send?"
+save_changes = "Save changes?"
+reset_setting = "Reset setting?"
+subagents_running = "Subagents are still running. Stop them?"
+tip_docs = "Tip · Ask Grok about the docs…"
+stop_running = "Stop running"
+continue_to_run = "Continue to run"
+always_stop = "Always stop"
+always_continue = "Always continue"
+
+[modal.footer]
+enter_select = "Enter select"
+esc_close = "Esc close"
+
+[modal.section]
+session = "Session"
+
+[pane]
+no_todos = "No todo items."
+no_tasks = "No tasks or agents."
+no_bundled = "No bundled items."
+no_progress = "No progress items yet"
+
+[permission.args]
+expand_hint = "… Ctrl-F to expand"
+
+[permission.default]
+always_allow_all_sessions = "Always allow on all sessions"
+allow_once = "Allow once"
+allow_command_always = "Always allow this command"
+reject = "Reject"
+
+[permission.hint]
+choose_scope = "Use ← → to choose permission scope"
+
+[permission.mcp]
+all_tools_from = "all tools from {server}"
+
+[permission.option]
+yes = "Yes"
+yes_proceed = "Yes, proceed"
+yes_allow_once = "Yes, allow once"
+reject_once = "No, and tell Grok what to do differently"
+enable_always_approve = "Yes, and don't ask again for anything (always-approve mode)"
+allow_edits_session = "Yes, allow all edits during this session"
+always_allow_bash = "Yes, and don't ask again for bash commands"
+reject_always_bash = "No, and don't run bash commands"
+
+[permission.prefix]
+always_allow = "Always allow:"
+never_allow = "Never allow:"
+
+[permission.reject_once]
+placeholder = "No, reject (type to add feedback)"
+
+[permission.title]
+allow = "Allow?"
+allow_execute = "Allow Execute?"
+allow_edit = "Allow Edit?"
+allow_delete = "Allow Delete?"
+allow_bin = "Allow `{bin}`?"
+allow_edit_path = "Allow Edit to {path}?"
+allow_named = "Allow {name}?"
+
+[persona]
+saved = "Saved"
+save_failed = "Save failed: {error}"
+no_source = "No source file"
+
+[plan]
+waiting_approval = "Waiting on plan approval"
+no_plan_approve = "No plan written — approve or request changes"
+
+[rewind]
+loading = "Loading rewind points..."
+cancel_and_rewind = "Cancel turn and rewind"
+confirm = "Confirm rewind"
+
+[scrollback]
+thinking = "Thinking…"
+thought = "Thought"
+for_time = " for {time}"
+turn_completed = "Turn completed."
+turn_cancelled = "Turn cancelled by user…"
+compacting = "Context {n}% full. Compacting…"
+compaction_failed = "Compaction failed."
+retry_failed = "Retry failed: {error}"
+system_prompt = "System prompt"
+reasoning_overhead = "Reasoning/overhead"
+tool_definitions = "Tool definitions"
+compact_tip = "Tip: run /compact to free context"
+credit_limit = "You've hit your credit limit."
+
+[settings.auto_dark_theme]
+label = "Auto dark theme"
+description = "Theme to use when the system is in dark mode (only with theme=auto)."
+
+[settings.auto_light_theme]
+label = "Auto light theme"
+description = "Theme to use when the system is in light mode (only with theme=auto)."
+
+[settings.auto_update]
+label = "Auto-update"
+description = "Automatically download and install pager updates on startup. \\ Restart required."
+
+[settings.category]
+appearance = "Appearance"
+mouse = "Mouse"
+editor = "Editor & Input"
+agent = "Agent & Approval"
+privacy = "Privacy"
+models = "Models"
+session = "Session"
+advanced = "Advanced"
+
+[settings.coding_data_sharing]
+label = "Coding data sharing"
+description = "Controls whether SpaceXAI may retain and train on coding session \\ data. Does not affect product analytics; see Configuration and \\ Monitoring docs."
+
+[settings.collapsed_edit_blocks]
+label = "Collapsed edit blocks"
+description = "Show edits as one-line +N/-M diffstat summaries and merge \\ back-to-back edits to the same file into one block; expand a \\ row to see the diffs."
+
+[settings.compact_mode]
+label = "Compact mode"
+description = "Reduce padding around messages for more content density. \\ Auto-enabled while the terminal is 20 rows or shorter."
+
+[settings.contextual_hints]
+label = "Show contextual hints"
+description = "Show brief, in-context keyboard hints as you work; \\ toggle each one individually."
+
+[settings.contextual_hints.image_input]
+label = "Image input"
+description = "Offer to paste an image when one is on the clipboard and the \\ model accepts images."
+
+[settings.contextual_hints.plan_mode]
+label = "Plan mode"
+description = "Suggest plan mode (Shift+Tab) when your prompt looks like a \\ planning request."
+
+[settings.contextual_hints.send_now]
+label = "Send now"
+description = "After you queue a follow-up mid-turn, remind you that Enter \\ on an empty prompt sends the top queued item now."
+
+[settings.contextual_hints.small_screen]
+label = "Small screen"
+description = "Suggest /compact-mode once per run when the terminal \\ is short on rows."
+
+[settings.contextual_hints.ssh_wrap]
+label = "SSH wrap"
+description = "At session load over SSH, recommend `grok wrap ssh` for \\ clipboard forwarding and terminal restore."
+
+[settings.contextual_hints.undo]
+label = "Undo"
+description = "Remind you that Ctrl+Z restores the prompt after you clear it."
+
+[settings.contextual_hints.word_select]
+label = "Word select"
+description = "After double-clicking conversation text while Text selection \\ is fold/nav, remind you that Word select lives in Settings."
+
+[settings.default_model]
+label = "Default model"
+description = "Model used for new sessions. Changing this also switches the active session. Pick `(no override)` to clear."
+
+[settings.default_selected_permission]
+label = "Default selected permission"
+description = "Which row the cursor preselects on permission prompts."
+
+[settings.display_refresh_auto_cadence]
+label = "Match display refresh rate"
+description = "On high-refresh displays, the TUI will stream/scroll faster \\ to match the display. Off keeps the classic ~60 Hz cadence. \\ Restart required."
+
+[settings.dynamic_enum]
+no_override = "(no override)"
+no_override_desc = "Inherit the default model (no per-user override)."
+
+[settings.fork_secondary_model]
+label = "Fork secondary model"
+description = "Model used for the secondary agent when forking. Pick `(no override)` to clear."
+
+[settings.group_tool_verbs]
+label = "Group tool calls"
+description = "Fold consecutive read/search/list tool calls and subagent rows into \\ one summary row; finished thoughts fold into the group too."
+
+[settings.hunk_tracker_mode]
+label = "Hunk tracker"
+description = "Which file changes the agent tracks as hunks. \\ Off disables tracking (and LOC stats) entirely. \\ Restart required."
+
+[settings.invert_scroll]
+label = "Invert scroll"
+description = "Reverse vertical scroll direction (natural scrolling)."
+
+[settings.keep_text_selection]
+label = "Text selection"
+description = "How long in-app selection stays on screen and what double-click does (fold vs. select & copy a word). For your terminal or multiplexer's own selection, hold Shift while dragging (native copy)."
+
+[settings.language]
+label = "UI language"
+description = "Language for the Grok Build interface. System follows your OS locale when Chinese or English is detected."
+choice_auto = "System"
+choice_auto_desc = "Follow the operating system language."
+choice_en = "English"
+choice_en_desc = "English interface."
+choice_zh_cn = "简体中文"
+choice_zh_cn_desc = "Simplified Chinese interface."
+
+[settings.modal]
+title = "Settings"
+value_on = "on"
+value_off = "off"
+restart_pill = "restart"
+no_matches_for = "No matches for"
+tip_long = "Tip · Ask Grok: \"change theme to grokday\" or \"what does compact mode do?\""
+tip_short = "Tip · Ask Grok to change a setting"
+err_empty = "Value cannot be empty"
+err_whitespace = "Value cannot contain whitespace"
+err_catalog_loading = "Model catalog still loading — try again"
+err_unknown_model = "Unknown model: \"{buffer}\""
+
+[settings.modal.footer]
+nav_jk = "↑/↓/j/k nav"
+space_toggle = "Space toggle"
+enter_edit = "Enter edit"
+slash_search = "/ search"
+reset = "d reset"
+close = "F2/Esc close"
+top_bottom = "g/G top/btm"
+enter_toggle = "Enter toggle"
+expand = "→ expand"
+type_to_filter = "type to filter"
+nav = "↑/↓ nav"
+backspace_edit = "Backspace edit"
+enter_commit = "Enter commit"
+esc_clear = "Esc clear"
+nav_try = "↑/↓ try"
+esc_revert = "Esc revert"
+esc_cancel = "Esc cancel"
+y_reset = "y reset"
+n_cancel = "n cancel"
+f2_cancel = "F2 cancel"
+type_to_edit = "type to edit"
+space_enter_toggle = "Space/Enter toggle"
+esc_back = "Esc back"
+
+[settings.multiline_mode]
+label = "Multiline"
+description = "When on, Enter inserts a newline and Shift+Enter sends. Resets each session."
+
+[settings.page_flip_on_send]
+label = "Snap prompt to top on send"
+description = "When you send a prompt, scroll it to the top of the screen so the \\ response starts on a fresh page (default). Turn off to leave the scroll \\ position unchanged when you send."
+
+[settings.permission_mode]
+label = "Permission mode"
+description = "Default uses the agent's built-in behavior; \\ Ask prompts for each tool action; \\ Auto uses an LLM classifier for risky tools; \\ Always approve grants all permissions automatically."
+choice_always_approve = "Always approve"
+choice_always_approve_desc = "Auto-approve every tool action. Skips ALL permission prompts."
+choice_ask = "Ask"
+choice_ask_desc = "Prompt for permission before tool actions."
+choice_auto = "Auto"
+choice_auto_desc = "LLM classifier approves safe tools; dangerous actions may still prompt or deny."
+choice_default = "Default"
+choice_default_desc = "Use the agent's default permission behavior (currently equivalent to Ask)."
+
+[settings.plan_mode]
+label = "Plan mode"
+description = "When on, the agent summarises a plan before running tools or making edits."
+choice_off = "Off"
+choice_off_desc = "Agent runs tools and edits files directly (default)."
+choice_on = "On"
+choice_on_desc = "Agent summarises a plan and asks for approval before running tools."
+
+[settings.prompt_suggestions]
+label = "Prompt suggestions"
+description = "After each turn, predict your likely next prompt and show it as \\ ghost text in the input (Tab to accept). Uses a small model call \\ per turn."
+
+[settings.remember_tool_approvals]
+label = "Remember tool approvals"
+description = "Show \"Always allow\" options in permission prompts so you can stop \\ being re-asked about a specific command or tool. Applies in ask and \\ auto; Always-approve still skips all prompts. Restart required."
+
+[settings.render_mermaid]
+label = "Render Mermaid diagrams"
+description = "How ```mermaid code blocks are shown: auto/on add a clickable row to \\ open the rendered diagram; off shows the raw source."
+
+[settings.respect_manual_folds]
+label = "Respect manual folds"
+description = "Keep manually folded blocks as-is while streaming and stop \\ auto-scroll when expanding a block. Experimental."
+
+[settings.screen_mode]
+label = "Default screen mode"
+description = "How plain grok opens next time: Fullscreen (default when unset) or \\ Minimal. Writes [ui] screen_mode in config.toml. Restart required. \\ Switch this session only with /minimal or /fullscreen."
+choice_fullscreen = "Fullscreen"
+choice_fullscreen_desc = "Open plain grok in the standard fullscreen TUI. Default when unset."
+choice_minimal = "Minimal"
+choice_minimal_desc = "Open plain grok in scrollback-native (minimal) mode."
+
+[settings.scroll_lines]
+label = "Scroll lines"
+description = "Lines per scroll tick for both wheel and trackpad (1-10). \\ Until set, each terminal's own profile applies."
+
+[settings.scroll_mode]
+label = "Scroll input"
+description = "Force wheel or trackpad scroll behavior when auto-detection \\ misreads your device."
+
+[settings.scroll_speed]
+label = "Scroll speed"
+description = "Mouse-wheel and trackpad scroll speed multiplier (1-100). Higher = faster."
+
+[settings.show_thinking_blocks]
+label = "Show thinking blocks"
+description = "Show agent thinking/reasoning blocks in the scrollback while streaming."
+
+[settings.show_timeline]
+label = "Timeline sidebar"
+description = "Per-turn tick rail in place of the scrollbar: hover previews a turn, click jumps to it."
+
+[settings.show_timestamps]
+label = "Show timestamps"
+description = "Show clock time next to user messages and agent responses."
+
+[settings.show_tips]
+label = "Show tips"
+description = "Show the tip-of-the-day banner on startup. Restart required."
+
+[settings.simple_mode]
+label = "Disable vim input mode"
+description = "Use plain readline-style input instead of vim keys in the prompt. Experimental."
+
+[settings.theme]
+label = "Theme"
+description = "Color theme for the pager UI."
+choice_auto_desc = "Follow system dark/light appearance."
+choice_grokday_desc = "Light theme for bright environments."
+choice_groknight_desc = "Neutral dark with magenta accent."
+choice_oscura_midnight_desc = "Deep dark with warm accents; needs truecolor."
+choice_rosepine_moon_desc = "Muted dark with mauve accents; needs truecolor."
+choice_tokyonight_desc = "Dark + blue-tinted; needs truecolor."
+
+[settings.toolset.ask_user_question.timeout_enabled]
+label = "Ask-Question timeout"
+description = "When on, the ask_user_question tool will time out after a set period \\ of time instead of infinitely blocking."
+
+[settings.vim_mode]
+label = "Vim scrollback navigation"
+description = "Enable vim keys (h/j/k/l, gg/G, /) for navigating the scrollback. Does not affect the input prompt."
+
+[settings.voice_capture_mode]
+label = "Voice capture"
+description = "How the voice chord (Ctrl+Space / F8) behaves: Toggle \\ (press to start/stop) or Hold to talk (hold to record, \\ release to stop; needs a Kitty-protocol terminal)."
+
+[settings.voice_stt_language]
+label = "Voice language"
+description = "Speech-to-text language for voice dictation (Grok STT). \\ English by default; System uses your locale when supported. \\ Sets formatting language for numbers and currencies."
+
+[shortcuts.category]
+essentials = "Essentials"
+input = "Input"
+conversation_nav = "Conversation Navigation"
+conversation_action = "Conversation Actions"
+panels = "Panels"
+session = "Session"
+dashboard = "Dashboard"
+
+[slash.always-approve]
+description = "Toggle always-approve mode (skip all permission prompts)"
+
+[slash.announcements]
+description = "Show or hide announcements"
+
+[slash.auto]
+description = "Toggle auto mode (classifier approves safe tools)"
+
+[slash.btw]
+description = "Ask a side question without interrupting"
+
+[slash.cd]
+description = "Change the working directory for new agents"
+
+[slash.compact]
+description = "Compact conversation history"
+
+[slash.compact-mode]
+description = "Toggle compact UI (less padding, more content)"
+
+[slash.config-agents]
+description = "Manage agent definitions"
+
+[slash.context]
+description = "View context usage"
+
+[slash.copy]
+description = "Copy last response to clipboard (/copy N for Nth-latest)"
+
+[slash.dashboard]
+description = "Open the Agent Dashboard — a fullscreen overview of every running session"
+
+[slash.debug]
+description = "Toggle debug overlays"
+
+[slash.docs]
+description = "Open How-to Guides or online Build docs"
+
+[slash.effort]
+description = "Set reasoning effort for the current model"
+
+[slash.err]
+no_active_session = "No active session"
+no_active_session_export = "No active session to export"
+no_active_session_share = "No active session to share"
+no_active_session_view = "No active session to view"
+no_active_model = "No active model"
+usage_model = "Usage: /model <name> [effort]"
+usage_rename = "Usage: /rename <new title>"
+no_release_notes = "No release notes available (offline)."
+
+[slash.expand]
+description = "Re-print the last collapsed block, fully expanded (minimal mode)"
+
+[slash.export]
+description = "Export the current conversation to a file or clipboard"
+
+[slash.feedback]
+description = "Send feedback about the current session"
+
+[slash.find]
+description = "Search the conversation scrollback"
+
+[slash.fork]
+description = "Branch the current session into a peer agent"
+
+[slash.help]
+description = "Browse commands and keyboard shortcuts"
+
+[slash.history]
+description = "Search prompt history"
+
+[slash.home]
+description = "Return to the welcome screen"
+
+[slash.hooks]
+description = "View hooks"
+
+[slash.import-claude]
+description = "Open the Claude settings import modal"
+
+[slash.jump]
+description = "Jump to a turn in the conversation"
+
+[slash.login]
+description = "Log in or re-authenticate with your account"
+
+[slash.logout]
+description = "Log out and return to the login screen"
+
+[slash.loop]
+description = "Run a prompt on a recurring interval"
+
+[slash.marketplace]
+description = "View marketplace"
+
+[slash.mcps]
+description = "Show MCP server status"
+
+[slash.model]
+description = "Switch the active model"
+
+[slash.multiline]
+description = "Toggle multiline input mode (swap Enter and Shift+Enter)"
+
+[slash.new]
+description = "Start a new session"
+
+[slash.personas]
+description = "Manage personas (create, edit, delete)"
+
+[slash.plan]
+description = "Enter plan mode"
+
+[slash.plugins]
+description = "View plugins"
+
+[slash.privacy]
+description = "Show or toggle privacy & data retention status"
+
+[slash.queue]
+description = "List the prompts queued behind the running turn"
+
+[slash.quit]
+description = "Quit the application"
+
+[slash.recap]
+description = "Summarize the session so far"
+
+[slash.release-notes]
+description = "View release notes for the current version"
+
+[slash.remember]
+description = "Save a memory note"
+
+[slash.rename]
+description = "Rename the current session"
+
+[slash.resume]
+description = "Resume a previous session"
+
+[slash.rewind]
+description = "Rewind to a previous turn"
+
+[slash.session-info]
+description = "Show session info"
+
+[slash.settings]
+description = "Open the settings modal"
+
+[slash.share]
+description = "Share this session via URL"
+
+[slash.skills]
+description = "View skills"
+
+[slash.tasks]
+description = "List background tasks, subagents, and scheduled tasks"
+
+[slash.terminal-setup]
+description = "Check terminal, color, and clipboard setup"
+
+[slash.theme]
+description = "Switch the color theme"
+
+[slash.timeline]
+description = "Toggle the timeline sidebar"
+
+[slash.timestamps]
+description = "Toggle message timestamps on/off"
+
+[slash.toggle-mouse-reporting]
+description = "Toggle terminal mouse reporting (native click-drag copy/paste)"
+
+[slash.transcript]
+description = "View the full conversation transcript in your pager ($PAGER)"
+
+[slash.usage]
+description = "View credit usage or manage billing"
+
+[slash.view-plan]
+description = "View the current plan"
+
+[slash.vim-mode]
+description = "Toggle vim-style scrollback keybindings (j/k, h/l, g/G, y/Y, …)"
+
+[status]
+queue_empty = "Queue is empty."
+no_tasks = "No background tasks."
+
+[tips]
+plan_nudge = "Planning? Check out plan mode via "
+small_screen = "Tight on space? Try /compact-mode"
+
+[tips.clipboard_image]
+prefix = "Image in clipboard · "
+suffix = " to paste"
+
+[tips.send_now]
+prefix = "Queued · "
+enter = "Enter"
+suffix = " to send now"
+
+[tips.ssh_wrap]
+full = "Over SSH? Run grok wrap ssh <host> locally for clipboard + terminal restore"
+
+[tips.undo]
+prefix = "Input cleared · "
+suffix = " to undo"
+
+[tips.word_select]
+full = "Want double-click to select? /settings → Text selection · Ctrl+Y: enable now"
+
+[toast]
+language_set = "UI language: {name}"
+check = "✓"
+setting_changed = "✓ {label}: {value}"
+already_default = "{label}: already at default"
+mouse_reporting_on = "Mouse reporting on"
+copied = "Copied!"
+no_active_session = "No active session"
+mermaid = "✓ Mermaid: {value}"
+theme = "✓ Theme: {name}"
+always_approve_on = "⚠ Always-approve ON: all tool actions auto-run"
+always_approve_on_plan = "⚠ Always-approve ON: plan mode still blocks file edits until you exit plan mode"
+already_plan_mode = "Already in plan mode. Use /view-plan to view the current plan."
+plan_mode = "Plan mode"
+always_approve = "Always-approve"
+reconnected = "Reconnected."
+session_restored = "Session restored. In-progress tools and terminals were lost."
+session_restore_failed = "Session restore failed. Kept the existing transcript."
+reconnecting = "Reconnecting, please wait..."
+voice_pipeline_failed = "Voice pipeline could not start — restart grok"
+voice_stopped = "Voice stopped — pipeline ended"
+opening_app = "Opening in default app…"
+could_not_open_file = "Could not open file"
+loading_video = "Loading video…"
+browser_unavailable = "Browser unavailable - URL shown above"
+editing_queued = "Editing a queued prompt: press Enter to save, Esc to discard"
+cant_send_mid_turn = "Can't send this mid-turn — it runs when the current turn ends"
+queued_gone = "Queued prompt is no longer in the queue"
+images_shared_queue = "Images can't be attached when editing a shared queued prompt"
+diagram_not_ready = "Diagram not ready yet"
+rendering_diagram = "Rendering diagram…"
+could_not_render_diagram = "Could not render diagram"
+no_turn_running = "No turn running — prompt will send when ready"
+cant_send_now = "Can't send this now — it runs when the current turn ends"
+no_plan_yet = "No plan written yet."
+plan_revision_sent = "Plan revision sent."
+no_comments = "No comments to send."
+plan_feedback_sent = "Plan feedback sent."
+couldnt_load_image = "Couldn't load image preview"
+couldnt_save_image = "Couldn't save pasted image"
+recap_disabled = "Session recap is not enabled"
+no_input_events = "No input events recorded yet."
+ffmpeg_required = "Video playback requires ffmpeg"
+interjection_sent = "Interjection sent"
+external_sessions_cant_delete = "External sessions can't be deleted"
+chat_delete_unsupported = "Deleting chat conversations isn't supported yet"
+deleting_session = "Deleting session…"
+session_deleted = "Session deleted"
+sharing_disabled = "Sharing is disabled"
+zdr_enabled = "✗ Cannot change: Zero Data Retention enabled"
+data_sharing_admin = "✗ Data sharing is controlled by your team admin"
+no_undoable = "No undoable prompts"
+images_removed_skill = "Images removed (skill prompt)"
+nothing_to_jump = "Nothing to jump to yet"
+fork_session_only = "/fork only works inside a session"
+fork_still_creating = "Cannot fork: session is still being created"
+default_model_cleared = "✓ Default model: cleared"
+fork_model_cleared = "✓ Fork secondary model: cleared"
+fork_model_default = "✓ Fork secondary model: already at default"
+compact_auto = "✓ Compact mode: off (auto-compact active on small terminal)"
+
+[tool.prefix]
+list = "List "
+edit = "Edit "
+creating = "Creating "
+read = "Read "
+run = "Run "
+search = "Search "
+fetch = "Fetch "
+memory_search = "Memory Search "
+web_search = "Web search "
+web_fetch = "Web fetch "
+
+[turn.activity]
+cancelling = "Cancelling…"
+verifying = "Verifying…"
+thinking = "Thinking…"
+responding = "Responding…"
+compacting = "Compacting…"
+running = "Running…"
+waiting = "Waiting…"
+starting_session = "Starting session…"
+
+[turn.button]
+stop = "[stop]"
+stop_spaced = " [stop]"
+
+[turn.tool.prefix]
+run = "Run "
+search = "Search "
+fetch = "Fetch "
+
+[turn.wait]
+model = "Waiting for response…"
+subagent = "Waiting on subagent…"
+task_output = "Waiting on task output…"
+tasks_complete = "Waiting on tasks…"
+sleep = "Sleeping…"
+
+[turn.watchers]
+watching = "watching"
+
+[welcome]
+quit = "quit"
+quit_menu = "Quit"
+resume_session = "Resume session"
+new_session = "New session"
+settings = "Settings"
+changelog = "Changelog"
+switch_account = "Switch account"
+logout = "Logout"
+upgrade_subscription = "Upgrade Subscription"
+import_claude_settings = "Import Claude settings"
+new_worktree = "New worktree"
+type_message = "Type a message..."
+hero_subtitle = "Thanks for trying Grok Build, give feedback with /feedback!"
+logged_in_api_key = "Logged in with API key"
+zdr_unavailable = "Grok Build is not yet available for this account."
+supergrok_required = "SuperGrok subscription required"
+refresh = "[Refresh]"
+tier_free = "Free"
+beta = "Beta"
+login_with = "Login with {label}"
+press_again = "press again to {label}"
+
+[welcome.picker]
+back = "back"
+select = "select"
+navigate = "navigate"
+filter = "filter"
+worktree = "worktree"
+
+[welcome.trust]
+yes = "Yes, proceed"
+no = "No, quit"
+question = "Do you trust the contents of this directory?"
+warning_line1 = "Grok Build may run or modify contents in this directory,"
+warning_line2 = "posing security risks."
+
+[worktree]
+new_title = "New Worktree"
+name_optional = "Name (optional): "

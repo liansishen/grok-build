@@ -14,7 +14,7 @@ impl SlashCommand for TimelineCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle the timeline sidebar"
+        xai_grok_i18n::t("slash.timeline.description")
     }
 
     /// Minimal mode has no interactive scrollback pane for the rail.

@@ -60,14 +60,14 @@ impl SettingCategory {
     /// Section-header label as rendered in the modal.
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Appearance => "Appearance",
-            Self::Mouse => "Mouse",
-            Self::Editor => "Editor & Input",
-            Self::Agent => "Agent & Approval",
-            Self::Privacy => "Privacy",
-            Self::Models => "Models",
-            Self::Session => "Session",
-            Self::Advanced => "Advanced",
+            Self::Appearance => xai_grok_i18n::t("settings.category.appearance"),
+            Self::Mouse => xai_grok_i18n::t("settings.category.mouse"),
+            Self::Editor => xai_grok_i18n::t("settings.category.editor"),
+            Self::Agent => xai_grok_i18n::t("settings.category.agent"),
+            Self::Privacy => xai_grok_i18n::t("settings.category.privacy"),
+            Self::Models => xai_grok_i18n::t("settings.category.models"),
+            Self::Session => xai_grok_i18n::t("settings.category.session"),
+            Self::Advanced => xai_grok_i18n::t("settings.category.advanced"),
         }
     }
 }
@@ -115,8 +115,9 @@ pub fn dynamic_enum_choices(
             let mut out = Vec::with_capacity(snapshot.available_models.len() + 1);
             out.push(OwnedEnumChoice {
                 canonical: String::new(),
-                display: "(no override)".to_string(),
-                description: "Inherit the default model (no per-user override).".to_string(),
+                display: xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string(),
+                description: xai_grok_i18n::t("settings.dynamic_enum.no_override_desc")
+                    .to_string(),
             });
             for (name, _id) in &snapshot.available_models {
                 out.push(OwnedEnumChoice {
@@ -200,7 +201,9 @@ pub struct SettingMeta {
     pub key: SettingKey,
     pub category: SettingCategory,
     pub owner: SettingOwner,
+    /// English label (source / search fallback). Prefer [`Self::label_t`] in UI.
     pub label: &'static str,
+    /// English description (source / search fallback). Prefer [`Self::description_t`].
     pub description: &'static str,
     /// Free-form keywords for the search/filter. All lowercase,
     /// no empty strings — `keywords_lowercase_and_non_empty` enforces.
@@ -212,6 +215,40 @@ pub struct SettingMeta {
     /// When `true`, the row is hidden in minimal mode (the setting still
     /// exists and applies to the full TUI).
     pub hidden_in_minimal: bool,
+}
+
+impl SettingMeta {
+    /// Localized label for the current UI locale (`settings.<key>.label`).
+    pub fn label_t(&self) -> &'static str {
+        let key = xai_grok_i18n::intern_key(&format!("settings.{}.label", self.key));
+        xai_grok_i18n::t_or(key, self.label)
+    }
+
+    /// Localized description for the current UI locale.
+    pub fn description_t(&self) -> &'static str {
+        let key = xai_grok_i18n::intern_key(&format!("settings.{}.description", self.key));
+        xai_grok_i18n::t_or(key, self.description)
+    }
+}
+
+impl EnumChoice {
+    /// Localized display for a choice under `settings.<setting_key>.choice_<canonical>`.
+    pub fn display_t(&self, setting_key: SettingKey) -> &'static str {
+        let canon = self.canonical.replace('-', "_");
+        let key = xai_grok_i18n::intern_key(&format!(
+            "settings.{setting_key}.choice_{canon}"
+        ));
+        xai_grok_i18n::t_or(key, self.display)
+    }
+
+    /// Localized sub-description for a choice.
+    pub fn description_t(&self, setting_key: SettingKey) -> &'static str {
+        let canon = self.canonical.replace('-', "_");
+        let key = xai_grok_i18n::intern_key(&format!(
+            "settings.{setting_key}.choice_{canon}_desc"
+        ));
+        xai_grok_i18n::t_or(key, self.description)
+    }
 }
 
 /// A typed value carried by `Action::Set*` payloads, modal preview state,
@@ -325,6 +362,12 @@ pub fn canonical_voice_capture_mode(value: Option<&str>) -> &'static str {
 /// `auto`). Unknown/blank/`None` → `en`.
 pub fn canonical_voice_stt_language(value: Option<&str>) -> &'static str {
     xai_grok_voice::canonicalize_stt_language(value)
+}
+
+/// Canonical UI language preference (`auto` | `en` | `zh-CN`).
+/// Unset / empty → `auto` (system locale).
+pub fn canonical_ui_language(value: Option<&str>) -> &'static str {
+    xai_grok_i18n::canonicalize_language(value)
 }
 
 /// Canonicalize a raw hunk-tracker mode to a registry choice. Case-insensitive
@@ -455,9 +498,14 @@ fn assert_unique_keys(entries: &[SettingMeta]) {
 
 fn build_search_haystack(m: &SettingMeta) -> String {
     let mut s = String::new();
+    // English source + current locale so both languages match filter.
     s.push_str(&m.label.to_lowercase());
     s.push(' ');
     s.push_str(&m.description.to_lowercase());
+    s.push(' ');
+    s.push_str(&m.label_t().to_lowercase());
+    s.push(' ');
+    s.push_str(&m.description_t().to_lowercase());
     s.push(' ');
     s.push_str(m.key);
     for kw in m.keywords {
@@ -575,6 +623,10 @@ pub fn current_value_for(
                 .as_deref()
                 .unwrap_or(&pager.voice_stt_language),
         )))),
+        // SHELL — UI language preference (not voice STT).
+        "language" => Some(SettingValue::Enum(canonical_ui_language(
+            ui.language.as_deref(),
+        ))),
         // Theme: unknown disk values fall through to canonical default.
         // auto_dark/light additionally filter out "auto" (circular ref).
         "theme" => Some(SettingValue::Enum(
@@ -990,6 +1042,18 @@ mod tests {
                         *default,
                         canonical_voice_stt_language(ui.voice_stt_language.as_deref()),
                         "voice_stt_language default drifts from UiConfig::default()",
+                    );
+                }
+                // language (UI): Option<String>; None → "auto".
+                ("language", SettingKind::Enum { default, .. }) => {
+                    assert_eq!(
+                        ui.language, None,
+                        "test assumes UiConfig::default().language is None",
+                    );
+                    assert_eq!(
+                        *default,
+                        canonical_ui_language(ui.language.as_deref()),
+                        "language default drifts from UiConfig::default()",
                     );
                 }
                 // hunk_tracker_mode: Option<String>; None → "agent_only".

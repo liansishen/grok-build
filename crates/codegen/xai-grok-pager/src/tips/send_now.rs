@@ -30,9 +30,9 @@ pub fn send_now_tip() -> EphemeralTip {
     EphemeralTip::new(
         SEND_NOW_TIP_KEY,
         Line::from(vec![
-            Span::styled("Queued · ", dim),
+            Span::styled(xai_grok_i18n::t("tips.send_now.prefix"), dim),
             Span::styled("Enter", key_style),
-            Span::styled(" to send now", dim),
+            Span::styled(xai_grok_i18n::t("tips.send_now.suffix"), dim),
         ]),
     )
     .with_session_seen_cap(SEND_NOW_TIP_SEEN_KEY, SEND_NOW_TIP_SEEN_CAP)

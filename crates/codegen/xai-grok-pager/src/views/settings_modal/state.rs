@@ -21,7 +21,14 @@ use xai_grok_shell::agent::config::UiConfig;
 
 /// Public display title of the modal — also used by
 /// `views/modal.rs::ActiveModal::message` so renames stay in one place.
+/// Prefer [`modal_title`] for locale-aware chrome; this constant remains
+/// the English fallback for tests that match exact chrome text.
 pub const MODAL_TITLE: &str = "Settings";
+
+/// Localized settings modal title.
+pub fn modal_title() -> &'static str {
+    xai_grok_i18n::t_or("settings.modal.title", MODAL_TITLE)
+}
 
 /// Width of the `"─ "` leading decoration before the title in the
 /// modal's top border. Used to compute the breadcrumb hit-rect x offset.
@@ -921,6 +928,7 @@ pub(super) fn action_for_enum_commit(key: SettingKey, choice: &'static str) -> O
         "screen_mode" => Some(Action::SetScreenMode(choice.to_string())),
         "voice_capture_mode" => Some(Action::SetVoiceCaptureMode(choice.to_string())),
         "voice_stt_language" => Some(Action::SetVoiceSttLanguage(choice.to_string())),
+        "language" => Some(Action::SetUiLanguage(choice.to_string())),
         "render_mermaid" => {
             crate::appearance::RenderMermaid::from_canonical(choice).map(Action::SetRenderMermaid)
         }
@@ -994,9 +1002,9 @@ pub(super) fn validate_string(
         StringValidator::Any => None,
         StringValidator::NonEmptyToken => {
             if buffer.is_empty() {
-                Some("Value cannot be empty".to_string())
+                Some(xai_grok_i18n::t("settings.modal.err_empty").to_string())
             } else if buffer.chars().any(|c| c.is_whitespace()) {
-                Some("Value cannot contain whitespace".to_string())
+                Some(xai_grok_i18n::t("settings.modal.err_whitespace").to_string())
             } else {
                 None
             }
@@ -1008,7 +1016,7 @@ pub(super) fn validate_string(
             }
             // Reject if the model catalog hasn't loaded yet.
             if available_models.is_empty() {
-                return Some("Model catalog still loading — try again".to_string());
+                return Some(xai_grok_i18n::t("settings.modal.err_catalog_loading").to_string());
             }
             let matched = available_models
                 .iter()

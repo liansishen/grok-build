@@ -1361,6 +1361,11 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
         "voice_stt_language" => {
             let _ = dispatch(Action::SetVoiceSttLanguage("es".to_string()), app);
         }
+        "language" => {
+            // Keep English so parallel tests that assert English chrome
+            // (category headers, etc.) are not poisoned by global locale.
+            let _ = dispatch(Action::SetUiLanguage("en".to_string()), app);
+        }
         "fork_secondary_model" => {
             use agent_client_protocol as acp;
             use std::sync::Arc;
@@ -2749,6 +2754,34 @@ fn dispatch_cycle_mode_refreshes_open_modal_snapshot() {
         "current_value_for must read the refreshed snapshot",
     );
 }
+/// `SetUiLanguage` persists `[ui].language`, applies the global locale, and
+/// restores English at the end so other tests are not poisoned.
+#[test]
+fn set_ui_language_persists_and_switches_locale() {
+    use crate::settings::SettingValue;
+    let mut app = test_app_with_agent();
+    let effects = dispatch(Action::SetUiLanguage("zh-CN".into()), &mut app);
+    assert_eq!(app.current_ui.language.as_deref(), Some("zh-CN"));
+    assert_eq!(xai_grok_i18n::current_locale(), xai_grok_i18n::Locale::ZhCn);
+    assert_eq!(xai_grok_i18n::t("welcome.quit"), "退出");
+    assert_eq!(effects.len(), 1);
+    match &effects[0] {
+        Effect::PersistSetting {
+            key,
+            value,
+            rollback_value,
+        } => {
+            assert_eq!(*key, "language");
+            assert_eq!(*value, SettingValue::Enum("zh-CN"));
+            assert_eq!(*rollback_value, SettingValue::Enum("auto"));
+        }
+        other => panic!("expected PersistSetting, got {other:?}"),
+    }
+    // Restore English for the rest of the process (parallel-test hygiene).
+    let _ = dispatch(Action::SetUiLanguage("en".into()), &mut app);
+    assert_eq!(xai_grok_i18n::current_locale(), xai_grok_i18n::Locale::En);
+}
+
 /// `dispatch(Action::SetTheme("grokday"), &mut app)` emits
 /// exactly one `Effect::PersistSetting`, mutates
 /// `app.current_ui.theme`, fires a toast, and toggles AUTO_MODE
@@ -3357,7 +3390,7 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
     );
     {
         let agent = app.agents.get_mut(&id).unwrap();
-        agent.show_toast("Copied!");
+        agent.show_toast(xai_grok_i18n::t("toast.copied"));
         assert_eq!(
             agent.toast.as_ref().map(|(m, _)| m.as_str()),
             Some("Copied!"),

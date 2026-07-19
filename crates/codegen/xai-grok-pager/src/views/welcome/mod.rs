@@ -50,7 +50,10 @@ fn quit_hint_spans(theme: &Theme) -> Vec<Span<'static>> {
                 .fg(theme.accent_user)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("  quit", Style::default().fg(theme.gray)),
+        Span::styled(
+            format!("  {}", xai_grok_i18n::t("welcome.quit")),
+            Style::default().fg(theme.gray),
+        ),
     ]
 }
 
@@ -105,7 +108,7 @@ pub struct WelcomeRenderResult {
     pub refresh_rect: Option<Rect>,
     /// Hit-test rect for the gate URL link (click to open in browser).
     pub gate_url_rect: Option<Rect>,
-    /// Whether a "Changelog" menu action was rendered (above Quit), so the
+    /// Whether a xai_grok_i18n::t("welcome.changelog") menu action was rendered (above Quit), so the
     /// input handler can map the extra menu row to the release-notes action
     /// once markdown is available.
     pub changelog_action_present: bool,
@@ -428,7 +431,7 @@ pub(super) fn render_version_badge(
     }
     if show_api_key && is_api_key_auth {
         spans.push(Span::styled(
-            "Logged in with API key",
+            xai_grok_i18n::t("welcome.logged_in_api_key"),
             Style::default().fg(theme.gray),
         ));
         spans.push(sep);
@@ -688,8 +691,8 @@ pub fn render_welcome(
     let mut result = match params.auth_state {
         AuthState::Pending { error } => {
             let label = params.login_label.unwrap_or("grok.com");
-            let login_text = format!("Login with {}", label);
-            let menu = [("l", login_text.as_str()), ("q", "Quit")];
+            let login_text = xai_grok_i18n::t_fmt("welcome.login_with", &[("label", label)]);
+            let menu = [("l", login_text.as_str()), ("q", xai_grok_i18n::t("welcome.quit_menu"))];
             let msg = error.as_deref().map(|e| (e, theme.accent_error));
             let info = PromptInfo {
                 model_name: params.model_name,
@@ -759,12 +762,12 @@ pub fn render_welcome(
             }
         }
         AuthState::Done if params.is_zdr_blocked => {
-            let menu = [("l", "Switch account"), ("q", "Quit")];
+            let menu = [("l", xai_grok_i18n::t("welcome.switch_account")), ("q", xai_grok_i18n::t("welcome.quit_menu"))];
             let (menu_rects, post_flush_escapes) = render_welcome_blocked(
                 content_area,
                 buf,
                 Some((
-                    "Grok Build is not yet available for this account.",
+                    xai_grok_i18n::t("welcome.zdr_unavailable"),
                     theme.gray_bright,
                 )),
                 &menu,
@@ -935,10 +938,10 @@ fn render_welcome_trust(
     h_margin: u16,
     compact: bool,
 ) -> WelcomeRenderResult {
-    let menu_items = [("y", "Yes, proceed"), ("n", "No, quit")];
+    let menu_items = [("y", xai_grok_i18n::t("welcome.trust.yes")), ("n", xai_grok_i18n::t("welcome.trust.no"))];
     let lines = vec![
         Line::from(Span::styled(
-            "Do you trust the contents of this directory?",
+            xai_grok_i18n::t("welcome.trust.question"),
             Style::default().fg(theme.gray_bright),
         ))
         .alignment(Alignment::Center),
@@ -951,12 +954,12 @@ fn render_welcome_trust(
         // Two lines so the warning never clips at narrow / compact widths
         // (a single ~78-char line would truncate "...posing security risks").
         Line::from(Span::styled(
-            "Grok Build may run or modify contents in this directory,",
+            xai_grok_i18n::t("welcome.trust.warning_line1"),
             Style::default().fg(theme.gray),
         ))
         .alignment(Alignment::Center),
         Line::from(Span::styled(
-            "posing security risks.",
+            xai_grok_i18n::t("welcome.trust.warning_line2"),
             Style::default().fg(theme.gray),
         ))
         .alignment(Alignment::Center),
@@ -1003,11 +1006,11 @@ fn render_welcome_trust(
 }
 
 /// Header text shared by Loopback and Command auth modes.
-const AUTH_HEADER: &str = "A browser window will open for authentication.";
+fn auth_header() -> &'static str { xai_grok_i18n::t("auth.browser_open_header") }
 /// Header text for the device-flow auth mode.
-const DEVICE_AUTH_HEADER: &str = "Approve in your browser to finish signing in.";
+fn device_auth_header() -> &'static str { xai_grok_i18n::t("auth.device_header") }
 /// Caption beneath the device code.
-const DEVICE_CODE_CAPTION: &str = "Make sure your browser shows this code.";
+fn device_code_caption() -> &'static str { xai_grok_i18n::t("auth.device_code_caption") }
 
 /// Extract `user_code` from a device verification URL (`None` if absent or
 /// malformed). Shown on-screen so the user can confirm it matches the browser
@@ -1077,7 +1080,7 @@ fn push_auth_copy_block(
     lines.push(Line::default());
     lines.push(match clipboard_delivery {
         Some(crate::clipboard::ClipboardDelivery::Confirmed) => {
-            Line::from(Span::styled("copied!", Style::default().fg(theme.gray)))
+            Line::from(Span::styled(xai_grok_i18n::t("auth.copied"), Style::default().fg(theme.gray)))
                 .alignment(Alignment::Center)
         }
         Some(crate::clipboard::ClipboardDelivery::Unverified) => Line::from(Span::styled(
@@ -1086,7 +1089,7 @@ fn push_auth_copy_block(
         ))
         .alignment(Alignment::Center),
         Some(crate::clipboard::ClipboardDelivery::Failed) => {
-            Line::from(Span::styled("copy failed", Style::default().fg(theme.gray)))
+            Line::from(Span::styled(xai_grok_i18n::t("auth.copy_failed"), Style::default().fg(theme.gray)))
                 .alignment(Alignment::Center)
         }
         None => Line::default(),
@@ -1259,17 +1262,17 @@ fn render_browser_status_arm(
 
     // Device also parses the user code from the verification URL.
     let (header, waiting_text, user_code) = match kind {
-        BrowserStatusKind::Command => (AUTH_HEADER, "Waiting for login to complete...", None),
+        BrowserStatusKind::Command => (auth_header(), xai_grok_i18n::t("auth.waiting_login"), None),
         BrowserStatusKind::Device => (
-            DEVICE_AUTH_HEADER,
-            "Waiting for approval...",
+            device_auth_header(),
+            xai_grok_i18n::t("auth.waiting_approval"),
             auth_url.and_then(extract_user_code),
         ),
     };
 
     let header_rows = (header.len() as u16).div_ceil(inner_width);
     let code_extra = if user_code.is_some() {
-        let caption_rows = (DEVICE_CODE_CAPTION.len() as u16).div_ceil(inner_width);
+        let caption_rows = (device_code_caption().len() as u16).div_ceil(inner_width);
         1 + 1 + 1 + caption_rows // blank + code + blank + caption
     } else {
         0
@@ -1312,7 +1315,7 @@ fn render_browser_status_arm(
         lines.push(Line::default());
         lines.push(
             Line::from(Span::styled(
-                DEVICE_CODE_CAPTION,
+                device_code_caption(),
                 Style::default().fg(theme.gray),
             ))
             .alignment(Alignment::Center),
@@ -1377,7 +1380,7 @@ fn render_welcome_authenticating(
             }
 
             let msg_height = if auth_url.is_some() {
-                let header_rows = (AUTH_HEADER.len() as u16).div_ceil(inner_width);
+                let header_rows = (auth_header().len() as u16).div_ceil(inner_width);
                 header_rows + auth_copy_block_rows(inner_width)
             } else {
                 1u16
@@ -1402,7 +1405,7 @@ fn render_welcome_authenticating(
             if auth_url.is_some() {
                 lines.push(
                     Line::from(Span::styled(
-                        AUTH_HEADER,
+                        auth_header(),
                         Style::default().fg(theme.gray_bright),
                     ))
                     .alignment(Alignment::Center),
@@ -1411,7 +1414,7 @@ fn render_welcome_authenticating(
             } else {
                 lines.push(
                     Line::from(Span::styled(
-                        "Waiting for auth URL...",
+                        xai_grok_i18n::t("auth.waiting_url"),
                         Style::default().fg(theme.gray),
                     ))
                     .alignment(Alignment::Center),
@@ -1423,7 +1426,7 @@ fn render_welcome_authenticating(
                 .render(msg_area, buf);
 
             let (click_rect, fallback_rect) = if auth_url.is_some() {
-                auth_hit_rects(msg_area, h_pad, inner_width, AUTH_HEADER, 0)
+                auth_hit_rects(msg_area, h_pad, inner_width, auth_header(), 0)
             } else {
                 (None, None)
             };
@@ -1502,7 +1505,7 @@ fn render_welcome_authenticating(
             render_logo(logo_area, buf, theme, content_area.height);
 
             let msg = Line::from(Span::styled(
-                "Connecting...",
+                xai_grok_i18n::t("auth.connecting"),
                 Style::default().fg(theme.gray_bright),
             ))
             .alignment(Alignment::Center);
@@ -1564,7 +1567,7 @@ fn render_changelog_section(
             .fg(theme.gray_bright)
             .add_modifier(Modifier::DIM),
     );
-    let title = "Changelog";
+    let title = xai_grok_i18n::t("welcome.changelog");
     buf.set_span(
         centered.x,
         centered.y,
@@ -1686,7 +1689,7 @@ fn render_welcome_done(
     let cta = p
         .gate
         .and_then(|g| g.label.as_deref())
-        .unwrap_or("Upgrade Subscription");
+        .unwrap_or(xai_grok_i18n::t("welcome.upgrade_subscription"));
     let in_vscode_family = welcome_in_vscode_family();
     let (key_g, key_l, key_q) = (
         "ctrl+g",
@@ -1730,7 +1733,7 @@ fn render_welcome_done(
     let gate_menu;
     let owned_menu;
     let menu_items: &[(&str, &str)] = if !p.has_access {
-        gate_menu = [(key_g, cta), (key_l, "Logout"), (key_q, "Quit")];
+        gate_menu = [(key_g, cta), (key_l, xai_grok_i18n::t("welcome.logout")), (key_q, xai_grok_i18n::t("welcome.quit_menu"))];
         &gate_menu
     } else {
         let (key_w, key_s, key_q, key_i_with_x) = (
@@ -1748,15 +1751,15 @@ fn render_welcome_done(
             // 3 cells of this row as dismiss instead of open. Keyboard:
             // ctrl-shift-i. The key string is right-aligned by render_menu,
             // so [x] sits at the very end of the row.
-            items.push((key_i_with_x, "Import Claude settings"));
+            items.push((key_i_with_x, xai_grok_i18n::t("welcome.import_claude_settings")));
         }
-        items.push((key_w, "New worktree"));
-        items.push((key_s, "Resume session"));
-        // "Changelog" above Quit; no shortcut — opened by click (row or block).
+        items.push((key_w, xai_grok_i18n::t("welcome.new_worktree")));
+        items.push((key_s, xai_grok_i18n::t("welcome.resume_session")));
+        // xai_grok_i18n::t("welcome.changelog") above Quit; no shortcut — opened by click (row or block).
         if show_changelog_action {
-            items.push(("", "Changelog"));
+            items.push(("", xai_grok_i18n::t("welcome.changelog")));
         }
-        items.push((key_q, "Quit"));
+        items.push((key_q, xai_grok_i18n::t("welcome.quit_menu")));
         owned_menu = items;
         owned_menu.as_slice()
     };
@@ -1962,7 +1965,7 @@ fn render_welcome_done(
         let gate_text = p
             .gate
             .map(|g| g.message.as_str())
-            .unwrap_or("SuperGrok subscription required");
+            .unwrap_or(xai_grok_i18n::t("welcome.supergrok_required"));
         let msg = Line::from(Span::styled(
             gate_text,
             Style::default().fg(theme.gray_bright),
@@ -2358,7 +2361,7 @@ pub(crate) fn render_session_picker(
     if !ctx.chat_mode {
         default_shortcuts.push(HintItem {
             keys: vec![],
-            label: "worktree".into(),
+            label: xai_grok_i18n::t("welcome.picker.worktree").into(),
             custom_display: Some(worktree_shortcut),
             description: None,
             pinned: false,
@@ -2382,7 +2385,7 @@ pub(crate) fn render_session_picker(
     }
 
     let config = PickerConfig {
-        title: Some("Resume session"),
+        title: Some(xai_grok_i18n::t("welcome.resume_session")),
         show_search_hint: true,
         expandable: true,
         esc_clears_query: true,
@@ -2483,7 +2486,7 @@ fn render_startup_warnings(
     // menu now carries the call-to-action with the same visual weight as
     // every other welcome menu item. Showing the warning text in addition to
     // the menu row would be redundant noise.
-    if w.message.starts_with("Import Claude settings")
+    if w.message.starts_with(xai_grok_i18n::t("welcome.import_claude_settings"))
         || w.message.starts_with("Claude settings detected")
     {
         return None;
@@ -2539,7 +2542,7 @@ fn build_masked_auth_token(input: &str, cursor_byte: usize) -> MaskedAuthToken {
 
 fn masked_auth_token_view(input: &str, cursor_byte: usize, width: usize) -> (String, usize) {
     if input.is_empty() {
-        return ("Paste your token here...".to_string(), 0);
+        return (xai_grok_i18n::t("auth.paste_token_placeholder").to_string(), 0);
     }
     let masked = build_masked_auth_token(input, cursor_byte);
     let buffer =
@@ -2562,12 +2565,12 @@ mod tests {
     fn auth_copy_feedback_covers_delivery_states() {
         let theme = Theme::current();
         for (delivery, expected) in [
-            (crate::clipboard::ClipboardDelivery::Confirmed, "copied!"),
+            (crate::clipboard::ClipboardDelivery::Confirmed, xai_grok_i18n::t("auth.copied")),
             (
                 crate::clipboard::ClipboardDelivery::Unverified,
                 "copy sent—verify paste",
             ),
-            (crate::clipboard::ClipboardDelivery::Failed, "copy failed"),
+            (crate::clipboard::ClipboardDelivery::Failed, xai_grok_i18n::t("auth.copy_failed")),
         ] {
             let mut lines = Vec::new();
             push_auth_copy_block(&mut lines, &theme, Some(delivery));
@@ -2584,7 +2587,7 @@ mod tests {
     fn masked_auth_token_preserves_reveal_policy() {
         assert_eq!(
             masked_auth_token_view("", 0, 24),
-            ("Paste your token here...".to_string(), 0)
+            (xai_grok_i18n::t("auth.paste_token_placeholder").to_string(), 0)
         );
         assert_eq!(build_masked_auth_token("12345678", 8).display, "12345678");
         assert_eq!(build_masked_auth_token("123456789", 9).display, "•••••6789");
@@ -3048,7 +3051,7 @@ mod tests {
 
     fn resume_picker_config() -> crate::views::picker::PickerConfig<'static> {
         crate::views::picker::PickerConfig {
-            title: Some("Resume session"),
+            title: Some(xai_grok_i18n::t("welcome.resume_session")),
             show_search_hint: true,
             expandable: true,
             esc_clears_query: true,

@@ -298,7 +298,7 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
                         "No active session",
                     ));
             } else {
-                agent.show_toast("No active session");
+                agent.show_toast(xai_grok_i18n::t("toast.no_active_session"));
             }
             return vec![];
         };
@@ -371,14 +371,14 @@ pub(super) fn dispatch_send_recap(app: &mut AppView, auto: bool) -> Vec<Effect> 
     // entirely when the feature is off so we never hit `x.ai/recap`.
     if !app.session_recap_available {
         if !auto {
-            agent.show_toast("Session recap is not enabled");
+            agent.show_toast(xai_grok_i18n::t("toast.recap_disabled"));
         }
         return vec![];
     }
 
     let Some(session_id) = agent.session.session_id.clone() else {
         if !auto {
-            agent.show_toast("No active session");
+            agent.show_toast(xai_grok_i18n::t("toast.no_active_session"));
         }
         return vec![];
     };

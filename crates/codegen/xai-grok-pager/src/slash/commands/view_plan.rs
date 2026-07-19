@@ -16,7 +16,7 @@ impl SlashCommand for ViewPlanCommand {
     }
 
     fn description(&self) -> &str {
-        "View the current plan"
+        xai_grok_i18n::t("slash.view-plan.description")
     }
 
     fn session_scoped(&self) -> bool {

@@ -758,7 +758,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         }
         TaskResult::DeleteSessionComplete { source, session_id } => {
             remove_session_from_pickers(app, &source, &session_id);
-            app.show_toast("Session deleted");
+            app.show_toast(xai_grok_i18n::t("toast.session_deleted"));
             vec![]
         }
         TaskResult::DeleteSessionFailed {

@@ -16,7 +16,7 @@ impl SlashCommand for HomeCommand {
     }
 
     fn description(&self) -> &str {
-        "Return to the welcome screen"
+        xai_grok_i18n::t("slash.home.description")
     }
 
     fn usage(&self) -> &str {

@@ -20,7 +20,7 @@ impl SlashCommand for ExpandCommand {
     }
 
     fn description(&self) -> &str {
-        "Re-print the last collapsed block, fully expanded (minimal mode)"
+        xai_grok_i18n::t("slash.expand.description")
     }
 
     fn session_scoped(&self) -> bool {
@@ -41,7 +41,7 @@ impl SlashCommand for ExpandCommand {
             );
         }
         if ctx.session_id.is_none() {
-            return CommandResult::Error("No active session".to_string());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_session").to_string());
         }
         CommandResult::Action(Action::MinimalExpandLast)
     }

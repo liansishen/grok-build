@@ -19,7 +19,7 @@ impl SlashCommand for CdCommand {
     }
 
     fn description(&self) -> &str {
-        "Change the working directory for new agents"
+        xai_grok_i18n::t("slash.cd.description")
     }
 
     fn usage(&self) -> &str {

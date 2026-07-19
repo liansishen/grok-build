@@ -19,7 +19,7 @@ impl SlashCommand for AlwaysApproveCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle always-approve mode (skip all permission prompts)"
+        xai_grok_i18n::t("slash.always-approve.description")
     }
 
     fn usage(&self) -> &str {

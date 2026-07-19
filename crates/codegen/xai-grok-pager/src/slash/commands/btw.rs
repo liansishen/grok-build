@@ -14,7 +14,7 @@ impl SlashCommand for BtwCommand {
     }
 
     fn description(&self) -> &str {
-        "Ask a side question without interrupting"
+        xai_grok_i18n::t("slash.btw.description")
     }
 
     fn session_scoped(&self) -> bool {

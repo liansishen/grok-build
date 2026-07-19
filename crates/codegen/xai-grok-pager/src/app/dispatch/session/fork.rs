@@ -46,7 +46,7 @@ pub(in crate::app::dispatch) fn dispatch_fork(
     args: crate::slash::commands::fork::ForkArgs,
 ) -> Vec<Effect> {
     let ActiveView::Agent(parent_id) = app.active_view else {
-        app.show_toast("/fork only works inside a session");
+        app.show_toast(xai_grok_i18n::t("toast.fork_session_only"));
         return vec![];
     };
     let (has_session, in_git_repo) = app
@@ -55,7 +55,7 @@ pub(in crate::app::dispatch) fn dispatch_fork(
         .map(|a| (a.session.session_id.is_some(), a.current_branch.is_some()))
         .unwrap_or((false, false));
     if !has_session {
-        app.show_toast("Cannot fork: session is still being created");
+        app.show_toast(xai_grok_i18n::t("toast.fork_still_creating"));
         return vec![];
     }
     match args.worktree_override {

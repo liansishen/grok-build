@@ -26,7 +26,7 @@ pub(in crate::app::dispatch) fn set_multiline_mode(app: &mut AppView, new: bool)
             surface = "dashboard",
             "setting changed",
         );
-        app.show_toast(&save_success_toast("Multiline", new));
+        app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.multiline_mode.label"), new));
         return vec![];
     }
 
@@ -48,7 +48,7 @@ pub(in crate::app::dispatch) fn set_multiline_mode(app: &mut AppView, new: bool)
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast("Multiline", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.multiline_mode.label"), new));
     vec![]
 }
 
@@ -257,6 +257,48 @@ pub(in crate::app::dispatch) fn set_voice_stt_language(
     }]
 }
 
+/// Apply UI language preference into `app.current_ui` and the process-wide
+/// i18n locale. Called by the commit path AND by rollback.
+pub(super) fn set_ui_language_inner(app: &mut AppView, canonical: &str) {
+    app.current_ui.language = Some(canonical.to_string());
+    let locale = xai_grok_i18n::resolve_locale(Some(canonical));
+    xai_grok_i18n::set_locale(locale);
+}
+
+/// Set the UI language. SHELL-owned; persists to `[ui].language` via
+/// `Effect::PersistSetting`. Live-applied (no restart).
+pub(in crate::app::dispatch) fn set_ui_language(app: &mut AppView, value: String) -> Vec<Effect> {
+    let canonical = crate::settings::canonical_ui_language(Some(&value));
+    let prev = crate::settings::canonical_ui_language(app.current_ui.language.as_deref());
+    if prev == canonical && app.current_ui.language.as_deref() == Some(canonical) {
+        return vec![];
+    }
+    set_ui_language_inner(app, canonical);
+    refresh_open_settings_modals(app);
+    let locale = xai_grok_i18n::resolve_locale(Some(canonical));
+    tracing::info!(
+        target: "settings",
+        key = "language",
+        value = canonical,
+        locale = locale.as_str(),
+        "setting changed"
+    );
+    let name = if canonical == xai_grok_i18n::LANGUAGE_AUTO {
+        format!("System ({})", locale.display_name())
+    } else {
+        locale.display_name().to_string()
+    };
+    app.show_toast(&xai_grok_i18n::t_fmt(
+        "toast.language_set",
+        &[("name", &name)],
+    ));
+    vec![Effect::PersistSetting {
+        key: "language",
+        value: crate::settings::SettingValue::Enum(canonical),
+        rollback_value: crate::settings::SettingValue::Enum(prev),
+    }]
+}
+
 /// State-only mutation for `vim_mode`. Propagates to every in-process
 /// agent so background subagents and side panes pick up the change
 /// without restart. The cache mirror lets new agents created later
@@ -287,7 +329,7 @@ pub(in crate::app::dispatch) fn set_vim_mode(app: &mut AppView, new: bool) -> Ve
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast("Vim scrollback", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.vim_mode.label"), new));
     vec![Effect::PersistSetting {
         key: "vim_mode",
         value: crate::settings::SettingValue::Bool(new),
@@ -407,7 +449,7 @@ pub(in crate::app::dispatch) fn set_show_thinking_blocks(
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast("Thinking blocks", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.show_thinking_blocks.label"), new));
     vec![Effect::PersistSetting {
         key: "show_thinking_blocks",
         value: crate::settings::SettingValue::Bool(new),
@@ -447,7 +489,7 @@ pub(in crate::app::dispatch) fn set_group_tool_verbs(app: &mut AppView, new: boo
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast("Group tool calls", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.group_tool_verbs.label"), new));
     vec![Effect::PersistSetting {
         key: "group_tool_verbs",
         value: crate::settings::SettingValue::Bool(new),
@@ -494,7 +536,7 @@ pub(in crate::app::dispatch) fn set_collapsed_edit_blocks(
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast("Collapsed edit blocks", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.collapsed_edit_blocks.label"), new));
     vec![Effect::PersistSetting {
         key: "collapsed_edit_blocks",
         value: crate::settings::SettingValue::Bool(new),
@@ -529,7 +571,7 @@ pub(in crate::app::dispatch) fn set_prompt_suggestions(
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast("Prompt suggestions", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.prompt_suggestions.label"), new));
     vec![Effect::PersistSetting {
         key: "prompt_suggestions",
         value: crate::settings::SettingValue::Bool(new),
@@ -662,7 +704,7 @@ pub(in crate::app::dispatch) fn set_invert_scroll(app: &mut AppView, new: bool) 
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast("Invert scroll", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.invert_scroll.label"), new));
     vec![Effect::PersistSetting {
         key: "invert_scroll",
         value: crate::settings::SettingValue::Bool(new),
@@ -736,7 +778,7 @@ pub(in crate::app::dispatch) fn set_respect_manual_folds(
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast("Respect manual folds", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.respect_manual_folds.label"), new));
     vec![Effect::PersistSetting {
         key: "respect_manual_folds",
         value: crate::settings::SettingValue::Bool(new),
@@ -846,9 +888,9 @@ pub(in crate::app::dispatch) fn set_compact_mode(app: &mut AppView, new: bool) -
     // Turning the setting off while the short-terminal derivation holds keeps
     // the UI compact; say so instead of implying the layout will loosen.
     if !new && crate::views::agent::effective_compact(false, app.last_known_terminal_rows) {
-        app.show_toast("\u{2713} Compact mode: off (auto-compact active on small terminal)");
+        app.show_toast(xai_grok_i18n::t("toast.compact_auto"));
     } else {
-        app.show_toast(&save_success_toast("Compact mode", new));
+        app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.compact_mode.label"), new));
     }
     vec![Effect::PersistSetting {
         key: "compact_mode",
@@ -880,7 +922,7 @@ pub(in crate::app::dispatch) fn set_timestamps(app: &mut AppView, new: bool) -> 
     set_timestamps_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "show_timestamps", value = new, "setting changed");
-    app.show_toast(&save_success_toast("Timestamps", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.show_timestamps.label"), new));
     vec![Effect::PersistSetting {
         key: "show_timestamps",
         value: crate::settings::SettingValue::Bool(new),
@@ -913,7 +955,7 @@ pub(in crate::app::dispatch) fn set_timeline(app: &mut AppView, new: bool) -> Ve
     set_timeline_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "show_timeline", value = new, "setting changed");
-    app.show_toast(&save_success_toast("Timeline sidebar", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.show_timeline.label"), new));
     vec![Effect::PersistSetting {
         key: "show_timeline",
         value: crate::settings::SettingValue::Bool(new),
@@ -935,7 +977,7 @@ pub(in crate::app::dispatch) fn set_page_flip_on_send(app: &mut AppView, new: bo
     set_page_flip_on_send_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "page_flip_on_send", value = new, "setting changed");
-    app.show_toast(&save_success_toast("Snap prompt to top on send", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.page_flip_on_send.label"), new));
     vec![Effect::PersistSetting {
         key: "page_flip_on_send",
         value: crate::settings::SettingValue::Bool(new),
@@ -975,7 +1017,7 @@ pub(in crate::app::dispatch) fn set_simple_mode(app: &mut AppView, new: bool) ->
     // Toast label mirrors the renamed registry label
     // ("Disable vim input mode") so the user sees the same name in the
     // modal and the toast.
-    app.show_toast(&save_success_toast("Disable vim input mode", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.simple_mode.label"), new));
     vec![Effect::PersistSetting {
         key: "simple_mode",
         value: crate::settings::SettingValue::Bool(new),
@@ -1717,7 +1759,7 @@ pub(in crate::app::dispatch) fn clear_default_model(app: &mut AppView) -> Vec<Ef
             "setting changed (startup-window clear — pager mirror was already None; \
              persist proceeds to ensure disk state matches user intent)",
         );
-        app.show_toast("\u{2713} Default model: cleared");
+        app.show_toast(xai_grok_i18n::t("toast.default_model_cleared"));
         return vec![Effect::PersistSetting {
             key: "default_model",
             value: crate::settings::SettingValue::String(String::new()),
@@ -1733,7 +1775,7 @@ pub(in crate::app::dispatch) fn clear_default_model(app: &mut AppView) -> Vec<Ef
         "setting changed",
     );
     refresh_open_settings_modals(app);
-    app.show_toast("\u{2713} Default model: cleared");
+    app.show_toast(xai_grok_i18n::t("toast.default_model_cleared"));
     vec![Effect::PersistSetting {
         key: "default_model",
         value: crate::settings::SettingValue::String(String::new()),
@@ -1839,7 +1881,7 @@ pub(in crate::app::dispatch) fn clear_fork_secondary_model(app: &mut AppView) ->
     let prev_id_str = app.current_ui.fork_secondary_model.clone();
     if prev_id_str == baseline {
         // Idempotent: already at baseline.
-        app.show_toast("\u{2713} Fork secondary model: already at default");
+        app.show_toast(xai_grok_i18n::t("toast.fork_model_default"));
         return vec![];
     }
     tracing::info!(
@@ -1851,7 +1893,7 @@ pub(in crate::app::dispatch) fn clear_fork_secondary_model(app: &mut AppView) ->
     );
     set_fork_secondary_model_inner(app, baseline);
     refresh_open_settings_modals(app);
-    app.show_toast("\u{2713} Fork secondary model: cleared");
+    app.show_toast(xai_grok_i18n::t("toast.fork_model_cleared"));
     vec![Effect::PersistSetting {
         key: "fork_secondary_model",
         // Persist payload is the empty-sentinel — the shell helper

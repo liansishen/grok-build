@@ -12,7 +12,9 @@ use xai_file_utils::events::{Event, EventWriter, PermissionDecision};
 use xai_grok_mcp::servers::parse_mcp_qualified_name;
 use xai_grok_tools::implementations::grok_build::web_fetch::domain_from_url;
 
-const REJECT_ONCE_LABEL: &str = "No, and tell Grok what to do differently";
+fn reject_once_label() -> &'static str {
+    xai_grok_i18n::t("permission.option.reject_once")
+}
 
 /// Stable option id for the edit prompt's "Yes, allow all edits during this
 /// session" choice. Distinct from the generic `"always-allow"` id (used by
@@ -59,8 +61,9 @@ pub const ENABLE_ALWAYS_APPROVE_OPTION_ID: &str = "enable-always-approve";
 /// User-facing label for the "enable always-approve mode" option. Kept
 /// here (not at each construction site) so the label is identical across
 /// every permission prompt — edit, bash, MCP, web_fetch, fallback.
-const ENABLE_ALWAYS_APPROVE_LABEL: &str =
-    "Yes, and don't ask again for anything (always-approve mode)";
+fn enable_always_approve_label() -> &'static str {
+    xai_grok_i18n::t("permission.option.enable_always_approve")
+}
 
 /// Build the "enable always-approve mode" option that is prepended to
 /// every TUI/Pager/Desktop permission prompt. See
@@ -91,7 +94,7 @@ const ENABLE_ALWAYS_APPROVE_LABEL: &str =
 fn enable_always_approve_option() -> acp::PermissionOption {
     acp::PermissionOption::new(
         ENABLE_ALWAYS_APPROVE_OPTION_ID,
-        ENABLE_ALWAYS_APPROVE_LABEL.to_owned(),
+        enable_always_approve_label().to_owned(),
         acp::PermissionOptionKind::AllowOnce,
     )
 }
@@ -243,7 +246,7 @@ pub fn mcp_pretty_name_if_qualified(name: &str) -> String {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct McpToolPermission {
     /// Static label prefix shown before the dynamic scope text,
-    /// e.g. `"Always allow:"`. Mirrors `BashCommandPermission::prompt_prefix`.
+    /// e.g. `xai_grok_i18n::t("permission.prefix.always_allow")`. Mirrors `BashCommandPermission::prompt_prefix`.
     pub prompt_prefix: String,
     /// Full tool name as the agent called it
     /// (e.g. `"grok_com_notion__notion-fetch"`).
@@ -284,7 +287,7 @@ pub enum PromptOutcome {
     AllowAlways,
     /// Session-scoped: allow all edits for the remainder of this session only.
     /// Does **not** persist to disk (unlike the legacy `AllowAlways` path for edits).
-    /// Matches the UX of "Yes, allow all edits during this session".
+    /// Matches the UX of xai_grok_i18n::t("permission.option.allow_edits_session").
     AllowEditsForSession,
     AllowAlwaysBashCommand(String),
     AllowAlwaysDomain(String),
@@ -376,7 +379,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new(ALLOW_EDITS_SESSION_OPTION_ID),
             acp::PermissionOption::new(
                 ALLOW_EDITS_SESSION_OPTION_ID,
-                "Yes, allow all edits during this session".to_owned(),
+                xai_grok_i18n::t("permission.option.allow_edits_session").to_owned(),
                 acp::PermissionOptionKind::AllowAlways,
             ),
         );
@@ -392,7 +395,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("reject-once"),
             acp::PermissionOption::new(
                 "reject-once",
-                REJECT_ONCE_LABEL.to_owned(),
+                reject_once_label().to_owned(),
                 acp::PermissionOptionKind::RejectOnce,
             ),
         );
@@ -404,7 +407,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("allow-once"),
             acp::PermissionOption::new(
                 "allow-once",
-                "Yes, proceed".to_owned(),
+                xai_grok_i18n::t("permission.option.yes_proceed").to_owned(),
                 acp::PermissionOptionKind::AllowOnce,
             ),
         );
@@ -412,7 +415,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("reject-once"),
             acp::PermissionOption::new(
                 "reject-once",
-                REJECT_ONCE_LABEL.to_owned(),
+                reject_once_label().to_owned(),
                 acp::PermissionOptionKind::RejectOnce,
             ),
         );
@@ -424,7 +427,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("always-allow"),
             acp::PermissionOption::new(
                 "always-allow",
-                "Yes, and don't ask again for bash commands".to_owned(),
+                xai_grok_i18n::t("permission.option.always_allow_bash").to_owned(),
                 acp::PermissionOptionKind::AllowAlways,
             ),
         );
@@ -432,7 +435,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("allow-once"),
             acp::PermissionOption::new(
                 "allow-once",
-                "Yes, proceed".to_owned(),
+                xai_grok_i18n::t("permission.option.yes_proceed").to_owned(),
                 acp::PermissionOptionKind::AllowOnce,
             ),
         );
@@ -440,7 +443,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("reject-once"),
             acp::PermissionOption::new(
                 "reject-once",
-                REJECT_ONCE_LABEL.to_owned(),
+                reject_once_label().to_owned(),
                 acp::PermissionOptionKind::RejectOnce,
             ),
         );
@@ -448,7 +451,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("reject-always"),
             acp::PermissionOption::new(
                 "reject-always",
-                "No, and don't run bash commands".to_owned(),
+                xai_grok_i18n::t("permission.option.reject_always_bash").to_owned(),
                 acp::PermissionOptionKind::RejectAlways,
             ),
         );
@@ -591,7 +594,7 @@ impl AcpPrompter {
                         if let Some(primary_command) = &primary_command {
                             let (id, option) = bash_scope_option(
                                 "allow-always-command",
-                                "Always allow:",
+                                xai_grok_i18n::t("permission.prefix.always_allow"),
                                 acp::PermissionOptionKind::AllowAlways,
                                 primary_command,
                             );
@@ -603,7 +606,7 @@ impl AcpPrompter {
                         if let Some(primary_command) = &primary_command {
                             let (id, option) = bash_scope_option(
                                 "reject-always-command",
-                                "Never allow:",
+                                xai_grok_i18n::t("permission.prefix.never_allow"),
                                 acp::PermissionOptionKind::RejectAlways,
                                 primary_command,
                             );
@@ -640,7 +643,7 @@ impl AcpPrompter {
                     acp::PermissionOptionId::new("allow-once"),
                     acp::PermissionOption::new(
                         "allow-once",
-                        "Yes, allow once".to_owned(),
+                        xai_grok_i18n::t("permission.option.yes_allow_once").to_owned(),
                         acp::PermissionOptionKind::AllowOnce,
                     ),
                 );
@@ -648,7 +651,7 @@ impl AcpPrompter {
                     acp::PermissionOptionId::new("reject-once"),
                     acp::PermissionOption::new(
                         "reject-once",
-                        REJECT_ONCE_LABEL.to_owned(),
+                        reject_once_label().to_owned(),
                         acp::PermissionOptionKind::RejectOnce,
                     ),
                 );
@@ -674,12 +677,12 @@ impl AcpPrompter {
                             acp::PermissionOptionId::new("allow-always-mcp"),
                             acp::PermissionOption::new(
                                 "allow-always-mcp",
-                                format!("Always allow: {}", tool_name),
+                                format!("{} {}", xai_grok_i18n::t("permission.prefix.always_allow"), tool_name),
                                 acp::PermissionOptionKind::AllowAlways,
                             )
                             .meta(
                                 serde_json::to_value(McpToolPermission {
-                                    prompt_prefix: "Always allow:".to_owned(),
+                                    prompt_prefix: xai_grok_i18n::t("permission.prefix.always_allow").to_owned(),
                                     tool_name: tool_name.clone(),
                                     server_prefix,
                                 })
@@ -699,7 +702,7 @@ impl AcpPrompter {
                             acp::PermissionOptionId::new("reject-once"),
                             acp::PermissionOption::new(
                                 "reject-once",
-                                REJECT_ONCE_LABEL.to_owned(),
+                                reject_once_label().to_owned(),
                                 acp::PermissionOptionKind::RejectOnce,
                             ),
                         );
@@ -934,7 +937,7 @@ fn map_selected_outcome(
                         PromptOutcome::AllowAlways
                     }
                 } else if option_id.0.as_ref() == ALLOW_EDITS_SESSION_OPTION_ID {
-                    // The edit prompt's "Yes, allow all edits during this session".
+                    // The edit prompt's xai_grok_i18n::t("permission.option.allow_edits_session").
                     // Treat as session-scoped only (in-memory). Do not persist.
                     PromptOutcome::AllowEditsForSession
                 } else {
@@ -1185,7 +1188,7 @@ mod tests {
                 serde_json::from_value(serde_json::Value::Object(meta)).unwrap();
             assert_eq!(perm.tool_name, name);
             assert_eq!(perm.server_prefix.as_deref(), Some(server));
-            assert_eq!(perm.prompt_prefix, "Always allow:");
+            assert_eq!(perm.prompt_prefix, xai_grok_i18n::t("permission.prefix.always_allow"));
         }
     }
 

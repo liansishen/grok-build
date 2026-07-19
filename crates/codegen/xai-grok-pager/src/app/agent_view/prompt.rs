@@ -493,7 +493,7 @@ impl AgentView {
                         if let Some(viewer) = crate::prompt_images::ImageViewerState::open(img) {
                             self.image_viewer = Some(viewer);
                         } else {
-                            self.show_toast("Couldn't load image preview");
+                            self.show_toast(xai_grok_i18n::t("toast.couldnt_load_image"));
                         }
                     }
                     return InputOutcome::Changed;

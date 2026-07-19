@@ -9,7 +9,7 @@ impl SlashCommand for McpsCommand {
     }
 
     fn description(&self) -> &str {
-        "Show MCP server status"
+        xai_grok_i18n::t("slash.mcps.description")
     }
 
     fn usage(&self) -> &str {

@@ -19,7 +19,7 @@ impl SlashCommand for TerminalSetupCommand {
     }
 
     fn description(&self) -> &str {
-        "Check terminal, color, and clipboard setup"
+        xai_grok_i18n::t("slash.terminal-setup.description")
     }
 
     fn usage(&self) -> &str {

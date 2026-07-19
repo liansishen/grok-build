@@ -17,7 +17,7 @@ impl SlashCommand for PlanCommand {
     }
 
     fn description(&self) -> &str {
-        "Enter plan mode"
+        xai_grok_i18n::t("slash.plan.description")
     }
 
     fn session_scoped(&self) -> bool {

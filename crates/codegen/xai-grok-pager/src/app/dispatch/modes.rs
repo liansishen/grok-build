@@ -48,13 +48,13 @@ pub(super) fn dispatch_enter_plan_mode(
 
     let in_plan = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
     if in_plan {
-        app.show_toast("Already in plan mode. Use /view-plan to view the current plan.");
+        app.show_toast(xai_grok_i18n::t("toast.already_plan_mode"));
         return vec![];
     }
 
     let agent = app.agents.get_mut(&id).unwrap();
     let Some(session_id) = agent.session.session_id.clone() else {
-        agent.show_toast("No active session");
+        agent.show_toast(xai_grok_i18n::t("toast.no_active_session"));
         return vec![];
     };
 
@@ -143,7 +143,7 @@ pub(super) fn set_plan_mode(
     };
 
     let Some(session_id) = agent.session.session_id.clone() else {
-        agent.show_toast("No active session");
+        agent.show_toast(xai_grok_i18n::t("toast.no_active_session"));
         return vec![];
     };
 
@@ -192,7 +192,7 @@ pub(super) fn set_plan_mode(
 /// (unlike YOLO), so both ON and OFF use the uniform ✓ glyph.
 /// Uses lowercase "on"/"off" via `save_success_toast`.
 fn plan_mode_toast(kind: crate::app::actions::PlanModeKind) -> String {
-    save_success_toast("Plan mode", kind.to_bool())
+    save_success_toast(xai_grok_i18n::t("toast.plan_mode"), kind.to_bool())
 }
 
 /// The single gate for client paths that ENABLE always-approve: `Some(reason)`
@@ -394,7 +394,7 @@ pub(super) fn set_yolo_mode(app: &mut AppView, new: bool) -> Vec<Effect> {
     // plan mode, say the plan edit gate stays binding — "all tool actions
     // auto-run" would overpromise while the shell rejects non-plan-file edits.
     if new && effective_plan {
-        app.show_toast(YOLO_ON_UNDER_PLAN_TOAST);
+        app.show_toast(yolo_on_under_plan_toast());
     } else {
         app.show_toast(&yolo_toast(new));
     }
@@ -468,7 +468,7 @@ pub(super) fn set_permission_mode(
     // Toast on every save (plan-aware for AlwaysApprove, mirroring
     // `set_yolo_mode` — the plan edit gate stays binding under yolo).
     if kind.is_always_approve() && effective_plan {
-        app.show_toast(YOLO_ON_UNDER_PLAN_TOAST);
+        app.show_toast(yolo_on_under_plan_toast());
     } else {
         app.show_toast(&permission_mode_toast(kind));
     }
@@ -496,17 +496,18 @@ pub(super) fn permission_mode_toast(kind: crate::app::actions::PermissionModeKin
 /// YOLO-ON toast when plan mode is active: always-approve arms the permission
 /// fast path, but the shell's plan-mode gate still rejects non-plan-file
 /// edits, so the standard "all tool actions auto-run" would overpromise.
-pub(super) const YOLO_ON_UNDER_PLAN_TOAST: &str =
-    "\u{26A0} Always-approve ON: plan mode still blocks file edits until you exit plan mode";
+pub(super) fn yolo_on_under_plan_toast() -> &'static str {
+    xai_grok_i18n::t("toast.always_approve_on_plan")
+}
 
 /// Build the YOLO toast — ⚠ on ON (destructive), ✓ on OFF (safe default).
 fn yolo_toast(new: bool) -> String {
     if new {
         // Warning glyph + consequence — only post-commit feedback.
-        "\u{26A0} Always-approve ON: all tool actions auto-run".to_string()
+        xai_grok_i18n::t("toast.always_approve_on").to_string()
     } else {
         // OFF restores safe default — uniform ✓ glyph.
-        save_success_toast("Always-approve", false)
+        save_success_toast(xai_grok_i18n::t("toast.always_approve"), false)
     }
 }
 

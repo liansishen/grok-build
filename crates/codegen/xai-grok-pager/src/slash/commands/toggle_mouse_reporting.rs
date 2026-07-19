@@ -22,7 +22,7 @@ impl SlashCommand for ToggleMouseReportingCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle terminal mouse reporting (native click-drag copy/paste)"
+        xai_grok_i18n::t("slash.toggle-mouse-reporting.description")
     }
 
     fn usage(&self) -> &str {

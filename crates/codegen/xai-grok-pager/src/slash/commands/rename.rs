@@ -16,7 +16,7 @@ impl SlashCommand for RenameCommand {
     }
 
     fn description(&self) -> &str {
-        "Rename the current session"
+        xai_grok_i18n::t("slash.rename.description")
     }
 
     fn session_scoped(&self) -> bool {
@@ -41,12 +41,12 @@ impl SlashCommand for RenameCommand {
 
     fn run(&self, ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         if ctx.session_id.is_none() {
-            return CommandResult::Error("No active session".to_string());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_session").to_string());
         }
 
         let title = args.trim().to_string();
         if title.is_empty() {
-            return CommandResult::Error("Usage: /rename <new title>".to_string());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.usage_rename").to_string());
         }
 
         CommandResult::Action(Action::RenameSession { title })

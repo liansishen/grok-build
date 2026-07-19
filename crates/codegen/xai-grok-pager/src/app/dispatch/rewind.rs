@@ -92,7 +92,7 @@ pub(super) fn dispatch_rewind(app: &mut AppView) -> Vec<Effect> {
         return vec![];
     };
     let Some(session_id) = agent.session.session_id.clone() else {
-        app.show_toast("No active session");
+        app.show_toast(xai_grok_i18n::t("toast.no_active_session"));
         return vec![];
     };
 
@@ -137,7 +137,7 @@ pub(super) fn dispatch_rewind_show_picker(app: &mut AppView) -> Vec<Effect> {
         return vec![];
     };
     let Some(session_id) = agent.session.session_id.clone() else {
-        app.show_toast("No active session");
+        app.show_toast(xai_grok_i18n::t("toast.no_active_session"));
         return vec![];
     };
 
@@ -505,7 +505,7 @@ pub(super) fn dispatch_inline_edit_submit(app: &mut AppView) -> Vec<Effect> {
         return vec![];
     };
     let Some(session_id) = agent.session.session_id.clone() else {
-        app.show_toast("No active session");
+        app.show_toast(xai_grok_i18n::t("toast.no_active_session"));
         return vec![];
     };
     let Some(edit) = agent.inline_edit.as_ref() else {
@@ -704,7 +704,7 @@ pub(super) fn handle_rewind_points_loaded(
         if let Some(stashed) = stashed {
             agent.prompt.restore(stashed);
         }
-        app.show_toast("No undoable prompts");
+        app.show_toast(xai_grok_i18n::t("toast.no_undoable"));
         return vec![];
     }
 

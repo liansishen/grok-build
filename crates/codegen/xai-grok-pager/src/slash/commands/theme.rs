@@ -26,7 +26,7 @@ impl SlashCommand for ThemeCommand {
     }
 
     fn description(&self) -> &str {
-        "Switch the color theme"
+        xai_grok_i18n::t("slash.theme.description")
     }
 
     /// Minimal has no theming, so there is nothing for `/theme` to switch.

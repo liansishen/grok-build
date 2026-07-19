@@ -1285,6 +1285,9 @@ pub(crate) async fn run(
         app.voice_config.language =
             crate::settings::canonical_voice_stt_language(Some(pref)).to_string();
     }
+    // Product UI language (`[ui].language` / `GROK_LANGUAGE`). Must run after
+    // `current_ui` is hydrated so the first painted frame uses the right catalog.
+    xai_grok_i18n::apply_from_config(app.current_ui.language.as_deref());
     // Resolve the per-tip contextual hints now that `current_ui` is hydrated and
     // propagate the prompt-relevant tips to any agents built at startup. New
     // agents adopt the gates at creation; settings toggles re-apply at runtime.
@@ -1791,7 +1794,7 @@ pub(crate) async fn run(
             } else if app.voice_cmd_tx.is_none() {
                 app.voice_state = VoiceState::Idle;
                 app.voice_ui_active = false;
-                app.show_toast("Voice pipeline could not start — restart grok");
+                app.show_toast(xai_grok_i18n::t("toast.voice_pipeline_failed"));
             } else {
                 // Defensive: a queued start with the pipeline already up (which
                 // shouldn't occur) — drop it so we don't re-enter every tick.
@@ -2614,11 +2617,11 @@ pub(crate) async fn run(
 
                 if pending.agent_ids.is_empty() {
                     // Nothing was reloaded (no open sessions at reconnect).
-                    app.show_toast("Reconnected.");
+                    app.show_toast(xai_grok_i18n::t("toast.reconnected"));
                 } else if restored {
-                    app.show_toast("Session restored. In-progress tools and terminals were lost.");
+                    app.show_toast(xai_grok_i18n::t("toast.session_restored"));
                 } else {
-                    app.show_toast("Session restore failed. Kept the existing transcript.");
+                    app.show_toast(xai_grok_i18n::t("toast.session_restore_failed"));
                 }
 
                 // Re-trigger the queue drain suppressed during the outage: every
@@ -2678,7 +2681,7 @@ pub(crate) async fn run(
                         // Pipeline is gone: drop any session/interim entirely.
                         app.voice_reset();
                         if was_listening {
-                            app.show_toast("Voice stopped — pipeline ended");
+                            app.show_toast(xai_grok_i18n::t("toast.voice_stopped"));
                         }
                         presenter.request(false);
                     }

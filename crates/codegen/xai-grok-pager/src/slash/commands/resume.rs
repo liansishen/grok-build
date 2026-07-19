@@ -11,7 +11,7 @@ impl SlashCommand for ResumeCommand {
     }
 
     fn description(&self) -> &str {
-        "Resume a previous session"
+        xai_grok_i18n::t("slash.resume.description")
     }
 
     fn usage(&self) -> &str {

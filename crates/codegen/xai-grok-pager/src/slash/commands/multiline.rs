@@ -24,7 +24,7 @@ impl SlashCommand for MultilineCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle multiline input mode (swap Enter and Shift+Enter)"
+        xai_grok_i18n::t("slash.multiline.description")
     }
 
     fn session_scoped(&self) -> bool {

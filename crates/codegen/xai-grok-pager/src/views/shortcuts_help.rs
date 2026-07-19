@@ -75,18 +75,20 @@ impl ShortcutsHelpEntry {
 // ---------------------------------------------------------------------------
 
 /// Category display order and labels for the cheatsheet.
-const CATEGORY_ORDER: &[(Category, &str)] = &[
-    (Category::GettingStarted, "Essentials"),
-    (Category::Input, "Input"),
-    (Category::ConversationNav, "Conversation Navigation"),
-    (Category::ConversationAction, "Conversation Actions"),
-    (Category::Panels, "Panels"),
-    (Category::Session, "Session"),
-    (Category::Dashboard, "Dashboard"),
-];
+fn category_order() -> [(Category, &'static str); 7] {
+    [
+        (Category::GettingStarted, xai_grok_i18n::t("shortcuts.category.essentials")),
+        (Category::Input, xai_grok_i18n::t("shortcuts.category.input")),
+        (Category::ConversationNav, xai_grok_i18n::t("shortcuts.category.conversation_nav")),
+        (Category::ConversationAction, xai_grok_i18n::t("shortcuts.category.conversation_action")),
+        (Category::Panels, xai_grok_i18n::t("shortcuts.category.panels")),
+        (Category::Session, xai_grok_i18n::t("shortcuts.category.session")),
+        (Category::Dashboard, xai_grok_i18n::t("shortcuts.category.dashboard")),
+    ]
+}
 
 pub fn default_collapsed() -> std::collections::HashSet<usize> {
-    (1..CATEGORY_ORDER.len()).collect()
+    (1..category_order().len()).collect()
 }
 
 // Man-page body for the paste pseudo-row (Enter detail). Keep claims that
@@ -139,7 +141,7 @@ pub fn build_entries(
             std::collections::HashSet::new()
         };
 
-    for (cat_idx, &(cat, label)) in CATEGORY_ORDER.iter().enumerate() {
+    for (cat_idx, &(cat, label)) in category_order().iter().enumerate() {
         // Dedup per category on the default key, preferring the def
         // whose `When` context is active: `DashboardStop` (list) and
         // `DashboardOverlayStop` (overlay) share Ctrl+X and category,

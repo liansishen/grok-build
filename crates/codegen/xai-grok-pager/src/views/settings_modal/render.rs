@@ -7,9 +7,9 @@ use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
 use super::state::{
-    CONTENT_MIN_WIDTH, MAX_THOUGHTS_WIDTH_WIDENED_MARGIN, MODAL_TITLE, RowEntry,
+    CONTENT_MIN_WIDTH, MAX_THOUGHTS_WIDTH_WIDENED_MARGIN, RowEntry,
     STANDARD_MAX_WIDTH, SettingsModalState, SettingsMode, SettingsModeKind,
-    TITLE_LEADING_DECORATION_W, effective_enum_choices, group_children,
+    TITLE_LEADING_DECORATION_W, effective_enum_choices, group_children, modal_title,
 };
 use crate::render::line_utils::truncate_str;
 use crate::settings::{
@@ -55,7 +55,8 @@ pub fn render_settings_modal(
     let breadcrumb_owned: String;
     let title: &str = if let Some(o) = overlay {
         breadcrumb_owned = format!(
-            "{MODAL_TITLE} {} {}",
+            "{} {} {}",
+            modal_title(),
             crate::glyphs::chevron(),
             o.breadcrumb_suffix
         );
@@ -65,32 +66,32 @@ pub fn render_settings_modal(
             SettingsMode::PickingEnum { key, .. } => {
                 if let Some(meta) = state.registry.find(key) {
                     breadcrumb_owned =
-                        format!("{MODAL_TITLE} {} {}", crate::glyphs::chevron(), meta.label);
+                        format!("{} {} {}", modal_title(), crate::glyphs::chevron(), meta.label_t());
                     &breadcrumb_owned
                 } else {
-                    MODAL_TITLE
+                    modal_title()
                 }
             }
 
             SettingsMode::EditingString { key, .. } | SettingsMode::EditingInt { key, .. } => {
                 if let Some(meta) = state.registry.find(key) {
                     breadcrumb_owned =
-                        format!("{MODAL_TITLE} {} {}", crate::glyphs::chevron(), meta.label);
+                        format!("{} {} {}", modal_title(), crate::glyphs::chevron(), meta.label_t());
                     &breadcrumb_owned
                 } else {
-                    MODAL_TITLE
+                    modal_title()
                 }
             }
             SettingsMode::PickingGroup { key, .. } => {
                 if let Some(meta) = state.registry.find(key) {
                     breadcrumb_owned =
-                        format!("{MODAL_TITLE} {} {}", crate::glyphs::chevron(), meta.label);
+                        format!("{} {} {}", modal_title(), crate::glyphs::chevron(), meta.label_t());
                     &breadcrumb_owned
                 } else {
-                    MODAL_TITLE
+                    modal_title()
                 }
             }
-            _ => MODAL_TITLE,
+            _ => modal_title(),
         }
     };
 
@@ -332,22 +333,22 @@ fn build_reset_confirm_shortcuts() -> Vec<Shortcut<'static>> {
     use crate::views::modal::{RESET_CONFIRM_NO_ID, RESET_CONFIRM_YES_ID};
     vec![
         Shortcut {
-            label: "y reset",
+            label: xai_grok_i18n::t("settings.modal.footer.y_reset"),
             clickable: true,
             id: RESET_CONFIRM_YES_ID,
         },
         Shortcut {
-            label: "n cancel",
+            label: xai_grok_i18n::t("settings.modal.footer.n_cancel"),
             clickable: true,
             id: RESET_CONFIRM_NO_ID,
         },
         Shortcut {
-            label: "Esc cancel",
+            label: xai_grok_i18n::t("settings.modal.footer.esc_cancel"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "F2 cancel",
+            label: xai_grok_i18n::t("settings.modal.footer.f2_cancel"),
             clickable: false,
             id: 0,
         },
@@ -684,13 +685,13 @@ pub(super) fn render_rows(
                             s.clone()
                         }
                     }
-                    SettingValue::Enum(e) => display_for_enum_canonical(&meta.kind, e).to_string(),
+                    SettingValue::Enum(e) => display_for_enum_canonical(meta.key, &meta.kind, e).to_string(),
                     SettingValue::Int(i) => i.to_string(),
                 };
                 let show_restart_pill_for_layout = meta.restart_required && is_expanded;
                 let layout_decision = row_layout(
                     area.width,
-                    meta.label,
+                    meta.label_t(),
                     &value_display,
                     show_restart_pill_for_layout,
                 );
@@ -849,11 +850,11 @@ fn compute_filtered_row_heights(state: &SettingsModalState, area_width: u16) -> 
                             s.clone()
                         }
                     }
-                    SettingValue::Enum(e) => display_for_enum_canonical(&meta.kind, e).to_string(),
+                    SettingValue::Enum(e) => display_for_enum_canonical(meta.key, &meta.kind, e).to_string(),
                     SettingValue::Int(i) => i.to_string(),
                 };
                 let show_restart_pill = meta.restart_required && is_expanded;
-                let layout = row_layout(area_width, meta.label, &value_display, show_restart_pill);
+                let layout = row_layout(area_width, meta.label_t(), &value_display, show_restart_pill);
                 let mut h: u16 = match layout {
                     RowLayout::OneLine => 1,
                     RowLayout::TwoLine | RowLayout::TwoLineWithLabelTruncation => 2,
@@ -877,7 +878,7 @@ fn wrapped_description_height(meta: &SettingMeta, area_width: u16, cap: u16) -> 
     if wrap_w == 0 {
         return 0;
     }
-    let line = Line::from(Span::raw(meta.description));
+    let line = Line::from(Span::raw(meta.description_t()));
     let wrapped = crate::render::wrapping::word_wrap_line(&line, wrap_w as usize);
     (wrapped.len() as u16).min(cap)
 }
@@ -988,8 +989,8 @@ pub(super) fn render_picking_enum(
                 .into_iter()
                 .map(|c| OwnedEnumChoice {
                     canonical: c.canonical.to_string(),
-                    display: c.display.to_string(),
-                    description: c.description.to_string(),
+                    display: c.display_t(setting_key).to_string(),
+                    description: c.description_t(setting_key).to_string(),
                 })
                 .collect()
         }
@@ -1004,7 +1005,7 @@ pub(super) fn render_picking_enum(
     }
 
     // Choosers need title + gap (2) before the description renders.
-    let header_rows = render_sub_pane_header(buf, area, theme, meta.label, meta.description, 2);
+    let header_rows = render_sub_pane_header(buf, area, theme, meta.label_t(), meta.description_t(), 2);
     if area.height <= header_rows {
         return;
     }
@@ -1293,8 +1294,8 @@ fn render_picking_group(
         buf,
         area,
         theme,
-        group_meta.label,
-        group_meta.description,
+        group_meta.label_t(),
+        group_meta.description_t(),
         2,
     );
     if area.height <= header_rows {
@@ -1374,10 +1375,10 @@ fn render_picking_group(
             .max(label_x);
         if value_x > label_x {
             let label_room = (value_x - label_x).saturating_sub(1) as usize;
-            let label_text: std::borrow::Cow<'_, str> = if child_meta.label.width() <= label_room {
-                std::borrow::Cow::Borrowed(child_meta.label)
+            let label_text: std::borrow::Cow<'_, str> = if child_meta.label_t().width() <= label_room {
+                std::borrow::Cow::Borrowed(child_meta.label_t())
             } else {
-                std::borrow::Cow::Owned(truncate_str(child_meta.label, label_room))
+                std::borrow::Cow::Owned(truncate_str(child_meta.label_t(), label_room))
             };
             let label_w = (label_text.width() as u16).min((value_x - label_x).saturating_sub(1));
             buf.set_span(
@@ -1584,8 +1585,8 @@ pub(super) fn render_editing_value(
             return;
         };
         // Snapshot meta fields to release registry borrow.
-        let label = meta.label;
-        let description = meta.description;
+        let label = meta.label_t();
+        let description = meta.description_t();
         render_int_stepper(
             buf,
             area,
@@ -1616,7 +1617,7 @@ pub(super) fn render_editing_value(
     };
 
     // Editors reserve title + gap + the input row (3) before the description.
-    let header_rows = render_sub_pane_header(buf, area, theme, meta.label, meta.description, 3);
+    let header_rows = render_sub_pane_header(buf, area, theme, meta.label_t(), meta.description_t(), 3);
     if area.height <= header_rows {
         return;
     }
@@ -2167,7 +2168,7 @@ fn compute_settings_max_label_w(metas: &[SettingMeta], content_w: u16) -> u16 {
     let cap = MAX_LABEL_W.min(half);
     metas
         .iter()
-        .map(|m| m.label.width() as u16)
+        .map(|m| m.label_t().width() as u16)
         .max()
         .unwrap_or(0)
         .min(cap)
@@ -2181,11 +2182,15 @@ fn compute_settings_max_label_w(metas: &[SettingMeta], content_w: u16) -> u16 {
 /// `display_name_for_canonical`'s pattern).
 ///
 /// Look up the display name for an Enum canonical via the registry.
-fn display_for_enum_canonical<'a>(kind: &'a SettingKind, canonical: &'a str) -> &'a str {
+fn display_for_enum_canonical<'a>(
+    setting_key: SettingKey,
+    kind: &'a SettingKind,
+    canonical: &'a str,
+) -> &'a str {
     if let SettingKind::Enum { choices, .. } = kind {
         for c in *choices {
             if c.canonical == canonical {
-                return c.display;
+                return c.display_t(setting_key);
             }
         }
     }
@@ -2344,7 +2349,7 @@ pub(super) fn render_setting_row(
                 s.as_str()
             }
         }
-        SettingValue::Enum(e) => display_for_enum_canonical(&meta.kind, e),
+        SettingValue::Enum(e) => display_for_enum_canonical(meta.key, &meta.kind, e),
         SettingValue::Int(i) => {
             value_text_owned = i.to_string();
             &value_text_owned
@@ -2395,7 +2400,7 @@ pub(super) fn render_setting_row(
     );
 
     // Fall back to one-line if only 1 line was allocated.
-    let layout_decision = row_layout(area.width, meta.label, value_text, show_restart_pill);
+    let layout_decision = row_layout(area.width, meta.label_t(), value_text, show_restart_pill);
     let layout = if area.height < 2 {
         // Only 1 line available — collapse to a one-line render and
         // accept that the label might collide with the value column.
@@ -2416,7 +2421,7 @@ pub(super) fn render_setting_row(
             let chevron_x = restart_x_line1.saturating_sub(ROW_CHEVRON_COL_W);
             let value_x = chevron_x.saturating_sub(value_w + 1);
 
-            let label_text = format!("{triangle} {}", meta.label);
+            let label_text = format!("{triangle} {}", meta.label_t());
             let label_w = label_text.width() as u16;
             let label_max_x = area.x.saturating_add(label_w);
             // Cap label end at value_x to never collide with the value column.
@@ -2489,11 +2494,11 @@ pub(super) fn render_setting_row(
                     if label_avail == 0 {
                         ""
                     } else {
-                        label_text_owned = truncate_str(meta.label, label_avail as usize);
+                        label_text_owned = truncate_str(meta.label_t(), label_avail as usize);
                         &label_text_owned
                     }
                 }
-                _ => meta.label,
+                _ => meta.label_t(),
             };
 
             let full_label_text = format!("{triangle} {label_text}");
@@ -2597,7 +2602,7 @@ fn render_expanded_description(buf: &mut Buffer, area: Rect, meta: &SettingMeta,
         .fg(theme.gray)
         .bg(theme.bg_base)
         .add_modifier(Modifier::ITALIC);
-    let desc_src: &str = meta.description;
+    let desc_src: &str = meta.description_t();
     // Indent 4 cols to nest under the label.
     let indent = 4u16.min(area.width);
     let wrap_w = area.width.saturating_sub(indent);
@@ -2641,10 +2646,10 @@ fn render_setting_row_no_value(
         .add_modifier(Modifier::BOLD);
 
     let label_max_w = max_label_w;
-    let label_truncated: std::borrow::Cow<'_, str> = if meta.label.width() <= label_max_w as usize {
-        std::borrow::Cow::Borrowed(meta.label)
+    let label_truncated: std::borrow::Cow<'_, str> = if meta.label_t().width() <= label_max_w as usize {
+        std::borrow::Cow::Borrowed(meta.label_t())
     } else {
-        std::borrow::Cow::Owned(truncate_str(meta.label, label_max_w as usize))
+        std::borrow::Cow::Owned(truncate_str(meta.label_t(), label_max_w as usize))
     };
     let text = format!(" !   {label_truncated} (no read mapping)");
     let w = text.width() as u16;
@@ -2685,7 +2690,7 @@ fn render_setting_group_row(
     // Triangle prefix mirrors normal rows: "▾" expanded, "▸" collapsed
     // (the group's description expands inline via Right/l like other rows).
     let triangle = if is_expanded { "\u{25BE}" } else { "\u{25B8}" };
-    let label_text = format!("{triangle} {}", meta.label);
+    let label_text = format!("{triangle} {}", meta.label_t());
     let label_cap = chevron_x.saturating_sub(area.x).saturating_sub(1);
     let label_w = (label_text.width() as u16).min(label_cap);
     if label_w > 0 {
@@ -2718,22 +2723,22 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
     match &state.state.mode {
         SettingsMode::Browse => {
             let enter_label = match state.focused_setting() {
-                Some((_, meta)) if matches!(meta.kind, SettingKind::Bool { .. }) => "Enter toggle",
-                _ => "Enter edit",
+                Some((_, meta)) if matches!(meta.kind, SettingKind::Bool { .. }) => xai_grok_i18n::t("settings.modal.footer.enter_toggle"),
+                _ => xai_grok_i18n::t("settings.modal.footer.enter_edit"),
             };
             let mut shortcuts = vec![
                 Shortcut {
-                    label: "\u{2191}/\u{2193}/j/k nav",
+                    label: xai_grok_i18n::t("settings.modal.footer.nav_jk"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "g/G top/btm",
+                    label: xai_grok_i18n::t("settings.modal.footer.top_bottom"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "Space toggle",
+                    label: xai_grok_i18n::t("settings.modal.footer.space_toggle"),
                     clickable: false,
                     id: 0,
                 },
@@ -2743,22 +2748,22 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                     id: 0,
                 },
                 Shortcut {
-                    label: "\u{2192} expand",
+                    label: xai_grok_i18n::t("settings.modal.footer.expand"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "/ search",
+                    label: xai_grok_i18n::t("settings.modal.footer.slash_search"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "d reset",
+                    label: xai_grok_i18n::t("settings.modal.footer.reset"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "F2/Esc close",
+                    label: xai_grok_i18n::t("settings.modal.footer.close"),
                     clickable: false,
                     id: 0,
                 },
@@ -2770,27 +2775,27 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
         }
         SettingsMode::FilterFocused => vec![
             Shortcut {
-                label: "type to filter",
+                label: xai_grok_i18n::t("settings.modal.footer.type_to_filter"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "\u{2191}/\u{2193} nav",
+                label: xai_grok_i18n::t("settings.modal.footer.nav"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Backspace edit",
+                label: xai_grok_i18n::t("settings.modal.footer.backspace_edit"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Enter commit",
+                label: xai_grok_i18n::t("settings.modal.footer.enter_commit"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc clear",
+                label: xai_grok_i18n::t("settings.modal.footer.esc_clear"),
                 clickable: false,
                 id: 0,
             },
@@ -2801,11 +2806,11 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
         } => {
             // Labels depend on whether the Enum supports live preview.
             let nav_label = if *sp {
-                "\u{2191}/\u{2193} try"
+                xai_grok_i18n::t("settings.modal.footer.nav_try")
             } else {
-                "\u{2191}/\u{2193} nav"
+                xai_grok_i18n::t("settings.modal.footer.nav")
             };
-            let esc_label = if *sp { "Esc revert" } else { "Esc cancel" };
+            let esc_label = if *sp { xai_grok_i18n::t("settings.modal.footer.esc_revert") } else { xai_grok_i18n::t("settings.modal.footer.esc_cancel") };
             vec![
                 Shortcut {
                     label: nav_label,
@@ -2813,7 +2818,7 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                     id: 0,
                 },
                 Shortcut {
-                    label: "Enter commit",
+                    label: xai_grok_i18n::t("settings.modal.footer.enter_commit"),
                     clickable: false,
                     id: 0,
                 },
@@ -2823,7 +2828,7 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                     id: 0,
                 },
                 Shortcut {
-                    label: "d reset",
+                    label: xai_grok_i18n::t("settings.modal.footer.reset"),
                     clickable: false,
                     id: 0,
                 },
@@ -2844,17 +2849,17 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                     id: 0,
                 },
                 Shortcut {
-                    label: "Enter commit",
+                    label: xai_grok_i18n::t("settings.modal.footer.enter_commit"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "Esc cancel",
+                    label: xai_grok_i18n::t("settings.modal.footer.esc_cancel"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "d reset",
+                    label: xai_grok_i18n::t("settings.modal.footer.reset"),
                     clickable: false,
                     id: 0,
                 },
@@ -2862,7 +2867,7 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
         }
         SettingsMode::EditingString { .. } => vec![
             Shortcut {
-                label: "type to edit",
+                label: xai_grok_i18n::t("settings.modal.footer.type_to_edit"),
                 clickable: false,
                 id: 0,
             },
@@ -2872,29 +2877,29 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                 id: 0,
             },
             Shortcut {
-                label: "Enter commit",
+                label: xai_grok_i18n::t("settings.modal.footer.enter_commit"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc cancel",
+                label: xai_grok_i18n::t("settings.modal.footer.esc_cancel"),
                 clickable: false,
                 id: 0,
             },
         ],
         SettingsMode::PickingGroup { .. } => vec![
             Shortcut {
-                label: "\u{2191}/\u{2193}/j/k nav",
+                label: xai_grok_i18n::t("settings.modal.footer.nav_jk"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Space/Enter toggle",
+                label: xai_grok_i18n::t("settings.modal.footer.space_enter_toggle"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc back",
+                label: xai_grok_i18n::t("settings.modal.footer.esc_back"),
                 clickable: false,
                 id: 0,
             },

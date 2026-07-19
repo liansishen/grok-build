@@ -12,7 +12,7 @@ use super::setters::{
     set_screen_mode_inner, set_scroll_lines_inner, set_scroll_mode_inner, set_scroll_speed_inner,
     set_show_thinking_blocks_inner, set_show_tips_inner, set_simple_mode_inner, set_theme_inner,
     set_timeline_inner, set_timestamps, set_timestamps_inner, set_vim_mode_inner,
-    set_voice_capture_mode_inner, set_voice_stt_language_inner,
+    set_ui_language_inner, set_voice_capture_mode_inner, set_voice_stt_language_inner,
 };
 use crate::app::actions::{Action, Effect};
 use crate::app::app_view::{ActiveView, AppView};
@@ -25,8 +25,15 @@ use agent_client_protocol as acp;
 
 /// Format a "✓ Label: value" success toast.
 pub(in crate::app::dispatch) fn save_success_toast(label: &str, on: bool) -> String {
-    let value = if on { "on" } else { "off" };
-    format!("\u{2713} {label}: {value}")
+    let value = if on {
+        xai_grok_i18n::t("settings.modal.value_on")
+    } else {
+        xai_grok_i18n::t("settings.modal.value_off")
+    };
+    xai_grok_i18n::t_fmt(
+        "toast.setting_changed",
+        &[("label", label), ("value", value)],
+    )
 }
 
 /// Refresh every open settings modal's `ui_snapshot` + `pager_snapshot`
@@ -368,7 +375,7 @@ pub(in crate::app::dispatch) fn dispatch_confirm_reset_setting(
                     "reset skipped — setting already at default",
                 );
                 with_active_agent(app, |agent| {
-                    agent.show_toast(&format!("{}: already at default", meta.label));
+                    agent.show_toast(&xai_grok_i18n::t_fmt("toast.already_default", &[("label", meta.label_t())]));
                 });
                 return vec![];
             }
@@ -553,7 +560,7 @@ pub(in crate::app::dispatch) fn dispatch_toggle_mouse_capture(app: &mut AppView)
         }
         with_active_agent(app, |agent| {
             toast_applied = true;
-            agent.show_toast("Mouse reporting on");
+            agent.show_toast(xai_grok_i18n::t("toast.mouse_reporting_on"));
         });
     } else {
         for agent in app.agents.values_mut() {
@@ -836,6 +843,7 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("voice_stt_language", SettingValue::Enum(s)) => {
             Some(Action::SetVoiceSttLanguage((*s).to_string()))
         }
+        ("language", SettingValue::Enum(s)) => Some(Action::SetUiLanguage((*s).to_string())),
         // fork_secondary_model: empty → Clear, non-empty is skew guard.
         ("fork_secondary_model", SettingValue::String(s)) => {
             if s.is_empty() {
@@ -1098,6 +1106,9 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
                 app,
                 crate::settings::canonical_voice_stt_language(Some(s)),
             );
+        }
+        ("language", SettingValue::Enum(s)) => {
+            set_ui_language_inner(app, crate::settings::canonical_ui_language(Some(s)));
         }
         // show_tips / auto_update: if rollback equals the effective
         // default, restore to None (keeps mirror in sync with disk).

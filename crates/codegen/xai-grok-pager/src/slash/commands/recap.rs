@@ -20,7 +20,7 @@ impl SlashCommand for RecapCommand {
     }
 
     fn description(&self) -> &str {
-        "Summarize the session so far"
+        xai_grok_i18n::t("slash.recap.description")
     }
 
     fn session_scoped(&self) -> bool {

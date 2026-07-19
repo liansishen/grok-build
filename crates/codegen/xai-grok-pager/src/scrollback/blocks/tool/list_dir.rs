@@ -113,7 +113,7 @@ impl ListDirToolCallBlock {
             theme.fg(theme.path)
         };
 
-        let prefix = "List ";
+        let prefix = xai_grok_i18n::t("tool.prefix.list");
         let path_budget = width
             .map(|w| w.saturating_sub(prefix.len()))
             .unwrap_or(usize::MAX);

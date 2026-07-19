@@ -11,7 +11,7 @@ impl SlashCommand for LogoutCommand {
     }
 
     fn description(&self) -> &str {
-        "Log out and return to the login screen"
+        xai_grok_i18n::t("slash.logout.description")
     }
 
     fn usage(&self) -> &str {

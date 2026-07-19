@@ -23,7 +23,7 @@ impl SlashCommand for ModelCommand {
     }
 
     fn description(&self) -> &str {
-        "Switch the active model"
+        xai_grok_i18n::t("slash.model.description")
     }
 
     fn session_scoped(&self) -> bool {
@@ -67,7 +67,7 @@ impl SlashCommand for ModelCommand {
     fn run(&self, ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         let trimmed = args.trim();
         if trimmed.is_empty() {
-            return CommandResult::Error("Usage: /model <name> [effort]".into());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.usage_model").into());
         }
 
         // Prefer an exact full-string catalog match first. Model display names

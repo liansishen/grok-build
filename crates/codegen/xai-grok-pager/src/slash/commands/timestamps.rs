@@ -14,7 +14,7 @@ impl SlashCommand for TimestampsCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle message timestamps on/off"
+        xai_grok_i18n::t("slash.timestamps.description")
     }
 
     fn usage(&self) -> &str {

@@ -392,7 +392,7 @@ impl AgentView {
             self.show_toast("Opening in default app\u{2026}");
             true
         } else {
-            self.show_toast("Could not open file");
+            self.show_toast(xai_grok_i18n::t("toast.could_not_open_file"));
             false
         }
     }
@@ -482,7 +482,7 @@ impl AgentView {
                     tracing::debug!("copy image failed: {e}");
                 }
             });
-            self.show_toast("Copied image");
+            self.show_toast(xai_grok_i18n::t("toast.copied"));
             return Some(InputOutcome::Changed);
         }
 

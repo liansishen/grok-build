@@ -9,7 +9,7 @@ impl SlashCommand for JumpCommand {
     }
 
     fn description(&self) -> &str {
-        "Jump to a turn in the conversation"
+        xai_grok_i18n::t("slash.jump.description")
     }
 
     fn session_scoped(&self) -> bool {

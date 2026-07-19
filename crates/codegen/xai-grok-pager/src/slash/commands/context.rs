@@ -12,7 +12,7 @@ impl SlashCommand for ContextCommand {
     }
 
     fn description(&self) -> &str {
-        "View context usage"
+        xai_grok_i18n::t("slash.context.description")
     }
 
     fn session_scoped(&self) -> bool {
@@ -25,7 +25,7 @@ impl SlashCommand for ContextCommand {
 
     fn run(&self, ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
         if ctx.session_id.is_none() {
-            return CommandResult::Error("No active session".to_string());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_session").to_string());
         }
 
         CommandResult::Action(Action::ShowContextInfo)
