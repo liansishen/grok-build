@@ -703,7 +703,7 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
         // ── Agent ────────────────────────────────────────────────────
         ActionDef {
             id: ActionId::ToggleYolo,
-            label: "yolo",
+            label: "always-approve",
             description: "Toggle always-approve",
             default_key: key!('o', CONTROL),
             alt_keys: vec![],

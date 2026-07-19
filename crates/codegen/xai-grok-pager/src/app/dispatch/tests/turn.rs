@@ -1327,11 +1327,11 @@ fn mouse_reporting_toggle_sticky_survives_subagent_esc_to_parent() {
     let _ = dispatch(Action::ToggleMouseCapture, &mut app);
 
     let parent = app.agents.get(&parent_id).unwrap();
-    assert_eq!(parent.sticky_toast.as_deref(), Some(MOUSE_OFF_STICKY));
+    assert_eq!(parent.sticky_toast.as_deref(), Some(mouse_off_sticky()));
     let child = parent.subagent_views.get(&child_sid).unwrap();
     assert_eq!(
         child.sticky_toast.as_deref(),
-        Some(MOUSE_OFF_STICKY),
+        Some(mouse_off_sticky()),
         "child gets sticky recursively even if toast path targeted active view only"
     );
 
@@ -1341,7 +1341,7 @@ fn mouse_reporting_toggle_sticky_survives_subagent_esc_to_parent() {
     let parent = app.agents.get(&parent_id).unwrap();
     assert_eq!(
         parent.sticky_toast.as_deref(),
-        Some(MOUSE_OFF_STICKY),
+        Some(mouse_off_sticky()),
         "parent keeps sticky after leaving subagent fullscreen"
     );
     assert!(parent.toast.is_none() || parent.sticky_toast.is_some());

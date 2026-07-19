@@ -151,7 +151,10 @@ impl AgentView {
                             };
                             hints.push(HintItem::new(key!('f', CONTROL), label));
                         }
-                        hints.push(HintItem::new(key!('o', CONTROL), "always-approve"));
+                        hints.push(HintItem::new(
+                            key!('o', CONTROL),
+                            xai_grok_i18n::t("mode.flag.always_approve"),
+                        ));
                         hints.push(HintItem::new(key!('c', CONTROL), "cancel"));
                         hints
                     }
@@ -1245,7 +1248,13 @@ impl AgentView {
             if self.hit_plan_button.hovered {
                 plan_style = plan_style.add_modifier(ratatui::style::Modifier::BOLD);
             }
-            status.push("plan", Line::from(Span::styled("plan", plan_style)));
+            status.push(
+                "plan",
+                Line::from(Span::styled(
+                    xai_grok_i18n::t("mode.flag.plan"),
+                    plan_style,
+                )),
+            );
         }
         if let Some(ref goal) = self.goal_state {
             let tick = self.tasks.tick_count() as usize;
@@ -2157,15 +2166,24 @@ impl AgentView {
             };
             let plan_label: &str = if approval_is_commenting || casual_commenting {
                 commenting_label = match commenting_range {
-                    Some(r) if r.len() == 1 => format!("commenting L{}", r.start),
-                    Some(r) => format!("commenting L{}-{}", r.start, r.end - 1),
-                    None => "commenting".to_string(),
+                    Some(r) if r.len() == 1 => xai_grok_i18n::t_fmt(
+                        "mode.flag.commenting_line",
+                        &[("n", &r.start.to_string())],
+                    ),
+                    Some(r) => xai_grok_i18n::t_fmt(
+                        "mode.flag.commenting_range",
+                        &[
+                            ("start", &r.start.to_string()),
+                            ("end", &(r.end - 1).to_string()),
+                        ],
+                    ),
+                    None => xai_grok_i18n::t("mode.flag.commenting").to_string(),
                 };
                 commenting_label.as_str()
             } else if self.plan_approval_view.is_some() {
-                "plan approval"
+                xai_grok_i18n::t("mode.flag.plan_approval")
             } else {
-                "plan"
+                xai_grok_i18n::t("mode.flag.plan")
             };
             mode_flags_vec.push(PromptFlag {
                 text: plan_label,
@@ -2175,14 +2193,14 @@ impl AgentView {
         }
         if self.session.is_yolo() && !effective_plan {
             mode_flags_vec.push(PromptFlag {
-                text: "always-approve",
+                text: xai_grok_i18n::t("mode.flag.always_approve"),
                 color: None,
                 bold: false,
             });
         }
         if self.auto_flag_visible(effective_plan) {
             mode_flags_vec.push(PromptFlag {
-                text: "auto",
+                text: xai_grok_i18n::t("mode.flag.auto"),
                 color: Some(theme.accent_system),
                 bold: false,
             });
@@ -3097,7 +3115,10 @@ impl AgentView {
                             };
                             hints.push(HintItem::new(key!('f', CONTROL), label));
                         }
-                        hints.push(HintItem::new(key!('o', CONTROL), "always-approve"));
+                        hints.push(HintItem::new(
+                            key!('o', CONTROL),
+                            xai_grok_i18n::t("mode.flag.always_approve"),
+                        ));
                         hints.push(HintItem::new(key!('c', CONTROL), "cancel"));
                         hints
                     }

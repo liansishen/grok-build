@@ -3417,7 +3417,7 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
     let parent = app.agents.get(&id).unwrap();
     assert_eq!(
         parent.sticky_toast.as_deref(),
-        Some(MOUSE_OFF_STICKY),
+        Some(mouse_off_sticky()),
         "sticky banner set on parent"
     );
     {
@@ -3428,7 +3428,7 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
             Some("Copied!"),
             "transient wins while active"
         );
-        assert_eq!(agent.sticky_toast.as_deref(), Some(MOUSE_OFF_STICKY));
+        assert_eq!(agent.sticky_toast.as_deref(), Some(mouse_off_sticky()));
         if let Some((_, ref mut ticks)) = agent.toast {
             *ticks = 0;
         }
@@ -3436,12 +3436,12 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
         assert!(agent.toast.is_none());
         assert_eq!(
             agent.sticky_toast.as_deref(),
-            Some(MOUSE_OFF_STICKY),
+            Some(mouse_off_sticky()),
             "sticky remains after transient expires"
         );
         agent.show_toast("temp");
         agent.toast = None;
-        assert_eq!(agent.sticky_toast.as_deref(), Some(MOUSE_OFF_STICKY));
+        assert_eq!(agent.sticky_toast.as_deref(), Some(mouse_off_sticky()));
     }
     let _ = dispatch(Action::ToggleMouseCapture, &mut app);
     assert!(mouse_capture_is_enabled());

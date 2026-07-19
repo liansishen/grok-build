@@ -272,7 +272,7 @@ label = "todos"
 description = "Toggle todo pane"
 
 [actions.ToggleYolo]
-label = "yolo"
+label = "always-approve"
 description = "Toggle always-approve"
 
 [actions.VoiceToggle]
@@ -455,6 +455,24 @@ esc_close = "Esc close"
 [modal.section]
 session = "Session"
 
+[mode]
+switched = "Switched to mode: {mode}"
+
+[mode.flag]
+always_approve = "always-approve"
+auto = "auto"
+plan = "plan"
+plan_approval = "plan approval"
+commenting = "commenting"
+commenting_line = "commenting L{n}"
+commenting_range = "commenting L{start}-{end}"
+
+[mode.name]
+plan = "Plan"
+auto = "Auto"
+always_approve = "Always-Approve"
+normal = "Normal"
+
 [pane]
 no_todos = "No todo items."
 no_tasks = "No tasks or agents."
@@ -511,6 +529,9 @@ no_source = "No source file"
 waiting_approval = "Waiting on plan approval"
 no_plan_approve = "No plan written — approve or request changes"
 
+[prompt.placeholder]
+build_anything = "Build anything"
+
 [rewind]
 loading = "Loading rewind points..."
 cancel_and_rewind = "Cancel turn and rewind"
@@ -530,6 +551,29 @@ reasoning_overhead = "Reasoning/overhead"
 tool_definitions = "Tool definitions"
 compact_tip = "Tip: run /compact to free context"
 credit_limit = "You've hit your credit limit."
+
+[session]
+worked_for = "Worked for {duration}"
+turn_completed = "Turn completed."
+turn_cancelled = "Turn cancelled by user in {duration}."
+turn_halted = "Agent was unable to make progress — turn ended in {duration}."
+turn_failed_in = "Turn failed in {duration}: {error}"
+turn_failed = "Turn failed: {error}"
+compaction_started = "Context {percentage}% full. Compacting…"
+compaction_completed_range = "Context compacted: {before} → {after} tokens"
+compaction_completed = "Context compacted → {after} tokens"
+compaction_completed_with_time = "{body} ({secs}s)"
+compaction_failed = "Compaction failed."
+compaction_failed_error = "Compaction failed: {error}"
+compaction_cancelled = "Compaction cancelled."
+compact_completed = "Compaction completed in {duration}."
+retry_failed = "Retry failed: {error}"
+retry_encrypted_mismatch = "This session's conversation history is incompatible with the current model. Please start a new session."
+reauth_required = "Authentication required — your session has expired or your credentials were rejected. Run /login to re-authenticate, then resend your message."
+context_too_large = "This conversation is too large for the model's context window. Use /new to start a new session."
+model_switched = "{reason} Switched to \"{model}\"."
+memory_saved = "Memory saved ({trigger}) → {path}  ·  /memory to view"
+goal_complete = "Goal complete — {duration} end-to-end."
 
 [settings.auto_dark_theme]
 label = "Auto dark theme"
@@ -1144,6 +1188,8 @@ permission_mode_auto = "✓ Permission mode: Auto (classifier)"
 permission_mode_ask = "✓ Permission mode: Ask"
 permission_mode_default = "✓ Permission mode: Default"
 restart_to_apply = "(restart to apply)"
+mouse_reporting_off_scrollback = "Ctrl+r to enable mouse reporting and restore TUI features"
+mouse_reporting_off_prompt = "/toggle-mouse-reporting to enable mouse reporting and restore TUI features"
 
 [tool.prefix]
 list = "List "

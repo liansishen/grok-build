@@ -3125,7 +3125,9 @@ impl PromptWidget {
             && !style.focused
             && !voice_interim_shown
         {
-            let placeholder = style.placeholder_override.unwrap_or("Build anything");
+            let placeholder = style
+                .placeholder_override
+                .unwrap_or_else(|| xai_grok_i18n::t("prompt.placeholder.build_anything"));
             buf.set_string(
                 ta_area.x,
                 ta_area.y,

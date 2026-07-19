@@ -145,34 +145,39 @@ impl SessionEvent {
             // Deliberately period-less — don't re-punctuate.
             SessionEvent::TurnCompleted {
                 elapsed: Some(elapsed),
-            } => {
-                format!("Worked for {}", format_duration(*elapsed))
+            } => xai_grok_i18n::t_fmt(
+                "session.worked_for",
+                &[("duration", &format_duration(*elapsed))],
+            ),
+            SessionEvent::TurnCompleted { elapsed: None } => {
+                xai_grok_i18n::t("session.turn_completed").to_string()
             }
-            SessionEvent::TurnCompleted { elapsed: None } => "Turn completed.".to_string(),
-            SessionEvent::TurnCancelled { elapsed } => {
-                format!("Turn cancelled by user in {}.", format_duration(*elapsed))
-            }
-            SessionEvent::TurnHalted { elapsed } => {
-                format!(
-                    "Agent was unable to make progress \u{2014} turn ended in {}.",
-                    format_duration(*elapsed)
-                )
-            }
+            SessionEvent::TurnCancelled { elapsed } => xai_grok_i18n::t_fmt(
+                "session.turn_cancelled",
+                &[("duration", &format_duration(*elapsed))],
+            ),
+            SessionEvent::TurnHalted { elapsed } => xai_grok_i18n::t_fmt(
+                "session.turn_halted",
+                &[("duration", &format_duration(*elapsed))],
+            ),
             SessionEvent::TurnFailed {
                 error,
                 elapsed: Some(elapsed),
-            } => {
-                format!("Turn failed in {}: {error}", format_duration(*elapsed))
-            }
+            } => xai_grok_i18n::t_fmt(
+                "session.turn_failed_in",
+                &[
+                    ("duration", &format_duration(*elapsed)),
+                    ("error", error.as_str()),
+                ],
+            ),
             SessionEvent::TurnFailed {
                 error,
                 elapsed: None,
-            } => {
-                format!("Turn failed: {error}")
-            }
-            SessionEvent::CompactionStarted { percentage } => {
-                format!("Context {percentage}% full. Compacting…")
-            }
+            } => xai_grok_i18n::t_fmt("session.turn_failed", &[("error", error.as_str())]),
+            SessionEvent::CompactionStarted { percentage } => xai_grok_i18n::t_fmt(
+                "session.compaction_started",
+                &[("percentage", &percentage.to_string())],
+            ),
             SessionEvent::CompactionCompleted {
                 tokens_before,
                 tokens_after,
@@ -181,52 +186,58 @@ impl SessionEvent {
                 let after = format_tokens(*tokens_after);
                 // Older shells don't send tokens_before — keep the legacy format.
                 let body = match tokens_before {
-                    Some(before) if *before > 0 => {
-                        format!(
-                            "Context compacted: {} → {after} tokens",
-                            format_tokens(*before)
-                        )
-                    }
-                    _ => format!("Context compacted → {after} tokens"),
+                    Some(before) if *before > 0 => xai_grok_i18n::t_fmt(
+                        "session.compaction_completed_range",
+                        &[
+                            ("before", &format_tokens(*before)),
+                            ("after", &after),
+                        ],
+                    ),
+                    _ => xai_grok_i18n::t_fmt(
+                        "session.compaction_completed",
+                        &[("after", &after)],
+                    ),
                 };
                 if let Some(ms) = elapsed_ms {
-                    let secs = *ms as f64 / 1000.0;
-                    format!("{body} ({secs:.1}s)")
+                    let secs = format!("{:.1}", *ms as f64 / 1000.0);
+                    xai_grok_i18n::t_fmt(
+                        "session.compaction_completed_with_time",
+                        &[("body", &body), ("secs", &secs)],
+                    )
                 } else {
                     body
                 }
             }
             SessionEvent::CompactionFailed { error } => {
                 if error.trim().is_empty() {
-                    "Compaction failed.".to_string()
+                    xai_grok_i18n::t("session.compaction_failed").to_string()
                 } else {
-                    format!("Compaction failed: {error}")
+                    xai_grok_i18n::t_fmt(
+                        "session.compaction_failed_error",
+                        &[("error", error.as_str())],
+                    )
                 }
             }
-            SessionEvent::CompactionCancelled => "Compaction cancelled.".to_string(),
+            SessionEvent::CompactionCancelled => {
+                xai_grok_i18n::t("session.compaction_cancelled").to_string()
+            }
             SessionEvent::RetryFailed { error, error_type } => {
                 if error_type.as_deref() == Some("encrypted_content_mismatch") {
-                    "This session's conversation history is incompatible with the \
-                     current model. Please start a new session."
-                        .to_string()
+                    xai_grok_i18n::t("session.retry_encrypted_mismatch").to_string()
                 } else {
-                    format!("Retry failed: {error}")
+                    xai_grok_i18n::t_fmt("session.retry_failed", &[("error", error.as_str())])
                 }
             }
             SessionEvent::ReAuthRequired => {
-                "Authentication required \u{2014} your session has expired or your \
-                 credentials were rejected. Run /login to re-authenticate, then resend \
-                 your message."
-                    .to_string()
+                xai_grok_i18n::t("session.reauth_required").to_string()
             }
             SessionEvent::ContextTooLarge => {
-                "This conversation is too large for the model's context window. \
-                 Use /new to start a new session."
-                    .to_string()
+                xai_grok_i18n::t("session.context_too_large").to_string()
             }
-            SessionEvent::CompactCompleted { elapsed } => {
-                format!("Compaction completed in {}.", format_duration(*elapsed))
-            }
+            SessionEvent::CompactCompleted { elapsed } => xai_grok_i18n::t_fmt(
+                "session.compact_completed",
+                &[("duration", &format_duration(*elapsed))],
+            ),
             SessionEvent::HookAnnotation { message } => message.clone(),
             SessionEvent::ModelUnavailable {
                 new_model_id,
@@ -236,19 +247,23 @@ impl SessionEvent {
                 if new_model_id.is_empty() {
                     reason.clone()
                 } else {
-                    format!("{reason} Switched to \"{new_model_id}\".")
+                    xai_grok_i18n::t_fmt(
+                        "session.model_switched",
+                        &[("reason", reason.as_str()), ("model", new_model_id.as_str())],
+                    )
                 }
             }
             SessionEvent::MemorySaved { path, trigger } => {
                 let short_path = crate::util::abbreviate_path(path);
-                format!("Memory saved ({trigger}) \u{2192} {short_path}  \u{00b7}  /memory to view")
-            }
-            SessionEvent::GoalCompleted { elapsed } => {
-                format!(
-                    "Goal complete \u{2014} {} end-to-end.",
-                    format_duration(*elapsed)
+                xai_grok_i18n::t_fmt(
+                    "session.memory_saved",
+                    &[("trigger", trigger.as_str()), ("path", &short_path)],
                 )
             }
+            SessionEvent::GoalCompleted { elapsed } => xai_grok_i18n::t_fmt(
+                "session.goal_complete",
+                &[("duration", &format_duration(*elapsed))],
+            ),
             SessionEvent::Recap { summary, auto: _ } => {
                 // Always "Recap —" (manual `/recap` and auto return-from-away).
                 format!("Recap \u{2014} {summary}")

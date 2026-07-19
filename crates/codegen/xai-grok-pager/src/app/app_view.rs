@@ -5850,7 +5850,7 @@ pub(crate) mod tests {
         app.agents
             .get_mut(&id)
             .unwrap()
-            .show_mode_switch_banner("Plan");
+            .show_mode_switch_banner(xai_grok_i18n::t("mode.name.plan"));
         assert!(
             app.needs_animation(),
             "mode_switch_banner must request ticks (tick_mode_banner countdown)"

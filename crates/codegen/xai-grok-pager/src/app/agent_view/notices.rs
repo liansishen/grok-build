@@ -239,9 +239,10 @@ impl AgentView {
         // from scrollback, so when the prompt is focused show the
         // `/toggle-mouse-reporting` command instead (it toggles from any pane).
         // Storage keeps the scrollback form; swap the displayed text here.
-        if sticky == crate::app::MOUSE_OFF_HINT_SCROLLBACK && self.active_pane == ActivePane::Prompt
+        if sticky == crate::app::mouse_off_hint_scrollback()
+            && self.active_pane == ActivePane::Prompt
         {
-            return Some(crate::app::MOUSE_OFF_HINT_PROMPT);
+            return Some(crate::app::mouse_off_hint_prompt());
         }
         Some(sticky)
     }
@@ -250,8 +251,10 @@ impl AgentView {
     ///
     /// Triggered on Shift+Tab mode cycles.
     /// Renders at full visibility for 2 s, then fades out over the final 0.3 s.
+    ///
+    /// `mode_name` should already be localized (see `mode.name.*` catalog keys).
     pub fn show_mode_switch_banner(&mut self, mode_name: &str) {
-        let msg = format!("Switched to mode: {}", mode_name);
+        let msg = xai_grok_i18n::t_fmt("mode.switched", &[("mode", mode_name)]);
         self.mode_switch_banner = Some((msg, MODE_BANNER_TOTAL_TICKS));
     }
 
@@ -361,20 +364,20 @@ mod mouse_off_banner_tests {
     #[test]
     fn mouse_off_banner_key_swaps_with_focused_pane() {
         let mut view = make_running_agent();
-        view.set_sticky_toast(Some(crate::app::MOUSE_OFF_HINT_SCROLLBACK));
+        view.set_sticky_toast(Some(crate::app::mouse_off_hint_scrollback()));
 
         // Scrollback focus: Ctrl+R works there, so advertise it.
         view.active_pane = AgentPane::Scrollback;
         assert_eq!(
             view.active_toast_message(),
-            Some(crate::app::MOUSE_OFF_HINT_SCROLLBACK)
+            Some(crate::app::mouse_off_hint_scrollback())
         );
 
         // Prompt focus: the toggle chord is scrollback-only, so advertise the command.
         view.active_pane = AgentPane::Prompt;
         assert_eq!(
             view.active_toast_message(),
-            Some(crate::app::MOUSE_OFF_HINT_PROMPT)
+            Some(crate::app::mouse_off_hint_prompt())
         );
 
         // A transient toast still wins over the sticky banner, regardless of pane.
