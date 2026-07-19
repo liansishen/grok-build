@@ -542,7 +542,7 @@ fn render_search_bar_with_label_viewport(
             x,
             y,
             &Line::from(Span::styled(
-                " / to search",
+                xai_grok_i18n::t("ui.search_placeholder"),
                 bg_style(Style::default().fg(theme.gray_dim)),
             )),
             width,

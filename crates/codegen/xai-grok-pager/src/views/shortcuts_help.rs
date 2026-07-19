@@ -257,7 +257,7 @@ pub fn build_entries(
         // handled inline; surface it here for discoverability.
         if vim_mode && cat == Category::ConversationNav {
             let mut item = HintItem::new(crate::key!('/'), "search");
-            item.description = Some("Search scrollback".into());
+            item.description = Some(xai_grok_i18n::t("shortcuts.pseudo.search_scrollback").into());
             let dimmed = !active_contexts.contains(&When::ScrollbackFocused);
             entries.push(ShortcutsHelpEntry::Hint {
                 item,
@@ -271,7 +271,7 @@ pub fn build_entries(
         // swallow it. Lit on the agent prompt and the dashboard (both paste).
         if cat == Category::Input {
             let mut item = HintItem::new(crate::key!('v', CONTROL), "paste");
-            item.description = Some("Paste images (and text) from the clipboard".into());
+            item.description = Some(xai_grok_i18n::t("shortcuts.pseudo.paste").into());
             #[cfg(target_os = "windows")]
             item.keys.push(crate::key!('v', ALT));
             let dimmed = !active_contexts.contains(&When::PromptFocused)
@@ -587,17 +587,17 @@ pub fn modal_footer_detail() -> Vec<crate::views::modal_window::Shortcut<'static
     use crate::views::modal_window::Shortcut;
     vec![
         Shortcut {
-            label: "Esc back",
+            label: xai_grok_i18n::t("shortcuts.footer.esc_back"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "\u{2191}/\u{2193} scroll",
+            label: xai_grok_i18n::t("shortcuts.footer.scroll"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Ctrl+./X close",
+            label: xai_grok_i18n::t("shortcuts.footer.close_chord"),
             clickable: false,
             id: 0,
         },
@@ -692,7 +692,7 @@ pub fn render_detail(
     };
     let footer = modal_footer_detail();
     let modal_config = mw::ModalWindowConfig {
-        title: "Keyboard Shortcuts",
+        title: xai_grok_i18n::t("modal.keyboard_shortcuts"),
         tabs: None,
         shortcuts: &footer,
         sizing: modal_sizing(compact),
@@ -1004,41 +1004,41 @@ pub fn modal_footer(filter_active: bool) -> Vec<crate::views::modal_window::Shor
     use crate::views::modal_window::Shortcut;
     let mut shortcuts = vec![
         Shortcut {
-            label: "\u{2191}/\u{2193} nav",
+            label: xai_grok_i18n::t("shortcuts.footer.nav"),
             clickable: false,
             id: 0,
         },
         Shortcut {
             label: if filter_active {
-                "f show all"
+                xai_grok_i18n::t("shortcuts.footer.show_all")
             } else {
-                "f filter"
+                xai_grok_i18n::t("shortcuts.footer.filter")
             },
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "e/Space/\u{2192} expand",
+            label: xai_grok_i18n::t("shortcuts.footer.expand"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "\u{2190} collapse",
+            label: xai_grok_i18n::t("shortcuts.footer.collapse"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Enter details",
+            label: xai_grok_i18n::t("shortcuts.footer.details"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "/ search",
+            label: xai_grok_i18n::t("shortcuts.footer.search"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Esc close",
+            label: xai_grok_i18n::t("shortcuts.footer.close"),
             clickable: false,
             id: 0,
         },
@@ -1276,7 +1276,7 @@ pub fn render_modal(
     let non_sel: Vec<bool> = vec![false; picker_entries.len()];
     let footer = modal_footer(filter_active);
     let modal_config = mw::ModalWindowConfig {
-        title: "Keyboard Shortcuts",
+        title: xai_grok_i18n::t("modal.keyboard_shortcuts"),
         tabs: None,
         shortcuts: &footer,
         sizing: modal_sizing(compact),
@@ -1395,7 +1395,7 @@ pub fn handle_modal_key(
         modal_footer(filter_active)
     };
     let chrome_cfg = mw::ModalWindowConfig {
-        title: "Keyboard Shortcuts",
+        title: xai_grok_i18n::t("modal.keyboard_shortcuts"),
         tabs: None,
         shortcuts: &footer,
         sizing: modal_sizing(compact),

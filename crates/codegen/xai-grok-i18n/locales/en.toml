@@ -397,6 +397,26 @@ stop = "stop"
 shortcuts = "shortcuts"
 prompt = "prompt"
 scrollback = "scrollback"
+queue = "queue"
+newline = "newline"
+lines = "lines"
+accept_suggestion = "accept suggestion"
+mode = "mode"
+delete_row = "delete row"
+edit = "edit"
+save = "save"
+select = "select"
+view = "view"
+copy_output = "copy output"
+go = "go"
+open = "open"
+send_to_bg = "send to bg"
+reorder = "reorder"
+hide_done = "hide done"
+show_done = "show done"
+next_prev = "next/prev"
+page = "page"
+turn = "turn"
 
 [import]
 claude_title = "Import Claude settings"
@@ -425,6 +445,8 @@ stop_running = "Stop running"
 continue_to_run = "Continue to run"
 always_stop = "Always stop"
 always_continue = "Always continue"
+reset_setting_prompt = "Reset '{label}' to default ({value})?"
+reset_setting_breadcrumb = "Reset '{label}'"
 
 [modal.footer]
 enter_select = "Enter select"
@@ -534,6 +556,10 @@ advanced = "Advanced"
 [settings.coding_data_sharing]
 label = "Coding data sharing"
 description = "Controls whether SpaceXAI may retain and train on coding session \\ data. Does not affect product analytics; see Configuration and \\ Monitoring docs."
+choice_opt_in = "Opt in"
+choice_opt_in_desc = "Allow SpaceXAI to retain coding session data for model training and product improvement."
+choice_opt_out = "Opt out"
+choice_opt_out_desc = "Do not retain coding session data for training. Does not disable product analytics."
 
 [settings.collapsed_edit_blocks]
 label = "Collapsed edit blocks"
@@ -582,6 +608,10 @@ description = "Model used for new sessions. Changing this also switches the acti
 [settings.default_selected_permission]
 label = "Default selected permission"
 description = "Which row the cursor preselects on permission prompts."
+choice_always_allow_all_sessions = "Always allow on all sessions"
+choice_allow_once = "Allow once"
+choice_allow_command_always = "Always allow this command"
+choice_reject = "Reject"
 
 [settings.display_refresh_auto_cadence]
 label = "Match display refresh rate"
@@ -602,6 +632,12 @@ description = "Fold consecutive read/search/list tool calls and subagent rows in
 [settings.hunk_tracker_mode]
 label = "Hunk tracker"
 description = "Which file changes the agent tracks as hunks. \\ Off disables tracking (and LOC stats) entirely. \\ Restart required."
+choice_agent_only = "Agent only"
+choice_agent_only_desc = "Track only files the agent edits (default)."
+choice_all_dirty = "All dirty"
+choice_all_dirty_desc = "Track every git-dirty file, including external edits."
+choice_off = "Off"
+choice_off_desc = "Disable hunk tracking entirely. Also disables LOC tracking."
 
 [settings.invert_scroll]
 label = "Invert scroll"
@@ -610,6 +646,12 @@ description = "Reverse vertical scroll direction (natural scrolling)."
 [settings.keep_text_selection]
 label = "Text selection"
 description = "How long in-app selection stays on screen and what double-click does (fold vs. select & copy a word). For your terminal or multiplexer's own selection, hold Shift while dragging (native copy)."
+choice_flash = "Flash after copy"
+choice_flash_desc = "Brief highlight on mouse-up, then clear. Double-click toggles fold. Default."
+choice_hold = "Hold until dismissed"
+choice_hold_desc = "Keep the selection visible until Esc, click, or scroll. Double-click toggles fold."
+choice_word_select = "Word select (terminal-like)"
+choice_word_select_desc = "Double-click selects & copies a word, triple-click a line; selection stays until dismissed."
 
 [settings.language]
 label = "UI language"
@@ -620,6 +662,10 @@ choice_en = "English"
 choice_en_desc = "English interface."
 choice_zh_cn = "简体中文"
 choice_zh_cn_desc = "Simplified Chinese interface."
+
+[settings.max_thoughts_width]
+label = "Max thoughts width"
+description = "Column width budget for the agent's thoughts panel (40-500, default 120)."
 
 [settings.modal]
 title = "Settings"
@@ -698,6 +744,12 @@ description = "Show \"Always allow\" options in permission prompts so you can st
 [settings.render_mermaid]
 label = "Render Mermaid diagrams"
 description = "How ```mermaid code blocks are shown: auto/on add a clickable row to \\ open the rendered diagram; off shows the raw source."
+choice_auto = "Auto"
+choice_on = "On"
+choice_off = "Off"
+choice_auto_desc = "Show diagrams with a clickable row to open/copy the rendered image."
+choice_on_desc = "Same as auto: always show the clickable affordance row."
+choice_off_desc = "Always show the raw Mermaid source as a code block."
 
 [settings.respect_manual_folds]
 label = "Respect manual folds"
@@ -718,6 +770,12 @@ description = "Lines per scroll tick for both wheel and trackpad (1-10). \\ Unti
 [settings.scroll_mode]
 label = "Scroll input"
 description = "Force wheel or trackpad scroll behavior when auto-detection \\ misreads your device."
+choice_auto = "Auto-detect"
+choice_auto_desc = "Detect wheel vs trackpad per gesture from event timing. Default."
+choice_wheel = "Mouse wheel"
+choice_wheel_desc = "Always treat scrolling as wheel notches (fixed lines per tick)."
+choice_trackpad = "Trackpad"
+choice_trackpad_desc = "Always treat scrolling as a trackpad (fractional accumulation)."
 
 [settings.scroll_speed]
 label = "Scroll speed"
@@ -752,6 +810,12 @@ choice_groknight_desc = "Neutral dark with magenta accent."
 choice_oscura_midnight_desc = "Deep dark with warm accents; needs truecolor."
 choice_rosepine_moon_desc = "Muted dark with mauve accents; needs truecolor."
 choice_tokyonight_desc = "Dark + blue-tinted; needs truecolor."
+choice_auto = "Auto"
+choice_groknight = "Grok Night"
+choice_grokday = "Grok Day"
+choice_tokyonight = "Tokyo Night"
+choice_rosepine_moon = "Rose Pine Moon"
+choice_oscura_midnight = "Oscura Midnight"
 
 [settings.toolset.ask_user_question.timeout_enabled]
 label = "Ask-Question timeout"
@@ -764,10 +828,15 @@ description = "Enable vim keys (h/j/k/l, gg/G, /) for navigating the scrollback.
 [settings.voice_capture_mode]
 label = "Voice capture"
 description = "How the voice chord (Ctrl+Space / F8) behaves: Toggle \\ (press to start/stop) or Hold to talk (hold to record, \\ release to stop; needs a Kitty-protocol terminal)."
+choice_toggle = "Toggle"
+choice_toggle_desc = "Ctrl+Space / F8 starts dictation; press again (or Esc/Enter) to stop."
+choice_hold = "Hold to talk"
+choice_hold_desc = "Hold Ctrl+Space / F8 to record, release to stop. Needs a Kitty-protocol terminal."
 
 [settings.voice_stt_language]
 label = "Voice language"
 description = "Speech-to-text language for voice dictation (Grok STT). \\ English by default; System uses your locale when supported. \\ Sets formatting language for numbers and currencies."
+choice_auto = "System"
 
 [shortcuts.category]
 essentials = "Essentials"
@@ -777,6 +846,23 @@ conversation_action = "Conversation Actions"
 panels = "Panels"
 session = "Session"
 dashboard = "Dashboard"
+
+[shortcuts.footer]
+nav = "↑/↓ nav"
+filter = "f filter"
+show_all = "f show all"
+expand = "e/Space/→ expand"
+collapse = "← collapse"
+details = "Enter details"
+search = "/ search"
+close = "Esc close"
+esc_back = "Esc back"
+scroll = "↑/↓ scroll"
+close_chord = "Ctrl+./X close"
+
+[shortcuts.pseudo]
+search_scrollback = "Search scrollback"
+paste = "Paste images (and text) from the clipboard"
 
 [slash.always-approve]
 description = "Toggle always-approve mode (skip all permission prompts)"
@@ -958,6 +1044,8 @@ description = "View the full conversation transcript in your pager ($PAGER)"
 
 [slash.usage]
 description = "View credit usage or manage billing"
+arg_show = "View credit usage"
+arg_manage = "Open billing management page"
 
 [slash.view-plan]
 description = "View the current plan"
@@ -1002,8 +1090,8 @@ copied = "Copied!"
 no_active_session = "No active session"
 mermaid = "✓ Mermaid: {value}"
 theme = "✓ Theme: {name}"
-always_approve_on = "⚠ Always-approve ON: all tool actions auto-run"
-always_approve_on_plan = "⚠ Always-approve ON: plan mode still blocks file edits until you exit plan mode"
+always_approve_on = "⚠ Always-approve ON"
+always_approve_on_plan = "⚠ Always-approve ON (plan mode still blocks edits)"
 already_plan_mode = "Already in plan mode. Use /view-plan to view the current plan."
 plan_mode = "Plan mode"
 always_approve = "Always-approve"
@@ -1052,6 +1140,10 @@ default_model_cleared = "✓ Default model: cleared"
 fork_model_cleared = "✓ Fork secondary model: cleared"
 fork_model_default = "✓ Fork secondary model: already at default"
 compact_auto = "✓ Compact mode: off (auto-compact active on small terminal)"
+permission_mode_auto = "✓ Permission mode: Auto (classifier)"
+permission_mode_ask = "✓ Permission mode: Ask"
+permission_mode_default = "✓ Permission mode: Default"
+restart_to_apply = "(restart to apply)"
 
 [tool.prefix]
 list = "List "
@@ -1093,6 +1185,20 @@ sleep = "Sleeping…"
 
 [turn.watchers]
 watching = "watching"
+
+[ui]
+search_placeholder = " / to search"
+
+[usage]
+weekly_limit = "Weekly limit"
+monthly_limit = "Monthly limit"
+usage = "Usage"
+next_reset = "Next reset: {time}"
+credits = "Credits: {amount}"
+auto_topup = "Auto topup: {amount}"
+max_monthly_topup = "Max monthly topup: {amount}"
+auto_topup_disabled = "Auto topup: disabled"
+payg = "Pay-as-you-go: {used} used of {cap} limit"
 
 [welcome]
 quit = "quit"

@@ -433,11 +433,19 @@ pub(super) fn render_row_list_with_search_bar(
 }
 
 pub(super) fn render_docs_footer(buf: &mut Buffer, area: Rect, theme: &Theme) {
-    const LONG: &str =
-        "Tip · Ask Grok: \"change theme to grokday\" or \"what does compact mode do?\"";
-    const SHORT: &str = "Tip · Ask Grok to change a setting";
-    let text = modal_window::fit_tip_line(&[LONG, SHORT], area.width as usize);
+    let long = xai_grok_i18n::t("settings.modal.tip_long");
+    let short = xai_grok_i18n::t("settings.modal.tip_short");
+    let text = modal_window::fit_tip_line(&[long, short], area.width as usize);
     modal_window::render_centered_tip_footer(buf, area, theme, text.as_ref());
+}
+
+/// Localized bool display for settings rows (`on`/`off` → `开`/`关`).
+fn bool_value_text(on: bool) -> &'static str {
+    if on {
+        xai_grok_i18n::t("settings.modal.value_on")
+    } else {
+        xai_grok_i18n::t("settings.modal.value_off")
+    }
 }
 
 pub(super) fn render_rows(
@@ -671,21 +679,17 @@ pub(super) fn render_rows(
 
                 // Decide 1 vs 2 line layout; fall back to 1 if viewport is tight.
                 let value_display = match value {
-                    SettingValue::Bool(b) => {
-                        if *b {
-                            "on".to_string()
-                        } else {
-                            "off".to_string()
-                        }
-                    }
+                    SettingValue::Bool(b) => bool_value_text(*b).to_string(),
                     SettingValue::String(s) => {
                         if s.is_empty() && matches!(meta.kind, SettingKind::DynamicEnum { .. }) {
-                            "(no override)".to_string()
+                            xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string()
                         } else {
                             s.clone()
                         }
                     }
-                    SettingValue::Enum(e) => display_for_enum_canonical(meta.key, &meta.kind, e).to_string(),
+                    SettingValue::Enum(e) => {
+                        display_for_enum_canonical(meta.key, &meta.kind, e).to_string()
+                    }
                     SettingValue::Int(i) => i.to_string(),
                 };
                 let show_restart_pill_for_layout = meta.restart_required && is_expanded;
@@ -836,21 +840,17 @@ fn compute_filtered_row_heights(state: &SettingsModalState, area_width: u16) -> 
                 };
                 let is_expanded = state.expanded_keys.contains(key);
                 let value_display = match &value {
-                    SettingValue::Bool(b) => {
-                        if *b {
-                            "on".to_string()
-                        } else {
-                            "off".to_string()
-                        }
-                    }
+                    SettingValue::Bool(b) => bool_value_text(*b).to_string(),
                     SettingValue::String(s) => {
                         if s.is_empty() && matches!(meta.kind, SettingKind::DynamicEnum { .. }) {
-                            "(no override)".to_string()
+                            xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string()
                         } else {
                             s.clone()
                         }
                     }
-                    SettingValue::Enum(e) => display_for_enum_canonical(meta.key, &meta.kind, e).to_string(),
+                    SettingValue::Enum(e) => {
+                        display_for_enum_canonical(meta.key, &meta.kind, e).to_string()
+                    }
                     SettingValue::Int(i) => i.to_string(),
                 };
                 let show_restart_pill = meta.restart_required && is_expanded;
@@ -1346,7 +1346,7 @@ fn render_picking_group(
 
         // Value read live from the snapshot (refreshed after each toggle).
         let on = matches!(state.value_for(child_key), Some(SettingValue::Bool(true)));
-        let value_text = if on { "on" } else { "off" };
+        let value_text = bool_value_text(on);
         let value_style = if on {
             Style::default().fg(theme.accent_user).bg(bg)
         } else {
@@ -2335,16 +2335,10 @@ pub(super) fn render_setting_row(
     // Enum rows display the user-friendly name, not the canonical.
     let value_text_owned;
     let value_text: &str = match value {
-        SettingValue::Bool(b) => {
-            if *b {
-                "on"
-            } else {
-                "off"
-            }
-        }
+        SettingValue::Bool(b) => bool_value_text(*b),
         SettingValue::String(s) => {
             if s.is_empty() && matches!(meta.kind, SettingKind::DynamicEnum { .. }) {
-                "(no override)"
+                xai_grok_i18n::t("settings.dynamic_enum.no_override")
             } else {
                 s.as_str()
             }

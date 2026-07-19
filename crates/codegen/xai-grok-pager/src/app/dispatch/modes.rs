@@ -487,9 +487,9 @@ pub(super) fn permission_mode_toast(kind: crate::app::actions::PermissionModeKin
     use crate::app::actions::PermissionModeKind;
     match kind {
         PermissionModeKind::AlwaysApprove => yolo_toast(true),
-        PermissionModeKind::Auto => "\u{2713} Permission mode: Auto (classifier)".to_string(),
-        PermissionModeKind::Ask => "\u{2713} Permission mode: Ask".to_string(),
-        PermissionModeKind::Default => "\u{2713} Permission mode: Default".to_string(),
+        PermissionModeKind::Auto => xai_grok_i18n::t("toast.permission_mode_auto").to_string(),
+        PermissionModeKind::Ask => xai_grok_i18n::t("toast.permission_mode_ask").to_string(),
+        PermissionModeKind::Default => xai_grok_i18n::t("toast.permission_mode_default").to_string(),
     }
 }
 

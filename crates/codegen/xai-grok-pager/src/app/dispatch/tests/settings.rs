@@ -1185,6 +1185,7 @@ fn pr13_show_tips_rollback_from_none_state_restores_none() {
 /// `set_auto_compact_threshold_percent_toast_includes_restart_marker`.
 #[test]
 fn pr13_set_show_tips_toast_includes_restart_marker() {
+    xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
     let mut app = test_app_with_agent();
     let _ = dispatch(Action::SetShowTips(false), &mut app);
     let toast = read_toast(&app);
@@ -1197,7 +1198,7 @@ fn pr13_set_show_tips_toast_includes_restart_marker() {
         "toast must include the value, got {toast:?}"
     );
     assert!(
-        toast.contains("restart to apply"),
+        toast.contains(xai_grok_i18n::t("toast.restart_to_apply")),
         "toast must include the deferred-effect cue, got {toast:?}"
     );
 }
@@ -1394,12 +1395,17 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
 }
 #[test]
 fn set_compact_mode_toast_format() {
+    xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
     let mut app = test_app_with_agent();
+    let check = crate::glyphs::check_mark();
     let _ = dispatch(Action::SetCompactMode(true), &mut app);
     let toast = read_toast(&app);
     assert!(toast.contains("Compact mode"));
     assert!(toast.contains("on"));
-    assert!(toast.contains('\u{2713}'));
+    assert!(
+        toast.contains(check),
+        "toast must contain platform check glyph, got: {toast:?}"
+    );
     let _ = dispatch(Action::SetCompactMode(false), &mut app);
     let toast = read_toast(&app);
     assert!(toast.contains("Compact mode"));
@@ -1613,21 +1619,24 @@ fn set_multiline_mode_initial_same_value_is_no_op() {
 /// that substring `contains` checks would miss.
 #[test]
 fn set_multiline_mode_toast_format() {
+    xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
     let mut app = test_app_with_agent();
+    let check = crate::glyphs::check_mark();
     let _ = dispatch(Action::SetMultilineMode(true), &mut app);
     let toast = app.agents[&AgentId(0)]
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
         .expect("toast must be set");
-    assert_eq!(toast, "\u{2713} Multiline: on");
+    // `show_toast` runs `legacy_glyph_fallback`, so match the platform check glyph.
+    assert_eq!(toast, format!("{check} Multiline: on"));
     let _ = dispatch(Action::SetMultilineMode(false), &mut app);
     let toast = app.agents[&AgentId(0)]
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
         .expect("toast must be set");
-    assert_eq!(toast, "\u{2713} Multiline: off");
+    assert_eq!(toast, format!("{check} Multiline: off"));
 }
 /// No active agent → no-op (no panic, no effect, no mutation).
 /// Differs from `set_simple_mode_no_op_when_no_active_agent`: SHARED
@@ -2668,9 +2677,11 @@ fn rollback_permission_mode_reverts_state_no_effect() {
         .as_ref()
         .map(|(s, _)| s.clone())
         .expect("failure toast must be set");
+    let fail = crate::glyphs::ballot_x();
     assert_eq!(
-        toast, "\u{2717} Could not save permission_mode: permission denied",
-        "rollback toast must follow the exact `✗ Could not save {{key}}: {{error}}` format \
+        toast,
+        format!("{fail} Could not save permission_mode: permission denied"),
+        "rollback toast must follow the exact `{{ballot_x}} Could not save {{key}}: {{error}}` format \
              — drift here would diverge from other rollback toasts",
     );
 }
@@ -2756,9 +2767,22 @@ fn dispatch_cycle_mode_refreshes_open_modal_snapshot() {
 }
 /// `SetUiLanguage` persists `[ui].language`, applies the global locale, and
 /// restores English at the end so other tests are not poisoned.
+///
+/// Serialized: process-wide `current_locale` would race toast/chrome tests that
+/// assert English catalog strings.
 #[test]
+#[serial_test::serial(GROK_UI_LOCALE)]
 fn set_ui_language_persists_and_switches_locale() {
     use crate::settings::SettingValue;
+    struct RestoreEn;
+    impl Drop for RestoreEn {
+        fn drop(&mut self) {
+            xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
+        }
+    }
+    let _guard = RestoreEn;
+    xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
+
     let mut app = test_app_with_agent();
     let effects = dispatch(Action::SetUiLanguage("zh-CN".into()), &mut app);
     assert_eq!(app.current_ui.language.as_deref(), Some("zh-CN"));
@@ -3112,7 +3136,11 @@ fn set_theme_toast_format_uses_display_name() {
             toast.contains("Grok Day"),
             "toast must use display name `Grok Day`, not canonical `grokday`, got: {toast:?}",
         );
-        assert!(toast.contains('\u{2713}'), "toast must contain the ✓ glyph");
+        let check = crate::glyphs::check_mark();
+        assert!(
+            toast.contains(check),
+            "toast must contain the platform check glyph, got: {toast:?}"
+        );
     });
 }
 #[test]
@@ -3123,7 +3151,11 @@ fn set_auto_dark_theme_toast_format_uses_display_name() {
         let toast = read_toast(&app);
         assert!(toast.contains("Auto dark theme"));
         assert!(toast.contains("Grok Day"));
-        assert!(toast.contains('\u{2713}'));
+        let check = crate::glyphs::check_mark();
+        assert!(
+            toast.contains(check),
+            "toast must contain the platform check glyph, got: {toast:?}"
+        );
     });
 }
 #[test]

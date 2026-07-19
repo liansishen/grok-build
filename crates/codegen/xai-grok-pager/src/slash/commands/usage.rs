@@ -44,13 +44,13 @@ impl SlashCommand for UsageCommand {
                 display: "show".to_string(),
                 match_text: "show".to_string(),
                 insert_text: "show".to_string(),
-                description: "View credit usage".to_string(),
+                description: xai_grok_i18n::t("slash.usage.arg_show").to_string(),
             },
             ArgItem {
                 display: "manage".to_string(),
                 match_text: "manage".to_string(),
                 insert_text: "manage".to_string(),
-                description: "Open billing management page".to_string(),
+                description: xai_grok_i18n::t("slash.usage.arg_manage").to_string(),
             },
         ])
     }
