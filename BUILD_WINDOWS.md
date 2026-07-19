@@ -159,41 +159,45 @@ D:\Projects\grok-build\target\release\xai-grok-pager.exe
 
 ---
 
-## 5. 推荐一键脚本
+## 5. 一键脚本（推荐）
 
-保存为 `scripts/build-windows.ps1` 或直接在仓库根执行：
+均在仓库根目录用 PowerShell 执行（可先 `cd D:\Projects\grok-build`）。
+
+| 脚本 | 作用 |
+|------|------|
+| `.\scripts\build.ps1` | 一键 release 编译（自动下 protoc 29.3 + rust-lld） |
+| `.\scripts\replace.ps1` | 备份官方后，用自建版覆盖 `~\.grok\bin\grok.exe` |
+| `.\scripts\replace.ps1 -Build` | 先编译再替换 |
+| `.\scripts\restore.ps1` | 还原最近一次 replace 的备份 |
+| `.\scripts\restore.ps1 -List` | 列出可用备份 |
+| `.\scripts\restore.ps1 -FromOld` | 用官方更新留下的 `grok.exe.old` |
+| `.\scripts\build-windows.ps1` | 兼容旧名，等同 `build.ps1` |
 
 ```powershell
-# scripts/build-windows.ps1
-$ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $PSScriptRoot
-if (-not (Test-Path (Join-Path $Root "Cargo.toml"))) {
-  $Root = $PSScriptRoot
-  if (-not (Test-Path (Join-Path $Root "Cargo.toml"))) {
-    $Root = Get-Location
-  }
-}
-Set-Location $Root
+cd D:\Projects\grok-build
 
-$Protoc = Join-Path $Root "tools\protoc\bin\protoc.exe"
-if (-not (Test-Path $Protoc)) {
-  Write-Host "protoc not found at $Protoc — download 29.3 win64 into tools\protoc first."
-  exit 1
-}
+# 1) 编译
+.\scripts\build.ps1
 
-$env:PROTOC = $Protoc
-$env:RUSTFLAGS = "-C linker=rust-lld"
-Write-Host "PROTOC=$env:PROTOC"
-Write-Host "RUSTFLAGS=$env:RUSTFLAGS"
-cargo build -p xai-grok-pager-bin --release
-Write-Host "OK: $(Join-Path $Root 'target\release\xai-grok-pager.exe')"
+# 2) 替换官方 grok（请先关掉所有 grok 窗口）
+.\scripts\replace.ps1
+# 或一步完成：
+# .\scripts\replace.ps1 -Build
+
+# 3) 出问题则还原
+.\scripts\restore.ps1
+.\scripts\restore.ps1 -List
 ```
+
+备份目录：`%USERPROFILE%\.grok\bin\backups\grok.exe.bak-*`
+
+注意：`grok update` 会再次写成官方二进制；更新后需再跑 `.\scripts\replace.ps1`（或 `-Build`）。
 
 ---
 
 ## 6. 安装与日常使用
 
-### 6.1 不覆盖官方 `grok`（推荐）
+### 6.1 不覆盖官方 `grok`（可选）
 
 ```powershell
 Copy-Item D:\Projects\grok-build\target\release\xai-grok-pager.exe `
@@ -204,9 +208,8 @@ grok-transparent
 
 ### 6.2 替换官方命令
 
-将 `xai-grok-pager.exe` 复制为 `grok.exe`，放到 **比** 官方安装目录 **更靠前** 的 PATH 位置。
-
-注意：`grok update` 可能再次覆盖官方路径下的二进制；自建版本建议用独立文件名。
+优先用 **§5 一键脚本** `replace.ps1` / `restore.ps1`。  
+手动方式：覆盖 `%USERPROFILE%\.grok\bin\grok.exe`（先备份）。
 
 ### 6.3 全屏半透明（本 fork 功能）
 
