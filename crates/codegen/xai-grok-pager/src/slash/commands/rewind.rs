@@ -9,7 +9,7 @@ impl SlashCommand for RewindCommand {
     }
 
     fn description(&self) -> &str {
-        "Rewind to a previous turn"
+        xai_grok_i18n::t("slash.rewind.description")
     }
 
     fn session_scoped(&self) -> bool {

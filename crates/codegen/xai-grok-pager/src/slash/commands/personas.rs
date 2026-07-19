@@ -17,7 +17,7 @@ impl SlashCommand for PersonasCommand {
     }
 
     fn description(&self) -> &str {
-        "Manage personas (create, edit, delete)"
+        xai_grok_i18n::t("slash.personas.description")
     }
 
     fn usage(&self) -> &str {

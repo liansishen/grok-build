@@ -17,7 +17,7 @@ impl SlashCommand for HistoryCommand {
     }
 
     fn description(&self) -> &str {
-        "Search prompt history"
+        xai_grok_i18n::t("slash.history.description")
     }
 
     fn session_scoped(&self) -> bool {

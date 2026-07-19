@@ -11,7 +11,7 @@ impl SlashCommand for LoginCommand {
     }
 
     fn description(&self) -> &str {
-        "Log in or re-authenticate with your account"
+        xai_grok_i18n::t("slash.login.description")
     }
 
     fn usage(&self) -> &str {

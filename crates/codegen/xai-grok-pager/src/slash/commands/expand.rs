@@ -20,7 +20,7 @@ impl SlashCommand for ExpandCommand {
     }
 
     fn description(&self) -> &str {
-        "Re-print the last collapsed block, fully expanded (minimal mode)"
+        xai_grok_i18n::t("slash.expand.description")
     }
 
     fn session_scoped(&self) -> bool {

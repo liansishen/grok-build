@@ -18,7 +18,7 @@ impl SlashCommand for HooksCommand {
     }
 
     fn description(&self) -> &str {
-        "View hooks"
+        xai_grok_i18n::t("slash.hooks.description")
     }
 
     fn usage(&self) -> &str {
@@ -42,7 +42,7 @@ impl SlashCommand for PluginsCommand {
     }
 
     fn description(&self) -> &str {
-        "View plugins"
+        xai_grok_i18n::t("slash.plugins.description")
     }
 
     fn usage(&self) -> &str {
@@ -66,7 +66,7 @@ impl SlashCommand for MarketplaceCommand {
     }
 
     fn description(&self) -> &str {
-        "View marketplace"
+        xai_grok_i18n::t("slash.marketplace.description")
     }
 
     fn usage(&self) -> &str {
@@ -90,7 +90,7 @@ impl SlashCommand for SkillsCommand {
     }
 
     fn description(&self) -> &str {
-        "View skills"
+        xai_grok_i18n::t("slash.skills.description")
     }
 
     fn usage(&self) -> &str {

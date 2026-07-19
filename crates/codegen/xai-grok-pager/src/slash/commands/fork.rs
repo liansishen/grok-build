@@ -104,7 +104,7 @@ impl SlashCommand for ForkCommand {
     }
 
     fn description(&self) -> &str {
-        "Branch the current session into a peer agent"
+        xai_grok_i18n::t("slash.fork.description")
     }
 
     fn session_scoped(&self) -> bool {

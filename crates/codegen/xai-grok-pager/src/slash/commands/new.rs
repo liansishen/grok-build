@@ -16,7 +16,7 @@ impl SlashCommand for NewCommand {
     }
 
     fn description(&self) -> &str {
-        "Start a new session"
+        xai_grok_i18n::t("slash.new.description")
     }
 
     fn usage(&self) -> &str {

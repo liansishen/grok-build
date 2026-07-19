@@ -115,8 +115,9 @@ pub fn dynamic_enum_choices(
             let mut out = Vec::with_capacity(snapshot.available_models.len() + 1);
             out.push(OwnedEnumChoice {
                 canonical: String::new(),
-                display: "(no override)".to_string(),
-                description: "Inherit the default model (no per-user override).".to_string(),
+                display: xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string(),
+                description: xai_grok_i18n::t("settings.dynamic_enum.no_override_desc")
+                    .to_string(),
             });
             for (name, _id) in &snapshot.available_models {
                 out.push(OwnedEnumChoice {
@@ -200,7 +201,9 @@ pub struct SettingMeta {
     pub key: SettingKey,
     pub category: SettingCategory,
     pub owner: SettingOwner,
+    /// English label (source / search fallback). Prefer [`Self::label_t`] in UI.
     pub label: &'static str,
+    /// English description (source / search fallback). Prefer [`Self::description_t`].
     pub description: &'static str,
     /// Free-form keywords for the search/filter. All lowercase,
     /// no empty strings — `keywords_lowercase_and_non_empty` enforces.
@@ -212,6 +215,40 @@ pub struct SettingMeta {
     /// When `true`, the row is hidden in minimal mode (the setting still
     /// exists and applies to the full TUI).
     pub hidden_in_minimal: bool,
+}
+
+impl SettingMeta {
+    /// Localized label for the current UI locale (`settings.<key>.label`).
+    pub fn label_t(&self) -> &'static str {
+        let key = xai_grok_i18n::intern_key(&format!("settings.{}.label", self.key));
+        xai_grok_i18n::t_or(key, self.label)
+    }
+
+    /// Localized description for the current UI locale.
+    pub fn description_t(&self) -> &'static str {
+        let key = xai_grok_i18n::intern_key(&format!("settings.{}.description", self.key));
+        xai_grok_i18n::t_or(key, self.description)
+    }
+}
+
+impl EnumChoice {
+    /// Localized display for a choice under `settings.<setting_key>.choice_<canonical>`.
+    pub fn display_t(&self, setting_key: SettingKey) -> &'static str {
+        let canon = self.canonical.replace('-', "_");
+        let key = xai_grok_i18n::intern_key(&format!(
+            "settings.{setting_key}.choice_{canon}"
+        ));
+        xai_grok_i18n::t_or(key, self.display)
+    }
+
+    /// Localized sub-description for a choice.
+    pub fn description_t(&self, setting_key: SettingKey) -> &'static str {
+        let canon = self.canonical.replace('-', "_");
+        let key = xai_grok_i18n::intern_key(&format!(
+            "settings.{setting_key}.choice_{canon}_desc"
+        ));
+        xai_grok_i18n::t_or(key, self.description)
+    }
 }
 
 /// A typed value carried by `Action::Set*` payloads, modal preview state,
@@ -461,9 +498,14 @@ fn assert_unique_keys(entries: &[SettingMeta]) {
 
 fn build_search_haystack(m: &SettingMeta) -> String {
     let mut s = String::new();
+    // English source + current locale so both languages match filter.
     s.push_str(&m.label.to_lowercase());
     s.push(' ');
     s.push_str(&m.description.to_lowercase());
+    s.push(' ');
+    s.push_str(&m.label_t().to_lowercase());
+    s.push(' ');
+    s.push_str(&m.description_t().to_lowercase());
     s.push(' ');
     s.push_str(m.key);
     for kw in m.keywords {

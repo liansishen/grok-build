@@ -18,7 +18,7 @@ impl SlashCommand for CompactModeCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle compact UI (less padding, more content)"
+        xai_grok_i18n::t("slash.compact-mode.description")
     }
 
     fn usage(&self) -> &str {

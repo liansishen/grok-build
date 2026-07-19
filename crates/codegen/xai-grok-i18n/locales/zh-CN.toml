@@ -1,11 +1,5 @@
 # Simplified Chinese. Missing keys fall back to en.toml at runtime.
 
-[welcome]
-quit = "退出"
-resume_session = "恢复会话"
-new_session = "新会话"
-settings = "设置"
-
 [settings.category]
 appearance = "外观"
 mouse = "鼠标"
@@ -15,6 +9,41 @@ privacy = "隐私"
 models = "模型"
 session = "会话"
 advanced = "高级"
+
+[toast]
+language_set = "界面语言：{name}"
+
+[settings.compact_mode]
+label = "紧凑模式"
+description = "减少消息周围的留白以提高信息密度。终端高度不超过 20 行时会自动启用。"
+
+[settings.screen_mode]
+label = "默认界面模式"
+description = "下次启动 plain grok 时的模式：全屏（未设置时的默认）或极简。写入 config.toml 的 [ui] screen_mode。需重启。本会话可用 /minimal 或 /fullscreen 切换。"
+choice_fullscreen = "全屏"
+choice_fullscreen_desc = "以标准全屏 TUI 打开 plain grok。未设置时的默认。"
+choice_minimal = "极简"
+choice_minimal_desc = "以回滚原生（极简）模式打开 plain grok。"
+
+[settings.show_timestamps]
+label = "显示时间戳"
+description = "在用户消息和智能体回复旁显示时钟时间。"
+
+[settings.show_timeline]
+label = "时间线侧栏"
+description = "用每回合刻度条替代滚动条：悬停预览回合，点击跳转。"
+
+[settings.page_flip_on_send]
+label = "发送时将提示滚到顶部"
+description = "发送提示时将其滚到屏幕顶部，使回复从新页开始（默认）。关闭后发送时不改变滚动位置。"
+
+[settings.simple_mode]
+label = "禁用 vim 输入模式"
+description = "在输入框使用普通 readline 风格输入，而非 vim 键。实验性。"
+
+[settings.vim_mode]
+label = "Vim 回滚导航"
+description = "使用 vim 键（h/j/k/l、gg/G、/）浏览回滚区。不影响输入框。"
 
 [settings.language]
 label = "界面语言"
@@ -26,5 +55,755 @@ choice_en_desc = "英文界面。"
 choice_zh_cn = "简体中文"
 choice_zh_cn_desc = "简体中文界面。"
 
-[toast]
-language_set = "界面语言：{name}"
+[settings.theme]
+label = "主题"
+description = "分页器界面的配色主题。"
+choice_auto_desc = "跟随系统深色/浅色外观。"
+choice_grokday_desc = "适合明亮环境的浅色主题。"
+choice_groknight_desc = "中性深色，品红强调色。"
+choice_oscura_midnight_desc = "深邃暗色，暖色强调；需要真彩色。"
+choice_rosepine_moon_desc = "柔和深色，淡紫强调；需要真彩色。"
+choice_tokyonight_desc = "深色偏蓝；需要真彩色。"
+
+[settings.auto_dark_theme]
+label = "自动深色主题"
+description = "系统为深色模式时使用的主题（仅在 theme=auto 时生效）。"
+
+[settings.auto_light_theme]
+label = "自动浅色主题"
+description = "系统为浅色模式时使用的主题（仅在 theme=auto 时生效）。"
+
+[settings.render_mermaid]
+label = "渲染 Mermaid 图"
+description = "如何显示 mermaid 代码块：auto/on 显示可点击行以打开渲染图；off 显示原始源码。"
+
+[settings.permission_mode]
+label = "权限模式"
+description = "Default 使用智能体内置行为；Ask 在每次工具操作前询问；Auto 用 LLM 分类器审批风险操作；Always approve 自动授予全部权限。"
+choice_always_approve = "始终批准"
+choice_always_approve_desc = "自动批准所有工具操作。跳过全部权限提示。"
+choice_ask = "询问"
+choice_ask_desc = "在工具操作前请求许可。"
+choice_auto = "自动"
+choice_auto_desc = "LLM 分类器批准安全工具；危险操作仍可能询问或拒绝。"
+choice_default = "默认"
+choice_default_desc = "使用智能体默认权限行为（目前等同于询问）。"
+
+[settings.remember_tool_approvals]
+label = "记住工具批准"
+description = "在权限提示中显示「始终允许」选项，避免对同一命令/工具反复确认。适用于 ask 与 auto；Always-approve 仍会跳过全部提示。需重启。"
+
+[settings.multiline_mode]
+label = "多行输入"
+description = "开启后 Enter 换行、Shift+Enter 发送。每次会话重置。"
+
+[settings.default_model]
+label = "默认模型"
+description = "新会话使用的模型。更改也会切换当前会话。选择「(不覆盖)」可清除。"
+
+[settings.show_thinking_blocks]
+label = "显示思考块"
+description = "流式输出时在回滚中显示智能体的思考/推理块。"
+
+[settings.prompt_suggestions]
+label = "提示建议"
+description = "每回合结束后预测你可能的下一条提示，并以幽灵文本显示（Tab 接受）。每回合会调用小模型。"
+
+[settings.respect_manual_folds]
+label = "尊重手动折叠"
+description = "流式输出时保留手动折叠的块，展开块时停止自动滚动。实验性。"
+
+[settings.group_tool_verbs]
+label = "合并工具调用"
+description = "将连续的读取/搜索/列表工具调用与子智能体行折叠为一行摘要；完成的思考也会并入组。"
+
+[settings.collapsed_edit_blocks]
+label = "折叠编辑块"
+description = "以单行 +N/-M 差异统计显示编辑，并将同一文件的连续编辑合并；展开行可查看差异。"
+
+[settings.display_refresh_auto_cadence]
+label = "匹配显示器刷新率"
+description = "在高刷新率显示器上，TUI 会以更快节奏流式输出/滚动。关闭则保持约 60 Hz。需重启。"
+
+[settings.scroll_speed]
+label = "滚动速度"
+description = "鼠标滚轮与触控板滚动速度倍率（1–100）。越高越快。"
+
+[settings.scroll_mode]
+label = "滚动输入"
+description = "在自动检测误判设备时，强制按滚轮或触控板行为滚动。"
+
+[settings.scroll_lines]
+label = "滚动行数"
+description = "滚轮与触控板每次滚动的行数（1–10）。未设置前沿用各终端自带配置。"
+
+[settings.invert_scroll]
+label = "反转滚动"
+description = "反转垂直滚动方向（自然滚动）。"
+
+[settings.keep_text_selection]
+label = "文本选择"
+description = "应用内选区保留多久，以及双击是折叠还是选中并复制单词。终端原生选择请按住 Shift 拖拽。"
+
+[settings.coding_data_sharing]
+label = "编码数据共享"
+description = "控制 SpaceXAI 是否可保留并用于训练编码会话数据。不影响产品分析。"
+
+[settings.default_selected_permission]
+label = "默认选中的权限项"
+description = "权限提示中光标预选中的行。"
+
+[settings.toolset.ask_user_question.timeout_enabled]
+label = "提问超时"
+description = "开启后，ask_user_question 工具会在设定时间后超时，而不是无限阻塞。"
+
+[settings.plan_mode]
+label = "计划模式"
+description = "开启后，智能体在运行工具或修改文件前会先汇总计划。"
+choice_off = "关"
+choice_off_desc = "智能体直接运行工具并编辑文件（默认）。"
+choice_on = "开"
+choice_on_desc = "智能体先汇总计划并在运行工具前请求批准。"
+
+[settings.show_tips]
+label = "显示提示"
+description = "启动时显示每日提示横幅。需重启。"
+
+[settings.contextual_hints]
+label = "显示情境提示"
+description = "工作时显示简短的情境快捷键提示；可分别开关每一项。"
+
+[settings.auto_update]
+label = "自动更新"
+description = "启动时自动下载并安装分页器更新。需重启。"
+
+[settings.hunk_tracker_mode]
+label = "Hunk 跟踪"
+description = "智能体跟踪哪些文件变更。Off 完全禁用跟踪（以及 LOC 统计）。需重启。"
+
+[settings.voice_capture_mode]
+label = "语音采集"
+description = "语音快捷键（Ctrl+Space / F8）行为：切换或按住说话。"
+
+[settings.voice_stt_language]
+label = "语音语言"
+description = "语音听写的识别语言（Grok STT）。默认英语；「跟随系统」在受支持时使用系统语言。"
+
+[settings.contextual_hints.undo]
+label = "撤销"
+description = "清空提示后提醒可用 Ctrl+Z 恢复。"
+
+[settings.contextual_hints.plan_mode]
+label = "计划模式"
+description = "当提示像是规划请求时，建议使用计划模式（Shift+Tab）。"
+
+[settings.contextual_hints.image_input]
+label = "图片输入"
+description = "剪贴板有图片且模型支持时，提示可粘贴图片。"
+
+[settings.contextual_hints.send_now]
+label = "立即发送"
+description = "回合中排队后续消息后，提醒在空提示上按 Enter 可立即发送队首项。"
+
+[settings.contextual_hints.small_screen]
+label = "小屏幕"
+description = "终端行数较少时建议使用 /compact-mode。"
+
+[settings.contextual_hints.word_select]
+label = "词选择"
+description = "双击对话文本后，提醒可在设置中启用词选择。"
+
+[settings.contextual_hints.ssh_wrap]
+label = "SSH 包装"
+description = "经 SSH 加载会话时，建议本地运行 grok wrap ssh。"
+
+[settings.fork_secondary_model]
+label = "分叉次级模型"
+description = "分叉时次级智能体使用的模型。选择「(不覆盖)」可清除。"
+
+[actions.BashMode]
+label = "shell"
+description = "Shell mode (type ! on empty prompt)"
+
+[actions.CancelTurn]
+label = "取消"
+description = "Cancel turn"
+
+[actions.Collapse]
+label = "fold"
+description = "Collapse selected entry"
+
+[actions.CommandPalette]
+label = "命令"
+description = "Command palette"
+
+[actions.CopyBlockContent]
+label = "复制"
+description = "Copy content"
+
+[actions.CopyBlockMeta]
+label = "copy cmd"
+description = "Copy command / path"
+
+[actions.CycleMode]
+label = "模式"
+description = "Cycle mode (Normal / Plan / Always-approve)"
+
+[actions.DashboardBeginRename]
+label = "rename"
+description = "Rename agent"
+
+[actions.DashboardCycleMode]
+label = "mode"
+description = "Cycle dispatch mode"
+
+[actions.DashboardExit]
+label = "退出"
+description = "Close dashboard"
+
+[actions.DashboardOpenLocationPicker]
+label = "location"
+description = "Change working directory for new agents"
+
+[actions.DashboardOverlayExit]
+label = "close overlay"
+description = "Back to dashboard"
+
+[actions.DashboardOverlayNext]
+label = "next session"
+description = "Next session"
+
+[actions.DashboardOverlayPrev]
+label = "prev session"
+description = "Previous session"
+
+[actions.DashboardOverlayStop]
+label = "stop"
+description = "Stop agent, close session (back to dashboard)"
+
+[actions.DashboardReorderDown]
+label = "reorder down"
+description = "Reorder agent down"
+
+[actions.DashboardReorderUp]
+label = "reorder up"
+description = "Reorder agent up"
+
+[actions.DashboardSelectNext]
+label = "next"
+description = "Select next row"
+
+[actions.DashboardSelectPrev]
+label = "prev"
+description = "Select previous row"
+
+[actions.DashboardShortcutsHelp]
+label = "shortcuts"
+description = "Show shortcuts overlay"
+
+[actions.DashboardStop]
+label = "停止"
+description = "Stop / Close agent"
+
+[actions.DashboardToggleAutoApprove]
+label = "always-approve"
+description = "Toggle always-approve"
+
+[actions.DashboardToggleGrouping]
+label = "group"
+description = "Toggle row grouping"
+
+[actions.DashboardTogglePin]
+label = "pin"
+description = "Pin / unpin agent"
+
+[actions.DashboardToggleWorktree]
+label = "worktree"
+description = "Toggle worktree mode for new agents"
+
+[actions.EnableVoiceMode]
+label = "语音模式"
+description = "Start voice dictation (Ctrl+Space / F8)"
+
+[actions.Expand]
+label = "fold"
+description = "Expand selected entry"
+
+[actions.ExpandAllThinking]
+label = "expand/collapse thinking"
+description = "Toggle all thinking blocks"
+
+[actions.FocusPrompt]
+label = "提示"
+description = "Focus prompt"
+
+[actions.FocusScrollback]
+label = "回滚"
+description = "Focus scrollback"
+
+[actions.GotoBottom]
+label = "底部"
+description = "Go to bottom"
+
+[actions.GotoTop]
+label = "顶/底"
+description = "Go to top"
+
+[actions.HalfPageDown]
+label = "half page down"
+description = "Scroll down half page"
+
+[actions.HalfPageUp]
+label = "half page up"
+description = "Scroll up half page"
+
+[actions.InterjectPrompt]
+label = "立即发送"
+description = "Send now while running (cancels the current turn)"
+
+[actions.KillBgTask]
+label = "kill"
+description = "Kill background task"
+
+[actions.ModelPicker]
+label = "模型"
+description = "Pick model"
+
+[actions.NewSession]
+label = "新会话"
+description = "New session"
+
+[actions.NextResponse]
+label = "response"
+description = "Next response"
+
+[actions.NextTurn]
+label = "turn"
+description = "Next turn"
+
+[actions.OpenBlockViewer]
+label = "view"
+description = "Open in viewer"
+
+[actions.OpenDashboard]
+label = "仪表盘"
+description = "Open the Agent Dashboard"
+
+[actions.OpenExtensions]
+label = "扩展"
+description = "Open extensions"
+
+[actions.OpenNextLink]
+label = "link"
+description = "Next link"
+
+[actions.OpenPrevLink]
+label = "link"
+description = "Previous link"
+
+[actions.OpenSessions]
+label = "会话"
+description = "Open sessions"
+
+[actions.OpenSettings]
+label = "设置"
+description = "Open the settings modal"
+
+[actions.PageDown]
+label = "下页"
+description = "Scroll down one page"
+
+[actions.PageUp]
+label = "上页"
+description = "Scroll up one page"
+
+[actions.PrevResponse]
+label = "response"
+description = "Previous response"
+
+[actions.PrevTurn]
+label = "turn"
+description = "Previous turn"
+
+[actions.Quit]
+label = "退出"
+description = "Quit"
+
+[actions.Rewind]
+label = "回退"
+description = "Rewind to selected turn"
+
+[actions.ScrollDown]
+label = "下滚"
+description = "Scroll down one line"
+
+[actions.ScrollUp]
+label = "上滚"
+description = "Scroll up one line"
+
+[actions.SelectNext]
+label = "导航"
+description = "Select next entry"
+
+[actions.SelectPrev]
+label = "导航"
+description = "Select previous entry"
+
+[actions.SendPrompt]
+label = "发送"
+description = "Send"
+
+[actions.SendToBackground]
+label = "转后台"
+description = "Send running task to background"
+
+[actions.ShortcutsHelp]
+label = "快捷键"
+description = "Keyboard shortcuts"
+
+[actions.ToggleExpandAll]
+label = "all"
+description = "Expand all / collapse all"
+
+[actions.ToggleFold]
+label = "折叠"
+description = "Expand / collapse"
+
+[actions.ToggleMouseCapture]
+label = "mouse reporting"
+description = "Toggle mouse reporting (native copy/paste)"
+
+[actions.ToggleMultiline]
+label = "多行"
+description = "Toggle multiline"
+
+[actions.ToggleQueue]
+label = "队列"
+description = "Toggle prompt queue"
+
+[actions.ToggleRaw]
+label = "raw"
+description = "Toggle raw markdown"
+
+[actions.ToggleTasks]
+label = "任务"
+description = "Toggle tasks pane"
+
+[actions.ToggleTodos]
+label = "待办"
+description = "Toggle todo pane"
+
+[actions.ToggleYolo]
+label = "始终批准"
+description = "Toggle always-approve"
+
+[actions.VoiceToggle]
+label = "麦克风"
+description = "Voice dictation (Ctrl+Space / F8)"
+
+[auth]
+browser_open_header = "将打开浏览器窗口进行身份验证。"
+device_header = "在浏览器中批准以完成登录。"
+device_code_caption = "请确认浏览器显示此代码。"
+copied = "已复制！"
+copy_failed = "复制失败"
+waiting_login = "等待登录完成..."
+waiting_approval = "等待批准..."
+waiting_url = "等待认证链接..."
+connecting = "连接中..."
+paste_token_placeholder = "在此粘贴令牌..."
+go_back = "返回"
+submit = "提交"
+show_full_url = "无法复制？点击此处显示完整 URL。"
+select_url_hint = "请用鼠标选中下方 URL 并手动复制。"
+
+[permission.default]
+always_allow_all_sessions = "所有会话始终允许"
+allow_once = "允许一次"
+allow_command_always = "始终允许此命令"
+reject = "拒绝"
+
+[permission.hint]
+choose_scope = "使用 ← → 选择权限范围"
+
+[permission.reject_once]
+placeholder = "不，拒绝（可输入反馈）"
+
+[settings.dynamic_enum]
+no_override = "(不覆盖)"
+no_override_desc = "继承默认模型（无每用户覆盖）。"
+
+[settings.modal]
+title = "设置"
+value_on = "开"
+value_off = "关"
+restart_pill = "需重启"
+no_matches_for = "无匹配"
+
+[settings.modal.footer]
+nav_jk = "↑/↓/j/k 导航"
+space_toggle = "Space 切换"
+enter_edit = "Enter 编辑"
+slash_search = "/ 搜索"
+reset = "d 重置"
+close = "F2/Esc 关闭"
+
+[slash.always-approve]
+description = "切换始终批准模式（跳过全部权限提示）"
+
+[slash.announcements]
+description = "显示或隐藏公告"
+
+[slash.auto]
+description = "切换自动模式（分类器批准安全工具）"
+
+[slash.btw]
+description = "提出旁路问题而不打断当前回合"
+
+[slash.cd]
+description = "更改新智能体的工作目录"
+
+[slash.compact]
+description = "压缩对话历史"
+
+[slash.compact-mode]
+description = "切换紧凑界面（更少留白、更多内容）"
+
+[slash.config-agents]
+description = "管理智能体定义"
+
+[slash.context]
+description = "查看上下文用量"
+
+[slash.copy]
+description = "将最近回复复制到剪贴板（/copy N 表示第 N 近）"
+
+[slash.dashboard]
+description = "打开智能体仪表盘 — 全屏查看所有运行中的会话"
+
+[slash.debug]
+description = "切换调试叠加层"
+
+[slash.docs]
+description = "打开使用指南或在线 Build 文档"
+
+[slash.effort]
+description = "设置当前模型的推理强度"
+
+[slash.expand]
+description = "完整展开打印最近折叠的块（极简模式）"
+
+[slash.export]
+description = "将当前对话导出到文件或剪贴板"
+
+[slash.feedback]
+description = "发送关于当前会话的反馈"
+
+[slash.find]
+description = "搜索对话回滚"
+
+[slash.fork]
+description = "将当前会话分支为对等智能体"
+
+[slash.help]
+description = "浏览命令与键盘快捷键"
+
+[slash.history]
+description = "搜索提示历史"
+
+[slash.home]
+description = "返回欢迎页"
+
+[slash.hooks]
+description = "查看 hooks"
+
+[slash.import-claude]
+description = "打开 Claude 设置导入对话框"
+
+[slash.jump]
+description = "跳转到对话中的某个回合"
+
+[slash.login]
+description = "登录或重新认证账号"
+
+[slash.logout]
+description = "登出并返回登录页"
+
+[slash.loop]
+description = "按间隔循环运行提示"
+
+[slash.marketplace]
+description = "查看市场"
+
+[slash.mcps]
+description = "显示 MCP 服务器状态"
+
+[slash.model]
+description = "切换活动模型"
+
+[slash.multiline]
+description = "切换多行输入模式（交换 Enter 与 Shift+Enter）"
+
+[slash.new]
+description = "开始新会话"
+
+[slash.personas]
+description = "管理角色（创建、编辑、删除）"
+
+[slash.plan]
+description = "进入计划模式"
+
+[slash.plugins]
+description = "查看插件"
+
+[slash.privacy]
+description = "显示或切换隐私与数据保留状态"
+
+[slash.queue]
+description = "列出当前回合后排队的提示"
+
+[slash.quit]
+description = "退出应用"
+
+[slash.recap]
+description = "总结目前为止的会话"
+
+[slash.release-notes]
+description = "查看当前版本的发行说明"
+
+[slash.remember]
+description = "保存一条记忆笔记"
+
+[slash.rename]
+description = "重命名当前会话"
+
+[slash.resume]
+description = "恢复先前会话"
+
+[slash.rewind]
+description = "回退到先前回合"
+
+[slash.session-info]
+description = "显示会话信息"
+
+[slash.settings]
+description = "打开设置面板"
+
+[slash.share]
+description = "通过 URL 分享此会话"
+
+[slash.skills]
+description = "查看技能"
+
+[slash.tasks]
+description = "列出后台任务、子智能体与定时任务"
+
+[slash.terminal-setup]
+description = "检查终端、颜色与剪贴板设置"
+
+[slash.theme]
+description = "切换配色主题"
+
+[slash.timeline]
+description = "切换时间线侧栏"
+
+[slash.timestamps]
+description = "切换消息时间戳"
+
+[slash.toggle-mouse-reporting]
+description = "切换终端鼠标报告（原生拖选复制）"
+
+[slash.transcript]
+description = "在分页器（$PAGER）中查看完整对话记录"
+
+[slash.usage]
+description = "查看用量或管理账单"
+
+[slash.view-plan]
+description = "查看当前计划"
+
+[slash.vim-mode]
+description = "切换 vim 风格回滚快捷键"
+
+[tips]
+plan_nudge = "在做规划？试试计划模式 "
+small_screen = "空间紧张？试试 /compact-mode"
+
+[tips.clipboard_image]
+prefix = "剪贴板有图片 · "
+suffix = " 粘贴"
+
+[tips.send_now]
+prefix = "已排队 · "
+enter = "Enter"
+suffix = " 立即发送"
+
+[tips.undo]
+prefix = "输入已清空 · "
+suffix = " 撤销"
+
+[turn.activity]
+cancelling = "正在取消…"
+verifying = "正在验证…"
+thinking = "思考中…"
+responding = "回复中…"
+compacting = "压缩中…"
+running = "运行中…"
+waiting = "等待中…"
+starting_session = "正在启动会话…"
+
+[turn.button]
+stop = "[停止]"
+stop_spaced = " [停止]"
+
+[turn.tool.prefix]
+run = "运行 "
+search = "搜索 "
+fetch = "获取 "
+
+[turn.wait]
+model = "等待响应…"
+subagent = "等待子智能体…"
+task_output = "等待任务输出…"
+tasks_complete = "等待任务…"
+sleep = "休眠中…"
+
+[turn.watchers]
+watching = "监视中"
+
+[welcome]
+quit = "退出"
+quit_menu = "退出"
+resume_session = "恢复会话"
+new_session = "新会话"
+settings = "设置"
+changelog = "更新日志"
+switch_account = "切换账号"
+logout = "登出"
+upgrade_subscription = "升级订阅"
+import_claude_settings = "导入 Claude 设置"
+new_worktree = "新建工作树"
+type_message = "输入消息..."
+hero_subtitle = "感谢试用 Grok Build，可用 /feedback 反馈！"
+logged_in_api_key = "已使用 API 密钥登录"
+zdr_unavailable = "此账号尚无法使用 Grok Build。"
+supergrok_required = "需要 SuperGrok 订阅"
+refresh = "[刷新]"
+tier_free = "免费"
+beta = "Beta"
+login_with = "使用 {label} 登录"
+
+[welcome.picker]
+back = "返回"
+select = "选择"
+navigate = "导航"
+filter = "筛选"
+worktree = "工作树"
+
+[welcome.trust]
+yes = "是，继续"
+no = "否，退出"
+question = "是否信任此目录中的内容？"
+warning_line1 = "Grok Build 可能在此目录中运行命令或修改内容，"
+warning_line2 = "存在安全风险。"
+

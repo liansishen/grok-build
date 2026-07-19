@@ -18,7 +18,7 @@ impl SlashCommand for TasksCommand {
     }
 
     fn description(&self) -> &str {
-        "List background tasks, subagents, and scheduled tasks"
+        xai_grok_i18n::t("slash.tasks.description")
     }
 
     fn session_scoped(&self) -> bool {

@@ -13518,6 +13518,7 @@ dependencies = [
  "vte 0.15.0",
  "windows-sys 0.59.0",
  "xai-grok-config",
+ "xai-grok-i18n",
  "xai-grok-markdown",
  "xai-grok-paths",
  "xai-grok-shared",

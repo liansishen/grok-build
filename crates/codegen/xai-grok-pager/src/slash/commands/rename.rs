@@ -16,7 +16,7 @@ impl SlashCommand for RenameCommand {
     }
 
     fn description(&self) -> &str {
-        "Rename the current session"
+        xai_grok_i18n::t("slash.rename.description")
     }
 
     fn session_scoped(&self) -> bool {

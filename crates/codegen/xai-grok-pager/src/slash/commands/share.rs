@@ -12,7 +12,7 @@ impl SlashCommand for ShareCommand {
     }
 
     fn description(&self) -> &str {
-        "Share this session via URL"
+        xai_grok_i18n::t("slash.share.description")
     }
 
     fn session_scoped(&self) -> bool {

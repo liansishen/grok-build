@@ -20,7 +20,7 @@ impl SlashCommand for AutoCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle auto mode (classifier approves safe tools)"
+        xai_grok_i18n::t("slash.auto.description")
     }
 
     fn usage(&self) -> &str {

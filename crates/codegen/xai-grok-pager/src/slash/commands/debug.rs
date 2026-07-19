@@ -44,7 +44,7 @@ impl SlashCommand for DebugCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle debug overlays"
+        xai_grok_i18n::t("slash.debug.description")
     }
 
     fn usage(&self) -> &str {

@@ -21,7 +21,7 @@ impl SlashCommand for ExportCommand {
     }
 
     fn description(&self) -> &str {
-        "Export the current conversation to a file or clipboard"
+        xai_grok_i18n::t("slash.export.description")
     }
 
     fn session_scoped(&self) -> bool {

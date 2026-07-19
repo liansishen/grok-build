@@ -12,7 +12,7 @@ impl SlashCommand for RememberCommand {
     }
 
     fn description(&self) -> &str {
-        "Save a memory note"
+        xai_grok_i18n::t("slash.remember.description")
     }
 
     fn usage(&self) -> &str {

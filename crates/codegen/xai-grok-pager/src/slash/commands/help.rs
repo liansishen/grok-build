@@ -16,7 +16,7 @@ impl SlashCommand for HelpCommand {
     }
 
     fn description(&self) -> &str {
-        "Browse commands and keyboard shortcuts"
+        xai_grok_i18n::t("slash.help.description")
     }
 
     fn usage(&self) -> &str {

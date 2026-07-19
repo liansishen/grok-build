@@ -16,7 +16,7 @@ impl SlashCommand for ReleaseNotesCommand {
     }
 
     fn description(&self) -> &str {
-        "View release notes for the current version"
+        xai_grok_i18n::t("slash.release-notes.description")
     }
 
     fn usage(&self) -> &str {

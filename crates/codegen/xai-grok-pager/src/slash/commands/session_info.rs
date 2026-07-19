@@ -12,7 +12,7 @@ impl SlashCommand for SessionInfoCommand {
     }
 
     fn description(&self) -> &str {
-        "Show session info"
+        xai_grok_i18n::t("slash.session-info.description")
     }
 
     fn session_scoped(&self) -> bool {

@@ -208,21 +208,43 @@ pub fn t_for(locale: Locale, key: &str) -> &'static str {
     lookup(locale, key)
 }
 
-fn lookup(locale: Locale, key: &str) -> &'static str {
+/// Look up `key`; if missing in both catalogs, return `fallback` (not the key).
+///
+/// Prefer this when English source strings still live next to the call site
+/// (settings/actions registries) and the catalog is filled progressively.
+pub fn t_or(key: &str, fallback: &'static str) -> &'static str {
+    if let Some(s) = lookup_optional(current_locale(), key) {
+        return s;
+    }
+    fallback
+}
+
+/// Intern a dynamic catalog key path once (e.g. `settings.compact_mode.label`).
+pub fn intern_key(key: &str) -> &'static str {
+    leak_fallback(key)
+}
+
+/// Whether `key` exists in the English catalog.
+pub fn has_en(key: &str) -> bool {
+    EN.contains_key(key)
+}
+
+fn lookup_optional(locale: Locale, key: &str) -> Option<&'static str> {
     let primary = match locale {
         Locale::ZhCn => ZH_CN.get(key),
         Locale::En => EN.get(key),
     };
     if let Some(s) = primary {
-        return s;
+        return Some(s);
     }
-    if !matches!(locale, Locale::En)
-        && let Some(s) = EN.get(key)
-    {
-        return s;
+    if !matches!(locale, Locale::En) {
+        return EN.get(key).copied();
     }
-    // Unknown key: surface the key itself (leaked once per unique key).
-    leak_fallback(key)
+    None
+}
+
+fn lookup(locale: Locale, key: &str) -> &'static str {
+    lookup_optional(locale, key).unwrap_or_else(|| leak_fallback(key))
 }
 
 fn leak_fallback(key: &str) -> &'static str {

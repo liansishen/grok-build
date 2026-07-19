@@ -24,7 +24,7 @@ impl SlashCommand for DocsCommand {
     }
 
     fn description(&self) -> &str {
-        "Open How-to Guides or online Build docs"
+        xai_grok_i18n::t("slash.docs.description")
     }
 
     fn usage(&self) -> &str {

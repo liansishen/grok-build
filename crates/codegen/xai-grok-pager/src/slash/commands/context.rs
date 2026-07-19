@@ -12,7 +12,7 @@ impl SlashCommand for ContextCommand {
     }
 
     fn description(&self) -> &str {
-        "View context usage"
+        xai_grok_i18n::t("slash.context.description")
     }
 
     fn session_scoped(&self) -> bool {

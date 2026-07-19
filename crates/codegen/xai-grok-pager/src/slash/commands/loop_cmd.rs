@@ -85,7 +85,7 @@ impl SlashCommand for LoopCommand {
     }
 
     fn description(&self) -> &str {
-        "Run a prompt on a recurring interval"
+        xai_grok_i18n::t("slash.loop.description")
     }
 
     fn usage(&self) -> &str {

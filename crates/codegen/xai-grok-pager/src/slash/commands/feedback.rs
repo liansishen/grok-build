@@ -12,7 +12,7 @@ impl SlashCommand for FeedbackCommand {
     }
 
     fn description(&self) -> &str {
-        "Send feedback about the current session"
+        xai_grok_i18n::t("slash.feedback.description")
     }
 
     fn usage(&self) -> &str {

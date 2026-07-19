@@ -23,7 +23,7 @@ impl SlashCommand for ModelCommand {
     }
 
     fn description(&self) -> &str {
-        "Switch the active model"
+        xai_grok_i18n::t("slash.model.description")
     }
 
     fn session_scoped(&self) -> bool {

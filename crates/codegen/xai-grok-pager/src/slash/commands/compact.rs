@@ -15,7 +15,7 @@ impl SlashCommand for CompactCommand {
     }
 
     fn description(&self) -> &str {
-        "Compact conversation history"
+        xai_grok_i18n::t("slash.compact.description")
     }
 
     fn session_scoped(&self) -> bool {

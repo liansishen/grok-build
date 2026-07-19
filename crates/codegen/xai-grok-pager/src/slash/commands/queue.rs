@@ -18,7 +18,7 @@ impl SlashCommand for QueueCommand {
     }
 
     fn description(&self) -> &str {
-        "List the prompts queued behind the running turn"
+        xai_grok_i18n::t("slash.queue.description")
     }
 
     fn session_scoped(&self) -> bool {

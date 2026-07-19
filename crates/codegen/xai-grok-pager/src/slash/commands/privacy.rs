@@ -21,7 +21,7 @@ impl SlashCommand for PrivacyCommand {
     }
 
     fn description(&self) -> &str {
-        "Show or toggle privacy & data retention status"
+        xai_grok_i18n::t("slash.privacy.description")
     }
 
     fn usage(&self) -> &str {

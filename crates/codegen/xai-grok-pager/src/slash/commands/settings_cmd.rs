@@ -19,7 +19,7 @@ impl SlashCommand for SettingsCommand {
     }
 
     fn description(&self) -> &str {
-        "Open the settings modal"
+        xai_grok_i18n::t("slash.settings.description")
     }
 
     fn usage(&self) -> &str {

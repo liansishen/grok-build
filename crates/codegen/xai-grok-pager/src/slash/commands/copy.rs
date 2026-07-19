@@ -12,7 +12,7 @@ impl SlashCommand for CopyCommand {
     }
 
     fn description(&self) -> &str {
-        "Copy last response to clipboard (/copy N for Nth-latest)"
+        xai_grok_i18n::t("slash.copy.description")
     }
 
     fn session_scoped(&self) -> bool {

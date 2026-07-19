@@ -16,7 +16,7 @@ impl SlashCommand for EffortCommand {
     }
 
     fn description(&self) -> &str {
-        "Set reasoning effort for the current model"
+        xai_grok_i18n::t("slash.effort.description")
     }
 
     fn session_scoped(&self) -> bool {

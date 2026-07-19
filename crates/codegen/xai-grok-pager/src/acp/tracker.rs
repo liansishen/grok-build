@@ -105,7 +105,7 @@ pub fn clamp_activity_subject(s: &str) -> String {
 pub fn format_waiting_for_subject(subject: &str) -> String {
     let clamped = clamp_activity_subject(subject);
     if clamped.is_empty() {
-        "Waiting on task output…".to_string()
+        xai_grok_i18n::t("turn.wait.task_output").to_string()
     } else {
         format!("{clamped}…")
     }
@@ -123,15 +123,15 @@ impl WaitingReason {
     /// User-facing spinner label.
     pub fn label(&self) -> String {
         match self {
-            Self::Model => "Waiting for response…".to_string(),
-            Self::Subagent => "Waiting on subagent…".to_string(),
+            Self::Model => xai_grok_i18n::t("turn.wait.model").to_string(),
+            Self::Subagent => xai_grok_i18n::t("turn.wait.subagent").to_string(),
             Self::TaskOutput {
                 subject: Some(subject),
                 ..
             } => format_waiting_for_subject(subject),
-            Self::TaskOutput { .. } => "Waiting on task output…".to_string(),
-            Self::TasksComplete => "Waiting on tasks…".to_string(),
-            Self::Sleep => "Sleeping…".to_string(),
+            Self::TaskOutput { .. } => xai_grok_i18n::t("turn.wait.task_output").to_string(),
+            Self::TasksComplete => xai_grok_i18n::t("turn.wait.tasks_complete").to_string(),
+            Self::Sleep => xai_grok_i18n::t("turn.wait.sleep").to_string(),
         }
     }
     /// Short, stable snake_case label for telemetry / phase-transition logs.
@@ -5239,7 +5239,7 @@ mod tests {
         );
         assert_eq!(
             WaitingReason::task_output().label(),
-            "Waiting on task output…"
+            xai_grok_i18n::t("turn.wait.task_output")
         );
         assert_eq!(
             WaitingReason::TaskOutput {
@@ -5264,7 +5264,7 @@ mod tests {
     #[test]
     fn format_waiting_for_subject_matches_label_shape() {
         assert_eq!(format_waiting_for_subject("run tests"), "run tests…");
-        assert_eq!(format_waiting_for_subject("   "), "Waiting on task output…");
+        assert_eq!(format_waiting_for_subject("   "), xai_grok_i18n::t("turn.wait.task_output"));
     }
     /// A `task` ToolCall carrying the shell's `_meta.subagentBackground` flag.
     fn task_call_with_bg(id: &str, background: bool) -> acp::SessionUpdate {
@@ -5285,7 +5285,7 @@ mod tests {
         )
     }
     /// Shell-stamped foreground (`subagentBackground=false`): the subagent wait
-    /// surfaces from frame 1 — no "Waiting for response…" flash.
+    /// surfaces from frame 1 — no xai_grok_i18n::t("turn.wait.model") flash.
     #[test]
     fn foreground_stamp_waits_on_subagent_from_frame_one() {
         let mut sb = ScrollbackState::new();

@@ -18,7 +18,7 @@ impl SlashCommand for VimModeCommand {
     }
 
     fn description(&self) -> &str {
-        "Toggle vim-style scrollback keybindings (j/k, h/l, g/G, y/Y, …)"
+        xai_grok_i18n::t("slash.vim-mode.description")
     }
 
     fn usage(&self) -> &str {

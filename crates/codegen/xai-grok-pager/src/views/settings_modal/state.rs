@@ -21,7 +21,14 @@ use xai_grok_shell::agent::config::UiConfig;
 
 /// Public display title of the modal — also used by
 /// `views/modal.rs::ActiveModal::message` so renames stay in one place.
+/// Prefer [`modal_title`] for locale-aware chrome; this constant remains
+/// the English fallback for tests that match exact chrome text.
 pub const MODAL_TITLE: &str = "Settings";
+
+/// Localized settings modal title.
+pub fn modal_title() -> &'static str {
+    xai_grok_i18n::t_or("settings.modal.title", MODAL_TITLE)
+}
 
 /// Width of the `"─ "` leading decoration before the title in the
 /// modal's top border. Used to compute the breadcrumb hit-rect x offset.

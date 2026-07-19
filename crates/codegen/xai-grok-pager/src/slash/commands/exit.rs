@@ -16,7 +16,7 @@ impl SlashCommand for ExitCommand {
     }
 
     fn description(&self) -> &str {
-        "Quit the application"
+        xai_grok_i18n::t("slash.quit.description")
     }
 
     fn usage(&self) -> &str {

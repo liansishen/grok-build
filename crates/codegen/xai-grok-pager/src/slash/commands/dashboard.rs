@@ -40,7 +40,7 @@ impl SlashCommand for DashboardCommand {
     }
 
     fn description(&self) -> &str {
-        "Open the Agent Dashboard — a fullscreen overview of every running session"
+        xai_grok_i18n::t("slash.dashboard.description")
     }
 
     fn usage(&self) -> &str {

@@ -66,12 +66,27 @@ impl DefaultSelectedPermission {
     /// `AllowCommandAlways` preselects the prompt-specific always-allow row
     /// (per-command / per-tool / per-domain / per-edit-session), never a
     /// global allow-everything — that is `AlwaysAllowAllSessions`.
+    /// English display (const-safe; used in static settings catalogs).
     pub const fn display(self) -> &'static str {
         match self {
             Self::AlwaysAllowAllSessions => "Always allow on all sessions",
             Self::AllowOnce => "Allow once",
             Self::AllowCommandAlways => "Always allow this command",
             Self::Reject => "Reject",
+        }
+    }
+
+    /// Localized display for the current UI locale.
+    pub fn display_localized(self) -> &'static str {
+        match self {
+            Self::AlwaysAllowAllSessions => {
+                xai_grok_i18n::t("permission.default.always_allow_all_sessions")
+            }
+            Self::AllowOnce => xai_grok_i18n::t("permission.default.allow_once"),
+            Self::AllowCommandAlways => {
+                xai_grok_i18n::t("permission.default.allow_command_always")
+            }
+            Self::Reject => xai_grok_i18n::t("permission.default.reject"),
         }
     }
 

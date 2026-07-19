@@ -23,7 +23,7 @@ impl SlashCommand for UsageCommand {
     }
 
     fn description(&self) -> &str {
-        "View credit usage or manage billing"
+        xai_grok_i18n::t("slash.usage.description")
     }
 
     fn usage(&self) -> &str {

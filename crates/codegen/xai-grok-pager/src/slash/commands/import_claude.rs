@@ -19,7 +19,7 @@ impl SlashCommand for ImportClaudeCommand {
     }
 
     fn description(&self) -> &str {
-        "Open the Claude settings import modal"
+        xai_grok_i18n::t("slash.import-claude.description")
     }
 
     fn usage(&self) -> &str {
