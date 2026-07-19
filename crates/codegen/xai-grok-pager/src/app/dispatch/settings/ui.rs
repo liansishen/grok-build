@@ -36,6 +36,19 @@ pub(in crate::app::dispatch) fn save_success_toast(label: &str, on: bool) -> Str
     )
 }
 
+/// Append the localized "(restart to apply)" cue to a settings toast.
+pub(in crate::app::dispatch) fn with_restart_cue(toast: &str) -> String {
+    format!("{toast} {}", xai_grok_i18n::t("toast.restart_to_apply"))
+}
+
+/// Format a "✓ Label: value" toast for non-bool settings (enum/int/string).
+pub(in crate::app::dispatch) fn save_value_toast(label: &str, value: &str) -> String {
+    xai_grok_i18n::t_fmt(
+        "toast.setting_changed",
+        &[("label", label), ("value", value)],
+    )
+}
+
 /// Refresh every open settings modal's `ui_snapshot` + `pager_snapshot`
 /// so the next render reads the latest live state. The modal stores
 /// snapshots by value; without this, toggles would appear stuck.

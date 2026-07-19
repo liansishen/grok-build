@@ -1,6 +1,8 @@
 //! Individual setting setters with persistence effects and toasts.
 
-use super::ui::{refresh_open_settings_modals, save_success_toast};
+use super::ui::{
+    refresh_open_settings_modals, save_success_toast, save_value_toast, with_restart_cue,
+};
 use crate::app::actions::Effect;
 use crate::app::app_view::{ActiveView, AppView};
 use agent_client_protocol as acp;
@@ -80,7 +82,17 @@ pub(in crate::app::dispatch) fn set_render_mermaid(
         value = kind.as_canonical(),
         "setting changed",
     );
-    app.show_toast(&format!("\u{2713} Mermaid: {}", kind.as_canonical()));
+    let value = xai_grok_i18n::t_or(
+        xai_grok_i18n::intern_key(&format!(
+            "settings.render_mermaid.choice_{}",
+            kind.as_canonical().replace('-', "_")
+        )),
+        kind.as_canonical(),
+    );
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.render_mermaid.label"),
+        value,
+    ));
     vec![Effect::PersistSetting {
         key: "render_mermaid",
         value: crate::settings::SettingValue::Enum(kind.as_canonical()),
@@ -113,9 +125,17 @@ pub(in crate::app::dispatch) fn set_screen_mode(app: &mut AppView, value: String
     set_screen_mode_inner(app, canonical);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "screen_mode", value = canonical, "setting changed");
-    app.show_toast(&format!(
-        "\u{2713} Screen mode: {canonical} (restart to apply)"
-    ));
+    let value = xai_grok_i18n::t_or(
+        xai_grok_i18n::intern_key(&format!(
+            "settings.screen_mode.choice_{}",
+            canonical.replace('-', "_")
+        )),
+        canonical,
+    );
+    app.show_toast(&with_restart_cue(&save_value_toast(
+        xai_grok_i18n::t("settings.screen_mode.label"),
+        value,
+    )));
     vec![Effect::PersistSetting {
         key: "screen_mode",
         value: crate::settings::SettingValue::Enum(canonical),
@@ -152,9 +172,17 @@ pub(in crate::app::dispatch) fn set_hunk_tracker_mode(
     set_hunk_tracker_mode_inner(app, canonical);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "hunk_tracker_mode", value = canonical, "setting changed");
-    app.show_toast(&format!(
-        "\u{2713} Hunk tracker: {canonical} (restart to apply)"
-    ));
+    let value = xai_grok_i18n::t_or(
+        xai_grok_i18n::intern_key(&format!(
+            "settings.hunk_tracker_mode.choice_{}",
+            canonical.replace('-', "_")
+        )),
+        canonical,
+    );
+    app.show_toast(&with_restart_cue(&save_value_toast(
+        xai_grok_i18n::t("settings.hunk_tracker_mode.label"),
+        value,
+    )));
     vec![Effect::PersistSetting {
         key: "hunk_tracker_mode",
         value: crate::settings::SettingValue::Enum(canonical),
@@ -185,7 +213,17 @@ pub(in crate::app::dispatch) fn set_voice_capture_mode(
     set_voice_capture_mode_inner(app, canonical);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "voice_capture_mode", value = canonical, "setting changed");
-    app.show_toast(&format!("\u{2713} Voice capture: {canonical}"));
+    let value = xai_grok_i18n::t_or(
+        xai_grok_i18n::intern_key(&format!(
+            "settings.voice_capture_mode.choice_{}",
+            canonical.replace('-', "_")
+        )),
+        canonical,
+    );
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.voice_capture_mode.label"),
+        value,
+    ));
     vec![Effect::PersistSetting {
         key: "voice_capture_mode",
         value: crate::settings::SettingValue::Enum(canonical),
@@ -243,13 +281,18 @@ pub(in crate::app::dispatch) fn set_voice_stt_language(
         effective,
         "setting changed"
     );
-    let toast = if canonical == xai_grok_voice::STT_LANGUAGE_AUTO {
-        format!("\u{2713} Voice language: System ({effective})")
+    let value = if canonical == xai_grok_voice::STT_LANGUAGE_AUTO {
+        let system = xai_grok_i18n::t("settings.voice_stt_language.choice_auto");
+        format!("{system} ({effective})")
     } else {
-        let name = xai_grok_voice::stt_language_by_code(canonical).map_or(canonical, |l| l.name);
-        format!("\u{2713} Voice language: {name}")
+        xai_grok_voice::stt_language_by_code(canonical)
+            .map_or(canonical, |l| l.name)
+            .to_string()
     };
-    app.show_toast(&toast);
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.voice_stt_language.label"),
+        &value,
+    ));
     vec![Effect::PersistSetting {
         key: "voice_stt_language",
         value: crate::settings::SettingValue::Enum(canonical),
@@ -362,10 +405,10 @@ pub(in crate::app::dispatch) fn set_remember_tool_approvals(
         value = new,
         "setting changed",
     );
-    app.show_toast(&format!(
-        "{} (restart to apply)",
-        save_success_toast("Remember tool approvals", new),
-    ));
+    app.show_toast(&with_restart_cue(&save_success_toast(
+        xai_grok_i18n::t("settings.remember_tool_approvals.label"),
+        new,
+    )));
     vec![Effect::PersistSetting {
         key: "remember_tool_approvals",
         value: crate::settings::SettingValue::Bool(new),
@@ -400,10 +443,10 @@ pub(in crate::app::dispatch) fn set_ask_user_question_timeout_enabled(
         value = new,
         "setting changed",
     );
-    app.show_toast(&format!(
-        "{} (restart to apply)",
-        save_success_toast("Ask-Question timeout", new),
-    ));
+    app.show_toast(&with_restart_cue(&save_success_toast(
+        xai_grok_i18n::t("settings.toolset.ask_user_question.timeout_enabled.label"),
+        new,
+    )));
     vec![Effect::PersistSetting {
         key: "toolset.ask_user_question.timeout_enabled",
         value: crate::settings::SettingValue::Bool(new),
@@ -603,7 +646,17 @@ pub(in crate::app::dispatch) fn set_keep_text_selection(
         value = kind.as_canonical(),
         "setting changed",
     );
-    app.show_toast(&format!("\u{2713} Text selection: {}", kind.as_canonical()));
+    let value = xai_grok_i18n::t_or(
+        xai_grok_i18n::intern_key(&format!(
+            "settings.keep_text_selection.choice_{}",
+            kind.as_canonical().replace('-', "_")
+        )),
+        kind.as_canonical(),
+    );
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.keep_text_selection.label"),
+        value,
+    ));
     vec![Effect::PersistSetting {
         key: "keep_text_selection",
         value: crate::settings::SettingValue::Enum(kind.as_canonical()),
@@ -639,7 +692,10 @@ pub(in crate::app::dispatch) fn set_scroll_speed(app: &mut AppView, raw: i64) ->
         value = clamped,
         "setting changed",
     );
-    app.show_toast(&format!("\u{2713} Scroll speed: {clamped}"));
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.scroll_speed.label"),
+        &clamped.to_string(),
+    ));
     vec![Effect::PersistSetting {
         key: "scroll_speed",
         value: crate::settings::SettingValue::Int(clamped as i64),
@@ -673,7 +729,17 @@ pub(in crate::app::dispatch) fn set_scroll_mode(
         value = mode.as_canonical(),
         "setting changed",
     );
-    app.show_toast(&format!("\u{2713} Scroll input: {}", mode.as_canonical()));
+    let value = xai_grok_i18n::t_or(
+        xai_grok_i18n::intern_key(&format!(
+            "settings.scroll_mode.choice_{}",
+            mode.as_canonical().replace('-', "_")
+        )),
+        mode.as_canonical(),
+    );
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.scroll_mode.label"),
+        value,
+    ));
     vec![Effect::PersistSetting {
         key: "scroll_mode",
         value: crate::settings::SettingValue::Enum(mode.as_canonical()),
@@ -740,7 +806,10 @@ pub(in crate::app::dispatch) fn set_scroll_lines(app: &mut AppView, raw: i64) ->
         value = clamped,
         "setting changed",
     );
-    app.show_toast(&format!("\u{2713} Scroll lines: {clamped}"));
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.scroll_lines.label"),
+        &clamped.to_string(),
+    ));
     vec![Effect::PersistSetting {
         key: "scroll_lines",
         value: crate::settings::SettingValue::Int(clamped as i64),
@@ -826,9 +895,16 @@ pub(in crate::app::dispatch) fn set_default_selected_permission(
         value = new_canonical,
         "setting changed",
     );
-    app.show_toast(&format!(
-        "\u{2713} Default selected permission: {}",
+    let value = xai_grok_i18n::t_or(
+        xai_grok_i18n::intern_key(&format!(
+            "settings.default_selected_permission.choice_{}",
+            new_canonical.replace('-', "_")
+        )),
         parsed.display(),
+    );
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.default_selected_permission.label"),
+        value,
     ));
     vec![Effect::PersistSetting {
         key: "default_selected_permission",
@@ -1948,7 +2024,10 @@ pub(in crate::app::dispatch) fn set_max_thoughts_width(app: &mut AppView, new: i
         value = clamped,
         "setting changed",
     );
-    app.show_toast(&format!("\u{2713} Max thoughts width: {clamped}"));
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.max_thoughts_width.label"),
+        &clamped.to_string(),
+    ));
     vec![Effect::PersistSetting {
         key: "max_thoughts_width",
         value: crate::settings::SettingValue::Int(clamped),
@@ -2001,10 +2080,10 @@ pub(in crate::app::dispatch) fn set_show_tips(app: &mut AppView, new: bool) -> V
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "show_tips", value = new, "setting changed");
     // Restart-required: cue in the toast.
-    app.show_toast(&format!(
-        "{} (restart to apply)",
-        save_success_toast("Show tips", new),
-    ));
+    app.show_toast(&with_restart_cue(&save_success_toast(
+        xai_grok_i18n::t("settings.show_tips.label"),
+        new,
+    )));
     vec![Effect::PersistSetting {
         key: "show_tips",
         value: crate::settings::SettingValue::Bool(new),
@@ -2027,10 +2106,10 @@ pub(in crate::app::dispatch) fn set_auto_update(app: &mut AppView, new: bool) ->
     set_auto_update_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "auto_update", value = new, "setting changed");
-    app.show_toast(&format!(
-        "{} (restart to apply)",
-        save_success_toast("Auto-update", new),
-    ));
+    app.show_toast(&with_restart_cue(&save_success_toast(
+        xai_grok_i18n::t("settings.auto_update.label"),
+        new,
+    )));
     vec![Effect::PersistSetting {
         key: "auto_update",
         value: crate::settings::SettingValue::Bool(new),
@@ -2066,10 +2145,10 @@ pub(in crate::app::dispatch) fn set_display_refresh_auto_cadence(
         value = new,
         "setting changed",
     );
-    app.show_toast(&format!(
-        "{} (restart to apply)",
-        save_success_toast("Match display refresh rate", new),
-    ));
+    app.show_toast(&with_restart_cue(&save_success_toast(
+        xai_grok_i18n::t("settings.display_refresh_auto_cadence.label"),
+        new,
+    )));
     vec![Effect::PersistSetting {
         key: "display_refresh_auto_cadence",
         value: crate::settings::SettingValue::Bool(new),

@@ -40,9 +40,9 @@ impl CreditBalance {
     /// "Weekly limit" / "Monthly limit", falling back to "Usage" when unknown.
     pub fn usage_label(&self) -> &'static str {
         match self.period_type.as_deref() {
-            Some(t) if t.contains("WEEKLY") => "Weekly limit",
-            Some(t) if t.contains("MONTHLY") => "Monthly limit",
-            _ => "Usage",
+            Some(t) if t.contains("WEEKLY") => xai_grok_i18n::t("usage.weekly_limit"),
+            Some(t) if t.contains("MONTHLY") => xai_grok_i18n::t("usage.monthly_limit"),
+            _ => xai_grok_i18n::t("usage.usage"),
         }
     }
 }
@@ -112,7 +112,10 @@ pub fn format_usage_summary(balance: &CreditBalance, autotopup: Option<&AutoTopu
         balance.usage_pct.floor() as i64
     )];
     if let Some(reset) = &balance.period_end_display {
-        lines.push(format!("Next reset: {reset}"));
+        lines.push(xai_grok_i18n::t_fmt(
+            "usage.next_reset",
+            &[("time", reset.as_str())],
+        ));
     }
 
     // Billing stores credit / top-up amounts as negative cents (accounting
@@ -123,18 +126,26 @@ pub fn format_usage_summary(balance: &CreditBalance, autotopup: Option<&AutoTopu
         .filter(|c| *c > 0)
     {
         lines.push(String::new());
-        lines.push(format!("Credits: {}", fmt_dollars(prepaid)));
+        lines.push(xai_grok_i18n::t_fmt(
+            "usage.credits",
+            &[("amount", &fmt_dollars(prepaid))],
+        ));
         match autotopup {
             Some(at) if at.enabled && at.topup_amount_cents.is_some() => {
-                lines.push(format!(
-                    "Auto topup: {}",
-                    fmt_dollars(at.topup_amount_cents.unwrap().abs())
+                let amt = fmt_dollars(at.topup_amount_cents.unwrap().abs());
+                lines.push(xai_grok_i18n::t_fmt(
+                    "usage.auto_topup",
+                    &[("amount", amt.as_str())],
                 ));
                 if let Some(max) = at.max_amount_cents {
-                    lines.push(format!("Max monthly topup: {}", fmt_dollars(max.abs())));
+                    let m = fmt_dollars(max.abs());
+                    lines.push(xai_grok_i18n::t_fmt(
+                        "usage.max_monthly_topup",
+                        &[("amount", m.as_str())],
+                    ));
                 }
             }
-            _ => lines.push("Auto topup: disabled".to_string()),
+            _ => lines.push(xai_grok_i18n::t("usage.auto_topup_disabled").to_string()),
         }
     }
 
@@ -145,7 +156,12 @@ pub fn format_usage_summary(balance: &CreditBalance, autotopup: Option<&AutoTopu
         let used = balance.on_demand_used_cents.unwrap_or(0).abs() as f64 / 100.0;
         let cap = balance.on_demand_cap_cents.unwrap_or(0).abs() as f64 / 100.0;
         lines.push(String::new());
-        lines.push(format!("Pay-as-you-go: ${used:.2} used of ${cap:.2} limit"));
+        let used_s = format!("${used:.2}");
+        let cap_s = format!("${cap:.2}");
+        lines.push(xai_grok_i18n::t_fmt(
+            "usage.payg",
+            &[("used", used_s.as_str()), ("cap", cap_s.as_str())],
+        ));
     }
 
     lines.join("\n")

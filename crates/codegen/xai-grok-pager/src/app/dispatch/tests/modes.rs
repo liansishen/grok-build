@@ -1053,15 +1053,15 @@ fn set_yolo_mode_redispatch_same_value_still_emits_effect_and_toast() {
 /// Toast string format: exact-equality pin.
 ///
 /// **Destructive-action toast.**
-/// The ON case uses `⚠ Always-approve ON: all tool actions
-/// auto-run` (warning glyph + body spelling out the consequence)
-/// because enabling YOLO is the single most security-relevant
-/// user action in the pager. The OFF case uses the standard `✓`
-/// success glyph + "Label: value" format (restoring the safe
-/// default).
+/// The ON case uses a short `⚠ Always-approve ON` warning (keeps toast
+/// width under narrow terminals). The OFF case uses the standard success
+/// glyph + "Label: value" format (restoring the safe default).
+/// Glyphs go through `legacy_glyph_fallback` at show time.
 #[test]
 fn set_yolo_mode_toast_format() {
     let mut app = test_app_with_agent();
+    let check = crate::glyphs::check_mark();
+    let warn = crate::glyphs::legacy_glyph_fallback("\u{26A0}").into_owned();
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
     let toast = app.agents[&AgentId(0)]
         .toast
@@ -1070,7 +1070,7 @@ fn set_yolo_mode_toast_format() {
         .expect("toast must be set");
     assert_eq!(
         toast,
-        "\u{26A0} Always-approve ON: all tool actions auto-run"
+        format!("{warn} Always-approve ON")
     );
 
     let _ = dispatch(Action::SetYoloMode(false), &mut app);
@@ -1079,7 +1079,7 @@ fn set_yolo_mode_toast_format() {
         .as_ref()
         .map(|(s, _)| s.clone())
         .expect("toast must be set");
-    assert_eq!(toast, "\u{2713} Always-approve: off");
+    assert_eq!(toast, format!("{check} Always-approve: off"));
 }
 
 #[test]
@@ -2246,7 +2246,11 @@ fn plan_mode_toast_format() {
         !toast.contains(": On"),
         "ON toast must NOT use capital 'On' (PR 10 R1 G-3 #1 fix): {toast}",
     );
-    assert!(toast.contains('\u{2713}'));
+    let check = crate::glyphs::check_mark();
+    assert!(
+        toast.contains(check),
+        "toast must contain platform check glyph, got: {toast:?}"
+    );
 
     // Bring the agent into plan mode for the OFF toast assertion.
     // (The previous SetPlanMode(On) set pending = Some(true); we
