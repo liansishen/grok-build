@@ -577,7 +577,7 @@ pub(in crate::app::dispatch) fn dispatch_toggle_mouse_capture(app: &mut AppView)
         });
     } else {
         for agent in app.agents.values_mut() {
-            agent.set_sticky_toast_recursive(Some(crate::app::MOUSE_OFF_HINT_SCROLLBACK));
+            agent.set_sticky_toast_recursive(Some(crate::app::mouse_off_hint_scrollback()));
             toast_applied = true;
         }
     }

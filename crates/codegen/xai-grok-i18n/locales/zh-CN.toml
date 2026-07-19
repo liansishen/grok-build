@@ -84,8 +84,8 @@ label = "停止"
 description = "Stop / Close agent"
 
 [actions.DashboardToggleAutoApprove]
-label = "always-approve"
-description = "Toggle always-approve"
+label = "始终批准"
+description = "切换始终批准"
 
 [actions.DashboardToggleGrouping]
 label = "group"
@@ -455,6 +455,24 @@ esc_close = "Esc 关闭"
 [modal.section]
 session = "会话"
 
+[mode]
+switched = "已切换模式：{mode}"
+
+[mode.flag]
+always_approve = "始终批准"
+auto = "自动"
+plan = "计划"
+plan_approval = "计划审批"
+commenting = "评论中"
+commenting_line = "评论 L{n}"
+commenting_range = "评论 L{start}-{end}"
+
+[mode.name]
+plan = "计划"
+auto = "自动"
+always_approve = "始终批准"
+normal = "普通"
+
 [pane]
 no_todos = "暂无待办。"
 no_tasks = "暂无任务或智能体。"
@@ -511,6 +529,9 @@ no_source = "无源文件"
 waiting_approval = "等待计划批准"
 no_plan_approve = "尚未编写计划 — 批准或请求修改"
 
+[prompt.placeholder]
+build_anything = "随便写点什么"
+
 [rewind]
 loading = "正在加载回退点…"
 cancel_and_rewind = "取消回合并回退"
@@ -530,6 +551,29 @@ reasoning_overhead = "推理/开销"
 tool_definitions = "工具定义"
 compact_tip = "提示：运行 /compact 释放上下文"
 credit_limit = "你已达到额度上限。"
+
+[session]
+worked_for = "工作了 {duration}"
+turn_completed = "回合已完成。"
+turn_cancelled = "用户在 {duration} 后取消了回合。"
+turn_halted = "智能体无法继续推进 — 回合在 {duration} 后结束。"
+turn_failed_in = "回合在 {duration} 后失败：{error}"
+turn_failed = "回合失败：{error}"
+compaction_started = "上下文已用 {percentage}%。正在压缩…"
+compaction_completed_range = "上下文已压缩：{before} → {after} tokens"
+compaction_completed = "上下文已压缩 → {after} tokens"
+compaction_completed_with_time = "{body}（{secs}s）"
+compaction_failed = "压缩失败。"
+compaction_failed_error = "压缩失败：{error}"
+compaction_cancelled = "压缩已取消。"
+compact_completed = "压缩在 {duration} 内完成。"
+retry_failed = "重试失败：{error}"
+retry_encrypted_mismatch = "此会话的对话历史与当前模型不兼容。请开始新会话。"
+reauth_required = "需要重新认证 — 会话已过期或凭据被拒绝。请运行 /login 重新登录，然后重新发送消息。"
+context_too_large = "此对话过大，超出模型上下文窗口。请使用 /new 开始新会话。"
+model_switched = "{reason} 已切换到「{model}」。"
+memory_saved = "记忆已保存（{trigger}） → {path}  ·  /memory 查看"
+goal_complete = "目标完成 — 端到端 {duration}。"
 
 [settings.auto_dark_theme]
 label = "自动深色主题"
@@ -1144,6 +1188,8 @@ permission_mode_auto = "✓ 权限模式：自动"
 permission_mode_ask = "✓ 权限模式：询问"
 permission_mode_default = "✓ 权限模式：默认"
 restart_to_apply = "（需重启生效）"
+mouse_reporting_off_scrollback = "Ctrl+R 开启鼠标报告以恢复 TUI 功能"
+mouse_reporting_off_prompt = "/toggle-mouse-reporting 开启鼠标报告以恢复 TUI 功能"
 
 [tool.prefix]
 list = "列表 "

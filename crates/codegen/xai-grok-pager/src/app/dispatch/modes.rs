@@ -668,7 +668,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             (false, false, false) => {
                 agent.plan_mode_pending = Some(true);
                 agent.deferred_session_mode = Some(xai_grok_tools::types::SessionMode::Plan);
-                agent.show_mode_switch_banner("Plan");
+                agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.plan"));
                 tracing::info!("Mode cycle (pre-session): Normal → Plan");
                 None
             }
@@ -684,7 +684,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                     agent.session.yolo_mode = false;
                     app.default_yolo = false;
                     app.current_ui.permission_mode = Some("auto".into());
-                    agent.show_mode_switch_banner("Auto");
+                    agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.auto"));
                     tracing::info!("Mode cycle (pre-session): Plan → Auto");
                     Some("auto")
                 } else if let Some(warning) = yolo_locked {
@@ -692,14 +692,14 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                     agent.session.yolo_mode = false;
                     app.default_yolo = false;
                     agent.show_toast(warning);
-                    agent.show_mode_switch_banner("Normal");
+                    agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.normal"));
                     tracing::info!("Mode cycle (pre-session): Plan → Normal (auto gated, policy)");
                     Some("ask")
                 } else {
                     agent.session.yolo_mode = true;
                     app.default_yolo = true;
                     app.current_ui.permission_mode = Some("always-approve".into());
-                    agent.show_mode_switch_banner("Always-Approve");
+                    agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.always_approve"));
                     tracing::info!("Mode cycle (pre-session): Plan → Always-Approve (auto gated)");
                     Some("always-approve")
                 }
@@ -711,14 +711,14 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                     agent.session.yolo_mode = false;
                     app.default_yolo = false;
                     agent.show_toast(warning);
-                    agent.show_mode_switch_banner("Normal");
+                    agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.normal"));
                     tracing::info!("Mode cycle (pre-session): Auto → Normal (policy)");
                     Some("ask")
                 } else {
                     agent.session.yolo_mode = true;
                     app.default_yolo = true;
                     app.current_ui.permission_mode = Some("always-approve".into());
-                    agent.show_mode_switch_banner("Always-Approve");
+                    agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.always_approve"));
                     tracing::info!("Mode cycle (pre-session): Auto → Always-Approve");
                     Some("always-approve")
                 }
@@ -728,7 +728,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 agent.session.yolo_mode = false;
                 app.default_yolo = false;
                 app.current_ui.permission_mode = Some("ask".into());
-                agent.show_mode_switch_banner("Normal");
+                agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.normal"));
                 tracing::info!("Mode cycle (pre-session): Always-Approve → Normal");
                 Some("ask")
             }
@@ -744,12 +744,12 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 app.default_yolo = false;
                 if auto_gate && in_auto && !in_yolo {
                     app.current_ui.permission_mode = Some("auto".into());
-                    agent.show_mode_switch_banner("Auto");
+                    agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.auto"));
                     tracing::info!("Mode cycle (pre-session): Plan+Auto → Auto");
                     Some("auto")
                 } else {
                     app.current_ui.permission_mode = Some("ask".into());
-                    agent.show_mode_switch_banner("Normal");
+                    agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.normal"));
                     tracing::info!("Mode cycle (pre-session): Plan(*) → Normal");
                     Some("ask")
                 }
@@ -782,7 +782,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
         // Normal → Plan
         (false, false, false) => {
             agent.plan_mode_pending = Some(true);
-            agent.show_mode_switch_banner("Plan");
+            agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.plan"));
             refresh_open_settings_modals(app);
             tracing::info!("Mode cycle: Normal → Plan");
             vec![Effect::SetSessionMode {
@@ -802,7 +802,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                     refresh_open_settings_modals(app);
                     if let Some(a) = app.agents.get_mut(&id) {
                         a.show_toast(warning);
-                        a.show_mode_switch_banner("Normal");
+                        a.show_mode_switch_banner(xai_grok_i18n::t("mode.name.normal"));
                     }
                     tracing::info!(
                         "Mode cycle: Plan → Normal (auto gated, always-approve blocked by policy)"
@@ -826,7 +826,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 app.current_ui.permission_mode = Some("always-approve".into());
                 refresh_open_settings_modals(app);
                 if let Some(a) = app.agents.get_mut(&id) {
-                    a.show_mode_switch_banner("Always-Approve");
+                    a.show_mode_switch_banner(xai_grok_i18n::t("mode.name.always_approve"));
                 }
                 tracing::info!("Mode cycle: Plan → Always-Approve (auto gated)");
                 return vec![
@@ -847,7 +847,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             app.current_ui.permission_mode = Some("auto".into());
             refresh_open_settings_modals(app);
             if let Some(a) = app.agents.get_mut(&id) {
-                a.show_mode_switch_banner("Auto");
+                a.show_mode_switch_banner(xai_grok_i18n::t("mode.name.auto"));
             }
             tracing::info!("Mode cycle: Plan → Auto");
             vec![
@@ -872,7 +872,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 refresh_open_settings_modals(app);
                 if let Some(a) = app.agents.get_mut(&id) {
                     a.show_toast(warning);
-                    a.show_mode_switch_banner("Normal");
+                    a.show_mode_switch_banner(xai_grok_i18n::t("mode.name.normal"));
                 }
                 tracing::info!("Mode cycle: Auto → Normal (always-approve blocked by policy)");
                 return vec![Effect::PersistPermissionMode {
@@ -885,7 +885,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             app.current_ui.permission_mode = Some("always-approve".into());
             refresh_open_settings_modals(app);
             if let Some(a) = app.agents.get_mut(&id) {
-                a.show_mode_switch_banner("Always-Approve");
+                a.show_mode_switch_banner(xai_grok_i18n::t("mode.name.always_approve"));
             }
             tracing::info!("Mode cycle: Auto → Always-Approve");
             vec![Effect::PersistPermissionMode {
@@ -900,7 +900,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             app.current_ui.permission_mode = Some("ask".into());
             refresh_open_settings_modals(app);
             if let Some(a) = app.agents.get_mut(&id) {
-                a.show_mode_switch_banner("Normal");
+                a.show_mode_switch_banner(xai_grok_i18n::t("mode.name.normal"));
             }
             tracing::info!("Mode cycle: Always-Approve → Normal");
             vec![Effect::PersistPermissionMode {
@@ -917,7 +917,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             app.current_ui.permission_mode = Some("auto".into());
             refresh_open_settings_modals(app);
             if let Some(a) = app.agents.get_mut(&id) {
-                a.show_mode_switch_banner("Auto");
+                a.show_mode_switch_banner(xai_grok_i18n::t("mode.name.auto"));
             }
             tracing::info!("Mode cycle: Plan+Auto → Auto (exit plan, keep classifier)");
             vec![
@@ -948,7 +948,7 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             app.current_ui.permission_mode = Some("ask".into());
             refresh_open_settings_modals(app);
             if let Some(a) = app.agents.get_mut(&id) {
-                a.show_mode_switch_banner("Normal");
+                a.show_mode_switch_banner(xai_grok_i18n::t("mode.name.normal"));
             }
             tracing::info!("Mode cycle: mixed state → Normal");
             let mut effects = vec![];

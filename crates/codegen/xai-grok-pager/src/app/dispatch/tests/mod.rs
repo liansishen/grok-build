@@ -971,7 +971,9 @@ fn push_synthetic_permission(
     agent.permission_queue.push_back(state);
     rx
 }
-const MOUSE_OFF_STICKY: &str = crate::app::MOUSE_OFF_HINT_SCROLLBACK;
+fn mouse_off_sticky() -> &'static str {
+    crate::app::mouse_off_hint_scrollback()
+}
 fn reset_mouse_capture_enabled(on: bool) {
     crate::app::MOUSE_CAPTURE_ENABLED.store(on, std::sync::atomic::Ordering::Release);
 }

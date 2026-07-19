@@ -246,10 +246,14 @@ mod voice_gate_tests {
 /// `/toggle-mouse-reporting` command (which toggles from any pane). The banner
 /// is stored in the scrollback form; `AgentView::active_toast_message` swaps to
 /// the prompt form at render time when the prompt is focused.
-pub(crate) const MOUSE_OFF_HINT_SCROLLBACK: &str =
-    "Ctrl+r to enable mouse reporting and restore TUI features";
-pub(crate) const MOUSE_OFF_HINT_PROMPT: &str =
-    "/toggle-mouse-reporting to enable mouse reporting and restore TUI features";
+/// Localized sticky when mouse reporting is off (scrollback-focused wording).
+pub(crate) fn mouse_off_hint_scrollback() -> &'static str {
+    xai_grok_i18n::t("toast.mouse_reporting_off_scrollback")
+}
+/// Localized sticky when mouse reporting is off (prompt-focused wording).
+pub(crate) fn mouse_off_hint_prompt() -> &'static str {
+    xai_grok_i18n::t("toast.mouse_reporting_off_prompt")
+}
 /// Terminal type for the pager.
 ///
 /// Uses [`xai_ratatui_inline::Terminal`] instead of stock `ratatui::Terminal`

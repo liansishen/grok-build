@@ -2153,13 +2153,17 @@ mod link_click_tests {
             !(0..short.height).any(|y| buffer_row(&buf, short.width, y).contains("ZZTIPZZ")),
             "short terminal must not reserve or paint the tip row"
         );
-        agent.show_mode_switch_banner("PlanMode");
+        agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.plan"));
         let buf = render_agent(&mut agent, tall, &reg);
         let frame: String = (0..tall.height)
             .map(|y| buffer_row(&buf, tall.width, y))
             .collect();
         assert!(
-            frame.contains("Switched to mode: PlanMode"),
+            frame.contains("Switched to mode: Plan")
+                || frame.contains(xai_grok_i18n::t_fmt(
+                    "mode.switched",
+                    &[("mode", xai_grok_i18n::t("mode.name.plan"))],
+                ).as_str()),
             "mode-switch banner must own the slot"
         );
         assert!(
