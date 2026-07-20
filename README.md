@@ -24,7 +24,7 @@ language = "zh-CN"   # auto | en | zh-CN
 
 ### 2. 全屏透明背景（Acrylic / Mica）
 
-- 设置项 **透明背景**：全屏主题画布使用终端背景（`Color::Reset`），便于 Windows Terminal Acrylic / Mica 等透出。
+- 配置项 **透明背景**：全屏主题画布使用终端背景（`Color::Reset`），便于 Windows Terminal Acrylic / Mica 等透出。
 - 悬停、选区等抬升层仍使用主题色。
 
 配置示例：
@@ -124,30 +124,30 @@ Fork 发布版本采用合法 SemVer：
 <官方版本>-fork.<更新编号>
 ```
 
-例如官方基线为 `0.2.105`：
-
-```text
-0.2.105-fork.1
-0.2.105-fork.2
-```
-
-同步到官方 `0.2.106` 后，Fork 编号从 `1` 重新开始：
+例如官方基线为 `0.2.106`：
 
 ```text
 0.2.106-fork.1
+0.2.106-fork.2
+```
+
+同步到官方 `0.2.107` 后，Fork 编号从 `1` 重新开始：
+
+```text
+0.2.107-fork.1
 ```
 
 创建发布时，在 GitHub Actions 的 **Build → Run workflow** 中填写：
 
 ```text
-release_tag = v0.2.105-fork.1
+release_tag = v0.2.106-fork.1
 ```
 
 工作流会先构建并验证 Linux/Windows 二进制，全部成功后才创建该 tag 和 GitHub Release，避免 tag 触发构建失败后留下无法安全重用的版本号。已存在的 tag 会被拒绝，不能覆盖同一版本的资产。工作流会校验 tag 中的官方版本必须与 `crates/codegen/xai-grok-version/Cargo.toml` 一致。Release 资产格式为：
 
 ```text
-grok-0.2.105-fork.1-linux-x86_64
-grok-0.2.105-fork.1-windows-x86_64
+grok-0.2.106-fork.1-linux-x86_64
+grok-0.2.106-fork.1-windows-x86_64
 SHA256SUMS
 ```
 

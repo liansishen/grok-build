@@ -238,6 +238,7 @@ pub enum TaskEntry {
         label: String,
         styled: Line<'static>,
         started_at: Instant,
+        linked_subagent: Option<String>,
     },
     /// Collapsible group header row (e.g. `▾ Subagents 2`). Not a task —
     /// selecting it and pressing Enter (or clicking it) toggles the group's
@@ -448,7 +449,9 @@ impl TaskEntry {
         info: &ScheduledTaskInfo,
         current_cron: Option<&str>,
         is_queued: bool,
+        linked: Option<(String, bool)>,
     ) -> Self {
+        let linked_running = linked.as_ref().is_some_and(|(_, running)| *running);
         let theme = Theme::current();
         let prompt_preview = if info.prompt.chars().count() > 60 {
             info.prompt.chars().take(57).collect::<String>() + "..."
@@ -470,7 +473,7 @@ impl TaskEntry {
             }
         };
         let is_provisional = info.task_id.starts_with("provisional-");
-        let suffix = if current_cron == Some(&info.task_id) {
+        let suffix = if current_cron == Some(&info.task_id) || linked_running {
             xai_grok_i18n::t("tasks.status_running").to_string()
         } else if is_queued {
             xai_grok_i18n::t("tasks.status_queued").to_string()
@@ -492,9 +495,10 @@ impl TaskEntry {
         } else {
             countdown(&info.human_schedule, info.created_at)
         };
-        // Capitalize the tag for display (`loop` → `Loop`) so it reads as a
-        // proper label, matching the monitor row's `Monitor` tag.
-        let tag_display = {
+        // Translate built-in tags; capitalize unknown/custom tags for display.
+        let tag_display = if info.tag.eq_ignore_ascii_case("loop") {
+            xai_grok_i18n::t("tasks.loop").to_string()
+        } else {
             let mut chars = info.tag.chars();
             match chars.next() {
                 Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
@@ -502,7 +506,7 @@ impl TaskEntry {
             }
         };
         let label = format!(
-            "{}  {}  {}{}",
+            "{} {} \u{b7} {}{}",
             tag_display, info.human_schedule, &prompt_preview, &suffix
         );
 
@@ -511,11 +515,11 @@ impl TaskEntry {
         // neutral secondary text color so the row reads calmly with a single
         // point of color. No surrounding `[ ]` brackets: the color alone
         // sets the tag apart from the schedule that follows it.
-        let schedule_style = format!("{}  ", info.human_schedule);
+        let schedule_style = format!("{} \u{b7} ", info.human_schedule);
         let neutral = Style::default().fg(theme.text_secondary);
         let styled = Line::from(vec![
             Span::styled(
-                format!("{}  ", tag_display),
+                format!("{} ", tag_display),
                 Style::default().fg(theme.accent_system),
             ),
             Span::styled(schedule_style, neutral),
@@ -538,6 +542,7 @@ impl TaskEntry {
             label,
             styled,
             started_at: info.created_at,
+            linked_subagent: linked.map(|(sid, _)| sid),
         }
     }
 
@@ -661,7 +666,7 @@ impl ListItem for TaskEntry {
 enum OverlayEntryData {
     BgTask(String),
     Agent(String, String),
-    Scheduled(String),
+    Scheduled(String, Option<String>),
 }
 
 const MAX_TASKS_HEIGHT: u16 = 8;
@@ -835,10 +840,17 @@ impl TasksPane {
 
         // Add scheduled task items (always "running")
         for info in scheduled.values() {
+            let linked = info.last_subagent_id.as_deref().and_then(|sid| {
+                subagents
+                    .values()
+                    .find(|s| s.subagent_id.as_ref() == sid)
+                    .map(|s| (sid.to_string(), s.is_running()))
+            });
             self.items.push(TaskEntry::from_scheduled(
                 info,
                 current_cron_task_id,
                 queued_cron_ids.contains(info.task_id.as_str()),
+                linked,
             ));
         }
 
@@ -1308,9 +1320,11 @@ impl TasksPane {
                         child_session_id,
                         ..
                     } => OverlayEntryData::Agent(subagent_id.clone(), child_session_id.clone()),
-                    TaskEntry::Scheduled { task_id, .. } => {
-                        OverlayEntryData::Scheduled(task_id.clone())
-                    }
+                    TaskEntry::Scheduled {
+                        task_id,
+                        linked_subagent,
+                        ..
+                    } => OverlayEntryData::Scheduled(task_id.clone(), linked_subagent.clone()),
                     // Group headers have no kill/view buttons; they still
                     // occupy a row (vis_row is enumerated before this filter),
                     // so the y offsets for following items stay correct.
@@ -1334,8 +1348,15 @@ impl TasksPane {
                     };
                     self.render_agent_overlay(area, buf, y, subagent_id, info, &theme);
                 }
-                OverlayEntryData::Scheduled(ref task_id) => {
-                    self.render_scheduled_overlay(area, buf, y, task_id, &theme);
+                OverlayEntryData::Scheduled(ref task_id, ref linked_subagent) => {
+                    self.render_scheduled_overlay(
+                        area,
+                        buf,
+                        y,
+                        task_id,
+                        linked_subagent.as_deref(),
+                        &theme,
+                    );
                 }
             }
         }
@@ -1644,6 +1665,7 @@ impl TasksPane {
         buf: &mut Buffer,
         y: u16,
         task_id: &str,
+        linked_subagent: Option<&str>,
         theme: &Theme,
     ) {
         let frames = crate::glyphs::dot_spinner_frames();
@@ -1655,8 +1677,8 @@ impl TasksPane {
             2,
         );
 
-        // Clear overlay area (kill button + separator = 4 cols).
-        clear_overlay_area(buf, area, y, 4);
+        let overlay_cols = if linked_subagent.is_some() { 7 } else { 4 };
+        clear_overlay_area(buf, area, y, overlay_cols);
 
         let mut rx = area.x + area.width;
 
@@ -1681,6 +1703,29 @@ impl TasksPane {
             TaskEntryId::Scheduled(task_id.to_string()),
             Rect::new(rx, y, 3, 1),
         ));
+
+        if linked_subagent.is_some() {
+            rx = rx.saturating_sub(3);
+            let is_view_hovered = matches!(
+                &self.hovered_view,
+                Some(TaskEntryId::Scheduled(tid)) if tid == task_id
+            );
+            let view_style = if is_view_hovered {
+                Style::default().fg(theme.text_primary)
+            } else {
+                Style::default().fg(theme.gray)
+            };
+            buf.set_span(
+                rx,
+                y,
+                &Span::styled(crate::glyphs::enlarge_button(), view_style),
+                3,
+            );
+            self.view_button_rects.push((
+                TaskEntryId::Scheduled(task_id.to_string()),
+                Rect::new(rx, y, 3, 1),
+            ));
+        }
 
         if rx > area.x {
             buf.set_span(rx - 1, y, &Span::raw(" "), 1);
@@ -2900,6 +2945,7 @@ mod tests {
             created_at: std::time::Instant::now(),
             next_fire_at: next.map(|s| s.to_string()),
             tag: "loop".into(),
+            last_subagent_id: None,
         }
     }
 

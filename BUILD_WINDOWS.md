@@ -8,12 +8,12 @@
 | 系统 | Windows 11 |
 | Shell | PowerShell 7（pwsh） |
 | 仓库路径 | `D:\Projects\grok-build` |
-| 分支 | `feature/transparent-bg`（含半透明画布改动） |
+| 分支 | `main`（已包含半透明画布改动） |
 | Rust | 由 `rust-toolchain.toml` 拉取，成功时为 **1.92.0** |
 | protoc | **29.3**（Windows 官方 zip，非仓库内 DotSlash 包装） |
 | 链接器 | **rust-lld**（避免 MSVC `link.exe` LNK1318） |
 | 产物 | `target\release\xai-grok-pager.exe`（约 123 MB） |
-| 版本输出 | `grok 0.2.105 (...)` |
+| 版本输出 | `grok 0.2.106 (...)` |
 
 ---
 
@@ -77,11 +77,11 @@ $env:PROTOC = "$dest\bin\protoc.exe"
 
 ```powershell
 # 若尚未 clone
-git clone https://github.com/xai-org/grok-build.git D:\Projects\grok-build
+git clone https://github.com/liansishen/grok-build.git D:\Projects\grok-build
 cd D:\Projects\grok-build
 
-# 本 fork 半透明相关改动在分支 feature/transparent-bg
-git checkout feature/transparent-bg
+# 本 fork 的增强均已合并到 main
+git checkout main
 ```
 
 ---

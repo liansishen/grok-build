@@ -12,7 +12,7 @@ fi
 
 if [[ ! "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-fork\.([1-9][0-9]*)$ ]]; then
     echo "invalid fork release tag: $tag" >&2
-    echo "expected: v<official-version>-fork.<positive integer> (example: v0.2.105-fork.1)" >&2
+    echo "expected: v<official-version>-fork.<positive integer> (example: v0.2.106-fork.1)" >&2
     exit 1
 fi
 

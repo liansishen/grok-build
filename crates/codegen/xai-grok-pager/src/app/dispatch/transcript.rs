@@ -51,8 +51,12 @@ pub(super) fn dispatch_copy_block_content(app: &mut AppView) {
     });
 }
 
-/// Copy the Nth most recent assistant message to the clipboard.
-pub(super) fn dispatch_copy_assistant_message(app: &mut AppView, n: usize) {
+/// Copy the Nth most recent assistant message to the clipboard, or to `file_path`.
+pub(super) fn dispatch_copy_assistant_message(
+    app: &mut AppView,
+    n: usize,
+    file_path: Option<std::path::PathBuf>,
+) {
     with_active_agent(app, |agent| {
         // Collect agent messages in reverse order (most recent first).
         let mut agent_messages: Vec<String> = Vec::new();
@@ -96,13 +100,58 @@ pub(super) fn dispatch_copy_assistant_message(app: &mut AppView, n: usize) {
         }
 
         let stats = crate::clipboard::clipboard_stats_suffix(text);
-        agent
-            .scrollback
-            .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
-                "transcript.copied_to_clipboard",
-                &[("stats", &stats)],
-            )));
-        agent.copy_to_clipboard(text);
+
+        if let Some(p) = file_path {
+            match crate::clipboard::write_text_to_copy_file(text, &p) {
+                Ok(path) => {
+                    let path = crate::clipboard::display_copy_path(&path);
+                    agent
+                        .scrollback
+                        .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                            "transcript.copied_to_file",
+                            &[("path", &path), ("stats", &stats)],
+                        )));
+                }
+                Err(e) => {
+                    let error = e.to_string();
+                    agent
+                        .scrollback
+                        .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                            "transcript.write_file_failed",
+                            &[("error", &error)],
+                        )));
+                }
+            }
+            return;
+        }
+
+        let delivery = crate::clipboard::copy_text_or_file(text);
+        let block_msg = match &delivery {
+            crate::clipboard::CopyDelivery::Clipboard { file, .. } => match file {
+                Some(path) => {
+                    let path = crate::clipboard::display_copy_path(path);
+                    xai_grok_i18n::t_fmt(
+                        "transcript.copied_with_backup",
+                        &[("path", &path), ("stats", &stats)],
+                    )
+                }
+                None => {
+                    xai_grok_i18n::t_fmt("transcript.copied_to_clipboard", &[("stats", &stats)])
+                }
+            },
+            crate::clipboard::CopyDelivery::File { path } => {
+                let path = crate::clipboard::display_copy_path(path);
+                xai_grok_i18n::t_fmt(
+                    "transcript.clipboard_unreachable_written",
+                    &[("path", &path), ("stats", &stats)],
+                )
+            }
+            crate::clipboard::CopyDelivery::Failed { .. } => {
+                xai_grok_i18n::t_fmt("transcript.copy_failed", &[("stats", &stats)])
+            }
+        };
+        agent.scrollback.push_block(RenderBlock::system(block_msg));
+        agent.show_toast_ticks(delivery.toast_message().as_ref(), delivery.toast_ticks());
     });
 }
 
@@ -169,14 +218,37 @@ pub(super) fn dispatch_export_conversation(
         } else {
             // Clipboard path: stats block (like assistant copy) + route-aware toast
             // (like block content copy / selection). Good UX for a potentially large transcript.
+            // The scrollback line reflects where the copy actually landed —
+            // same pattern as /copy N — instead of claiming clipboard success
+            // when the delivery fell back to the backup file.
             let stats = crate::clipboard::clipboard_stats_suffix(&md);
-            agent
-                .scrollback
-                .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
-                    "transcript.conversation_copied",
+            let delivery = agent.copy_to_clipboard(&md);
+            let block_msg = match &delivery {
+                crate::clipboard::CopyDelivery::Clipboard { file, .. } => match file {
+                    Some(path) => {
+                        let path = crate::clipboard::display_copy_path(path);
+                        xai_grok_i18n::t_fmt(
+                            "transcript.conversation_copied_with_backup",
+                            &[("path", &path), ("stats", &stats)],
+                        )
+                    }
+                    None => {
+                        xai_grok_i18n::t_fmt("transcript.conversation_copied", &[("stats", &stats)])
+                    }
+                },
+                crate::clipboard::CopyDelivery::File { path } => {
+                    let path = crate::clipboard::display_copy_path(path);
+                    xai_grok_i18n::t_fmt(
+                        "transcript.conversation_clipboard_unreachable_written",
+                        &[("path", &path), ("stats", &stats)],
+                    )
+                }
+                crate::clipboard::CopyDelivery::Failed { .. } => xai_grok_i18n::t_fmt(
+                    "transcript.conversation_copy_failed",
                     &[("stats", &stats)],
-                )));
-            agent.copy_to_clipboard(&md);
+                ),
+            };
+            agent.scrollback.push_block(RenderBlock::system(block_msg));
         }
     });
 }
