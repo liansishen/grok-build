@@ -770,7 +770,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 agent
                     .scrollback
                     .push_block(crate::scrollback::block::RenderBlock::system(
-                        xai_grok_i18n::t_fmt("task_result.session_renamed", &[("title", safe)]),
+                        xai_grok_i18n::t_fmt("task_result.session_renamed", &[("title", &safe)]),
                     ));
             }
             vec![]
