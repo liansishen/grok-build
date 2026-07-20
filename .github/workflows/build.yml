@@ -1,0 +1,121 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-24.04
+            artifact: grok-build-linux-x86_64
+            binary: target/release/xai-grok-pager
+            packaged_binary: dist/grok
+          - name: Windows x86_64
+            os: windows-2022
+            artifact: grok-build-windows-x86_64
+            binary: target/release/xai-grok-pager.exe
+            packaged_binary: dist/grok.exe
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential clang cmake libssl-dev pkg-config unzip
+
+      - name: Install Linux protoc
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          version="29.3"
+          archive="$RUNNER_TEMP/protoc.zip"
+          directory="$RUNNER_TEMP/protoc"
+          curl --fail --location --silent --show-error \
+            "https://github.com/protocolbuffers/protobuf/releases/download/v${version}/protoc-${version}-linux-x86_64.zip" \
+            --output "$archive"
+          unzip -q "$archive" -d "$directory"
+          echo "PROTOC=$directory/bin/protoc" >> "$GITHUB_ENV"
+
+      - name: Install Windows protoc
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "29.3"
+          $archive = Join-Path $env:RUNNER_TEMP "protoc.zip"
+          $directory = Join-Path $env:RUNNER_TEMP "protoc"
+          Invoke-WebRequest `
+            -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v$version/protoc-$version-win64.zip" `
+            -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $directory -Force
+          "PROTOC=$directory\bin\protoc.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.92.0 --profile minimal --no-self-update
+          rustup default 1.92.0
+          rustc --version
+
+      - name: Configure Windows linker
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=rust-lld" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Cache Cargo data
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ runner.os }}-x86_64-release
+          cache-on-failure: true
+
+      - name: Build release binary
+        shell: bash
+        run: cargo build --locked -p xai-grok-pager-bin --release
+
+      - name: Verify binary
+        shell: bash
+        run: '"${{ matrix.binary }}" --version'
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "${{ matrix.binary }}" "${{ matrix.packaged_binary }}"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14

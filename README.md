@@ -99,6 +99,24 @@ grok --version                      # 确认当前 PATH 上的版本
 
 安装路径固定为：`%USERPROFILE%\.grok\bin\grok.exe`。
 
+## GitHub Actions 自动编译
+
+仓库包含 [`.github/workflows/build.yml`](.github/workflows/build.yml)，会在以下情况自动编译：
+
+- 向 `main` 分支推送提交；
+- 创建或更新 Pull Request；
+- 推送名称以 `v` 开头的 tag；
+- 在 GitHub Actions 页面手动运行。
+
+工作流会分别生成 Linux x86_64 和 Windows x86_64 的 release 二进制。编译完成后，可在对应工作流运行页面的 **Artifacts** 区域下载：
+
+| Artifact | 可执行文件 |
+|----------|------------|
+| `grok-build-linux-x86_64` | `grok` |
+| `grok-build-windows-x86_64` | `grok.exe` |
+
+Artifacts 默认保留 14 天。该工作流只上传构建产物，不会自动创建 GitHub Release。
+
 ---
 
 ## 以下是原内容
