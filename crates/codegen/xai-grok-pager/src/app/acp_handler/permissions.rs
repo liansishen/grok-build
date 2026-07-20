@@ -258,10 +258,9 @@ fn build_permission_display(
             .map(|t| t.to_string())
             .unwrap_or_else(
                 || match bash_highlights.and_then(|h| h.highlighted_words.first()) {
-                    Some(bin) => xai_grok_i18n::t_fmt(
-                        "permission.title.allow_bin",
-                        &[("bin", bin.as_str())],
-                    ),
+                    Some(bin) => {
+                        xai_grok_i18n::t_fmt("permission.title.allow_bin", &[("bin", bin.as_str())])
+                    }
                     None => xai_grok_i18n::t("permission.title.allow_execute").to_string(),
                 },
             )
@@ -286,9 +285,15 @@ fn build_permission_display(
         xai_grok_i18n::t_fmt("permission.title.allow_named", &[("name", name.as_str())])
     } else {
         match req.tool_call.fields.kind {
-            Some(acp::ToolKind::Edit) => xai_grok_i18n::t("permission.title.allow_edit").to_string(),
-            Some(acp::ToolKind::Execute) => xai_grok_i18n::t("permission.title.allow_execute").to_string(),
-            Some(acp::ToolKind::Delete) => xai_grok_i18n::t("permission.title.allow_delete").to_string(),
+            Some(acp::ToolKind::Edit) => {
+                xai_grok_i18n::t("permission.title.allow_edit").to_string()
+            }
+            Some(acp::ToolKind::Execute) => {
+                xai_grok_i18n::t("permission.title.allow_execute").to_string()
+            }
+            Some(acp::ToolKind::Delete) => {
+                xai_grok_i18n::t("permission.title.allow_delete").to_string()
+            }
             _ => xai_grok_i18n::t("permission.title.allow").to_string(),
         }
     };

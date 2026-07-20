@@ -7,9 +7,9 @@ use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
 use super::state::{
-    CONTENT_MIN_WIDTH, MAX_THOUGHTS_WIDTH_WIDENED_MARGIN, RowEntry,
-    STANDARD_MAX_WIDTH, SettingsModalState, SettingsMode, SettingsModeKind,
-    TITLE_LEADING_DECORATION_W, effective_enum_choices, group_children, modal_title,
+    CONTENT_MIN_WIDTH, MAX_THOUGHTS_WIDTH_WIDENED_MARGIN, RowEntry, STANDARD_MAX_WIDTH,
+    SettingsModalState, SettingsMode, SettingsModeKind, TITLE_LEADING_DECORATION_W,
+    effective_enum_choices, group_children, modal_title,
 };
 use crate::render::line_utils::truncate_str;
 use crate::settings::{
@@ -65,8 +65,12 @@ pub fn render_settings_modal(
         match &state.state.mode {
             SettingsMode::PickingEnum { key, .. } => {
                 if let Some(meta) = state.registry.find(key) {
-                    breadcrumb_owned =
-                        format!("{} {} {}", modal_title(), crate::glyphs::chevron(), meta.label_t());
+                    breadcrumb_owned = format!(
+                        "{} {} {}",
+                        modal_title(),
+                        crate::glyphs::chevron(),
+                        meta.label_t()
+                    );
                     &breadcrumb_owned
                 } else {
                     modal_title()
@@ -75,8 +79,12 @@ pub fn render_settings_modal(
 
             SettingsMode::EditingString { key, .. } | SettingsMode::EditingInt { key, .. } => {
                 if let Some(meta) = state.registry.find(key) {
-                    breadcrumb_owned =
-                        format!("{} {} {}", modal_title(), crate::glyphs::chevron(), meta.label_t());
+                    breadcrumb_owned = format!(
+                        "{} {} {}",
+                        modal_title(),
+                        crate::glyphs::chevron(),
+                        meta.label_t()
+                    );
                     &breadcrumb_owned
                 } else {
                     modal_title()
@@ -84,8 +92,12 @@ pub fn render_settings_modal(
             }
             SettingsMode::PickingGroup { key, .. } => {
                 if let Some(meta) = state.registry.find(key) {
-                    breadcrumb_owned =
-                        format!("{} {} {}", modal_title(), crate::glyphs::chevron(), meta.label_t());
+                    breadcrumb_owned = format!(
+                        "{} {} {}",
+                        modal_title(),
+                        crate::glyphs::chevron(),
+                        meta.label_t()
+                    );
                     &breadcrumb_owned
                 } else {
                     modal_title()
@@ -477,7 +489,7 @@ pub(super) fn render_rows(
     // Empty filter — show "No matches for <query>".
     if total_visible == 0 {
         if !state.query().is_empty() {
-            let prefix = "No matches for ";
+            let prefix = xai_grok_i18n::t("settings.modal.no_matches_for");
             let suffix_quote_w = 2u16; // surrounding "" chars
             let available_for_query = (area.width as usize)
                 .saturating_sub(prefix.width())
@@ -854,7 +866,12 @@ fn compute_filtered_row_heights(state: &SettingsModalState, area_width: u16) -> 
                     SettingValue::Int(i) => i.to_string(),
                 };
                 let show_restart_pill = meta.restart_required && is_expanded;
-                let layout = row_layout(area_width, meta.label_t(), &value_display, show_restart_pill);
+                let layout = row_layout(
+                    area_width,
+                    meta.label_t(),
+                    &value_display,
+                    show_restart_pill,
+                );
                 let mut h: u16 = match layout {
                     RowLayout::OneLine => 1,
                     RowLayout::TwoLine | RowLayout::TwoLineWithLabelTruncation => 2,
@@ -1005,7 +1022,8 @@ pub(super) fn render_picking_enum(
     }
 
     // Choosers need title + gap (2) before the description renders.
-    let header_rows = render_sub_pane_header(buf, area, theme, meta.label_t(), meta.description_t(), 2);
+    let header_rows =
+        render_sub_pane_header(buf, area, theme, meta.label_t(), meta.description_t(), 2);
     if area.height <= header_rows {
         return;
     }
@@ -1375,11 +1393,12 @@ fn render_picking_group(
             .max(label_x);
         if value_x > label_x {
             let label_room = (value_x - label_x).saturating_sub(1) as usize;
-            let label_text: std::borrow::Cow<'_, str> = if child_meta.label_t().width() <= label_room {
-                std::borrow::Cow::Borrowed(child_meta.label_t())
-            } else {
-                std::borrow::Cow::Owned(truncate_str(child_meta.label_t(), label_room))
-            };
+            let label_text: std::borrow::Cow<'_, str> =
+                if child_meta.label_t().width() <= label_room {
+                    std::borrow::Cow::Borrowed(child_meta.label_t())
+                } else {
+                    std::borrow::Cow::Owned(truncate_str(child_meta.label_t(), label_room))
+                };
             let label_w = (label_text.width() as u16).min((value_x - label_x).saturating_sub(1));
             buf.set_span(
                 label_x,
@@ -1617,7 +1636,8 @@ pub(super) fn render_editing_value(
     };
 
     // Editors reserve title + gap + the input row (3) before the description.
-    let header_rows = render_sub_pane_header(buf, area, theme, meta.label_t(), meta.description_t(), 3);
+    let header_rows =
+        render_sub_pane_header(buf, area, theme, meta.label_t(), meta.description_t(), 3);
     if area.height <= header_rows {
         return;
     }
@@ -1664,9 +1684,12 @@ pub(super) fn render_editing_value(
     if buffer.is_empty() {
         let placeholder = match &meta.kind {
             SettingKind::String { validator, .. } => match validator {
-                StringValidator::KnownModel => "<empty — use shell default>",
-                StringValidator::NonEmptyToken => "<type a value>",
-                StringValidator::Any => "<type a value>",
+                StringValidator::KnownModel => {
+                    xai_grok_i18n::t("settings.modal.placeholder_shell_default")
+                }
+                StringValidator::NonEmptyToken | StringValidator::Any => {
+                    xai_grok_i18n::t("settings.modal.placeholder_value")
+                }
             },
             _ => "",
         };
@@ -2063,7 +2086,7 @@ fn render_preview_block(
     // clamp signal has been moved to a note row below the content
     // (see the bottom of this function) so the title carries the
     // same shape regardless of clamp state.
-    let title_text: &str = "preview";
+    let title_text = xai_grok_i18n::t("settings.modal.preview");
     let title_text_truncated: std::borrow::Cow<'_, str> =
         if title_text.width() <= effective_width as usize {
             std::borrow::Cow::Borrowed(title_text)
@@ -2137,7 +2160,10 @@ fn render_preview_block(
             .saturating_add(1);
         let area_end_y = area.y.saturating_add(area.height);
         if note_y < area_end_y {
-            let note_text = format!("note: clamped at {effective_width} cols");
+            let note_text = xai_grok_i18n::t_fmt(
+                "settings.modal.clamped_note",
+                &[("width", &effective_width.to_string())],
+            );
             let note_text_truncated: std::borrow::Cow<'_, str> =
                 if note_text.width() <= area.width as usize {
                     std::borrow::Cow::Borrowed(note_text.as_str())
@@ -2234,7 +2260,6 @@ pub(super) const ROW_RIGHT_PAD_W: u16 = 1;
 const ROW_CHEVRON_W: u16 = 2;
 /// Chevron column width — reserved for all rows for alignment.
 pub(super) const ROW_CHEVRON_COL_W: u16 = ROW_CHEVRON_W;
-const ROW_RESTART_PILL_W: u16 = 10; // " · restart" — used for layout budgeting only.
 
 /// Per-row layout decision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2254,7 +2279,9 @@ pub(super) fn row_layout(
     show_restart_pill: bool,
 ) -> RowLayout {
     let restart_w = if show_restart_pill {
-        ROW_RESTART_PILL_W
+        xai_grok_i18n::t("settings.modal.restart_pill_spaced")
+            .width()
+            .min(u16::MAX as usize) as u16
     } else {
         0
     };
@@ -2374,7 +2401,7 @@ pub(super) fn render_setting_row(
     // Pill only while expanded — change-time feedback is the toast's job, and
     // a collapsed non-default row would misread as "restart pending" forever.
     let show_restart_pill = meta.restart_required && is_expanded;
-    let restart_pill_text = " \u{00B7} restart";
+    let restart_pill_text = xai_grok_i18n::t("settings.modal.restart_pill_spaced");
     let restart_w = if show_restart_pill {
         restart_pill_text.width() as u16
     } else {
@@ -2640,12 +2667,16 @@ fn render_setting_row_no_value(
         .add_modifier(Modifier::BOLD);
 
     let label_max_w = max_label_w;
-    let label_truncated: std::borrow::Cow<'_, str> = if meta.label_t().width() <= label_max_w as usize {
-        std::borrow::Cow::Borrowed(meta.label_t())
-    } else {
-        std::borrow::Cow::Owned(truncate_str(meta.label_t(), label_max_w as usize))
-    };
-    let text = format!(" !   {label_truncated} (no read mapping)");
+    let label_truncated: std::borrow::Cow<'_, str> =
+        if meta.label_t().width() <= label_max_w as usize {
+            std::borrow::Cow::Borrowed(meta.label_t())
+        } else {
+            std::borrow::Cow::Owned(truncate_str(meta.label_t(), label_max_w as usize))
+        };
+    let text = xai_grok_i18n::t_fmt(
+        "settings.modal.no_read_mapping",
+        &[("label", label_truncated.as_ref())],
+    );
     let w = text.width() as u16;
     buf.set_span(
         area.x,
@@ -2717,7 +2748,9 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
     match &state.state.mode {
         SettingsMode::Browse => {
             let enter_label = match state.focused_setting() {
-                Some((_, meta)) if matches!(meta.kind, SettingKind::Bool { .. }) => xai_grok_i18n::t("settings.modal.footer.enter_toggle"),
+                Some((_, meta)) if matches!(meta.kind, SettingKind::Bool { .. }) => {
+                    xai_grok_i18n::t("settings.modal.footer.enter_toggle")
+                }
                 _ => xai_grok_i18n::t("settings.modal.footer.enter_edit"),
             };
             let mut shortcuts = vec![
@@ -2804,7 +2837,11 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
             } else {
                 xai_grok_i18n::t("settings.modal.footer.nav")
             };
-            let esc_label = if *sp { xai_grok_i18n::t("settings.modal.footer.esc_revert") } else { xai_grok_i18n::t("settings.modal.footer.esc_cancel") };
+            let esc_label = if *sp {
+                xai_grok_i18n::t("settings.modal.footer.esc_revert")
+            } else {
+                xai_grok_i18n::t("settings.modal.footer.esc_cancel")
+            };
             vec![
                 Shortcut {
                     label: nav_label,
@@ -2866,7 +2903,7 @@ pub(super) fn build_shortcuts(state: &SettingsModalState) -> Vec<Shortcut<'stati
                 id: 0,
             },
             Shortcut {
-                label: "\u{2190}/\u{2192} cursor",
+                label: xai_grok_i18n::t("settings.modal.footer.cursor"),
                 clickable: false,
                 id: 0,
             },

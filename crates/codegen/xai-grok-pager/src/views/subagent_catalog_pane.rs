@@ -129,9 +129,21 @@ impl SubagentCatalogPane {
         let desc_style = Style::default().fg(theme.gray_bright);
 
         let groups: [(&str, &'static str, &[String]); 3] = [
-            ("Personas", "persona", &state.personas),
-            ("Roles", "role", &state.roles),
-            ("Agents", "agent", &state.agents),
+            (
+                xai_grok_i18n::t("subagent_catalog.personas"),
+                "persona",
+                &state.personas,
+            ),
+            (
+                xai_grok_i18n::t("subagent_catalog.roles"),
+                "role",
+                &state.roles,
+            ),
+            (
+                xai_grok_i18n::t("subagent_catalog.agents"),
+                "agent",
+                &state.agents,
+            ),
         ];
 
         for (name, kind, items) in &groups {
@@ -268,8 +280,10 @@ impl SubagentCatalogPane {
         if self.entries.is_empty() {
             if inner.height > 0 && inner.width > 0 {
                 let theme = Theme::current();
-                let span =
-                    Span::styled("No bundled items.", Style::default().fg(theme.gray_bright));
+                let span = Span::styled(
+                    xai_grok_i18n::t("pane.no_bundled"),
+                    Style::default().fg(theme.gray_bright),
+                );
                 buf.set_span(inner.x, inner.y, &span, inner.width);
             }
             return;

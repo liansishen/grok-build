@@ -2745,8 +2745,11 @@ impl AppView {
         };
         if def.requires_confirmation {
             let shortcut = KeyShortcut::from(*key);
-            self.pending_action =
-                Some(PendingAction::new(Action::ExitSession, shortcut, def.label_t()));
+            self.pending_action = Some(PendingAction::new(
+                Action::ExitSession,
+                shortcut,
+                def.label_t(),
+            ));
             InputOutcome::Changed
         } else {
             InputOutcome::Action(Action::ExitSession)

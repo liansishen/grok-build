@@ -62,9 +62,13 @@ impl SlashCommand for UsageCommand {
             "manage" => {
                 CommandResult::Action(Action::OpenUrl("https://grok.com/?_s=usage".to_string()))
             }
-            _ => CommandResult::Error(format!(
-                "Unknown argument: {arg}. Use /usage show or /usage manage"
-            )),
+            _ => CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.usage.unknown_argument",
+                    "Unknown argument: {arg}. Use /usage show or /usage manage",
+                )
+                .replace("{arg}", arg),
+            ),
         }
     }
 }

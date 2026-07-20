@@ -15,6 +15,7 @@ use crate::version::{
     UpdateConfig, fetch_latest_version, get_installed_grok_version, get_latest_version,
     is_version_cache_fresh, try_fetch_stable_pointer, write_version_cache,
 };
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_shell::util::config;
 use xai_grok_shell::util::grok_home::{grok_application, grok_home};
 
@@ -24,25 +25,23 @@ pub enum UpdateRunMode {
     NonBlocking,
 }
 
-const PROMPT_UPDATE_NOW: &str = "Update now? [Y/n/d]";
-const MSG_AUTO_UPDATE_BACKGROUND: &str = "Auto-update running in background.";
-const MSG_RUN_UPDATE_MANUAL: &str = "Run `grok update` to get the latest version.";
 /// Manual-install one-liner for this platform's bootstrap installer.
 fn manual_install_cmd() -> &'static str {
-    "Download the matching binary from https://github.com/liansishen/grok-build/releases/latest"
+    t("update.manual_install.download_release")
 }
 
 /// Build a reinstall hint for a known installer type.
 fn reinstall_hint(installer: &str) -> String {
     match installer {
-        "gh-release" => format!(
-            "Please reinstall from this fork's GitHub Releases:\n  https://github.com/{}/releases/latest",
-            crate::version::GH_RELEASE_REPO
+        "gh-release" => t_fmt(
+            "update.reinstall.github_releases",
+            &[("repo", crate::version::GH_RELEASE_REPO)],
         ),
-        "npm" => {
-            "This fork updates through GitHub Releases, not the official npm package.".to_string()
-        }
-        _ => format!("Please reinstall manually:\n  {}", manual_install_cmd()),
+        "npm" => t("update.reinstall.npm_uses_github").to_string(),
+        _ => t_fmt(
+            "update.reinstall.manual",
+            &[("command", manual_install_cmd())],
+        ),
     }
 }
 
@@ -68,36 +67,66 @@ pub fn print_update_status(status: &UpdateStatus, json: bool) -> anyhow::Result<
 
     if let Some(error) = status.error.as_deref() {
         println!(
-            "Grok Build - v{} [{}]",
-            status.current_version, status.channel
+            "{}",
+            t_fmt(
+                "update.status.header_channel",
+                &[
+                    ("current", status.current_version.as_str()),
+                    ("channel", status.channel.as_str()),
+                ],
+            )
         );
-        println!("Update check failed: {error}");
+        println!(
+            "{}",
+            t_fmt("update.status.check_failed", &[("error", error)])
+        );
         return Ok(());
     }
-
-    let channel_label = format!(" [{}]", status.channel);
 
     if status.update_available {
         if let Some(latest_version) = status.latest_version.as_deref() {
             println!(
-                "A new version of Grok Build is available: {} -> {}{}",
-                status.current_version, latest_version, channel_label
+                "{}",
+                t_fmt(
+                    "update.available.with_versions",
+                    &[
+                        ("current", status.current_version.as_str()),
+                        ("latest", latest_version),
+                        ("channel", status.channel.as_str()),
+                    ],
+                )
             );
         } else {
-            println!("A new version of Grok Build is available.");
+            println!("{}", t("update.available.generic"));
         }
         return Ok(());
     }
 
     if let Some(latest_version) = status.latest_version.as_deref() {
         println!(
-            "Grok Build - v{} (latest: {}){}",
-            status.current_version, latest_version, channel_label
+            "{}",
+            t_fmt(
+                "update.status.current_latest_channel",
+                &[
+                    ("current", status.current_version.as_str()),
+                    ("latest", latest_version),
+                    ("channel", status.channel.as_str()),
+                ],
+            )
         );
         return Ok(());
     }
 
-    println!("Grok Build - v{}{}", status.current_version, channel_label);
+    println!(
+        "{}",
+        t_fmt(
+            "update.status.current_channel",
+            &[
+                ("current", status.current_version.as_str()),
+                ("channel", status.channel.as_str()),
+            ],
+        )
+    );
     Ok(())
 }
 
@@ -133,15 +162,21 @@ pub async fn check_update_status(update_config: &UpdateConfig) -> UpdateStatus {
                         let parse_ok = semver::Version::parse(&current_version).is_ok()
                             && semver::Version::parse(&latest_version).is_ok();
                         error = Some(if parse_ok {
-                            format!(
-                                "Unsupported release channel '{}' (current={}, latest={}). \
-                             Supported channels: fork, stable, alpha, enterprise.",
-                                channel, current_version, latest_version
+                            t_fmt(
+                                "update.error.unsupported_status_channel",
+                                &[
+                                    ("channel", channel.as_str()),
+                                    ("current", current_version.as_str()),
+                                    ("latest", latest_version.as_str()),
+                                ],
                             )
                         } else {
-                            format!(
-                                "Failed to parse versions (current={}, latest={})",
-                                current_version, latest_version
+                            t_fmt(
+                                "update.error.parse_status_versions",
+                                &[
+                                    ("current", current_version.as_str()),
+                                    ("latest", latest_version.as_str()),
+                                ],
                             )
                         });
                         false
@@ -541,23 +576,31 @@ pub async fn run_update_if_available(
         return Ok(false);
     }
 
-    let channel_label = format!(" [{}]", update_config.channel);
     if auto_update {
         eprintln!(
-            "A new version of Grok Build is available: {} -> {}{}",
-            current_version, latest_version, channel_label
+            "{}",
+            t_fmt(
+                "update.available.with_versions",
+                &[
+                    ("current", current_version.as_str()),
+                    ("latest", latest_version.as_str()),
+                    ("channel", update_config.channel.as_str()),
+                ],
+            )
         );
         if interactive {
             if let Err(e) = run_update_subcommand(run_mode).await {
-                eprintln!("Update failed: {}", e);
+                let error = e.to_string();
+                eprintln!("{}", t_fmt("update.failed", &[("error", error.as_str())]));
             } else if matches!(run_mode, UpdateRunMode::Blocking) {
                 return Ok(true);
             } else {
-                eprintln!("{}", MSG_AUTO_UPDATE_BACKGROUND);
+                eprintln!("{}", t("update.background_running"));
                 return Ok(false);
             }
         } else if let Err(e) = run_update_subcommand(run_mode).await {
-            eprintln!("Update failed: {}", e);
+            let error = e.to_string();
+            eprintln!("{}", t_fmt("update.failed", &[("error", error.as_str())]));
         } else if matches!(run_mode, UpdateRunMode::Blocking) {
             return Ok(true);
         }
@@ -572,21 +615,29 @@ pub async fn run_update_if_available(
             return Ok(false);
         }
         eprintln!(
-            "A new version of Grok Build is available: {} -> {}{}",
-            current_version, latest_version, channel_label
+            "{}",
+            t_fmt(
+                "update.available.with_versions",
+                &[
+                    ("current", current_version.as_str()),
+                    ("latest", latest_version.as_str()),
+                    ("channel", update_config.channel.as_str()),
+                ],
+            )
         );
         if interactive {
-            eprintln!("{}", PROMPT_UPDATE_NOW);
+            eprintln!("{}", t("update.prompt.now"));
             let mut line = String::new();
             if io::stdin().read_line(&mut line).is_ok() {
                 let ans = line.trim().to_ascii_lowercase();
                 if ans.is_empty() || ans == "y" || ans == "yes" {
                     if let Err(e) = run_update_subcommand(run_mode).await {
-                        eprintln!("Update failed: {}", e);
+                        let error = e.to_string();
+                        eprintln!("{}", t_fmt("update.failed", &[("error", error.as_str())]));
                     } else if matches!(run_mode, UpdateRunMode::Blocking) {
                         return Ok(true);
                     } else {
-                        eprintln!("{}", MSG_AUTO_UPDATE_BACKGROUND);
+                        eprintln!("{}", t("update.background_running"));
                         return Ok(false);
                     }
                 } else if ans == "d" || ans == "dismiss" {
@@ -601,7 +652,7 @@ pub async fn run_update_if_available(
                 }
             }
         } else {
-            eprintln!("{}", MSG_RUN_UPDATE_MANUAL);
+            eprintln!("{}", t("update.run_manual"));
         }
     }
     Ok(false)
@@ -638,7 +689,11 @@ async fn run_update_subcommand(run_mode: UpdateRunMode) -> Result<Option<tokio::
             // No detach: the child must stay in the foreground process group so Ctrl+C cancels it with the parent; the atomic install protocol makes mid-download kills safe.
             let status = cmd.status().await?;
             if !status.success() {
-                anyhow::bail!("grok update failed with {}", status);
+                let status = status.to_string();
+                anyhow::bail!(t_fmt(
+                    "update.error.command_failed",
+                    &[("status", status.as_str())],
+                ));
             }
             Ok(None)
         }
@@ -677,7 +732,7 @@ pub fn restart_grok() -> Result<()> {
     }
     cmd.env_clear();
     cmd.envs(std::env::vars_os().filter(|(k, _)| k != "GROK_AUTO_UPDATE"));
-    eprintln!("Restarting Grok...");
+    eprintln!("{}", t("update.restarting"));
 
     // Use exec on Unix to replace the current process, avoiding stdio issues
     // when the parent exits. On Windows, fall back to spawn + exit.
@@ -688,7 +743,11 @@ pub fn restart_grok() -> Result<()> {
         let _ = io::stderr().flush();
         let err = cmd.exec();
         // exec only returns if there was an error
-        anyhow::bail!("Failed to exec: {}", err);
+        let error = err.to_string();
+        anyhow::bail!(t_fmt(
+            "update.error.exec_failed",
+            &[("error", error.as_str())],
+        ));
     }
 
     #[cfg(not(unix))]
@@ -722,11 +781,12 @@ pub async fn run_install_script(
         remove_stale_models_cache().await;
     }
     result.map_err(|e| {
-        anyhow::anyhow!(
-            "Auto-update failed: {:#}\n\n{}",
-            e,
-            reinstall_hint(installer)
-        )
+        let error = format!("{e:#}");
+        let hint = reinstall_hint(installer);
+        anyhow::anyhow!(t_fmt(
+            "update.auto_update_failed",
+            &[("error", error.as_str()), ("hint", hint.as_str())],
+        ))
     })
 }
 
@@ -739,14 +799,14 @@ pub(crate) fn detect_platform() -> Result<(&'static str, &'static str)> {
     } else if cfg!(target_os = "windows") {
         "windows"
     } else {
-        anyhow::bail!("Unsupported OS");
+        anyhow::bail!(t("update.error.unsupported_os"));
     };
     let arch = if cfg!(target_arch = "x86_64") {
         "x86_64"
     } else if cfg!(target_arch = "aarch64") {
         "aarch64"
     } else {
-        anyhow::bail!("Unsupported architecture");
+        anyhow::bail!(t("update.error.unsupported_architecture"));
     };
     Ok((os, arch))
 }
@@ -972,7 +1032,11 @@ pub async fn download_with_progress(url: &str, dest: &std::path::Path) -> Result
     let resp = client.get(url).send().await?;
 
     if !resp.status().is_success() {
-        anyhow::bail!("Download failed: HTTP {}", resp.status());
+        let status = resp.status().to_string();
+        anyhow::bail!(t_fmt(
+            "update.error.download_failed_http",
+            &[("status", status.as_str())],
+        ));
     }
 
     let total_size = resp.content_length();
@@ -990,7 +1054,7 @@ pub async fn download_with_progress(url: &str, dest: &std::path::Path) -> Result
         let pb = ProgressBar::new_spinner();
         pb.set_style(
             ProgressStyle::default_spinner()
-                .template("  {spinner:.cyan} {bytes} downloaded")
+                .template(t("update.progress.bytes_downloaded"))
                 .unwrap(),
         );
         pb.enable_steady_tick(Duration::from_millis(100));
@@ -1032,7 +1096,11 @@ pub async fn download_silent(url: &str, dest: &std::path::Path) -> Result<()> {
     let resp = client.get(url).send().await?;
 
     if !resp.status().is_success() {
-        anyhow::bail!("Download failed: HTTP {}", resp.status());
+        let status = resp.status().to_string();
+        anyhow::bail!(t_fmt(
+            "update.error.download_failed_http",
+            &[("status", status.as_str())],
+        ));
     }
 
     let tmp = tmp_download_path(dest);
@@ -1146,7 +1214,7 @@ pub async fn install_internal_from_bases(
             }
         }
     }
-    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("no CLI base URLs to try")))
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!(t("update.error.no_base_urls"))))
 }
 
 const SMOKE_TEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -1221,8 +1289,12 @@ async fn download_verified_from_base(
 
     let version = match target {
         Some(v) => {
-            semver::Version::parse(v)
-                .map_err(|_| anyhow::anyhow!("invalid version format: '{}'", v))?;
+            semver::Version::parse(v).map_err(|_| {
+                anyhow::anyhow!(t_fmt(
+                    "update.error.invalid_version_format",
+                    &[("version", v)],
+                ))
+            })?;
             v.to_string()
         }
         None => {
@@ -1238,7 +1310,16 @@ async fn download_verified_from_base(
     let binary_name = format!("grok-{}-{}", version, platform);
     let binary_path = download_dir.join(&binary_name);
 
-    eprintln!("  Downloading grok v{} ({})...", version, platform);
+    eprintln!(
+        "{}",
+        t_fmt(
+            "update.downloading",
+            &[
+                ("version", version.as_str()),
+                ("platform", platform.as_str())
+            ],
+        )
+    );
 
     // Published already +x (see `publish_downloaded_artifact`).
     download_cli_artifact_from_gcs(gcs_base_url, &binary_name, &binary_path, true).await?;
@@ -1248,12 +1329,10 @@ async fn download_verified_from_base(
     if !smoke_test_binary(&binary_path).await {
         let _ = tokio::fs::remove_file(&binary_path).await;
         // No prefix: run_install_script's wrap adds "Auto-update failed:".
-        anyhow::bail!(
-            "downloaded binary failed to run.\n\
-             Your current version is unchanged.\n\
-             To update manually: {}",
-            manual_install_cmd()
-        );
+        anyhow::bail!(t_fmt(
+            "update.error.downloaded_binary_failed",
+            &[("command", manual_install_cmd())],
+        ));
     }
 
     Ok(VerifiedDownload {
@@ -1727,11 +1806,12 @@ async fn windows_replace_exe(src: &std::path::Path, dest: &std::path::Path) -> R
         }
     }
     rename_result.map_err(|e| {
-        anyhow::anyhow!(
-            "cannot rename locked executable {}: {e}\n\
-             Close all running grok sessions and retry.",
-            dest.display(),
-        )
+        let path = dest.display().to_string();
+        let error = e.to_string();
+        anyhow::anyhow!(t_fmt(
+            "update.error.rename_locked_executable",
+            &[("path", path.as_str()), ("error", error.as_str())],
+        ))
     })?;
     match tokio::fs::copy(src, dest).await {
         Ok(_) => Ok(()),
@@ -2011,7 +2091,12 @@ pub(crate) fn parse_release_checksum(checksums: &str, asset_name: &str) -> Resul
         .filter(|checksum| {
             checksum.len() == 64 && checksum.bytes().all(|byte| byte.is_ascii_hexdigit())
         })
-        .ok_or_else(|| anyhow::anyhow!("SHA256SUMS has no valid entry for '{asset_name}'"))
+        .ok_or_else(|| {
+            anyhow::anyhow!(t_fmt(
+                "update.error.checksum_entry_missing",
+                &[("asset", asset_name)],
+            ))
+        })
 }
 
 async fn sha256_file(path: &std::path::Path) -> Result<String> {
@@ -2042,8 +2127,14 @@ async fn install_gh_release(target: Option<&str>, channel: &str) -> Result<()> {
     let binary_path = download_dir.join(&binary_name);
 
     eprintln!(
-        "  Downloading grok v{} ({}) from GitHub Releases...",
-        version, platform
+        "{}",
+        t_fmt(
+            "update.downloading_github",
+            &[
+                ("version", version.as_str()),
+                ("platform", platform.as_str())
+            ],
+        )
     );
 
     let asset_url = crate::version::github_release_asset_url(&version, &binary_name).await?;
@@ -2063,12 +2154,14 @@ async fn install_gh_release(target: Option<&str>, channel: &str) -> Result<()> {
         let expected_checksum = parse_release_checksum(&checksums, &binary_name)?;
         let actual_checksum = sha256_file(&binary_path).await?;
         if actual_checksum != expected_checksum {
-            anyhow::bail!(
-                "SHA-256 mismatch for '{}': expected {}, got {}",
-                binary_name,
-                expected_checksum,
-                actual_checksum
-            );
+            anyhow::bail!(t_fmt(
+                "update.error.checksum_mismatch",
+                &[
+                    ("asset", binary_name.as_str()),
+                    ("expected", expected_checksum.as_str()),
+                    ("actual", actual_checksum.as_str()),
+                ],
+            ));
         }
 
         // chmod +x before the smoke test on Unix.
@@ -2080,7 +2173,7 @@ async fn install_gh_release(target: Option<&str>, channel: &str) -> Result<()> {
         }
 
         if !smoke_test_binary_version(&binary_path, Some(&version)).await {
-            anyhow::bail!("downloaded GitHub Release binary failed version smoke test");
+            anyhow::bail!(t("update.error.github_binary_smoke_test_failed"));
         }
         Ok::<(), anyhow::Error>(())
     }
@@ -2195,13 +2288,12 @@ fn warn_if_other_grok_processes_running() {
             .filter(|pid| !pid.is_empty() && *pid != my_pid)
             .collect();
         if !other_pids.is_empty() {
+            let count = other_pids.len().to_string();
             eprintln!(
-                "  ⚠ Warning: {} other grok process(es) detected.",
-                other_pids.len()
+                "{}",
+                t_fmt("update.npm.process_warning", &[("count", count.as_str())])
             );
-            eprintln!("    Processes running from the npm vendored binary path may be");
-            eprintln!("    killed by macOS when npm replaces the package files.");
-            eprintln!("    Consider closing other grok sessions before updating.");
+            eprintln!("{}", t("update.npm.process_warning_detail"));
             eprintln!();
         }
     }
@@ -2248,7 +2340,7 @@ fn install_npm(target: Option<&str>, channel: &str, npm_registry: Option<&str>) 
     let pb = ProgressBar::new_spinner();
     pb.set_style(
         ProgressStyle::default_spinner()
-            .template("  {spinner:.cyan} Installing via npm...")
+            .template(t("update.progress.installing_npm"))
             .unwrap(),
     );
     pb.enable_steady_tick(Duration::from_millis(100));
@@ -2281,7 +2373,7 @@ fn install_npm(target: Option<&str>, channel: &str, npm_registry: Option<&str>) 
     pb.finish_and_clear();
 
     if !status.success() {
-        anyhow::bail!("npm install failed. Please try again.");
+        anyhow::bail!(t("update.error.npm_install_failed"));
     }
     eprintln!();
     Ok(())
@@ -2296,7 +2388,7 @@ pub async fn apply_channel_switch(channel_switch: Option<&str>, update_config: &
         })
         .await;
         update_config.channel = ch.to_string();
-        eprintln!("Switched to {} channel.", ch);
+        eprintln!("{}", t_fmt("update.channel_switched", &[("channel", ch)]));
     }
 }
 
@@ -2318,7 +2410,7 @@ pub async fn run_update(
     let installer = match get_installer().await {
         Some(i) => i,
         None => {
-            eprintln!("Auto-update is not available for manual installations.");
+            eprintln!("{}", t("update.manual_install.unavailable"));
             return Ok(None);
         }
     };
@@ -2342,8 +2434,11 @@ pub async fn run_update(
             anyhow::bail!("{e}");
         }
         eprintln!(
-            "Installing Grok {} (current: {})...",
-            version, current_version
+            "{}",
+            t_fmt(
+                "update.installing_version",
+                &[("version", version), ("current", current_version.as_str())],
+            )
         );
         eprintln!();
         run_install_script(installer, Some(version), update_config).await?;
@@ -2355,15 +2450,18 @@ pub async fn run_update(
         {
             tracing::warn!("Failed to persist auto_update=false for pinned install: {e}");
         }
-        eprintln!("  ✓ grok v{} installed successfully!", version);
-        eprintln!("  Please restart Grok.");
+        eprintln!(
+            "{}",
+            t_fmt("update.installed_successfully", &[("version", version)])
+        );
+        eprintln!("{}", t("update.restart_required"));
         return Ok(Some(version.to_string()));
     }
 
     let pb = ProgressBar::new_spinner();
     pb.set_style(
         ProgressStyle::default_spinner()
-            .template("  {spinner:.cyan} Checking for updates...")
+            .template(t("update.progress.checking"))
             .unwrap(),
     );
     pb.enable_steady_tick(Duration::from_millis(100));
@@ -2376,9 +2474,14 @@ pub async fn run_update(
     };
     if install_target != latest_version {
         eprintln!(
-            "Latest available is {} but the configured minimum is higher; \
-             installing {} instead.",
-            latest_version, install_target
+            "{}",
+            t_fmt(
+                "update.minimum_overrides_latest",
+                &[
+                    ("latest", latest_version.as_str()),
+                    ("minimum", install_target.as_str()),
+                ],
+            )
         );
     }
 
@@ -2409,7 +2512,13 @@ pub async fn run_update(
                 } else {
                     let stable_ptr = try_fetch_stable_pointer().await;
                     write_version_cache(&install_target, stable_ptr.as_deref()).await;
-                    eprintln!("Already up to date ({}).", effective_current);
+                    eprintln!(
+                        "{}",
+                        t_fmt(
+                            "update.already_up_to_date",
+                            &[("version", effective_current.as_str())],
+                        )
+                    );
                     // Retry if a prior sync failed.
                     refresh_deployment_config().await;
                     // The target is on disk even though this call installed
@@ -2424,20 +2533,22 @@ pub async fn run_update(
                 let parse_ok = semver::Version::parse(&effective_current).is_ok()
                     && semver::Version::parse(&install_target).is_ok();
                 if parse_ok {
-                    anyhow::bail!(
-                        "Unsupported release channel '{}' (current={}, target={}). \
-                         Supported channels: stable, alpha, enterprise. \
-                         Use --stable or --alpha to override, or set [cli] channel in config.toml.",
-                        update_config.channel,
-                        effective_current,
-                        install_target
-                    );
+                    anyhow::bail!(t_fmt(
+                        "update.error.unsupported_channel",
+                        &[
+                            ("channel", update_config.channel.as_str()),
+                            ("current", effective_current.as_str()),
+                            ("target", install_target.as_str()),
+                        ],
+                    ));
                 } else {
-                    anyhow::bail!(
-                        "Failed to parse versions (current={}, target={})",
-                        effective_current,
-                        install_target
-                    );
+                    anyhow::bail!(t_fmt(
+                        "update.error.parse_versions",
+                        &[
+                            ("current", effective_current.as_str()),
+                            ("target", install_target.as_str()),
+                        ],
+                    ));
                 }
             }
         }
@@ -2453,12 +2564,24 @@ pub async fn run_update(
         .unwrap_or(true)
     {
         eprintln!(
-            "Forcing reinstall of Grok {} (already up to date)",
-            effective_current
+            "{}",
+            t_fmt(
+                "update.forcing_reinstall",
+                &[("version", effective_current.as_str())],
+            )
         );
         &effective_current
     } else {
-        eprintln!("Updating Grok {} → {}", effective_current, install_target);
+        eprintln!(
+            "{}",
+            t_fmt(
+                "update.updating",
+                &[
+                    ("current", effective_current.as_str()),
+                    ("target", install_target.as_str()),
+                ],
+            )
+        );
         &install_target
     };
 
@@ -2470,10 +2593,16 @@ pub async fn run_update(
     let stable_ptr = try_fetch_stable_pointer().await;
     write_version_cache(target_version, stable_ptr.as_deref()).await;
     refresh_deployment_config().await;
-    eprintln!("  ✓ grok v{} installed successfully!", target_version);
+    eprintln!(
+        "{}",
+        t_fmt(
+            "update.installed_successfully",
+            &[("version", target_version)],
+        )
+    );
 
     if !force && std::env::var_os("GROK_AUTO_UPDATE").is_none() {
-        eprintln!("  Please restart Grok.");
+        eprintln!("{}", t("update.restart_required"));
     }
     Ok(Some(target_version.to_string()))
 }
@@ -2495,15 +2624,21 @@ async fn refresh_deployment_config() {
         return;
     }
     match xai_grok_shell::managed_config::sync().await {
-        Ok(true) => eprintln!("  Applied managed configuration."),
+        Ok(true) => eprintln!("{}", t("update.managed_config.applied")),
         Ok(false) => tracing::debug!("no managed configuration to apply"),
         // Auth issues aren't actionable mid-update: quiet here, loud on `grok setup`.
         Err(e) if e.is_auth_rejection() => tracing::debug!("managed config not applied: {e}"),
         Err(e) if e.is_retryable() => {
             tracing::debug!("managed config refresh failed: {e}");
-            eprintln!("  Couldn't apply managed configuration. Run `grok setup` to retry.");
+            eprintln!("{}", t("update.managed_config.retry"));
         }
-        Err(e) => eprintln!("  Couldn't apply managed configuration. {e}"),
+        Err(e) => {
+            let error = e.to_string();
+            eprintln!(
+                "{}",
+                t_fmt("update.managed_config.failed", &[("error", error.as_str())],)
+            );
+        }
     }
 }
 
@@ -4274,23 +4409,6 @@ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb *grok-0.2.105-f
         assert!(matches!(m3, UpdateRunMode::Blocking));
         // Debug exists.
         let _ = format!("{:?}", UpdateRunMode::NonBlocking);
-    }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Constants — lock them in so silent renames are caught.
-    // ──────────────────────────────────────────────────────────────────────
-
-    #[test]
-    fn test_user_facing_constants_are_stable() {
-        assert_eq!(PROMPT_UPDATE_NOW, "Update now? [Y/n/d]");
-        assert_eq!(
-            MSG_AUTO_UPDATE_BACKGROUND,
-            "Auto-update running in background."
-        );
-        assert_eq!(
-            MSG_RUN_UPDATE_MANUAL,
-            "Run `grok update` to get the latest version."
-        );
     }
 
     // ──────────────────────────────────────────────────────────────────────

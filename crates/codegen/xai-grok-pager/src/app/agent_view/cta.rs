@@ -122,25 +122,37 @@ impl AgentView {
                 }
                 CtaPhase::Matched { name, .. } => (
                     vec![
-                        Span::styled("Install ", secondary),
+                        Span::styled(xai_grok_i18n::t("plugin.cta.install_prefix"), secondary),
                         Span::styled(name.clone(), name_style),
-                        Span::styled(" plugin?", secondary),
+                        Span::styled(xai_grok_i18n::t("plugin.cta.plugin_question"), secondary),
                     ],
-                    Some("[Install]"),
+                    Some(xai_grok_i18n::t("plugin.cta.install_button")),
                 ),
                 CtaPhase::Installing { name, .. } => (
                     vec![
-                        Span::styled(format!("{spinner} Installing "), secondary),
+                        Span::styled(
+                            format!(
+                                "{spinner} {}",
+                                xai_grok_i18n::t("plugin.cta.installing_prefix")
+                            ),
+                            secondary,
+                        ),
                         Span::styled(name.clone(), name_style),
-                        Span::styled(" plugin\u{2026}", secondary),
+                        Span::styled(xai_grok_i18n::t("plugin.cta.plugin_ellipsis"), secondary),
                     ],
                     None,
                 ),
                 CtaPhase::AwaitingReload { name } | CtaPhase::AwaitingMcps { name } => (
                     vec![
-                        Span::styled(format!("{spinner} Setting up "), secondary),
+                        Span::styled(
+                            format!(
+                                "{spinner} {}",
+                                xai_grok_i18n::t("plugin.cta.setting_up_prefix")
+                            ),
+                            secondary,
+                        ),
                         Span::styled(name.clone(), name_style),
-                        Span::styled(" plugin\u{2026}", secondary),
+                        Span::styled(xai_grok_i18n::t("plugin.cta.plugin_ellipsis"), secondary),
                     ],
                     None,
                 ),
@@ -148,7 +160,10 @@ impl AgentView {
                     vec![
                         Span::styled(name.clone(), name_style),
                         Span::styled(
-                            format!(" plugin installed {}", crate::glyphs::check_mark()),
+                            xai_grok_i18n::t_fmt(
+                                "plugin.cta.installed_suffix",
+                                &[("check", crate::glyphs::check_mark())],
+                            ),
                             secondary,
                         ),
                     ],
@@ -156,11 +171,11 @@ impl AgentView {
                 ),
                 CtaPhase::Error { name, .. } => (
                     vec![
-                        Span::styled("Couldn't install ", secondary),
+                        Span::styled(xai_grok_i18n::t("plugin.cta.error_prefix"), secondary),
                         Span::styled(name.clone(), name_style),
-                        Span::styled(" plugin", secondary),
+                        Span::styled(xai_grok_i18n::t("plugin.cta.plugin"), secondary),
                     ],
-                    Some("[Retry]"),
+                    Some(xai_grok_i18n::t("plugin.cta.retry_button")),
                 ),
             };
 

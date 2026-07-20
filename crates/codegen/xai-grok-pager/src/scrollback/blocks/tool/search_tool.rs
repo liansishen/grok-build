@@ -131,12 +131,18 @@ impl SearchToolCallBlock {
             theme.fg(theme.command)
         };
 
-        let prefix = "Search Tools ";
+        let prefix = xai_grok_i18n::t("tool.prefix.search_tools");
 
         match max_width {
             Some(w) => {
-                let s = if self.result_count == 1 { "" } else { "s" };
-                let suffix = format!(" ({} result{s})", self.result_count);
+                let suffix = xai_grok_i18n::t_fmt(
+                    if self.result_count == 1 {
+                        "tool.search_tool.one_result"
+                    } else {
+                        "tool.search_tool.many_results"
+                    },
+                    &[("count", &self.result_count.to_string())],
+                );
 
                 let suffix_fits = prefix.len() + suffix.len() < w;
                 let effective_suffix = if suffix_fits { &suffix } else { "" };
@@ -240,7 +246,11 @@ impl BlockContent for SearchToolCallBlock {
                 } else if self.error.is_none() {
                     lines.push(Line::from("").into());
                     lines.push(
-                        Line::from(Span::styled("  (no results found)", theme.muted())).into(),
+                        Line::from(Span::styled(
+                            xai_grok_i18n::t("tool.search_tool.no_results"),
+                            theme.muted(),
+                        ))
+                        .into(),
                     );
                 }
 

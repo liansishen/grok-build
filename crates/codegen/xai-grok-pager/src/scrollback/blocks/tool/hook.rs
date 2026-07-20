@@ -90,7 +90,10 @@ fn hooks_count_spans(success: usize, failed: usize) -> Option<Vec<Span<'static>>
         return None;
     }
     let theme = Theme::current();
-    let mut spans = vec![Span::styled("  [hooks: ", theme.muted())];
+    let mut spans = vec![Span::styled(
+        xai_grok_i18n::t("tool.hooks.count_prefix"),
+        theme.muted(),
+    )];
     if success > 0 {
         spans.push(Span::styled(
             format!("{}", success),
@@ -110,7 +113,10 @@ fn hooks_count_spans(success: usize, failed: usize) -> Option<Vec<Span<'static>>
                 .add_modifier(ratatui::style::Modifier::DIM),
         ));
     }
-    spans.push(Span::styled("]", theme.muted()));
+    spans.push(Span::styled(
+        xai_grok_i18n::t("tool.hooks.count_suffix"),
+        theme.muted(),
+    ));
     Some(spans)
 }
 
@@ -215,7 +221,13 @@ fn render_hooks_expanded_inner(runs: &[HookRunEntry]) -> Vec<BlockLine> {
                             theme.fg(theme.accent_success),
                         ),
                         Span::styled(run.name.clone(), theme.muted()),
-                        Span::styled(format!(" ({}ms)", elapsed.as_millis()), theme.muted()),
+                        Span::styled(
+                            xai_grok_i18n::t_fmt(
+                                "tool.hooks.elapsed_ms",
+                                &[("count", &elapsed.as_millis().to_string())],
+                            ),
+                            theme.muted(),
+                        ),
                     ])
                     .into(),
                 );
@@ -226,7 +238,7 @@ fn render_hooks_expanded_inner(runs: &[HookRunEntry]) -> Vec<BlockLine> {
                         Span::styled(format!("{}  ", INDENT), theme.muted()),
                         Span::styled("- ", theme.muted()),
                         Span::styled(run.name.clone(), theme.muted()),
-                        Span::styled(" skipped", theme.muted()),
+                        Span::styled(xai_grok_i18n::t("tool.hooks.skipped"), theme.muted()),
                     ])
                     .into(),
                 );
@@ -240,7 +252,13 @@ fn render_hooks_expanded_inner(runs: &[HookRunEntry]) -> Vec<BlockLine> {
                             theme.fg(theme.accent_error),
                         ),
                         Span::styled(run.name.clone(), theme.muted()),
-                        Span::styled(format!(" ({}ms)", elapsed.as_millis()), theme.muted()),
+                        Span::styled(
+                            xai_grok_i18n::t_fmt(
+                                "tool.hooks.elapsed_ms",
+                                &[("count", &elapsed.as_millis().to_string())],
+                            ),
+                            theme.muted(),
+                        ),
                     ])
                     .into(),
                 );

@@ -71,9 +71,9 @@ impl RewindMode {
 
     pub fn display(&self) -> &'static str {
         match self {
-            Self::All => "all",
-            Self::ConversationOnly => "conversation only",
-            Self::FilesOnly => "files only",
+            Self::All => xai_grok_i18n::t("rewind.mode.all"),
+            Self::ConversationOnly => xai_grok_i18n::t("rewind.mode.conversation_only"),
+            Self::FilesOnly => xai_grok_i18n::t("rewind.mode.files_only"),
         }
     }
 }
@@ -132,10 +132,10 @@ pub struct ConflictDisplay {
 impl ConflictDisplay {
     pub fn from_conflict(c: &RewindConflictInfo) -> Self {
         let label = match c.conflict_type.as_str() {
-            "deleted_externally" => "deleted",
-            "created_externally" => "added",
-            "modified_externally" => "modified",
-            _ => "conflict",
+            "deleted_externally" => xai_grok_i18n::t("rewind.conflict.deleted"),
+            "created_externally" => xai_grok_i18n::t("rewind.conflict.added"),
+            "modified_externally" => xai_grok_i18n::t("rewind.conflict.modified"),
+            _ => xai_grok_i18n::t("rewind.conflict.conflict"),
         };
         Self {
             path: c.path.clone(),
@@ -608,7 +608,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 content_x,
                 y,
                 &Line::from(Span::styled(
-                    "Loading rewind points...",
+                    xai_grok_i18n::t("rewind.loading_points"),
                     Style::default().fg(theme.gray),
                 )),
                 content_w,
@@ -622,35 +622,45 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 len: points.len(),
                 selected: *selected,
             }
-            .render(buf, area, "Rewind to which turn?", focused, |i, ctx| {
-                let point = &points[i];
-                let dot_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
-                let preview: String = crate::render::line_utils::truncate_str(
-                    point.prompt_preview.as_deref().unwrap_or("(no preview)"),
-                    ctx.content_width.saturating_sub(8) as usize,
-                );
-                let text_style = Style::default()
-                    .fg(theme.text_primary)
-                    .bg(ctx.row_bg)
-                    .add_modifier(if ctx.is_cursor {
-                        Modifier::BOLD
+            .render(
+                buf,
+                area,
+                xai_grok_i18n::t("rewind.pick_turn"),
+                focused,
+                |i, ctx| {
+                    let point = &points[i];
+                    let dot_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
+                    let preview: String = crate::render::line_utils::truncate_str(
+                        point
+                            .prompt_preview
+                            .as_deref()
+                            .unwrap_or_else(|| xai_grok_i18n::t("rewind.no_preview")),
+                        ctx.content_width.saturating_sub(8) as usize,
+                    );
+                    let text_style = Style::default()
+                        .fg(theme.text_primary)
+                        .bg(ctx.row_bg)
+                        .add_modifier(if ctx.is_cursor {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        });
+                    let meta_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
+
+                    let file_info = if point.has_file_changes {
+                        let count = point.num_file_snapshots.to_string();
+                        xai_grok_i18n::t_fmt("rewind.file_count", &[("count", &count)])
                     } else {
-                        Modifier::empty()
-                    });
-                let meta_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
+                        String::new()
+                    };
 
-                let file_info = if point.has_file_changes {
-                    format!(" \u{00B7} {} files", point.num_file_snapshots)
-                } else {
-                    String::new()
-                };
-
-                Line::from(vec![
-                    Span::styled("\u{00B7} ", dot_style),
-                    Span::styled(preview, text_style),
-                    Span::styled(file_info, meta_style),
-                ])
-            });
+                    Line::from(vec![
+                        Span::styled("\u{00B7} ", dot_style),
+                        Span::styled(preview, text_style),
+                        Span::styled(file_info, meta_style),
+                    ])
+                },
+            );
             return;
         }
         RewindPhase::CancelOffer { active_idx } => {
@@ -658,7 +668,10 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
             buf.set_line(
                 content_x,
                 y,
-                &Line::from(Span::styled("A turn is currently running.", title_style)),
+                &Line::from(Span::styled(
+                    xai_grok_i18n::t("rewind.turn_running"),
+                    title_style,
+                )),
                 content_w,
             );
             y += 1;
@@ -666,7 +679,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 content_x,
                 y,
                 &Line::from(Span::styled(
-                    "Would you like to cancel it before rewinding?",
+                    xai_grok_i18n::t("rewind.cancel_before_question"),
                     Style::default().fg(theme.gray),
                 )),
                 content_w,
@@ -678,7 +691,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 y,
                 content_w,
                 'y',
-                "Cancel turn and rewind",
+                xai_grok_i18n::t("rewind.cancel_and_rewind"),
                 true,
                 *active_idx == 0,
                 focused,
@@ -691,7 +704,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 y,
                 content_w,
                 'n',
-                "Let it finish",
+                xai_grok_i18n::t("rewind.let_finish"),
                 true,
                 *active_idx == 1,
                 focused,
@@ -708,9 +721,9 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
             // Inline edit-and-resubmit: the conversation rewind is a given —
             // the only question is whether files come along.
             let title = if *offer_files_only {
-                "What do you want to rewind?"
+                xai_grok_i18n::t("rewind.mode_question")
             } else {
-                "Resubmit from here \u{2014} what should be rewound?"
+                xai_grok_i18n::t("rewind.resubmit_question")
             };
             buf.set_line(
                 content_x,
@@ -725,7 +738,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 y,
                 content_w,
                 'a',
-                "Both conversation and file changes",
+                xai_grok_i18n::t("rewind.both_conversation_files"),
                 true,
                 *active_idx == 0,
                 focused,
@@ -740,7 +753,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 // Sequential lettering in the two-row inline variant; the
                 // mnemonic 'c' only reads right with the 'f' row present.
                 if *offer_files_only { 'c' } else { 'b' },
-                "Conversation only",
+                xai_grok_i18n::t("rewind.conversation_only"),
                 true,
                 *active_idx == 1,
                 focused,
@@ -754,7 +767,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                     y,
                     content_w,
                     'f',
-                    "File changes only",
+                    xai_grok_i18n::t("rewind.file_changes_only"),
                     *has_file_changes,
                     *active_idx == 2,
                     focused,
@@ -768,7 +781,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 content_x,
                 y,
                 &Line::from(Span::styled(
-                    "Previewing file changes...",
+                    xai_grok_i18n::t("rewind.previewing_files"),
                     Style::default().fg(theme.gray),
                 )),
                 content_w,
@@ -780,7 +793,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 content_x,
                 y,
                 &Line::from(Span::styled(
-                    "Rewinding...",
+                    xai_grok_i18n::t("rewind.rewinding"),
                     Style::default().fg(theme.gray),
                 )),
                 content_w,
@@ -796,35 +809,43 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
         } => {
             let mut y = area.y + 1;
             let file_total = clean_files.len() + conflicts.len();
-            let preview_text = prompt_preview.as_deref().unwrap_or("this turn");
+            let preview_text = prompt_preview
+                .as_deref()
+                .unwrap_or_else(|| xai_grok_i18n::t("rewind.this_turn"));
             let (prefix, suffix) = match mode {
                 RewindMode::All => {
                     if file_total > 0 {
                         (
-                            "Rewind file changes and conversation to \u{201C}",
-                            format!("\u{201D}? ({file_total} files)"),
+                            xai_grok_i18n::t("rewind.confirm_both_prefix"),
+                            xai_grok_i18n::t_fmt(
+                                "rewind.confirm_files_suffix",
+                                &[("count", &file_total.to_string())],
+                            ),
                         )
                     } else {
                         (
-                            "Rewind file changes and conversation to \u{201C}",
-                            "\u{201D}?".to_string(),
+                            xai_grok_i18n::t("rewind.confirm_both_prefix"),
+                            xai_grok_i18n::t("rewind.confirm_suffix").to_string(),
                         )
                     }
                 }
                 RewindMode::ConversationOnly => (
-                    "Rewind conversation only to \u{201C}",
-                    "\u{201D}?".to_string(),
+                    xai_grok_i18n::t("rewind.confirm_conversation_prefix"),
+                    xai_grok_i18n::t("rewind.confirm_suffix").to_string(),
                 ),
                 RewindMode::FilesOnly => {
                     if file_total > 0 {
                         (
-                            "Rewind file changes only to \u{201C}",
-                            format!("\u{201D}? ({file_total} files)"),
+                            xai_grok_i18n::t("rewind.confirm_files_prefix"),
+                            xai_grok_i18n::t_fmt(
+                                "rewind.confirm_files_suffix",
+                                &[("count", &file_total.to_string())],
+                            ),
                         )
                     } else {
                         (
-                            "Rewind file changes only to \u{201C}",
-                            "\u{201D}?".to_string(),
+                            xai_grok_i18n::t("rewind.confirm_files_prefix"),
+                            xai_grok_i18n::t("rewind.confirm_suffix").to_string(),
                         )
                     }
                 }
@@ -851,7 +872,8 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
 
             for (i, path) in clean_files.iter().enumerate() {
                 if i >= 5 {
-                    let more = format!("+{} more", clean_files.len() - 5);
+                    let count = (clean_files.len() - 5).to_string();
+                    let more = xai_grok_i18n::t_fmt("rewind.more", &[("count", &count)]);
                     buf.set_line(
                         content_x,
                         y,
@@ -874,7 +896,8 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
             }
             for (i, conflict) in conflicts.iter().enumerate() {
                 if i >= 5 {
-                    let more = format!("+{} more", conflicts.len() - 5);
+                    let count = (conflicts.len() - 5).to_string();
+                    let more = xai_grok_i18n::t_fmt("rewind.more", &[("count", &count)]);
                     buf.set_line(
                         content_x,
                         y,
@@ -904,7 +927,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 y,
                 content_w,
                 'y',
-                "Confirm rewind",
+                xai_grok_i18n::t("rewind.confirm"),
                 true,
                 *active_idx == 0,
                 focused,
@@ -917,7 +940,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 y,
                 content_w,
                 '\x08',
-                "Back",
+                xai_grok_i18n::t("rewind.back"),
                 true,
                 *active_idx == 1,
                 focused,
@@ -930,9 +953,11 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
             ..
         } => {
             let mut y = area.y + 1;
-            let preview_text = prompt_preview.as_deref().unwrap_or("this turn");
-            let prefix = "Rewind conversation only to \u{201C}";
-            let suffix = "\u{201D}?";
+            let preview_text = prompt_preview
+                .as_deref()
+                .unwrap_or_else(|| xai_grok_i18n::t("rewind.this_turn"));
+            let prefix = xai_grok_i18n::t("rewind.confirm_conversation_prefix");
+            let suffix = xai_grok_i18n::t("rewind.confirm_suffix");
             let chrome = prefix.chars().count() + suffix.chars().count();
             let max_preview = (content_w as usize).saturating_sub(chrome + 1);
             let preview_trunc: String = if preview_text.chars().count() > max_preview {
@@ -956,7 +981,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 content_x,
                 y,
                 &Line::from(Span::styled(
-                    "File effects from removed turns will be orphaned.",
+                    xai_grok_i18n::t("rewind.orphaned_file_effects"),
                     Style::default().fg(theme.warning),
                 )),
                 content_w,
@@ -968,7 +993,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 y,
                 content_w,
                 'y',
-                "Confirm rewind",
+                xai_grok_i18n::t("rewind.confirm"),
                 true,
                 *active_idx == 0,
                 focused,
@@ -981,7 +1006,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 y,
                 content_w,
                 '\x08',
-                "Back",
+                xai_grok_i18n::t("rewind.back"),
                 true,
                 *active_idx == 1,
                 focused,
@@ -994,7 +1019,7 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 content_x,
                 y,
                 &Line::from(Span::styled(
-                    "Rewind failed",
+                    xai_grok_i18n::t("rewind.failed"),
                     Style::default()
                         .fg(theme.accent_error)
                         .add_modifier(Modifier::BOLD),
@@ -1014,7 +1039,16 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
             );
             y += 1;
             render_radio_row(
-                buf, content_x, y, content_w, '\x1b', "Dismiss", true, true, focused, &theme,
+                buf,
+                content_x,
+                y,
+                content_w,
+                '\x1b',
+                xai_grok_i18n::t("rewind.dismiss"),
+                true,
+                true,
+                focused,
+                &theme,
             );
         }
     }

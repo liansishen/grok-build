@@ -255,6 +255,106 @@ pub fn verb_group_header_label(
     acc.into_label(theme)
 }
 
+impl VerbGroupKind {
+    fn i18n_key(self, running: bool, count: usize) -> &'static str {
+        let tense = if running { "running" } else { "done" };
+        let plurality = if count == 1 { "one" } else { "many" };
+        match (self, tense, plurality) {
+            (VerbGroupKind::File, "running", "one") => "scrollback.verb_group.file.running_one",
+            (VerbGroupKind::File, "running", _) => "scrollback.verb_group.file.running_many",
+            (VerbGroupKind::File, _, "one") => "scrollback.verb_group.file.done_one",
+            (VerbGroupKind::File, _, _) => "scrollback.verb_group.file.done_many",
+            (VerbGroupKind::Skill, "running", "one") => "scrollback.verb_group.skill.running_one",
+            (VerbGroupKind::Skill, "running", _) => "scrollback.verb_group.skill.running_many",
+            (VerbGroupKind::Skill, _, "one") => "scrollback.verb_group.skill.done_one",
+            (VerbGroupKind::Skill, _, _) => "scrollback.verb_group.skill.done_many",
+            (VerbGroupKind::Search, "running", "one") => "scrollback.verb_group.search.running_one",
+            (VerbGroupKind::Search, "running", _) => "scrollback.verb_group.search.running_many",
+            (VerbGroupKind::Search, _, "one") => "scrollback.verb_group.search.done_one",
+            (VerbGroupKind::Search, _, _) => "scrollback.verb_group.search.done_many",
+            (VerbGroupKind::Dir, "running", "one") => "scrollback.verb_group.dir.running_one",
+            (VerbGroupKind::Dir, "running", _) => "scrollback.verb_group.dir.running_many",
+            (VerbGroupKind::Dir, _, "one") => "scrollback.verb_group.dir.done_one",
+            (VerbGroupKind::Dir, _, _) => "scrollback.verb_group.dir.done_many",
+            (VerbGroupKind::WebFetch, "running", "one") => {
+                "scrollback.verb_group.web_fetch.running_one"
+            }
+            (VerbGroupKind::WebFetch, "running", _) => {
+                "scrollback.verb_group.web_fetch.running_many"
+            }
+            (VerbGroupKind::WebFetch, _, "one") => "scrollback.verb_group.web_fetch.done_one",
+            (VerbGroupKind::WebFetch, _, _) => "scrollback.verb_group.web_fetch.done_many",
+            (VerbGroupKind::WebSearch, "running", "one") => {
+                "scrollback.verb_group.web_search.running_one"
+            }
+            (VerbGroupKind::WebSearch, "running", _) => {
+                "scrollback.verb_group.web_search.running_many"
+            }
+            (VerbGroupKind::WebSearch, _, "one") => "scrollback.verb_group.web_search.done_one",
+            (VerbGroupKind::WebSearch, _, _) => "scrollback.verb_group.web_search.done_many",
+            (VerbGroupKind::MemorySearch, "running", "one") => {
+                "scrollback.verb_group.memory_search.running_one"
+            }
+            (VerbGroupKind::MemorySearch, "running", _) => {
+                "scrollback.verb_group.memory_search.running_many"
+            }
+            (VerbGroupKind::MemorySearch, _, "one") => {
+                "scrollback.verb_group.memory_search.done_one"
+            }
+            (VerbGroupKind::MemorySearch, _, _) => "scrollback.verb_group.memory_search.done_many",
+            (VerbGroupKind::IntegrationSearch, "running", "one") => {
+                "scrollback.verb_group.integration_search.running_one"
+            }
+            (VerbGroupKind::IntegrationSearch, "running", _) => {
+                "scrollback.verb_group.integration_search.running_many"
+            }
+            (VerbGroupKind::IntegrationSearch, _, "one") => {
+                "scrollback.verb_group.integration_search.done_one"
+            }
+            (VerbGroupKind::IntegrationSearch, _, _) => {
+                "scrollback.verb_group.integration_search.done_many"
+            }
+            (VerbGroupKind::Subagent, "running", "one") => {
+                "scrollback.verb_group.subagent.running_one"
+            }
+            (VerbGroupKind::Subagent, "running", _) => {
+                "scrollback.verb_group.subagent.running_many"
+            }
+            (VerbGroupKind::Subagent, _, "one") => "scrollback.verb_group.subagent.done_one",
+            (VerbGroupKind::Subagent, _, _) => "scrollback.verb_group.subagent.done_many",
+            (VerbGroupKind::Command, "running", "one") => {
+                "scrollback.verb_group.command.running_one"
+            }
+            (VerbGroupKind::Command, "running", _) => "scrollback.verb_group.command.running_many",
+            (VerbGroupKind::Command, _, "one") => "scrollback.verb_group.command.done_one",
+            (VerbGroupKind::Command, _, _) => "scrollback.verb_group.command.done_many",
+            (VerbGroupKind::EditFile, "running", "one") => {
+                "scrollback.verb_group.edit_file.running_one"
+            }
+            (VerbGroupKind::EditFile, "running", _) => {
+                "scrollback.verb_group.edit_file.running_many"
+            }
+            (VerbGroupKind::EditFile, _, "one") => "scrollback.verb_group.edit_file.done_one",
+            (VerbGroupKind::EditFile, _, _) => "scrollback.verb_group.edit_file.done_many",
+            (VerbGroupKind::McpCall, "running", "one") => {
+                "scrollback.verb_group.mcp_call.running_one"
+            }
+            (VerbGroupKind::McpCall, "running", _) => "scrollback.verb_group.mcp_call.running_many",
+            (VerbGroupKind::McpCall, _, "one") => "scrollback.verb_group.mcp_call.done_one",
+            (VerbGroupKind::McpCall, _, _) => "scrollback.verb_group.mcp_call.done_many",
+            (VerbGroupKind::OtherTool, "running", "one") => {
+                "scrollback.verb_group.other_tool.running_one"
+            }
+            (VerbGroupKind::OtherTool, "running", _) => {
+                "scrollback.verb_group.other_tool.running_many"
+            }
+            (VerbGroupKind::OtherTool, _, "one") => "scrollback.verb_group.other_tool.done_one",
+            (VerbGroupKind::OtherTool, _, _) => "scrollback.verb_group.other_tool.done_many",
+            _ => unreachable!("tense and plurality are fixed literals"),
+        }
+    }
+}
+
 /// Aggregated label for a truncation ("N more") header, describing the rows
 /// the fold hid — "Ran 6 commands, Read 2 files" — through the same bucket
 /// vocabulary as verb-group headers.
@@ -382,18 +482,24 @@ impl<'e> BucketAccumulator<'e> {
             } else {
                 bucket.sources.len()
             };
-            let segment = format!(
-                "{}{} {} {}",
-                if i == 0 { "" } else { ", " },
-                bucket.kind.verb(self.running),
-                count,
-                bucket.kind.noun(count)
-            );
+            let segment_key = bucket.kind.i18n_key(self.running, count);
+            let formatted = xai_grok_i18n::t_fmt(segment_key, &[("count", &count.to_string())]);
+            let segment = if i == 0 {
+                formatted
+            } else {
+                xai_grok_i18n::t_fmt(
+                    "scrollback.verb_group.next_segment",
+                    &[("segment", &formatted)],
+                )
+            };
             text.push_str(&segment);
             spans.push(Span::styled(segment, text_style));
         }
         if self.failed_count > 0 {
-            let suffix = format!(" · {} failed", self.failed_count);
+            let suffix = xai_grok_i18n::t_fmt(
+                "scrollback.verb_group.failed_suffix",
+                &[("count", &self.failed_count.to_string())],
+            );
             text.push_str(&suffix);
             spans.push(Span::styled(suffix, theme.fg(theme.accent_error)));
         }

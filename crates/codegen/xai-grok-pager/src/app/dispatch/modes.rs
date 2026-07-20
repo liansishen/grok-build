@@ -489,7 +489,9 @@ pub(super) fn permission_mode_toast(kind: crate::app::actions::PermissionModeKin
         PermissionModeKind::AlwaysApprove => yolo_toast(true),
         PermissionModeKind::Auto => xai_grok_i18n::t("toast.permission_mode_auto").to_string(),
         PermissionModeKind::Ask => xai_grok_i18n::t("toast.permission_mode_ask").to_string(),
-        PermissionModeKind::Default => xai_grok_i18n::t("toast.permission_mode_default").to_string(),
+        PermissionModeKind::Default => {
+            xai_grok_i18n::t("toast.permission_mode_default").to_string()
+        }
     }
 }
 

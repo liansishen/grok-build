@@ -5264,7 +5264,10 @@ mod tests {
     #[test]
     fn format_waiting_for_subject_matches_label_shape() {
         assert_eq!(format_waiting_for_subject("run tests"), "run tests…");
-        assert_eq!(format_waiting_for_subject("   "), xai_grok_i18n::t("turn.wait.task_output"));
+        assert_eq!(
+            format_waiting_for_subject("   "),
+            xai_grok_i18n::t("turn.wait.task_output")
+        );
     }
     /// A `task` ToolCall carrying the shell's `_meta.subagentBackground` flag.
     fn task_call_with_bg(id: &str, background: bool) -> acp::SessionUpdate {

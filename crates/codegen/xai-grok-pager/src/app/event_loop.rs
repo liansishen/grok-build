@@ -584,7 +584,7 @@ fn run_pending_suspends(
                     Instant::now(),
                 );
                 if first_timeout {
-                    report_suspend_wait(app, EDITOR_SUSPEND_WAIT);
+                    report_suspend_wait(app, xai_grok_i18n::t("toast.editor_suspend_wait"));
                     presenter.request_presentation(app, terminal, false);
                 }
                 return Ok(());
@@ -670,7 +670,7 @@ fn run_pending_suspends(
                     Instant::now(),
                 );
                 if first_timeout {
-                    report_suspend_wait(app, TRANSCRIPT_SUSPEND_WAIT);
+                    report_suspend_wait(app, xai_grok_i18n::t("toast.transcript_suspend_wait"));
                     presenter.request_presentation(app, terminal, false);
                 }
                 return Ok(());
@@ -746,9 +746,9 @@ pub(crate) async fn run(
         app.minimal_state.welcome_pending = true;
     }
     if term_state.relaunched_into_minimal && app.screen_mode.is_minimal() {
-        app.screen_mode_switch_hint = Some("Switched to minimal mode · /fullscreen to go back");
+        app.screen_mode_switch_hint = Some(xai_grok_i18n::t("toast.switched_minimal_mode"));
     } else if term_state.relaunched_into_fullscreen && !app.screen_mode.is_minimal() {
-        app.screen_mode_switch_hint = Some("Switched to fullscreen mode · /minimal to go back");
+        app.screen_mode_switch_hint = Some(xai_grok_i18n::t("toast.switched_fullscreen_mode"));
     }
     let remote_permission_mode = remote_settings
         .as_ref()
@@ -1455,9 +1455,7 @@ pub(crate) async fn run(
         let mins = app
             .current_ui
             .usage_refresh_interval_minutes
-            .unwrap_or(
-                crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT as u8,
-            )
+            .unwrap_or(crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT as u8)
             .clamp(
                 crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_MIN as u8,
                 crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_MAX as u8,
@@ -2372,8 +2370,9 @@ pub(crate) async fn run(
                             None,
                             Some(serde_json::json!({ "attempt": attempt })),
                         );
-                        app.show_toast(&format!(
-                            "Disconnected. Reconnecting... (attempt {attempt})"
+                        app.show_toast(&xai_grok_i18n::t_fmt(
+                            "toast.disconnected_reconnecting",
+                            &[("attempt", &attempt.to_string())],
                         ));
                         presenter.request(false);
                     }
@@ -2557,14 +2556,17 @@ pub(crate) async fn run(
                         reconnect_abort_handle = Some(join_handle.abort_handle());
 
                         app.show_toast(if any_reload {
-                            "Reconnected. Reloading session..."
+                            xai_grok_i18n::t("toast.reconnected_reloading_session")
                         } else {
-                            "Reconnected. Re-initializing..."
+                            xai_grok_i18n::t("toast.reconnected_reinitializing")
                         });
                         presenter.request(false);
                     }
                     ConnectionStatus::Failed { ref error } => {
-                        app.show_toast(&format!("Connection failed: {error}"));
+                        app.show_toast(&xai_grok_i18n::t_fmt(
+                            "toast.connection_failed",
+                            &[("error", error.as_str())],
+                        ));
                         presenter.request(false);
                     }
                     _ => {}

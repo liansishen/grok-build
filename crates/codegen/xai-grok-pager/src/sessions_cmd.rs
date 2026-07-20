@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Subcommand;
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_shell::agent::config::Config as AgentConfig;
 use xai_grok_shell::auth::{AuthManager, try_ensure_fresh_auth};
 use xai_grok_shell::session::merge::MergedSession;
@@ -12,23 +13,31 @@ pub struct SessionsArgs {
 
 #[derive(Debug, Subcommand, Clone)]
 enum SessionsCommand {
-    /// List recent sessions (same as search with no query)
+    #[command(about = t("cli.sessions.help.list"))]
     List {
-        /// Maximum number of sessions to show
-        #[arg(short = 'n', long, default_value = "20")]
+        #[arg(
+            short = 'n',
+            long,
+            default_value = "20",
+            help = t("cli.sessions.help.limit")
+        )]
         limit: usize,
     },
-    /// Search sessions by keyword
+    #[command(about = t("cli.sessions.help.search"))]
     Search {
-        /// Search query (searches summaries and first prompts).
+        #[arg(help = t("cli.sessions.help.query"))]
         query: String,
-        /// Maximum number of sessions to show
-        #[arg(short = 'n', long, default_value = "20")]
+        #[arg(
+            short = 'n',
+            long,
+            default_value = "20",
+            help = t("cli.sessions.help.limit")
+        )]
         limit: usize,
     },
-    /// Permanently delete a session from history
+    #[command(about = t("cli.sessions.help.delete"))]
     Delete {
-        /// Session id to delete.
+        #[arg(help = t("cli.sessions.help.id"))]
         id: String,
     },
 }
@@ -90,13 +99,17 @@ pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
                 )
                 .await
                 .unwrap_or_else(|_| {
-                    eprintln!(
-                        "warning: remote session search timed out, showing local results only"
-                    );
+                    eprintln!("{}", t("cli.sessions.remote_search_timed_out"));
                     Ok(Vec::new())
                 })
-                .unwrap_or_else(|e| {
-                    eprintln!("warning: remote session search failed: {e}");
+                .unwrap_or_else(|error| {
+                    eprintln!(
+                        "{}",
+                        t_fmt(
+                            "cli.sessions.remote_search_failed",
+                            &[("error", error.to_string().as_str())]
+                        )
+                    );
                     Vec::new()
                 })
             });
@@ -107,7 +120,7 @@ pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
 
             for hit in &resp.results {
                 let title = if hit.title.is_empty() {
-                    "(untitled)"
+                    t("cli.sessions.untitled")
                 } else {
                     &hit.title
                 };
@@ -119,12 +132,17 @@ pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
                     })
                     .unwrap_or_default();
                 println!(
-                    "{} (score: {:.2})  {}\n  {}\n  {}",
-                    hit.session_id,
-                    hit.score,
-                    time,
-                    title,
-                    hit.snippet.as_deref().unwrap_or("")
+                    "{}",
+                    t_fmt(
+                        "cli.sessions.local_search_result",
+                        &[
+                            ("session_id", hit.session_id.as_str()),
+                            ("score", format!("{:.2}", hit.score).as_str()),
+                            ("time", time.as_str()),
+                            ("title", title),
+                            ("snippet", hit.snippet.as_deref().unwrap_or("")),
+                        ],
+                    )
                 );
             }
 
@@ -138,7 +156,7 @@ pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
                     continue;
                 }
                 let title = if r.summary.is_empty() {
-                    "(untitled)"
+                    t("cli.sessions.untitled")
                 } else {
                     &r.summary
                 };
@@ -157,13 +175,25 @@ pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
                     .take(80)
                     .collect();
                 println!(
-                    "{} (remote)  {}\n  {}\n  {}",
-                    r.session_id, time, title, snippet
+                    "{}",
+                    t_fmt(
+                        "cli.sessions.remote_search_result",
+                        &[
+                            ("session_id", r.session_id.as_str()),
+                            ("time", time.as_str()),
+                            ("title", title),
+                            ("snippet", snippet.as_str()),
+                        ],
+                    )
                 );
                 remote_shown += 1;
             }
 
-            println!("\nTotal: {}", resp.results.len() + remote_shown);
+            let total = (resp.results.len() + remote_shown).to_string();
+            println!(
+                "\n{}",
+                t_fmt("cli.sessions.total", &[("count", total.as_str())])
+            );
         }
         SessionsCommand::Delete { id } => {
             // Always attempt the remote delete when authenticated and not
@@ -187,9 +217,15 @@ pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
             .await?;
 
             if deletion.any_removed() {
-                println!("Deleted session {id}");
+                println!(
+                    "{}",
+                    t_fmt("cli.sessions.deleted", &[("session_id", id.as_str())])
+                );
             } else {
-                println!("No session found with id {id}.");
+                println!(
+                    "{}",
+                    t_fmt("cli.sessions.not_found", &[("session_id", id.as_str())])
+                );
             }
         }
     }
@@ -201,7 +237,7 @@ pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
 /// format with a `Label: <label>` header before each group.
 fn print_sessions_grouped(sessions: &[MergedSession]) {
     if sessions.is_empty() {
-        println!("No sessions found.");
+        println!("{}", t("cli.sessions.none_found"));
         return;
     }
 
@@ -217,7 +253,11 @@ fn print_sessions_grouped(sessions: &[MergedSession]) {
 
     let header = format!(
         "{:<36}  {:<10}  {:<10}  {:<10}  {}",
-        "SESSION ID", "CREATED", "UPDATED", "STATUS", "SUMMARY"
+        t("cli.sessions.header.session_id"),
+        t("cli.sessions.header.created"),
+        t("cli.sessions.header.updated"),
+        t("cli.sessions.header.status"),
+        t("cli.sessions.header.summary")
     );
 
     // Labeled groups first (alphabetical), then unlabeled last.
@@ -235,7 +275,7 @@ fn print_sessions_grouped(sessions: &[MergedSession]) {
                 first_line = line.trim().to_string();
                 &first_line
             } else {
-                "(no summary)"
+                t("cli.sessions.no_summary")
             };
             let truncated: String = summary.chars().take(50).collect();
             let created = &s.created_at[..s.created_at.len().min(10)];
@@ -248,10 +288,10 @@ fn print_sessions_grouped(sessions: &[MergedSession]) {
     };
 
     for (label, members) in &groups {
-        let line = format!("Label: {}", label.unwrap_or(""));
+        let line = t_fmt("cli.sessions.label", &[("label", label.unwrap_or(""))]);
         print_group(&line, members);
     }
     if let Some(members) = &none_group {
-        print_group("(no label)", members);
+        print_group(t("cli.sessions.no_label"), members);
     }
 }

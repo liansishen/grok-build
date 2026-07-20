@@ -133,29 +133,33 @@ fn watching_label(watchers: Watchers) -> String {
     label.push_str(xai_grok_i18n::t("turn.watchers.watching"));
     if watchers.commands > 0 {
         let noun = if watchers.commands == 1 {
-            "command"
+            xai_grok_i18n::t("turn.watchers.command")
         } else {
-            "commands"
+            xai_grok_i18n::t("turn.watchers.commands")
         };
         let _ = write!(label, " \u{00b7} {} {noun}", watchers.commands);
     }
     if watchers.monitors > 0 {
         let noun = if watchers.monitors == 1 {
-            "monitor"
+            xai_grok_i18n::t("turn.watchers.monitor")
         } else {
-            "monitors"
+            xai_grok_i18n::t("turn.watchers.monitors")
         };
         let _ = write!(label, " \u{00b7} {} {noun}", watchers.monitors);
     }
     if watchers.loops > 0 {
-        let noun = if watchers.loops == 1 { "loop" } else { "loops" };
+        let noun = if watchers.loops == 1 {
+            xai_grok_i18n::t("turn.watchers.loop")
+        } else {
+            xai_grok_i18n::t("turn.watchers.loops")
+        };
         let _ = write!(label, " \u{00b7} {} {noun}", watchers.loops);
     }
     if watchers.subagents > 0 {
         let noun = if watchers.subagents == 1 {
-            "subagent"
+            xai_grok_i18n::t("turn.watchers.subagent")
         } else {
-            "subagents"
+            xai_grok_i18n::t("turn.watchers.subagents")
         };
         let _ = write!(label, " \u{00b7} {} {noun}", watchers.subagents);
     }
@@ -266,7 +270,7 @@ pub fn render_turn_status(
                 Style::default().fg(diamond_color),
             ),
             Span::styled(
-                "agent idle ~ waiting on your edit",
+                xai_grok_i18n::t("turn.waiting_on_edit"),
                 Style::default().fg(theme.gray),
             ),
         ];
@@ -341,7 +345,7 @@ pub fn render_turn_status(
     let show_bg = show_cancel && has_running_execute;
     let bg_str = if show_bg {
         if bg_hovered {
-            " [send to bg]"
+            xai_grok_i18n::t("turn.button.send_to_bg")
         } else {
             " [\u{2193}]"
         }
@@ -454,7 +458,7 @@ pub fn render_turn_status(
                     .strip_prefix("Ask: ")
                     .or_else(|| title.strip_prefix("Ask "))
                     .unwrap_or(title.as_str());
-                let msg = format!("Waiting on answers for {detail}");
+                let msg = xai_grok_i18n::t_fmt("turn.ask.waiting_answers", &[("detail", detail)]);
                 let display = truncate_str(&msg, available_for_label);
                 left_spans.push(Span::styled(display, activity_style));
             } else if let Some(desc) = description
@@ -514,9 +518,9 @@ pub fn render_turn_status(
         // toast — see `AgentView::held_queue_top_sendable`).
         let suffix = if held_queue > 0 && is_sendable_wait(activity) {
             if held_queue_top_sendable {
-                format!(" · {held_queue} queued — Enter to send now")
+                xai_grok_i18n::t_fmt("turn.queue.send_now", &[("count", &held_queue.to_string())])
             } else {
-                format!(" · {held_queue} queued")
+                xai_grok_i18n::t_fmt("turn.queue.queued", &[("count", &held_queue.to_string())])
             }
         } else {
             String::new()
@@ -660,7 +664,10 @@ fn compute_activity(
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Retrying { attempt, .. })) => (
             Style::default().fg(theme.warning),
-            format!("Retrying (attempt {attempt})…"),
+            xai_grok_i18n::t_fmt(
+                "turn.activity.retrying",
+                &[("attempt", &attempt.to_string())],
+            ),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Waiting(reason))) => (
@@ -1234,7 +1241,8 @@ mod tests {
     fn idle_with_monitors_renders_watching_line() {
         let text = render_idle_with_monitors(2);
         assert!(
-            text.contains(xai_grok_i18n::t("turn.watchers.watching")) && text.contains("2 monitors"),
+            text.contains(xai_grok_i18n::t("turn.watchers.watching"))
+                && text.contains("2 monitors"),
             "idle with monitors must render the watching cue, got: {text:?}"
         );
     }
@@ -1288,7 +1296,8 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains(xai_grok_i18n::t("turn.watchers.watching")) && text.contains("2 subagents"),
+            text.contains(xai_grok_i18n::t("turn.watchers.watching"))
+                && text.contains("2 subagents"),
             "idle with subagents must render the watching cue, got: {text:?}"
         );
     }

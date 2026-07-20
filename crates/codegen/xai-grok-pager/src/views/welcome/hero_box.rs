@@ -28,7 +28,9 @@ const LOGO_H_PAD: u16 = 3;
 /// message never paints over the button.
 const UPGRADE_CTA_ROWS: u16 = 2;
 
-fn hero_subtitle() -> &'static str { xai_grok_i18n::t("welcome.hero_subtitle") }
+fn hero_subtitle() -> &'static str {
+    xai_grok_i18n::t("welcome.hero_subtitle")
+}
 
 use super::{PROMPT_HEIGHT, VERSION_GAP};
 

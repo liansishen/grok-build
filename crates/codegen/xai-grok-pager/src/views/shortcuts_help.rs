@@ -77,13 +77,34 @@ impl ShortcutsHelpEntry {
 /// Category display order and labels for the cheatsheet.
 fn category_order() -> [(Category, &'static str); 7] {
     [
-        (Category::GettingStarted, xai_grok_i18n::t("shortcuts.category.essentials")),
-        (Category::Input, xai_grok_i18n::t("shortcuts.category.input")),
-        (Category::ConversationNav, xai_grok_i18n::t("shortcuts.category.conversation_nav")),
-        (Category::ConversationAction, xai_grok_i18n::t("shortcuts.category.conversation_action")),
-        (Category::Panels, xai_grok_i18n::t("shortcuts.category.panels")),
-        (Category::Session, xai_grok_i18n::t("shortcuts.category.session")),
-        (Category::Dashboard, xai_grok_i18n::t("shortcuts.category.dashboard")),
+        (
+            Category::GettingStarted,
+            xai_grok_i18n::t("shortcuts.category.essentials"),
+        ),
+        (
+            Category::Input,
+            xai_grok_i18n::t("shortcuts.category.input"),
+        ),
+        (
+            Category::ConversationNav,
+            xai_grok_i18n::t("shortcuts.category.conversation_nav"),
+        ),
+        (
+            Category::ConversationAction,
+            xai_grok_i18n::t("shortcuts.category.conversation_action"),
+        ),
+        (
+            Category::Panels,
+            xai_grok_i18n::t("shortcuts.category.panels"),
+        ),
+        (
+            Category::Session,
+            xai_grok_i18n::t("shortcuts.category.session"),
+        ),
+        (
+            Category::Dashboard,
+            xai_grok_i18n::t("shortcuts.category.dashboard"),
+        ),
     ]
 }
 

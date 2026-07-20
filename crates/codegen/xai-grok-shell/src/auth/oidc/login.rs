@@ -16,6 +16,7 @@ use axum::{
     routing::get,
 };
 use tokio::net::TcpListener;
+use xai_grok_i18n::{t, t_fmt};
 
 use super::super::config::{GrokComConfig, OidcAuthConfig};
 use super::super::{AuthManager, GrokAuth};
@@ -37,7 +38,9 @@ const AUTH_CALLBACK_TIMEOUT: std::time::Duration = std::time::Duration::from_sec
 fn parse_pasted_input(input: &str) -> Result<Callback, OidcError> {
     let input = input.trim();
     if input.is_empty() {
-        return Err(OidcError::InvalidPastedInput("empty input".into()));
+        return Err(OidcError::InvalidPastedInput(
+            t("auth.oidc.empty_input").to_owned(),
+        ));
     }
 
     if let Ok(url) = url::Url::parse(input) {
@@ -58,7 +61,7 @@ fn parse_pasted_input(input: &str) -> Result<Callback, OidcError> {
             }));
         }
         return Err(OidcError::InvalidPastedInput(
-            "URL has no 'code' query parameter".into(),
+            t("auth.oidc.url_missing_code").to_owned(),
         ));
     }
 
@@ -158,10 +161,13 @@ fn parse_callback_params(params: &HashMap<String, String>) -> CallbackResult {
 fn callback_response(result: &CallbackResult) -> (StatusCode, Html<String>) {
     let (title, message) = match result {
         Ok(_) => (
-            "Signed in",
-            "You can close this window and return to Grok Build.",
+            t("auth.oidc.callback_success_title"),
+            t("auth.oidc.callback_success_message"),
         ),
-        Err(_) => ("Access denied", "Close this window and try again."),
+        Err(_) => (
+            t("auth.oidc.callback_denied_title"),
+            t("auth.oidc.callback_denied_message"),
+        ),
     };
     (
         StatusCode::OK,
@@ -231,7 +237,10 @@ fn spawn_stdin_reader(tx: tokio::sync::mpsc::Sender<CallbackResult>) {
                 }
                 Err(OidcError::InvalidPastedInput(msg)) => {
                     tracing::debug!(input = %msg, "OIDC: invalid stdin paste, retrying");
-                    eprintln!("  Invalid input: {msg}. Try again:");
+                    eprintln!(
+                        "  {}",
+                        t_fmt("auth.oidc.invalid_input_retry", &[("message", &msg)])
+                    );
                 }
                 Err(e) => {
                     tracing::warn!(error = %e, "OIDC: stdin paste returned auth error");
@@ -431,19 +440,25 @@ pub async fn run_login_flow_with_config(
         } else {
             oidc.issuer.clone()
         };
-        eprintln!("Signing in with {}...", provider_label);
+        eprintln!(
+            "{}",
+            t_fmt(
+                "auth.oidc.signing_in_with_provider",
+                &[("provider", &provider_label)],
+            )
+        );
         eprintln!();
         if let Err(e) = webbrowser::open(&auth_url) {
             tracing::debug!(error = %e, "OIDC: failed to open browser");
         }
-        eprintln!("Open this URL to sign in:");
+        eprintln!("{}", t("auth.oidc.open_url"));
         eprintln!("  {}", auth_url);
     }
 
     let use_stdin = !has_client_ui && std::io::stdin().is_terminal();
     if use_stdin {
         eprintln!();
-        eprintln!("Paste the URL here if it doesn't connect:");
+        eprintln!("{}", t("auth.oidc.paste_url_fallback"));
     }
 
     // Push auth URL to the TUI via oneshot.

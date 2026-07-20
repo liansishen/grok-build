@@ -342,7 +342,10 @@ pub fn render_dashboard(
                     .get(parent)
                     .is_some_and(|p| p.subagent_views.contains_key(child_session_id));
                 if parent_ok && !loaded {
-                    (Some("Subagent not loaded"), false)
+                    (
+                        Some(xai_grok_i18n::t("dashboard.subagent_not_loaded")),
+                        false,
+                    )
                 } else {
                     (None, loaded)
                 }
@@ -485,10 +488,12 @@ pub fn render_dashboard(
     dispatch_cursor
 }
 
-const RENAME_PREFIX: &str = "rename: ";
+fn rename_prefix() -> &'static str {
+    xai_grok_i18n::t("dashboard.rename_prefix")
+}
 
 fn rename_editor_view(draft: &RenameDraft, width: u16) -> (&str, u16) {
-    let prefix_width = UnicodeWidthStr::width(RENAME_PREFIX) as u16;
+    let prefix_width = UnicodeWidthStr::width(rename_prefix()) as u16;
     let editor_width = width.saturating_sub(prefix_width);
     let viewport = draft.viewport(editor_width as usize);
     let visible = &draft.text()[viewport.visible_byte_range];
@@ -509,11 +514,11 @@ fn render_rename_editor(
     if width == 0 {
         return;
     }
-    let prefix_width = UnicodeWidthStr::width(RENAME_PREFIX) as u16;
+    let prefix_width = UnicodeWidthStr::width(rename_prefix()) as u16;
     buf.set_span(
         x,
         y,
-        &Span::styled(RENAME_PREFIX, style),
+        &Span::styled(rename_prefix(), style),
         prefix_width.min(width),
     );
     let (visible, _) = rename_editor_view(draft, width);
@@ -608,14 +613,27 @@ fn render_dashboard_banner(
             needs_input += 1;
         }
     }
-    let agent_word = if total == 1 { "agent" } else { "agents" };
-    let mut title_parts: Vec<String> = vec!["Dashboard".to_string()];
-    title_parts.push(format!("{total} {agent_word}"));
+    let total_key = if total == 1 {
+        "dashboard.agent_count_one"
+    } else {
+        "dashboard.agent_count"
+    };
+    let mut title_parts: Vec<String> = vec![xai_grok_i18n::t("dashboard.title").to_string()];
+    title_parts.push(xai_grok_i18n::t_fmt(
+        total_key,
+        &[("count", &total.to_string())],
+    ));
     if working > 0 {
-        title_parts.push(format!("{working} working"));
+        title_parts.push(xai_grok_i18n::t_fmt(
+            "dashboard.working_count",
+            &[("count", &working.to_string())],
+        ));
     }
     if needs_input > 0 {
-        title_parts.push(format!("{needs_input} awaiting"));
+        title_parts.push(xai_grok_i18n::t_fmt(
+            "dashboard.awaiting_count",
+            &[("count", &needs_input.to_string())],
+        ));
     }
     let title = format!(" {} ", title_parts.join(" · "));
 
@@ -644,7 +662,7 @@ fn render_dashboard_banner(
         return;
     }
     if rows.is_empty() {
-        let hint = " No sessions yet — Esc to dispatch one. ";
+        let hint = xai_grok_i18n::t("dashboard.banner_empty");
         let trunc = truncate_str(hint, inner.width as usize);
         buf.set_string(
             inner.x,
@@ -724,9 +742,9 @@ fn render_header(
     // plain new-session button. Width is derived from the chosen label so the
     // positioning + hit rect below stay correct for either string.
     let button_label: &str = if state.dispatch_worktree && state.cwd_has_git_ancestor {
-        "[+ New Worktree]"
+        xai_grok_i18n::t("dashboard.new_worktree_button")
     } else {
-        "[+ New Agent]"
+        xai_grok_i18n::t("dashboard.new_agent_button")
     };
     let button_w = UnicodeWidthStr::width(button_label) as u16;
     let right_margin: u16 = 1;
@@ -796,14 +814,14 @@ fn render_header(
     // so the most-actionable state (awaiting your input) appears
     // leftmost in the chip group, where the eye lands first.
     let mut status = AgentStatusBar::new(theme);
-    let chip = |glyph: &str, color: Color, count: usize, label: &'static str| {
+    let chip = |glyph: &str, color: Color, count: usize, label_key: &'static str| {
         Line::from(vec![
             Span::styled(
                 glyph.to_string(),
                 Style::default().fg(color).bg(theme.bg_base),
             ),
             Span::styled(
-                format!(" {count} {label}"),
+                format!(" {count} {}", xai_grok_i18n::t(label_key)),
                 Style::default().fg(theme.gray).bg(theme.bg_base),
             ),
         ])
@@ -817,7 +835,7 @@ fn render_header(
                 crate::glyphs::diamond_filled(),
                 theme.warning,
                 awaiting,
-                "awaiting",
+                "dashboard.state.awaiting",
             ),
         );
     }
@@ -829,7 +847,12 @@ fn render_header(
         let spin = frames[(state.spinner_tick / SPINNER_DIVISOR) as usize % frames.len()];
         status.push(
             "working",
-            chip(spin, theme.accent_running, working, "working"),
+            chip(
+                spin,
+                theme.accent_running,
+                working,
+                "dashboard.state.working",
+            ),
         );
     }
     if blocked > 0 {
@@ -839,7 +862,7 @@ fn render_header(
                 crate::glyphs::diamond_filled(),
                 theme.warning,
                 blocked,
-                "blocked",
+                "dashboard.state.blocked",
             ),
         );
     }
@@ -850,7 +873,7 @@ fn render_header(
                 crate::glyphs::diamond_hollow(),
                 theme.gray_dim,
                 idle,
-                "idle",
+                "dashboard.state.idle",
             ),
         );
     }
@@ -861,7 +884,7 @@ fn render_header(
                 crate::glyphs::diamond_filled(),
                 theme.accent_success,
                 done,
-                "done",
+                "dashboard.state.done",
             ),
         );
     }
@@ -872,7 +895,7 @@ fn render_header(
                 crate::glyphs::diamond_filled(),
                 theme.accent_error,
                 failed,
-                "failed",
+                "dashboard.state.failed",
             ),
         );
     }
@@ -1022,22 +1045,22 @@ fn render_location_picker(
 
     let mut shortcuts = vec![
         Shortcut {
-            label: "\u{2191}\u{2193} nav",
+            label: xai_grok_i18n::t("shortcuts.footer.nav"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Tab complete",
+            label: xai_grok_i18n::t("dashboard.location.tab_complete"),
             clickable: false,
             id: 1,
         },
         Shortcut {
-            label: "Enter select",
+            label: xai_grok_i18n::t("modal.footer.enter_select"),
             clickable: false,
             id: 2,
         },
         Shortcut {
-            label: "Esc close",
+            label: xai_grok_i18n::t("modal.footer.esc_close"),
             clickable: false,
             id: 3,
         },
@@ -1046,7 +1069,7 @@ fn render_location_picker(
     // picker, but Esc drops to nav under vim).
     push_vim_nav_search_hint(&mut shortcuts, modal.picker.search_active);
     let config = ModalWindowConfig {
-        title: "Change directory",
+        title: xai_grok_i18n::t("dashboard.location.title"),
         tabs: None,
         shortcuts: &shortcuts,
         sizing: ModalSizing::medium(),
@@ -1082,11 +1105,11 @@ fn render_location_picker(
         // usable path field; otherwise the field spans the full width and
         // the button is hidden.
         let wt_text = if modal.worktree_mode {
-            "[worktree:on]"
+            xai_grok_i18n::t("dashboard.location.worktree_on")
         } else {
-            "[worktree:off]"
+            xai_grok_i18n::t("dashboard.location.worktree_off")
         };
-        let wt_w = wt_text.len() as u16; // ASCII → byte len == display width
+        let wt_w = UnicodeWidthStr::width(wt_text) as u16;
         const WT_GAP: u16 = 1;
         const MIN_PATH_W: u16 = 16;
         let (path_w, wt_rect) = if show_worktree && content_area.width >= wt_w + WT_GAP + MIN_PATH_W
@@ -1109,7 +1132,7 @@ fn render_location_picker(
             content_area.y,
             path_w,
             theme,
-            " path: ",
+            xai_grok_i18n::t("dashboard.location.path_label"),
             &modal.picker,
             /* active */ false,
             /* show_hint */ false,
@@ -1131,13 +1154,11 @@ fn render_location_picker(
                 wt_text,
                 Style::default().fg(label_fg).bg(theme.bg_base),
             );
-            if modal.worktree_mode
-                && let Some(on_at) = wt_text.find("on")
-            {
+            if modal.worktree_mode {
                 buf.set_string(
-                    r.x + on_at as u16,
+                    r.x,
                     r.y,
-                    "on",
+                    wt_text,
                     Style::default().fg(theme.accent_success).bg(theme.bg_base),
                 );
             }
@@ -1175,8 +1196,13 @@ fn render_location_picker(
     let badges: Vec<String> = visible
         .iter()
         .map(|c| match &c.worktree {
-            Some(name) if name == &c.label => "worktree".to_string(),
-            Some(name) => format!("worktree: {name}"),
+            Some(name) if name == &c.label => {
+                xai_grok_i18n::t("dashboard.location.worktree_badge").to_string()
+            }
+            Some(name) => xai_grok_i18n::t_fmt(
+                "dashboard.location.worktree_badge_named",
+                &[("name", name.as_str())],
+            ),
             None => String::new(),
         })
         .collect();
@@ -1679,7 +1705,14 @@ fn render_rows(
                 let selected = state.selected_section == Some(key);
                 let hovered = state.hovered_section == Some(key);
                 render_group_header(
-                    buf, line_rect, theme, "Pinned", *count, collapsed, selected, hovered,
+                    buf,
+                    line_rect,
+                    theme,
+                    xai_grok_i18n::t("dashboard.group.pinned"),
+                    *count,
+                    collapsed,
+                    selected,
+                    hovered,
                 );
                 state
                     .section_rects
@@ -1699,7 +1732,7 @@ fn render_rows(
                     buf,
                     line_rect,
                     theme,
-                    rs.group_label(),
+                    dashboard_group_label(*rs),
                     *count,
                     collapsed,
                     selected,
@@ -1896,9 +1929,9 @@ fn render_idle_overflow(
     };
     let style = Style::default().fg(fg).bg(theme.bg_base);
     let label = if expanded {
-        "show fewer".to_string()
+        xai_grok_i18n::t("dashboard.show_fewer").to_string()
     } else {
-        format!("{hidden} more")
+        xai_grok_i18n::t_fmt("dashboard.more_count", &[("count", &hidden.to_string())])
     };
     // A `+` / `-` expand indicator in the icon column + the label in the
     // agent-name column, so the row aligns with the Idle rows above:
@@ -2279,8 +2312,8 @@ fn render_row(
             }
             let label = match badge {
                 RowBadge::NeedsInput | RowBadge::Worktree | RowBadge::Pinned => continue,
-                RowBadge::Failed => "failed",
-                RowBadge::BgTask => "bg",
+                RowBadge::Failed => xai_grok_i18n::t("dashboard.failed"),
+                RowBadge::BgTask => xai_grok_i18n::t("dashboard.badge.background"),
             };
             let chip = format!(" [{label}]");
             let cw = UnicodeWidthStr::width(chip.as_str()) as u16;
@@ -2320,15 +2353,17 @@ fn render_row(
             // The awaiting-input subtitle is `Pending: …`; paint the
             // `Pending:` prefix in yellow so the actionable state stands out,
             // and the rest in the normal secondary colour.
-            const PENDING_PREFIX: &str = "Pending:";
-            if let Some(rest) = trunc.strip_prefix(PENDING_PREFIX) {
+            const SOURCE_PENDING_PREFIX: &str = "Pending:";
+            if let Some(rest) = trunc.strip_prefix(SOURCE_PENDING_PREFIX) {
+                let pending_prefix = xai_grok_i18n::t("dashboard.pending_prefix");
                 buf.set_string(
                     content_start_x,
                     sec_y,
-                    PENDING_PREFIX,
+                    pending_prefix,
                     Style::default().bg(bg).fg(theme.warning),
                 );
-                let prefix_w = UnicodeWidthStr::width(PENDING_PREFIX) as u16;
+                let prefix_w = UnicodeWidthStr::width(pending_prefix) as u16;
+                let rest = truncate_str(rest, avail.saturating_sub(prefix_w) as usize);
                 buf.set_string(
                     content_start_x + prefix_w,
                     sec_y,
@@ -2411,7 +2446,14 @@ fn render_narrow_rows(
                 let selected = state.selected_section == Some(key);
                 let hovered = state.hovered_section == Some(key);
                 render_group_header_narrow(
-                    buf, line_rect, theme, "Pinned", *count, collapsed, selected, hovered,
+                    buf,
+                    line_rect,
+                    theme,
+                    xai_grok_i18n::t("dashboard.group.pinned"),
+                    *count,
+                    collapsed,
+                    selected,
+                    hovered,
                 );
                 state
                     .section_rects
@@ -2428,7 +2470,7 @@ fn render_narrow_rows(
                     buf,
                     line_rect,
                     theme,
-                    rs.group_label(),
+                    dashboard_group_label(*rs),
                     *count,
                     collapsed,
                     selected,
@@ -2545,12 +2587,16 @@ fn render_no_match(buf: &mut Buffer, area: Rect, theme: &Theme, filter: &Filter)
     }
     let hint = match filter {
         Filter::None => xai_grok_i18n::t("dashboard.no_matching_rows").to_string(),
-        Filter::Agent(n) => format!("No agents match `a:{n}` — press Esc to clear the filter."),
-        Filter::State(s) => format!(
-            "No agents in state `{}` — press Esc to clear the filter.",
-            s.group_label()
+        Filter::Agent(n) => {
+            xai_grok_i18n::t_fmt("dashboard.no_agent_match", &[("query", &format!("a:{n}"))])
+        }
+        Filter::State(s) => xai_grok_i18n::t_fmt(
+            "dashboard.no_state_match",
+            &[("state", dashboard_group_label(*s))],
         ),
-        Filter::Substring(n) => format!("No rows match `{n}` — press Esc to clear the filter."),
+        Filter::Substring(n) => {
+            xai_grok_i18n::t_fmt("dashboard.no_row_match", &[("query", n.as_str())])
+        }
     };
     let truncated = truncate_str(&hint, area.width.saturating_sub(2) as usize);
     // Explicit offset to avoid `area.y + 1.min(...)`
@@ -2687,12 +2733,12 @@ fn paint_dispatch_config_badge(
     let mut flags: Vec<PromptFlag> = Vec::new();
     match state.pending_mode {
         DashboardDispatchMode::Plan => flags.push(PromptFlag {
-            text: "plan",
+            text: xai_grok_i18n::t("mode.flag.plan"),
             color: Some(theme.accent_plan),
             bold: false,
         }),
         DashboardDispatchMode::AlwaysApprove => flags.push(PromptFlag {
-            text: "always-approve",
+            text: xai_grok_i18n::t("mode.flag.always_approve"),
             color: None,
             bold: false,
         }),
@@ -2732,7 +2778,7 @@ pub(super) fn paint_record_badge(buf: &mut Buffer, area: Rect, theme: &Theme, li
         buf.set_string(
             area.x + 2,
             area.y,
-            " \u{25CF} rec ",
+            xai_grok_i18n::t("dashboard.recording_badge"),
             Style::default()
                 .fg(theme.accent_error)
                 .bg(theme.bg_base)
@@ -2817,7 +2863,7 @@ fn render_dispatch(
     // unmistakable that typing filters rows (Enter confirms) rather than
     // dispatching. No chips / multiline here.
     if state.search_mode {
-        let prefix = "Search: ";
+        let prefix = xai_grok_i18n::t("dashboard.search_prefix");
         let prefix_w = UnicodeWidthStr::width(prefix) as u16;
         let painted_prefix_w = prefix_w.min(content.width);
         buf.set_span(
@@ -2836,7 +2882,10 @@ fn render_dispatch(
         let avail = content.width - painted_prefix_w;
         let cursor_column = if state.dispatch.text().is_empty() {
             if avail > 0 {
-                let placeholder = truncate_str("Type to filter sessions\u{2026}", avail as usize);
+                let placeholder = truncate_str(
+                    xai_grok_i18n::t("dashboard.search_placeholder"),
+                    avail as usize,
+                );
                 buf.set_string(
                     editor_x,
                     content.y,
@@ -2913,7 +2962,7 @@ fn render_dispatch(
         // (`paint_dispatch_feedback_badge`), not here, so it stays
         // visible even when the rejected text is still in the box.
         if !input_focused {
-            let msg = "Dispatch a new agent";
+            let msg = xai_grok_i18n::t("dashboard.dispatch_placeholder");
             let style = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
             let trunc = truncate_str(msg, content.width.saturating_sub(prefix_w) as usize);
             buf.set_string(content.x + prefix_w, content.y, trunc, style);
@@ -3275,7 +3324,7 @@ fn render_footer(
             .unwrap_or_else(|| key!('x', CONTROL));
         let pending = PendingHint {
             shortcut: stop_key,
-            label: "close this session",
+            label: xai_grok_i18n::t("dashboard.close_this_session"),
         };
         ShortcutsBar::new(&[])
             .with_pending(Some(pending))
@@ -3288,8 +3337,8 @@ fn render_footer(
     // exactly its two actions instead of the dispatch + nav matrix.
     if state.rename.is_some() {
         let hints = vec![
-            HintItem::new(key!(Enter), "save"),
-            HintItem::new(key!(Esc), "cancel"),
+            HintItem::new(key!(Enter), xai_grok_i18n::t("hint.save")),
+            HintItem::new(key!(Esc), xai_grok_i18n::t("hint.cancel")),
         ];
         ShortcutsBar::new(&hints)
             .compact(4, None)
@@ -3301,9 +3350,9 @@ fn render_footer(
     // live filter rather than the dispatch + nav matrix.
     if state.search_mode {
         let hints = vec![
-            HintItem::paired(key!(Up), key!(Down), "nav"),
-            HintItem::new(key!(Enter), "apply"),
-            HintItem::new(key!(Esc), "cancel"),
+            HintItem::paired(key!(Up), key!(Down), xai_grok_i18n::t("hint.nav")),
+            HintItem::new(key!(Enter), xai_grok_i18n::t("dashboard.hint.apply")),
+            HintItem::new(key!(Esc), xai_grok_i18n::t("hint.cancel")),
         ];
         ShortcutsBar::new(&hints)
             .compact(4, None)
@@ -3325,9 +3374,9 @@ fn render_footer(
         selected_state,
         Some(RowState::Working | RowState::NeedsInput)
     ) {
-        "stop"
+        xai_grok_i18n::t("hint.stop")
     } else {
-        "close"
+        xai_grok_i18n::t("dashboard.hint.close")
     };
 
     // Overview list focused (via Tab) — navigation hints: arrows / j-k
@@ -3354,16 +3403,19 @@ fn render_footer(
         // is omitted here too, mirroring the section-header row below.
         if state.selected_idle_overflow {
             let toggle = if state.idle_show_all {
-                "show fewer"
+                xai_grok_i18n::t("dashboard.show_fewer")
             } else {
-                "show all"
+                xai_grok_i18n::t("dashboard.show_all")
             };
             let hints = vec![
                 HintItem::new(key!(Enter), toggle),
-                HintItem::new(key!(Tab), "input"),
+                HintItem::new(key!(Tab), xai_grok_i18n::t("dashboard.hint.input")),
             ];
             ShortcutsBar::new(&hints)
-                .compact(4, Some(HintItem::new(help, "shortcuts")))
+                .compact(
+                    4,
+                    Some(HintItem::new(help, xai_grok_i18n::t("hint.shortcuts"))),
+                )
                 .render(inner, buf);
             return;
         }
@@ -3372,22 +3424,25 @@ fn render_footer(
         // to the dispatch input (Esc does too, one tier at a time).
         if let Some(section) = state.selected_section {
             let toggle = if state.is_section_collapsed(section) {
-                "expand"
+                xai_grok_i18n::t("hint.expand")
             } else {
-                "collapse"
+                xai_grok_i18n::t("dashboard.hint.collapse")
             };
             let hints = vec![
                 HintItem::new(key!(Enter), toggle),
-                HintItem::new(key!(Tab), "input"),
+                HintItem::new(key!(Tab), xai_grok_i18n::t("dashboard.hint.input")),
             ];
             ShortcutsBar::new(&hints)
-                .compact(4, Some(HintItem::new(help, "shortcuts")))
+                .compact(
+                    4,
+                    Some(HintItem::new(help, xai_grok_i18n::t("hint.shortcuts"))),
+                )
                 .render(inner, buf);
             return;
         }
         let mut hints = vec![
-            HintItem::new(key!(Enter), "open"),
-            HintItem::new(key!(Tab), "input"),
+            HintItem::new(key!(Enter), xai_grok_i18n::t("hint.open")),
+            HintItem::new(key!(Tab), xai_grok_i18n::t("dashboard.hint.input")),
         ];
         if stoppable {
             // Pinned so the stop chip always survives compact
@@ -3395,7 +3450,10 @@ fn render_footer(
             hints.push(HintItem::new(stop, stop_label).pinned());
         }
         ShortcutsBar::new(&hints)
-            .compact(4, Some(HintItem::new(help, "shortcuts")))
+            .compact(
+                4,
+                Some(HintItem::new(help, xai_grok_i18n::t("hint.shortcuts"))),
+            )
             .render(inner, buf);
         return;
     }
@@ -3426,7 +3484,7 @@ fn render_footer(
         key!('.', CONTROL),
     );
 
-    let help_hint = HintItem::new(help, "shortcuts");
+    let help_hint = HintItem::new(help, xai_grok_i18n::t("hint.shortcuts"));
 
     // Submit chord is `send_key` (Enter, or Shift/Alt+Enter in multiline).
     // Ctrl+S is send+open. Empty draft: create/open on the submit chord;
@@ -3455,7 +3513,11 @@ fn render_footer(
             .as_ref()
             .is_some_and(|p| p.selected_option.is_some());
         let reply_empty = state.peek_reply.text().trim().is_empty();
-        let esc_label = if reply_empty { "New Agent" } else { "back" };
+        let esc_label = if reply_empty {
+            xai_grok_i18n::t("dashboard.hint.new_agent")
+        } else {
+            xai_grok_i18n::t("dashboard.hint.back")
+        };
         // Pin Esc when it clears a draft (`back`) so compact doesn't drop it
         // behind stop/help — matches how important it is in handle_peek_key.
         let esc_hint = {
@@ -3467,11 +3529,18 @@ fn render_footer(
         // reply unfocused so j/k keep selecting.
         let peek_focused = state.peek.as_ref().map(|p| p.focused).unwrap_or(true);
         let question_focused = peek_focused && has_pending_question;
-        let tab_hint = HintItem::new(key!(Tab), if peek_focused { "list" } else { "input" });
+        let tab_hint = HintItem::new(
+            key!(Tab),
+            if peek_focused {
+                xai_grok_i18n::t("dashboard.hint.list")
+            } else {
+                xai_grok_i18n::t("dashboard.hint.input")
+            },
+        );
         // `1-9 select` hint for the question picker (no single bound key).
         let select_hint = HintItem {
             keys: vec![],
-            label: "select".into(),
+            label: xai_grok_i18n::t("hint.select").into(),
             custom_display: Some("1-9"),
             description: None,
             pinned: false,
@@ -3482,11 +3551,15 @@ fn render_footer(
             // two-focus toggle the other peek states surface). (↑/↓ still
             // move within the options; the nav chip is dropped to save
             // bottom-bar space.)
-            vec![HintItem::new(enter, "answer"), tab_hint, esc_hint]
+            vec![
+                HintItem::new(enter, xai_grok_i18n::t("dashboard.hint.answer")),
+                tab_hint,
+                esc_hint,
+            ]
         } else if has_pending_question && peek_focused {
             // Question pending, focused, nothing selected — navigation + select.
             let mut h = vec![
-                HintItem::new(enter, "open"),
+                HintItem::new(enter, xai_grok_i18n::t("hint.open")),
                 select_hint,
                 tab_hint,
                 esc_hint,
@@ -3500,9 +3573,9 @@ fn render_footer(
             // Right still attaches — surface it so open stays discoverable.
             // Pending question: keep 1-9 select (digits still work unfocused).
             let mut h = vec![
-                HintItem::new(enter, "input"),
+                HintItem::new(enter, xai_grok_i18n::t("dashboard.hint.input")),
                 // Pin open: attach is the replacement for Enter in this mode.
-                HintItem::new(key!(Right), "open").pinned(),
+                HintItem::new(key!(Right), xai_grok_i18n::t("hint.open")).pinned(),
                 tab_hint,
                 esc_hint,
             ];
@@ -3510,7 +3583,10 @@ fn render_footer(
                 h.insert(2, select_hint);
             }
             if !reply_empty {
-                h.insert(1, HintItem::new(send_open, "send+open"));
+                h.insert(
+                    1,
+                    HintItem::new(send_open, xai_grok_i18n::t("dashboard.hint.send_open")),
+                );
             }
             if stoppable {
                 h.push(HintItem::new(stop, stop_label).pinned());
@@ -3519,7 +3595,7 @@ fn render_footer(
         } else if has_pending_question {
             // Non-vim unfocused (or other) with a pending question — open + select.
             let mut h = vec![
-                HintItem::new(enter, "open"),
+                HintItem::new(enter, xai_grok_i18n::t("hint.open")),
                 select_hint,
                 tab_hint,
                 esc_hint,
@@ -3530,16 +3606,20 @@ fn render_footer(
             h
         } else if peek_focused && !reply_empty {
             vec![
-                HintItem::new(send_key, "send"),
-                HintItem::new(send_open, "send+open"),
+                HintItem::new(send_key, xai_grok_i18n::t("hint.send")),
+                HintItem::new(send_open, xai_grok_i18n::t("dashboard.hint.send_open")),
                 tab_hint,
-                HintItem::new(esc, "back").pinned(),
+                HintItem::new(esc, xai_grok_i18n::t("dashboard.hint.back")).pinned(),
             ]
         } else {
             // Focused empty: open is on the submit chord (send_key). Unfocused:
             // bare Enter still attaches.
             let open_key = if peek_focused { send_key } else { enter };
-            let mut h = vec![HintItem::new(open_key, "open"), tab_hint, esc_hint];
+            let mut h = vec![
+                HintItem::new(open_key, xai_grok_i18n::t("hint.open")),
+                tab_hint,
+                esc_hint,
+            ];
             if stoppable {
                 h.push(HintItem::new(stop, stop_label).pinned());
             }
@@ -3552,13 +3632,13 @@ fn render_footer(
             // ↑↓ navigate, Enter toggles collapse/expand, Esc returns
             // to the `[+ New Agent]` button.
             let toggle = if state.is_section_collapsed(section) {
-                "expand"
+                xai_grok_i18n::t("hint.expand")
             } else {
-                "collapse"
+                xai_grok_i18n::t("dashboard.hint.collapse")
             };
             vec![
                 HintItem::new(enter, toggle),
-                HintItem::new(key!(Esc), "New Agent"),
+                HintItem::new(key!(Esc), xai_grok_i18n::t("dashboard.hint.new_agent")),
             ]
         } else {
             // Typed text dispatches a NEW agent (a section header is
@@ -3567,9 +3647,9 @@ fn render_footer(
             // on the dashboard), Ctrl+S sends + opens detail,
             // Shift+Tab cycles the dispatch mode.
             vec![
-                HintItem::new(send_key, "send"),
-                HintItem::new(send_open, "send+open"),
-                HintItem::new(key!(BackTab), "mode"),
+                HintItem::new(send_key, xai_grok_i18n::t("hint.send")),
+                HintItem::new(send_open, xai_grok_i18n::t("dashboard.hint.send_open")),
+                HintItem::new(key!(BackTab), xai_grok_i18n::t("hint.mode")),
             ]
         }
     } else if state.selected_idle_overflow {
@@ -3577,40 +3657,55 @@ fn render_footer(
         // there's no session under it — no stop chip.
         if prompt_empty {
             let toggle = if state.idle_show_all {
-                "show fewer"
+                xai_grok_i18n::t("dashboard.show_fewer")
             } else {
-                "show all"
+                xai_grok_i18n::t("dashboard.show_all")
             };
             vec![
                 HintItem::new(enter, toggle),
-                HintItem::new(key!(Esc), "New Agent"),
+                HintItem::new(key!(Esc), xai_grok_i18n::t("dashboard.hint.new_agent")),
             ]
         } else {
             vec![
-                HintItem::new(send_key, "send"),
-                HintItem::new(send_open, "send+open"),
-                HintItem::new(key!(BackTab), "mode"),
+                HintItem::new(send_key, xai_grok_i18n::t("hint.send")),
+                HintItem::new(send_open, xai_grok_i18n::t("dashboard.hint.send_open")),
+                HintItem::new(key!(BackTab), xai_grok_i18n::t("hint.mode")),
             ]
         }
     } else if button_focused {
         let mut h: Vec<HintItem> = vec![];
         if prompt_empty {
-            h.push(HintItem::new(send_key, "create"));
-            h.push(HintItem::new(key!(Tab), "list"));
+            h.push(HintItem::new(
+                send_key,
+                xai_grok_i18n::t("dashboard.hint.create"),
+            ));
+            h.push(HintItem::new(
+                key!(Tab),
+                xai_grok_i18n::t("dashboard.hint.list"),
+            ));
         } else {
-            h.push(HintItem::new(send_key, "send"));
-            h.push(HintItem::new(send_open, "send+open"));
+            h.push(HintItem::new(send_key, xai_grok_i18n::t("hint.send")));
+            h.push(HintItem::new(
+                send_open,
+                xai_grok_i18n::t("dashboard.hint.send_open"),
+            ));
         }
-        h.push(HintItem::new(key!(BackTab), "mode"));
+        h.push(HintItem::new(key!(BackTab), xai_grok_i18n::t("hint.mode")));
         h
     } else if row_selected {
         let mut h: Vec<HintItem> = vec![];
         if prompt_empty {
-            h.push(HintItem::new(send_key, "open"));
-            h.push(HintItem::new(key!(Tab), "list"));
+            h.push(HintItem::new(send_key, xai_grok_i18n::t("hint.open")));
+            h.push(HintItem::new(
+                key!(Tab),
+                xai_grok_i18n::t("dashboard.hint.list"),
+            ));
         } else {
-            h.push(HintItem::new(send_key, "send"));
-            h.push(HintItem::new(send_open, "send+open"));
+            h.push(HintItem::new(send_key, xai_grok_i18n::t("hint.send")));
+            h.push(HintItem::new(
+                send_open,
+                xai_grok_i18n::t("dashboard.hint.send_open"),
+            ));
         }
         if stoppable {
             // Pinned so Ctrl+x always shows while an agent row is
@@ -3625,7 +3720,7 @@ fn render_footer(
         // `DashboardState`, but a fall-through keeps the bar
         // populated rather than silently empty.
         vec![
-            HintItem::new(send_key, "create"),
+            HintItem::new(send_key, xai_grok_i18n::t("dashboard.hint.create")),
             HintItem::new(stop, stop_label),
         ]
     };
@@ -3633,6 +3728,18 @@ fn render_footer(
     ShortcutsBar::new(&hints)
         .compact(4, Some(help_hint))
         .render(inner, buf);
+}
+
+fn dashboard_group_label(state: RowState) -> &'static str {
+    match state {
+        RowState::NeedsInput => xai_grok_i18n::t("dashboard.group.awaiting"),
+        RowState::Working => xai_grok_i18n::t("dashboard.group.working"),
+        RowState::Idle => xai_grok_i18n::t("dashboard.group.idle"),
+        RowState::Inactive => xai_grok_i18n::t("dashboard.group.inactive"),
+        RowState::Completed => xai_grok_i18n::t("dashboard.group.done"),
+        RowState::Failed => xai_grok_i18n::t("dashboard.group.failed"),
+        RowState::Blocked => xai_grok_i18n::t("dashboard.group.blocked"),
+    }
 }
 
 fn state_icon(state: RowState, tick: u64) -> &'static str {
@@ -3835,7 +3942,7 @@ pub fn render_popup_overlay(
         outline.render(area, buf);
         if area.height >= 3 && area.width >= 6 {
             let hint = truncate_str(
-                "(terminal too small — Esc to close)",
+                xai_grok_i18n::t("dashboard.terminal_too_small"),
                 area.width.saturating_sub(2) as usize,
             );
             buf.set_string(
@@ -4088,7 +4195,7 @@ fn paint_session_title_bar(
     // Labelled with its destination ("Dashboard") rather than a
     // generic `[✗]` so it's obvious that clicking it returns to the
     // dashboard. Plain ASCII, so no legacy-console fallback needed.
-    let close_label = "[Dashboard]";
+    let close_label = xai_grok_i18n::t("dashboard.overlay_close");
     let prev_label = format!("[{}]", crate::glyphs::chevron_left());
     let next_label = format!("[{}]", crate::glyphs::chevron());
     let close_w = UnicodeWidthStr::width(close_label) as u16;

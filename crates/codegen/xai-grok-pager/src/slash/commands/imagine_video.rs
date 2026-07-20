@@ -16,7 +16,10 @@ impl SlashCommand for ImagineVideoCommand {
     }
 
     fn description(&self) -> &str {
-        "Generate a video from a text description"
+        xai_grok_i18n::t_or(
+            "slash.imagine-video.description",
+            "Generate a video from a text description",
+        )
     }
 
     fn usage(&self) -> &str {
@@ -32,7 +35,10 @@ impl SlashCommand for ImagineVideoCommand {
     }
 
     fn arg_placeholder(&self) -> Option<&str> {
-        Some("description of the video to generate")
+        Some(xai_grok_i18n::t_or(
+            "slash.imagine-video.arg_placeholder",
+            "description of the video to generate",
+        ))
     }
 
     fn required_tools(&self) -> &[&str] {

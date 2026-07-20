@@ -7,6 +7,7 @@ use xai_fast_worktree::WorktreeRecord;
 
 use agent_client_protocol as acp;
 use xai_acp_lib::acp_send;
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_shell::agent::config::Config as AgentConfig;
 
 /// Local response types matching the ACP response shapes.
@@ -43,8 +44,7 @@ pub struct WorktreeArgs {
 
 #[derive(Debug, Subcommand, Clone)]
 enum WorktreeCommand {
-    /// List tracked worktrees
-    #[command(visible_alias = "ls")]
+    #[command(visible_alias = "ls", about = t("cli.worktree.help.list"))]
     List {
         #[arg(long)]
         repo: Option<String>,
@@ -55,9 +55,9 @@ enum WorktreeCommand {
         #[arg(long)]
         all: bool,
     },
-    /// Show details for a specific worktree
+    #[command(about = t("cli.worktree.help.show"))]
     Show { id_or_path: String },
-    /// Remove worktrees
+    #[command(about = t("cli.worktree.help.rm"))]
     Rm {
         #[arg(required = true)]
         ids: Vec<String>,
@@ -66,8 +66,7 @@ enum WorktreeCommand {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Garbage-collect orphaned/stale worktrees
-    #[command(alias = "prune")]
+    #[command(alias = "prune", about = t("cli.worktree.help.gc"))]
     Gc {
         #[arg(long)]
         dry_run: bool,
@@ -76,7 +75,7 @@ enum WorktreeCommand {
         #[arg(short, long)]
         force: bool,
     },
-    /// Database maintenance
+    #[command(about = t("cli.worktree.help.db"))]
     Db {
         #[command(subcommand)]
         command: WorktreeDbCommand,
@@ -85,11 +84,11 @@ enum WorktreeCommand {
 
 #[derive(Debug, Subcommand, Clone)]
 enum WorktreeDbCommand {
-    /// Rebuild DB from filesystem scan
+    #[command(about = t("cli.worktree.help.db_rebuild"))]
     Rebuild,
-    /// Show DB statistics
+    #[command(about = t("cli.worktree.help.db_stats"))]
     Stats,
-    /// Print DB file path
+    #[command(about = t("cli.worktree.help.db_path"))]
     Path,
 }
 
@@ -164,19 +163,33 @@ async fn ext_call<T: serde::de::DeserializeOwned>(
     method: &str,
     params: &impl serde::Serialize,
 ) -> Result<T> {
-    let req =
-        ext_request(method, params).map_err(|e| anyhow::anyhow!("failed to build request: {e}"))?;
-    let resp = acp_send(req, tx)
-        .await
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
-    let envelope: ExtEnvelope<T> = serde_json::from_str(resp.0.get())
-        .map_err(|e| anyhow::anyhow!("response parse error: {e}"))?;
-    if let Some(err) = envelope.error {
-        bail!("ACP error: {err}");
+    let req = ext_request(method, params).map_err(|error| {
+        anyhow::anyhow!(t_fmt(
+            "cli.worktree.error.build_request",
+            &[("error", error.to_string().as_str())]
+        ))
+    })?;
+    let resp = acp_send(req, tx).await.map_err(|error| {
+        anyhow::anyhow!(t_fmt(
+            "cli.worktree.error.request_failed",
+            &[("error", error.to_string().as_str())]
+        ))
+    })?;
+    let envelope: ExtEnvelope<T> = serde_json::from_str(resp.0.get()).map_err(|error| {
+        anyhow::anyhow!(t_fmt(
+            "cli.worktree.error.response_parse",
+            &[("error", error.to_string().as_str())]
+        ))
+    })?;
+    if let Some(error) = envelope.error {
+        bail!(t_fmt(
+            "cli.worktree.error.acp",
+            &[("error", error.to_string().as_str())]
+        ));
     }
     envelope
         .result
-        .ok_or_else(|| anyhow::anyhow!("ACP response missing result field"))
+        .ok_or_else(|| anyhow::anyhow!(t("cli.worktree.error.missing_result")))
 }
 
 async fn cmd_list(
@@ -218,7 +231,10 @@ async fn cmd_show(tx: &xai_acp_lib::AcpAgentTx, id_or_path: &str) -> Result<()> 
             display::print_show(&r);
             Ok(())
         }
-        None => bail!("worktree not found: {id_or_path}"),
+        None => bail!(t_fmt(
+            "cli.worktree.not_found",
+            &[("id_or_path", id_or_path)]
+        )),
     }
 }
 
@@ -252,12 +268,21 @@ async fn cmd_rm(
             Ok(r) => {
                 let path = r.resolved_path.as_deref().unwrap_or(id_or_path);
                 if dry_run {
-                    println!("  would remove: {path}");
+                    println!("{}", t_fmt("cli.worktree.would_remove", &[("path", path)]));
                 } else if r.removed {
-                    println!("  removed: {path}");
+                    println!("{}", t_fmt("cli.worktree.removed", &[("path", path)]));
                 }
             }
-            Err(e) => eprintln!("  error removing {id_or_path}: {e}"),
+            Err(error) => eprintln!(
+                "{}",
+                t_fmt(
+                    "cli.worktree.remove_error",
+                    &[
+                        ("id_or_path", id_or_path.as_str()),
+                        ("error", error.to_string().as_str()),
+                    ]
+                )
+            ),
         }
     }
     Ok(())
@@ -281,7 +306,7 @@ async fn cmd_gc(
     .await?;
 
     if dry_run {
-        println!("Dry run \u{2014} no changes made.");
+        println!("{}", t("cli.worktree.dry_run"));
     }
     display::print_gc(&report);
     Ok(())

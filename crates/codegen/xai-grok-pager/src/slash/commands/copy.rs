@@ -39,14 +39,22 @@ impl SlashCommand for CopyCommand {
             match trimmed.parse::<usize>() {
                 Ok(0) => {
                     return CommandResult::Error(
-                        "Usage: /copy [N] where N is 1 (latest), 2, 3, ...".to_string(),
+                        xai_grok_i18n::t_or(
+                            "slash.copy.usage",
+                            "Usage: /copy [N] where N is 1 (latest), 2, 3, ...",
+                        )
+                        .to_string(),
                     );
                 }
                 Ok(v) => v,
                 Err(_) => {
-                    return CommandResult::Error(format!(
-                        "/copy {trimmed} (invalid number)\nUsage: /copy [N] where N is 1 (latest), 2, 3, ..."
-                    ));
+                    return CommandResult::Error(
+                        xai_grok_i18n::t_or(
+                            "slash.copy.invalid_number",
+                            "/copy {value} (invalid number)\nUsage: /copy [N] where N is 1 (latest), 2, 3, ...",
+                        )
+                        .replace("{value}", trimmed),
+                    );
                 }
             }
         };

@@ -772,7 +772,7 @@ impl EditToolCallBlock {
             error: None,
             started_at: None,
             elapsed_ms: None,
-            prefix: "Edit ",  // localized at render via tool.prefix.edit
+            prefix: "Edit ", // localized at render via tool.prefix.edit
             summary_untrusted: false,
             change_counts,
             highlight: EditHighlightPhase::HunkOnly,

@@ -134,10 +134,10 @@ pub enum SourceFilter {
 impl SourceFilter {
     pub fn label(self) -> &'static str {
         match self {
-            Self::All => "All",
-            Self::Local => "Local",
-            Self::Remote => "Remote",
-            Self::External => "External",
+            Self::All => xai_grok_i18n::t("session_picker.filter.all"),
+            Self::Local => xai_grok_i18n::t("session_picker.filter.local"),
+            Self::Remote => xai_grok_i18n::t("session_picker.filter.remote"),
+            Self::External => xai_grok_i18n::t("session_picker.filter.external"),
         }
     }
 
@@ -595,7 +595,7 @@ pub(crate) fn build_session_entry_data(
         .map(|(fi, &orig_idx)| {
             let entry = &entries_data[orig_idx];
             let summary = if entry.summary.is_empty() {
-                "(no prompt)".to_string()
+                xai_grok_i18n::t("session_picker.no_prompt").to_string()
             } else {
                 entry.summary.clone()
             };
@@ -611,31 +611,57 @@ pub(crate) fn build_session_entry_data(
                 field_data.push(("ID".into(), entry.id.clone()));
                 field_data.push(("CWD".into(), entry.cwd.clone()));
                 if let Some(ref model) = entry.model_id {
-                    field_data.push(("Model".into(), model.clone()));
+                    field_data.push((
+                        xai_grok_i18n::t("session_picker.field.model").into(),
+                        model.clone(),
+                    ));
                 }
                 let fmt_time = |dt: chrono::DateTime<chrono::Utc>| {
                     dt.with_timezone(&chrono::Local)
                         .format("%b %d, %l:%M%P")
                         .to_string()
                 };
-                field_data.push(("Created".into(), fmt_time(entry.created_at)));
-                field_data.push(("Updated".into(), fmt_time(entry.updated_at)));
-                field_data.push(("Source".into(), entry.source.clone()));
+                field_data.push((
+                    xai_grok_i18n::t("session_picker.field.created").into(),
+                    fmt_time(entry.created_at),
+                ));
+                field_data.push((
+                    xai_grok_i18n::t("session_picker.field.updated").into(),
+                    fmt_time(entry.updated_at),
+                ));
+                field_data.push((
+                    xai_grok_i18n::t("session_picker.field.source").into(),
+                    entry.source.clone(),
+                ));
                 if let Some(ref host) = entry.hostname {
-                    field_data.push(("Host".into(), host.clone()));
+                    field_data.push((
+                        xai_grok_i18n::t("session_picker.field.host").into(),
+                        host.clone(),
+                    ));
                 }
                 if entry.num_messages > 0 {
-                    field_data.push(("Messages".into(), entry.num_messages.to_string()));
+                    field_data.push((
+                        xai_grok_i18n::t("session_picker.field.messages").into(),
+                        entry.num_messages.to_string(),
+                    ));
                 }
                 if let Some(ref detail) = entry.card_detail {
+                    let turns = detail.turn_count.to_string();
+                    let tools = detail.tool_call_count.to_string();
                     field_data.push((
-                        "Turns".into(),
-                        format!("{}    Tools  {}", detail.turn_count, detail.tool_call_count),
+                        xai_grok_i18n::t("session_picker.field.turns").into(),
+                        xai_grok_i18n::t_fmt(
+                            "session_picker.turns_tools",
+                            &[("turns", &turns), ("tools", &tools)],
+                        ),
                     ));
                     if !detail.first_prompt_preview.is_empty() {
                         let max_w = content_width.saturating_sub(4 + 12) as usize;
                         let preview = truncate_str(&detail.first_prompt_preview, max_w);
-                        field_data.push(("Prompt".into(), preview));
+                        field_data.push((
+                            xai_grok_i18n::t("session_picker.field.prompt").into(),
+                            preview,
+                        ));
                     }
                 }
             }
@@ -746,7 +772,7 @@ pub(crate) fn build_content_entry_data(
             let summary = if h.summary.is_empty() {
                 h.snippet
                     .as_deref()
-                    .unwrap_or("(no summary)")
+                    .unwrap_or_else(|| xai_grok_i18n::t("session_picker.no_summary"))
                     .lines()
                     .next()
                     .unwrap_or_default()
@@ -806,12 +832,12 @@ pub(crate) fn build_content_header_label(
     if content_loading {
         let spinner_frames = crate::glyphs::dot_spinner_frames();
         let frame_idx = (tick / 4) as usize % spinner_frames.len();
-        format!(
-            "{} Searching session content\u{2026}",
-            spinner_frames[frame_idx]
+        xai_grok_i18n::t_fmt(
+            "session_picker.searching_content",
+            &[("spinner", spinner_frames[frame_idx])],
         )
     } else if has_content_rows {
-        "Extended search results (remote and local sessions)".to_string()
+        xai_grok_i18n::t("session_picker.extended_results").to_string()
     } else {
         String::new()
     }
@@ -827,15 +853,19 @@ pub(crate) fn format_time_ago(dt: chrono::DateTime<chrono::Utc>) -> String {
     let duration = now.signed_duration_since(dt);
 
     let raw = if duration.num_minutes() < 1 {
-        "just now".to_string()
+        xai_grok_i18n::t("session_picker.time.just_now").to_string()
     } else if duration.num_minutes() < 60 {
-        format!("{}m ago", duration.num_minutes())
+        let count = duration.num_minutes().to_string();
+        xai_grok_i18n::t_fmt("session_picker.time.minutes_ago", &[("count", &count)])
     } else if duration.num_hours() < 24 {
-        format!("{}h ago", duration.num_hours())
+        let count = duration.num_hours().to_string();
+        xai_grok_i18n::t_fmt("session_picker.time.hours_ago", &[("count", &count)])
     } else if duration.num_days() < 30 {
-        format!("{}d ago", duration.num_days())
+        let count = duration.num_days().to_string();
+        xai_grok_i18n::t_fmt("session_picker.time.days_ago", &[("count", &count)])
     } else {
-        format!("{}mo ago", duration.num_days() / 30)
+        let count = (duration.num_days() / 30).to_string();
+        xai_grok_i18n::t_fmt("session_picker.time.months_ago", &[("count", &count)])
     };
     // Right-align to fixed width so the column doesn't jump
     format!("{:>8}", raw)

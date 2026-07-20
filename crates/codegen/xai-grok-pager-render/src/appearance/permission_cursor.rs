@@ -83,9 +83,7 @@ impl DefaultSelectedPermission {
                 xai_grok_i18n::t("permission.default.always_allow_all_sessions")
             }
             Self::AllowOnce => xai_grok_i18n::t("permission.default.allow_once"),
-            Self::AllowCommandAlways => {
-                xai_grok_i18n::t("permission.default.allow_command_always")
-            }
+            Self::AllowCommandAlways => xai_grok_i18n::t("permission.default.allow_command_always"),
             Self::Reject => xai_grok_i18n::t("permission.default.reject"),
         }
     }

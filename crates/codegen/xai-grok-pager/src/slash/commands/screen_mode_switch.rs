@@ -61,9 +61,15 @@ impl SlashCommand for ScreenModeSwitchCommand {
 
     fn description(&self) -> &str {
         if self.to_minimal {
-            "Reopen this session in minimal (scrollback-native) mode — switch back with /fullscreen"
+            xai_grok_i18n::t_or(
+                "slash.screen_mode.minimal_description",
+                "Reopen this session in minimal (scrollback-native) mode — switch back with /fullscreen",
+            )
         } else {
-            "Reopen this session in fullscreen mode — switch back with /minimal"
+            xai_grok_i18n::t_or(
+                "slash.screen_mode.fullscreen_description",
+                "Reopen this session in fullscreen mode — switch back with /minimal",
+            )
         }
     }
 
@@ -92,17 +98,23 @@ impl SlashCommand for ScreenModeSwitchCommand {
 
     fn run(&self, ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
         if !self.source_mode_active(ctx.screen_mode) {
-            return CommandResult::Error(format!(
-                "/{} is only available in {} mode",
-                self.target_label(),
-                self.source_label(),
-            ));
+            return CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.screen_mode.only_available",
+                    "/{command} is only available in {mode} mode",
+                )
+                .replace("{command}", self.target_label())
+                .replace("{mode}", self.source_label()),
+            );
         }
         if ctx.session_id.is_none() {
-            return CommandResult::Error(format!(
-                "No active session to reopen in {} mode",
-                self.target_label(),
-            ));
+            return CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.screen_mode.no_active_session",
+                    "No active session to reopen in {mode} mode",
+                )
+                .replace("{mode}", self.target_label()),
+            );
         }
         CommandResult::Action(Action::RelaunchInScreenMode {
             minimal: self.to_minimal,

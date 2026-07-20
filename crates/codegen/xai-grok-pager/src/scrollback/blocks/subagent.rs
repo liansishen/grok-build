@@ -13,7 +13,6 @@
 
 use std::time::Duration;
 
-use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
@@ -172,85 +171,90 @@ fn quoted_desc(desc: &str, max_width: usize) -> String {
 impl BlockContent for SubagentBlock {
     fn output(&self, ctx: &BlockContext) -> BlockOutput {
         let theme = Theme::current();
-        // When selected, lift only the bold "Subagent" label to
-        // `text_primary` so it reads as undimmed (mirrors `read.rs` /
-        // `search.rs`, which bump only the label and leave the rest at
-        // `muted`). The detail text (verb + description + meta) stays
-        // muted in every state.
-        let bold = if ctx.is_selected {
-            theme.primary().add_modifier(Modifier::BOLD)
-        } else {
-            theme.muted().add_modifier(Modifier::BOLD)
-        };
         let muted = theme.muted();
         let w = ctx.width as usize;
 
+        let localized_line = |key: &str, args: &[(&str, &str)]| {
+            Line::from(Span::styled(xai_grok_i18n::t_fmt(key, args), muted))
+        };
+
         let line = match (&self.kind, self.is_background) {
             (SubagentBlockKind::Started, bg) => {
-                let verb = if bg { "started: " } else { "running: " };
-                let activity_suffix: String = self
+                let activity = self
                     .activity_label
                     .as_deref()
                     .filter(|s| !s.is_empty())
-                    .map(|a| format!(" \u{2014} {a}"))
-                    .unwrap_or_default();
+                    .unwrap_or("");
                 let meta = format_subagent_meta(
                     self.persona.as_deref(),
                     self.role.as_deref(),
                     self.model.as_deref(),
                 );
-                // "Subagent running: " / "Subagent started: " = 18 chars
-                let overhead = 18 + meta.width() + activity_suffix.width();
+                let key = match (bg, activity.is_empty()) {
+                    (true, true) => "scrollback.subagent.started",
+                    (true, false) => "scrollback.subagent.started_activity",
+                    (false, true) => "scrollback.subagent.running",
+                    (false, false) => "scrollback.subagent.running_activity",
+                };
+                let overhead = xai_grok_i18n::t_fmt(
+                    key,
+                    &[("description", ""), ("activity", activity), ("meta", &meta)],
+                )
+                .width();
                 let desc = quoted_desc(&self.description, w.saturating_sub(overhead));
-                let mut spans = vec![
-                    Span::styled("Subagent ", bold),
-                    Span::styled(verb, muted),
-                    Span::styled(desc, muted),
-                ];
-                if !activity_suffix.is_empty() {
-                    spans.push(Span::styled(activity_suffix, muted));
-                }
-                spans.push(Span::styled(meta, muted));
-                Line::from(spans)
+                localized_line(
+                    key,
+                    &[
+                        ("description", &desc),
+                        ("activity", activity),
+                        ("meta", &meta),
+                    ],
+                )
             }
-            // Completed: Subagent completed in Xs: "description"
             (SubagentBlockKind::Completed { elapsed }, _) => {
                 let time_str = format_duration(*elapsed);
-                // "Subagent completed in Xs: " = 26 + time_str.len()
-                let prefix_len = 26 + time_str.len();
-                let desc = quoted_desc(&self.description, w.saturating_sub(prefix_len));
-                Line::from(vec![
-                    Span::styled("Subagent ", bold),
-                    Span::styled(format!("completed in {time_str}: "), muted),
-                    Span::styled(desc, muted),
-                ])
+                let key = "scrollback.subagent.completed";
+                let overhead =
+                    xai_grok_i18n::t_fmt(key, &[("duration", &time_str), ("description", "")])
+                        .width();
+                let desc = quoted_desc(&self.description, w.saturating_sub(overhead));
+                localized_line(key, &[("duration", &time_str), ("description", &desc)])
             }
-            // Failed: Subagent failed in Xs: "description"
             (SubagentBlockKind::Failed { elapsed, error }, _) => {
                 let time_str = format_duration(*elapsed);
-                let detail = error
-                    .as_deref()
-                    .map(|e| format!(" ({e})"))
-                    .unwrap_or_default();
-                let prefix_len = 21 + time_str.len() + detail.len();
-                let desc = quoted_desc(&self.description, w.saturating_sub(prefix_len));
-                Line::from(vec![
-                    Span::styled("Subagent ", bold),
-                    Span::styled(format!("failed in {time_str}{detail}: "), muted),
-                    Span::styled(desc, muted),
-                ])
+                let key = if error.is_some() {
+                    "scrollback.subagent.failed_error"
+                } else {
+                    "scrollback.subagent.failed"
+                };
+                let error = error.as_deref().unwrap_or("");
+                let overhead = xai_grok_i18n::t_fmt(
+                    key,
+                    &[
+                        ("duration", &time_str),
+                        ("error", error),
+                        ("description", ""),
+                    ],
+                )
+                .width();
+                let desc = quoted_desc(&self.description, w.saturating_sub(overhead));
+                localized_line(
+                    key,
+                    &[
+                        ("duration", &time_str),
+                        ("error", error),
+                        ("description", &desc),
+                    ],
+                )
             }
-            // Cancelled: Subagent cancelled in Xs: "description"
             (SubagentBlockKind::Cancelled { elapsed }, _) => {
                 let time_str = format_duration(*elapsed);
-                // "Subagent cancelled in Xs: " = 26 + time_str.len()
-                let prefix_len = 26 + time_str.len();
-                let desc = quoted_desc(&self.description, w.saturating_sub(prefix_len));
-                Line::from(vec![
-                    Span::styled("Subagent ", bold),
-                    Span::styled(format!("cancelled in {time_str}: "), muted),
-                    Span::styled(desc, muted),
-                ])
+                let key = "scrollback.subagent.cancelled";
+                let overhead =
+                    xai_grok_i18n::t_fmt(key, &[("duration", &time_str), ("description", "")])
+                        .width();
+                let desc = quoted_desc(&self.description, w.saturating_sub(overhead));
+                localized_line(key, &[("duration", &time_str), ("description", &desc)])
             }
         };
 

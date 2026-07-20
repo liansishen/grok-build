@@ -186,14 +186,20 @@ impl ThinkingBlock {
         let detail_style = theme.muted();
 
         if ctx.is_running {
-            Line::from(Span::styled(xai_grok_i18n::t("scrollback.thinking"), label_style))
+            Line::from(Span::styled(
+                xai_grok_i18n::t("scrollback.thinking"),
+                label_style,
+            ))
         } else if let Some(time_str) = self.format_time() {
             Line::from(vec![
                 Span::styled(xai_grok_i18n::t("scrollback.thought"), label_style),
                 Span::styled(format!(" for {time_str}"), detail_style),
             ])
         } else {
-            Line::from(Span::styled(xai_grok_i18n::t("scrollback.thought"), label_style))
+            Line::from(Span::styled(
+                xai_grok_i18n::t("scrollback.thought"),
+                label_style,
+            ))
         }
     }
 

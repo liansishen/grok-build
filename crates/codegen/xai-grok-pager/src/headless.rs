@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use clap::ValueEnum;
 use tokio_util::sync::CancellationToken;
+use xai_grok_i18n::{t, t_fmt};
 
 use agent_client_protocol as acp;
 use xai_acp_lib::{AcpAgentTx, AcpClientMessageBox, AcpClientRx, acp_send};
@@ -468,9 +469,9 @@ impl HeadlessEmitter {
         }
     }
 
-    fn on_error(&self, message: &str) {
+    fn on_error(&self, message: &str, human_message: Option<&str>) {
         match self.format {
-            OutputFormat::Plain => eprintln!("{message}"),
+            OutputFormat::Plain => eprintln!("{}", human_message.unwrap_or(message)),
             OutputFormat::StreamingJson | OutputFormat::Json => {
                 let mut err = serde_json::json!({"type":"error","message": message});
                 if let Some(usage) = &self.usage {
@@ -929,8 +930,16 @@ pub async fn run_single_turn(
     let spawned = match spawn_grok_shell(agent_config, &cancel, memory_config).await {
         Ok(s) => s,
         Err(e) => {
-            let msg = format!("Couldn't start session: {e}");
-            emitter.on_error(&msg);
+            let error = e.to_string();
+            let msg = format!("Couldn't start session: {error}");
+            let human_msg = t_fmt(
+                "cli.headless.start_session_failed",
+                &[("error", error.as_str())],
+            );
+            emitter.on_error(&msg, Some(&human_msg));
+            if emitter.format == OutputFormat::Plain {
+                anyhow::bail!(human_msg);
+            }
             anyhow::bail!("{msg}");
         }
     };
@@ -951,9 +960,17 @@ pub async fn run_single_turn(
     let init_resp: acp::InitializeResponse = match acp_send(init_req, &acp_tx).await {
         Ok(r) => r,
         Err(e) => {
-            let msg = format!("Couldn't initialize: {e}");
-            emitter.on_error(&msg);
+            let error = e.to_string();
+            let msg = format!("Couldn't initialize: {error}");
+            let human_msg = t_fmt(
+                "cli.headless.initialize_failed",
+                &[("error", error.as_str())],
+            );
+            emitter.on_error(&msg, Some(&human_msg));
             cancel.cancel();
+            if emitter.format == OutputFormat::Plain {
+                anyhow::bail!(human_msg);
+            }
             anyhow::bail!("{msg}");
         }
     };
@@ -974,8 +991,21 @@ pub async fn run_single_turn(
     {
         Ok(is_api_key) => is_api_key,
         Err(e) => {
-            emitter.on_error(&e.to_string());
+            let msg = e.to_string();
+            let human_msg = if msg == auth_required_message(true) {
+                Some(t("cli.headless.auth_required_interactive").to_string())
+            } else if msg == auth_required_message(false) {
+                Some(t("cli.headless.auth_required_non_interactive").to_string())
+            } else {
+                None
+            };
+            emitter.on_error(&msg, human_msg.as_deref());
             cancel.cancel();
+            if emitter.format == OutputFormat::Plain
+                && let Some(human_msg) = human_msg
+            {
+                anyhow::bail!(human_msg);
+            }
             return Err(e);
         }
     };
@@ -1045,9 +1075,17 @@ pub async fn run_single_turn(
     } = match opened {
         Ok(v) => v,
         Err(e) => {
-            let msg = format!("Couldn't create session: {e}");
-            emitter.on_error(&msg);
+            let error = e.to_string();
+            let msg = format!("Couldn't create session: {error}");
+            let human_msg = t_fmt(
+                "cli.headless.create_session_failed",
+                &[("error", error.as_str())],
+            );
+            emitter.on_error(&msg, Some(&human_msg));
             cancel.cancel();
+            if emitter.format == OutputFormat::Plain {
+                anyhow::bail!(human_msg);
+            }
             anyhow::bail!("{msg}");
         }
     };
@@ -1080,7 +1118,7 @@ pub async fn run_single_turn(
     .await
     {
         let msg = e.to_string();
-        emitter.on_error(&msg);
+        emitter.on_error(&msg, None);
         cancel.cancel();
         anyhow::bail!("{msg}");
     }
@@ -1205,8 +1243,14 @@ pub async fn run_single_turn(
             biased;
             msg = acp_rx.recv() => {
                 let Some(msg) = msg else {
-                    emitter.on_error("Connection closed unexpectedly");
+                    emitter.on_error(
+                        "Connection closed unexpectedly",
+                        Some(t("cli.headless.connection_closed_unexpectedly")),
+                    );
                     cancel.cancel();
+                    if emitter.format == OutputFormat::Plain {
+                        anyhow::bail!(t("cli.headless.connection_closed_unexpectedly"));
+                    }
                     anyhow::bail!("Connection closed unexpectedly");
                 };
                 handle_headless_acp_message(
@@ -1308,13 +1352,16 @@ pub async fn run_single_turn(
                 == Some("max_turns_reached");
             if is_max_turns {
                 match emitter.format {
-                    OutputFormat::Plain => eprintln!("Max turns reached"),
+                    OutputFormat::Plain => eprintln!("{}", t("cli.headless.max_turns_reached")),
                     OutputFormat::StreamingJson => {
                         println!("{}", serde_json::json!({"type": "max_turns_reached"}))
                     }
                     OutputFormat::Json => {} // conveyed by stopReason in the final JSON
                 }
                 emitter.on_end(&stop_reason, sid, rid);
+                if emitter.format == OutputFormat::Plain {
+                    anyhow::bail!(t("cli.headless.max_turns_reached"));
+                }
                 anyhow::bail!("max turns reached");
             }
             emitter.on_end(&stop_reason, sid, rid);
@@ -1335,7 +1382,7 @@ pub async fn run_single_turn(
             {
                 emitter.usage = Some(v);
             }
-            emitter.on_error(&msg);
+            emitter.on_error(&msg, None);
             anyhow::bail!("{msg}")
         }
         None => Ok(()),
@@ -1735,7 +1782,14 @@ fn handle_ext_notification(
                 );
             }
             OutputFormat::Plain => {
-                eprintln!("Auto-compacting conversation ({percentage}% full)...");
+                let percentage = percentage.to_string();
+                eprintln!(
+                    "{}",
+                    t_fmt(
+                        "cli.headless.auto_compact_started",
+                        &[("percentage", percentage.as_str())]
+                    )
+                );
             }
             OutputFormat::Json => {}
         },
@@ -1743,7 +1797,7 @@ fn handle_ext_notification(
             OutputFormat::StreamingJson => {
                 println!("{}", serde_json::json!({"type": "auto_compact_completed"}));
             }
-            OutputFormat::Plain => eprintln!("Conversation compacted."),
+            OutputFormat::Plain => eprintln!("{}", t("cli.headless.auto_compact_completed")),
             OutputFormat::Json => {}
         },
         XaiUpdate::AutoCompactFailed { error } => match format {
@@ -1755,9 +1809,15 @@ fn handle_ext_notification(
             }
             OutputFormat::Plain => {
                 if error.trim().is_empty() {
-                    eprintln!("Auto-compact failed.");
+                    eprintln!("{}", t("cli.headless.auto_compact_failed"));
                 } else {
-                    eprintln!("Auto-compact failed: {error}");
+                    eprintln!(
+                        "{}",
+                        t_fmt(
+                            "cli.headless.auto_compact_failed_error",
+                            &[("error", error.as_str())]
+                        )
+                    );
                 }
             }
             OutputFormat::Json => {}
@@ -1766,7 +1826,7 @@ fn handle_ext_notification(
             OutputFormat::StreamingJson => {
                 println!("{}", serde_json::json!({"type": "auto_compact_cancelled"}));
             }
-            OutputFormat::Plain => eprintln!("Auto-compact cancelled."),
+            OutputFormat::Plain => eprintln!("{}", t("cli.headless.auto_compact_cancelled")),
             OutputFormat::Json => {}
         },
         XaiUpdate::AutoContinueCompleted { total_tokens } => match format {
@@ -1776,7 +1836,7 @@ fn handle_ext_notification(
                     serde_json::json!({"type": "auto_continue_completed", "total_tokens": total_tokens})
                 );
             }
-            OutputFormat::Plain => eprintln!("Resumed after compaction."),
+            OutputFormat::Plain => eprintln!("{}", t("cli.headless.auto_continue_completed")),
             OutputFormat::Json => {}
         },
         XaiUpdate::ImageCompressed { message } => match format {

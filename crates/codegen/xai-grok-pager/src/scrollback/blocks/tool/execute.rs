@@ -208,7 +208,10 @@ impl ExecuteToolCallBlock {
                 } else {
                     theme.primary().add_modifier(Modifier::BOLD)
                 };
-                let mut spans = vec![Span::styled(xai_grok_i18n::t("tool.prefix.run").to_string(), label_style)];
+                let mut spans = vec![Span::styled(
+                    xai_grok_i18n::t("tool.prefix.run").to_string(),
+                    label_style,
+                )];
                 let mut hang = UnicodeWidthStr::width(xai_grok_i18n::t("tool.prefix.run"));
                 if self.bash_mode {
                     spans.push(Span::styled("(user) ".to_string(), theme.muted()));
@@ -303,7 +306,10 @@ impl ExecuteToolCallBlock {
         } else {
             theme.primary().add_modifier(Modifier::BOLD)
         };
-        let mut spans = vec![Span::styled(xai_grok_i18n::t("tool.prefix.run"), label_style)];
+        let mut spans = vec![Span::styled(
+            xai_grok_i18n::t("tool.prefix.run"),
+            label_style,
+        )];
         if self.bash_mode {
             // Same style as session event messages (e.g. "Worked for 2.3s")
             spans.push(Span::styled("(user) ", theme.muted()));
@@ -884,7 +890,10 @@ mod tests {
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, false, false);
         assert_eq!(headers.len(), 1);
         let text = line_text(&headers[0].0);
-        assert!(text.starts_with(xai_grok_i18n::t("tool.prefix.run")), "header={text:?}");
+        assert!(
+            text.starts_with(xai_grok_i18n::t("tool.prefix.run")),
+            "header={text:?}"
+        );
         assert!(text.contains("echo hi"), "header={text:?}");
     }
 

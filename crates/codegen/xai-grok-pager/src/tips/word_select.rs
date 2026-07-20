@@ -42,16 +42,21 @@ pub fn word_select_tip() -> EphemeralTip {
     let key_style = Style::default()
         .fg(theme.text_secondary)
         .add_modifier(Modifier::BOLD);
+    let full = xai_grok_i18n::t("tips.word_select.full");
+    let (prefix, after_settings) = full.split_once("/settings").unwrap_or((full, ""));
+    let (middle, suffix) = after_settings
+        .split_once(WORD_SELECT_ACCEPT_CHORD)
+        .unwrap_or((after_settings, ""));
     EphemeralTip {
         ticks_remaining: WORD_SELECT_TIP_TICKS,
         ..EphemeralTip::new(
             WORD_SELECT_TIP_KEY,
             Line::from(vec![
-                Span::styled("Want double-click to select? ", dim),
+                Span::styled(prefix, dim),
                 Span::styled("/settings", key_style),
-                Span::styled(" → Text selection · ", dim),
+                Span::styled(middle, dim),
                 Span::styled(WORD_SELECT_ACCEPT_CHORD, key_style),
-                Span::styled(": enable now", dim),
+                Span::styled(suffix, dim),
             ]),
         )
         .with_session_seen_cap(WORD_SELECT_TIP_SEEN_KEY, WORD_SELECT_TIP_SEEN_CAP)

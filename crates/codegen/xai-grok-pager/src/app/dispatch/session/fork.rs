@@ -60,7 +60,7 @@ pub(in crate::app::dispatch) fn dispatch_fork(
     }
     match args.worktree_override {
         Some(true) if !in_git_repo => {
-            app.show_toast("Cannot create worktree: not in a git repository");
+            app.show_toast(xai_grok_i18n::t("toast.worktree_not_git_repository"));
             vec![]
         }
         Some(worktree) => dispatch_fork_resolved(app, worktree, args.directive),
@@ -99,14 +99,14 @@ pub(super) fn worktree_persist_options()
     use xai_grok_tools::implementations::grok_build::ask_user_question::QuestionOption;
     [
         QuestionOption {
-            label: "Always worktree".into(),
-            description: "Use worktree and stop asking (reset in config.toml)".into(),
+            label: xai_grok_i18n::t("worktree.option.always").into(),
+            description: xai_grok_i18n::t("worktree.option.always_description").into(),
             preview: None,
             id: None,
         },
         QuestionOption {
-            label: "Never worktree".into(),
-            description: "Skip worktree and stop asking (reset in config.toml)".into(),
+            label: xai_grok_i18n::t("worktree.option.never").into(),
+            description: xai_grok_i18n::t("worktree.option.never_description").into(),
             preview: None,
             id: None,
         },
@@ -127,26 +127,26 @@ fn open_fork_question(app: &mut AppView, directive: Option<String>) -> Vec<Effec
         return vec![];
     };
     if agent.question_view.is_some() {
-        app.show_toast("Finish answering the current question first");
+        app.show_toast(xai_grok_i18n::t("toast.finish_current_question"));
         return vec![];
     }
     let mut options = vec![
         QuestionOption {
-            label: "Yes".into(),
-            description: "Fork in a new isolated git worktree".into(),
+            label: xai_grok_i18n::t("permission.option.yes").into(),
+            description: xai_grok_i18n::t("worktree.fork.yes_description").into(),
             preview: None,
             id: None,
         },
         QuestionOption {
-            label: "No".into(),
-            description: "Fork in the current cwd".into(),
+            label: xai_grok_i18n::t("worktree.fork.no").into(),
+            description: xai_grok_i18n::t("worktree.fork.no_description").into(),
             preview: None,
             id: None,
         },
     ];
     options.extend(worktree_persist_options());
     let question = Question {
-        question: "Run this fork in an isolated git worktree?".into(),
+        question: xai_grok_i18n::t("worktree.fork.question").into(),
         id: None,
         options,
         multi_select: Some(false),
@@ -183,7 +183,7 @@ pub(in crate::app::dispatch) fn dispatch_fork_resolved(
         return vec![];
     };
     let Some(parent_session_id) = parent.session.session_id.clone() else {
-        app.show_toast("Cannot fork: session not yet created");
+        app.show_toast(xai_grok_i18n::t("toast.fork_still_creating"));
         return vec![];
     };
     let parent_cwd = parent.session.cwd.clone();
@@ -192,8 +192,8 @@ pub(in crate::app::dispatch) fn dispatch_fork_resolved(
     app.next_agent_id += 1;
     let new_agent = build_fork_placeholder(app, new_id, parent_id, &parent_cwd, worktree);
     let parent_marker = match directive.as_deref() {
-        Some(d) => format!("Forked: {d}"),
-        None => "Forked".to_string(),
+        Some(d) => xai_grok_i18n::t_fmt("session.forked_with_directive", &[("directive", d)]),
+        None => xai_grok_i18n::t("session.forked").to_string(),
     };
     let parent_chat_kind = parent.chat_kind || app.chat_mode;
     app.agents.insert(new_id, new_agent);
@@ -229,9 +229,9 @@ pub(in crate::app::dispatch) fn dispatch_fork_resolved(
             worktree,
         });
         if worktree {
-            agent
-                .scrollback
-                .push_block(RenderBlock::system("Creating worktree\u{2026}".to_string()));
+            agent.scrollback.push_block(RenderBlock::system(
+                xai_grok_i18n::t("worktree.creating").to_string(),
+            ));
         }
         agent.pending_first_prompt = directive;
     }
@@ -321,13 +321,13 @@ pub(in crate::app::dispatch) fn dispatch_project_selected(
     let mut effects = Vec::new();
     if disable_picker {
         app.project_picker_disabled = true;
-        app.show_toast("Won't ask about project directory again (reset in config.toml)");
+        app.show_toast(xai_grok_i18n::t("toast.project_picker_disabled"));
         effects.push(Effect::PersistProjectPickerDisabled { disabled: true });
     }
     let path = if path.is_dir() {
         path
     } else {
-        app.show_toast("Directory not found, continuing in current directory");
+        app.show_toast(xai_grok_i18n::t("toast.directory_not_found_current"));
         app.cwd.clone()
     };
     app.cwd = path.clone();
@@ -342,7 +342,10 @@ pub(in crate::app::dispatch) fn dispatch_project_selected(
         agent.session.cwd = path.clone();
         if changed {
             let display = crate::project_picker::sources::display_path(&path);
-            agent.show_toast(&format!("Updated working directory to {display}"));
+            agent.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.working_directory_updated",
+                &[("path", &display)],
+            ));
         }
     }
     if let Some(agent) = app.agents.get_mut(&id) {
@@ -445,16 +448,27 @@ pub(in crate::app::dispatch) fn build_child_fork_marker(
     switch_hint: Option<&str>,
 ) -> String {
     let header = if let Some(cmd) = switch_hint {
-        format!(
-            "Session {session_id} (forked from {parent_sid}) \u{2014} use {cmd} to switch between sessions",
+        xai_grok_i18n::t_fmt(
+            "session.fork_child_switch_hint",
+            &[
+                ("session_id", session_id),
+                ("parent_session_id", parent_sid),
+                ("command", cmd),
+            ],
         )
     } else {
-        format!("Session {session_id} (forked from {parent_sid})")
+        xai_grok_i18n::t_fmt(
+            "session.fork_child",
+            &[
+                ("session_id", session_id),
+                ("parent_session_id", parent_sid),
+            ],
+        )
     };
     if worktree {
         header
     } else {
-        format!("{header}\n  (both agents share cwd)")
+        xai_grok_i18n::t_fmt("session.fork_child_shared_cwd", &[("header", &header)])
     }
 }
 pub(in crate::app::dispatch) fn dispatch_startup_fork_session(
@@ -528,20 +542,29 @@ pub(in crate::app::dispatch) fn handle_worktree_forked(
         agent.session.is_worktree = true;
         app.restore_code = None;
         agent.prompt.file_search.retarget(&session_cwd);
-        agent.scrollback.push_block(RenderBlock::system(format!(
-            "Worktree ready: {}",
-            worktree_path.display()
-        )));
+        let worktree_path_display = worktree_path.display().to_string();
+        agent
+            .scrollback
+            .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                "worktree.ready",
+                &[("path", &worktree_path_display)],
+            )));
         match (code_restored, restore_summary.as_deref()) {
             (true, Some(s)) => {
                 agent
                     .scrollback
-                    .push_block(RenderBlock::system(format!("\u{2713} Code restored: {s}")));
+                    .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                        "session.code_restored",
+                        &[("summary", s)],
+                    )));
             }
             (false, Some(s)) => {
-                agent.scrollback.push_block(RenderBlock::system(format!(
-                    "\u{26A0} Code restore failed: {s}"
-                )));
+                agent
+                    .scrollback
+                    .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                        "session.code_restore_failed",
+                        &[("summary", s)],
+                    )));
             }
             _ => {}
         }

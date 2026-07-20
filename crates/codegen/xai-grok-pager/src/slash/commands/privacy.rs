@@ -39,10 +39,13 @@ impl SlashCommand for PrivacyCommand {
         }
         match parse_privacy_arg(arg) {
             Some(opted_in) => CommandResult::Action(Action::SetCodingDataSharing { opted_in }),
-            None => CommandResult::Error(format!(
-                "Unknown argument `{arg}`. Valid options: opt-in (aliases: in, share) | \
-                 opt-out (aliases: out, private)."
-            )),
+            None => CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.privacy.unknown_argument",
+                    "Unknown argument `{arg}`. Valid options: opt-in (aliases: in, share) | opt-out (aliases: out, private).",
+                )
+                .replace("{arg}", arg),
+            ),
         }
     }
 }

@@ -968,9 +968,15 @@ pub fn build_hints(
         ActivePane::Prompt if is_editing_queued => {
             let mut hints = Vec::new();
             if prompt.can_send() {
-                hints.push(HintItem::new(crate::key!(Enter), xai_grok_i18n::t("hint.save")));
+                hints.push(HintItem::new(
+                    crate::key!(Enter),
+                    xai_grok_i18n::t("hint.save"),
+                ));
             }
-            hints.push(HintItem::new(crate::key!(Esc), xai_grok_i18n::t("hint.cancel")));
+            hints.push(HintItem::new(
+                crate::key!(Esc),
+                xai_grok_i18n::t("hint.cancel"),
+            ));
             hints
         }
         ActivePane::Prompt if prompt.history_search.is_active() => {
@@ -987,8 +993,14 @@ pub fn build_hints(
                     KeyShortcut::key(KeyCode::PageDown),
                     xai_grok_i18n::t("hint.page"),
                 ),
-                HintItem::new(KeyShortcut::key(KeyCode::Enter), xai_grok_i18n::t("hint.select")),
-                HintItem::new(KeyShortcut::key(KeyCode::Esc), xai_grok_i18n::t("hint.cancel")),
+                HintItem::new(
+                    KeyShortcut::key(KeyCode::Enter),
+                    xai_grok_i18n::t("hint.select"),
+                ),
+                HintItem::new(
+                    KeyShortcut::key(KeyCode::Esc),
+                    xai_grok_i18n::t("hint.cancel"),
+                ),
             ]
         }
         ActivePane::Prompt => {
@@ -1021,7 +1033,10 @@ pub fn build_hints(
                 ));
             }
             if prompt.file_ref_near_cursor() {
-                hints.push(HintItem::new(crate::key!(':'), xai_grok_i18n::t("hint.lines")));
+                hints.push(HintItem::new(
+                    crate::key!(':'),
+                    xai_grok_i18n::t("hint.lines"),
+                ));
             }
             if prompt.prompt_suggestion_visible() {
                 hints.push(
@@ -1054,7 +1069,10 @@ pub fn build_hints(
         ActivePane::Tasks => {
             let mut hints = Vec::new();
             if selected_supports_fullscreen {
-                hints.push(HintItem::new(crate::key!(Enter), xai_grok_i18n::t("hint.view")));
+                hints.push(HintItem::new(
+                    crate::key!(Enter),
+                    xai_grok_i18n::t("hint.view"),
+                ));
             }
             if selected_supports_copy {
                 hints.push(HintItem::new(
@@ -1063,7 +1081,10 @@ pub fn build_hints(
                 ));
             }
             if selected_can_kill {
-                hints.push(HintItem::new(crate::key!('x'), xai_grok_i18n::t("hint.kill")));
+                hints.push(HintItem::new(
+                    crate::key!('x'),
+                    xai_grok_i18n::t("hint.kill"),
+                ));
             }
             hints.push(HintItem::new(
                 crate::key!('h'),
@@ -1080,7 +1101,10 @@ pub fn build_hints(
             let mut hints = Vec::new();
             if vim_mode {
                 if scrollback_search.is_some_and(|s| s.is_composing()) {
-                    hints.push(HintItem::new(crate::key!(Enter), xai_grok_i18n::t("hint.go")));
+                    hints.push(HintItem::new(
+                        crate::key!(Enter),
+                        xai_grok_i18n::t("hint.go"),
+                    ));
                 } else {
                     hints.push(HintItem::paired(
                         crate::key!('n'),
@@ -1097,7 +1121,10 @@ pub fn build_hints(
                     xai_grok_i18n::t("hint.next_prev"),
                 ));
             }
-            hints.push(HintItem::new(crate::key!(Esc), xai_grok_i18n::t("hint.cancel")));
+            hints.push(HintItem::new(
+                crate::key!(Esc),
+                xai_grok_i18n::t("hint.cancel"),
+            ));
             hints
         }
         ActivePane::Scrollback => {
@@ -1213,7 +1240,10 @@ pub fn build_hints(
                 hints.push(HintItem::new(key, label));
             }
             if selected_can_kill {
-                hints.push(HintItem::new(crate::key!('x'), xai_grok_i18n::t("hint.kill")));
+                hints.push(HintItem::new(
+                    crate::key!('x'),
+                    xai_grok_i18n::t("hint.kill"),
+                ));
             }
             if is_subagent_view {
                 hints.push(HintItem::paired(crate::key!('q'), crate::key!(Esc), "back"));
@@ -1232,7 +1262,10 @@ pub fn build_hints(
         hints.push(def.hint());
     }
     if can_demote {
-        hints.push(HintItem::new(crate::key!('g', CONTROL), xai_grok_i18n::t("hint.send_to_bg")));
+        hints.push(HintItem::new(
+            crate::key!('g', CONTROL),
+            xai_grok_i18n::t("hint.send_to_bg"),
+        ));
     }
     hints
 }

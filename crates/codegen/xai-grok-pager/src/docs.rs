@@ -34,10 +34,17 @@ impl From<&Doc> for DocEntry {
 }
 
 fn localized_doc_meta(d: &Doc) -> (&'static str, &'static str) {
-    // Map guide file basename prefix → catalog keys docs.NN.{title,desc}
-    let num = d.filename.get(..2).unwrap_or("");
-    let title_key = xai_grok_i18n::intern_key(&format!("docs.{num}.title"));
-    let desc_key = xai_grok_i18n::intern_key(&format!("docs.{num}.desc"));
+    let key = match d.filename {
+        "hooks-and-plugins.md" => "docs.reference.hooks_plugins",
+        "custom-hooks.md" => "docs.reference.custom_hooks",
+        // User-guide files use a stable two-digit numeric prefix.
+        filename => {
+            let num = filename.get(..2).unwrap_or("");
+            xai_grok_i18n::intern_key(&format!("docs.{num}"))
+        }
+    };
+    let title_key = xai_grok_i18n::intern_key(&format!("{key}.title"));
+    let desc_key = xai_grok_i18n::intern_key(&format!("{key}.desc"));
     (
         xai_grok_i18n::t_or(title_key, d.title),
         xai_grok_i18n::t_or(desc_key, d.description),

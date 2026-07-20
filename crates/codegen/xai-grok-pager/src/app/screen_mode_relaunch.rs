@@ -234,7 +234,13 @@ pub(crate) fn exec_screen_mode_relaunch(session_id: &str, want_minimal: bool) ->
     } else {
         "/minimal"
     };
-    eprintln!("Reopening session in {mode_label} mode… (switch back with {reverse})");
+    eprintln!(
+        "{}",
+        xai_grok_i18n::t_fmt(
+            "screen_mode.reopening",
+            &[("mode", mode_label), ("reverse", reverse)],
+        )
+    );
     let _ = io::stdout().flush();
     let _ = io::stderr().flush();
 

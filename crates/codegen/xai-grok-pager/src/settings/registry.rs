@@ -116,8 +116,7 @@ pub fn dynamic_enum_choices(
             out.push(OwnedEnumChoice {
                 canonical: String::new(),
                 display: xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string(),
-                description: xai_grok_i18n::t("settings.dynamic_enum.no_override_desc")
-                    .to_string(),
+                description: xai_grok_i18n::t("settings.dynamic_enum.no_override_desc").to_string(),
             });
             for (name, _id) in &snapshot.available_models {
                 out.push(OwnedEnumChoice {
@@ -235,18 +234,14 @@ impl EnumChoice {
     /// Localized display for a choice under `settings.<setting_key>.choice_<canonical>`.
     pub fn display_t(&self, setting_key: SettingKey) -> &'static str {
         let canon = self.canonical.replace('-', "_");
-        let key = xai_grok_i18n::intern_key(&format!(
-            "settings.{setting_key}.choice_{canon}"
-        ));
+        let key = xai_grok_i18n::intern_key(&format!("settings.{setting_key}.choice_{canon}"));
         xai_grok_i18n::t_or(key, self.display)
     }
 
     /// Localized sub-description for a choice.
     pub fn description_t(&self, setting_key: SettingKey) -> &'static str {
         let canon = self.canonical.replace('-', "_");
-        let key = xai_grok_i18n::intern_key(&format!(
-            "settings.{setting_key}.choice_{canon}_desc"
-        ));
+        let key = xai_grok_i18n::intern_key(&format!("settings.{setting_key}.choice_{canon}_desc"));
         xai_grok_i18n::t_or(key, self.description)
     }
 }

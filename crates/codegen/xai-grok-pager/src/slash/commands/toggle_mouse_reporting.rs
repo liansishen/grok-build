@@ -39,9 +39,11 @@ impl SlashCommand for ToggleMouseReportingCommand {
             CommandResult::Action(Action::ToggleMouseCapture)
         } else {
             CommandResult::Message(
-                "Mouse reporting toggle is off. Set `[ui] mouse_reporting_toggle = true` \
-                 in ~/.grok/config.toml to enable it."
-                    .to_string(),
+                xai_grok_i18n::t_or(
+                    "slash.toggle-mouse-reporting.disabled",
+                    "Mouse reporting toggle is off. Set `[ui] mouse_reporting_toggle = true` in ~/.grok/config.toml to enable it.",
+                )
+                .to_string(),
             )
         }
     }

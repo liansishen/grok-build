@@ -1,5 +1,3 @@
-use std::fmt::Write;
-
 use crossterm::terminal::SetTitle;
 
 use super::config::{TitleConfig, TitleItem};
@@ -149,7 +147,7 @@ fn write_item(
                 write_activity(buf, activity);
             } else if state.is_busy {
                 push_separator(buf, has_parts);
-                buf.push_str("Waiting");
+                buf.push_str(xai_grok_i18n::t("notification.title.waiting"));
             } else {
                 return false;
             }
@@ -188,7 +186,10 @@ fn write_item(
                 return false;
             }
             push_separator(buf, has_parts);
-            let _ = write!(buf, "{}s", secs);
+            buf.push_str(&xai_grok_i18n::t_fmt(
+                "notification.title.seconds",
+                &[("count", &secs.to_string())],
+            ));
         }
         TitleItem::ActionRequired => {
             if !state.has_pending_permissions {
@@ -203,7 +204,7 @@ fn write_item(
                 return false;
             }
             push_separator(buf, has_parts);
-            buf.push_str("\u{26A0} Action Required");
+            buf.push_str(xai_grok_i18n::t("notification.title.action_required"));
         }
     }
     *has_parts = true;
@@ -218,8 +219,8 @@ fn push_separator(buf: &mut String, has_parts: &mut bool) {
 
 fn write_activity(buf: &mut String, activity: &TurnActivity) {
     match activity {
-        TurnActivity::Thinking => buf.push_str("Thinking"),
-        TurnActivity::Responding => buf.push_str("Responding"),
+        TurnActivity::Thinking => buf.push_str(xai_grok_i18n::t("notification.title.thinking")),
+        TurnActivity::Responding => buf.push_str(xai_grok_i18n::t("notification.title.responding")),
         TurnActivity::ToolRunning { title, description } => {
             if let Some(desc) = description
                 .as_deref()
@@ -228,38 +229,52 @@ fn write_activity(buf: &mut String, activity: &TurnActivity) {
             {
                 buf.push_str(&crate::acp::tracker::format_waiting_for_subject(desc));
             } else if title.is_empty() {
-                buf.push_str("Running tool");
+                buf.push_str(xai_grok_i18n::t("notification.title.running_tool"));
             } else {
-                buf.push_str("Running: ");
-                write_truncated(buf, title, 30);
+                let title = truncated(title, 30);
+                buf.push_str(&xai_grok_i18n::t_fmt(
+                    "notification.title.running_named",
+                    &[("title", &title)],
+                ));
             }
         }
-        TurnActivity::AutoCompacting => buf.push_str("Compacting"),
+        TurnActivity::AutoCompacting => {
+            buf.push_str(xai_grok_i18n::t("notification.title.compacting"))
+        }
         TurnActivity::Retrying {
             attempt,
             max_retries,
             ..
         } => {
-            let _ = write!(buf, "Retrying ({}/{})", attempt, max_retries);
+            buf.push_str(&xai_grok_i18n::t_fmt(
+                "notification.title.retrying",
+                &[
+                    ("attempt", &attempt.to_string()),
+                    ("max", &max_retries.to_string()),
+                ],
+            ));
         }
         TurnActivity::Waiting(reason) => buf.push_str(&reason.label()),
     }
 }
 
 fn write_truncated(buf: &mut String, s: &str, max: usize) {
-    // Fast path: ASCII-only strings where byte length == char count.
+    buf.push_str(&truncated(s, max));
+}
+
+fn truncated(s: &str, max: usize) -> String {
     if s.len() <= max {
-        buf.push_str(s);
-        return;
+        return s.to_string();
     }
-    // Slow path: iterate chars for multi-byte or over-limit strings.
+    let mut out = String::new();
     for (count, ch) in s.chars().enumerate() {
         if count >= max {
-            buf.push('\u{2026}');
-            return;
+            out.push('\u{2026}');
+            break;
         }
-        buf.push(ch);
+        out.push(ch);
     }
+    out
 }
 
 /// Build the escape sequence for setting the terminal title without writing

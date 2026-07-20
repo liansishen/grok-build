@@ -51,7 +51,9 @@ impl SlashCommand for ExportCommand {
 
     fn run(&self, ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         if ctx.session_id.is_none() {
-            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_session_export").to_string());
+            return CommandResult::Error(
+                xai_grok_i18n::t("slash.err.no_active_session_export").to_string(),
+            );
         }
 
         let trimmed = args.trim();
@@ -136,9 +138,9 @@ fn list_path_completions(cwd: &Path, query: &str) -> Vec<ArgItem> {
             match_text: format!("{typed_prefix}{name_str}"),
             insert_text: format!("{typed_prefix}{name_str}{suffix}"),
             description: if is_dir {
-                "directory".to_string()
+                xai_grok_i18n::t_or("slash.export.path_directory", "directory").to_string()
             } else {
-                "file".to_string()
+                xai_grok_i18n::t_or("slash.export.path_file", "file").to_string()
             },
         });
 

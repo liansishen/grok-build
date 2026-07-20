@@ -2,6 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::acp::meta::NotificationMeta;
 use crate::acp::tracker::AcpUpdateTracker;
@@ -10,12 +11,11 @@ use crate::scrollback::state::ScrollbackState;
 
 #[derive(Debug, clap::Args, Clone)]
 pub struct ExportArgs {
-    /// Session ID to export
+    #[arg(help = t("cli.export.help.session_id"))]
     pub session_id: String,
-    /// Output file path (default: stdout)
+    #[arg(help = t("cli.export.help.output"))]
     pub output: Option<PathBuf>,
-    /// Copy to clipboard instead of writing to stdout
-    #[arg(long, short)]
+    #[arg(long, short, help = t("cli.export.help.clipboard"))]
     pub clipboard: bool,
 }
 
@@ -23,7 +23,12 @@ pub fn run(args: ExportArgs) -> Result<()> {
     tracing::info!(session_id = %args.session_id, "export_cmd: starting session export");
 
     let updates = xai_grok_shell::session::storage::load_updates_for_replay(&args.session_id)?
-        .with_context(|| format!("Session '{}' not found.", args.session_id))?;
+        .with_context(|| {
+            t_fmt(
+                "cli.export.session_not_found",
+                &[("session_id", args.session_id.as_str())],
+            )
+        })?;
 
     let mut tracker = AcpUpdateTracker::new();
     let mut scrollback = ScrollbackState::new();
@@ -42,27 +47,41 @@ pub fn run(args: ExportArgs) -> Result<()> {
     let md = render_blocks_to_markdown(blocks);
 
     if md.is_empty() {
-        anyhow::bail!(
-            "Session '{}' has no conversation content to export",
-            args.session_id
-        );
+        anyhow::bail!(t_fmt(
+            "cli.export.no_content",
+            &[("session_id", args.session_id.as_str())]
+        ));
     }
 
     if let Some(path) = args.output {
         let expanded = PathBuf::from(shellexpand::tilde(&path.to_string_lossy()).as_ref());
         if let Some(parent) = expanded.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create {}", parent.display()))?;
+            std::fs::create_dir_all(parent).with_context(|| {
+                t_fmt(
+                    "cli.export.create_failed",
+                    &[("path", parent.to_string_lossy().as_ref())],
+                )
+            })?;
         }
-        std::fs::write(&expanded, &md)
-            .with_context(|| format!("Failed to write {}", expanded.display()))?;
+        std::fs::write(&expanded, &md).with_context(|| {
+            t_fmt(
+                "cli.export.write_failed",
+                &[("path", expanded.to_string_lossy().as_ref())],
+            )
+        })?;
         tracing::info!(
             session_id = %args.session_id,
             path = %expanded.display(),
             bytes = md.len(),
             "export_cmd: wrote transcript to file"
         );
-        eprintln!("Conversation exported to {}", expanded.display());
+        eprintln!(
+            "{}",
+            t_fmt(
+                "cli.export.exported",
+                &[("path", expanded.to_string_lossy().as_ref())]
+            )
+        );
     } else if args.clipboard {
         let _ = crate::clipboard::copy_text(&md);
         let lines = md.lines().count();
@@ -72,14 +91,22 @@ pub fn run(args: ExportArgs) -> Result<()> {
             lines,
             "export_cmd: copied transcript to clipboard"
         );
+        let chars = md.len().to_string();
+        let lines = lines.to_string();
         eprintln!(
-            "Conversation copied to clipboard ({} chars, {} lines)",
-            md.len(),
-            lines
+            "{}",
+            t_fmt(
+                "cli.export.copied_to_clipboard",
+                &[("chars", chars.as_str()), ("lines", lines.as_str())]
+            )
         );
     } else {
-        std::io::stdout().write_all(md.as_bytes())?;
-        std::io::stdout().write_all(b"\n")?;
+        std::io::stdout()
+            .write_all(md.as_bytes())
+            .with_context(|| t("cli.export.stdout_write_failed"))?;
+        std::io::stdout()
+            .write_all(b"\n")
+            .with_context(|| t("cli.export.stdout_write_failed"))?;
     }
 
     Ok(())

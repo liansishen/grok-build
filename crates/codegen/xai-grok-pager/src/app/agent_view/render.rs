@@ -1250,10 +1250,7 @@ impl AgentView {
             }
             status.push(
                 "plan",
-                Line::from(Span::styled(
-                    xai_grok_i18n::t("mode.flag.plan"),
-                    plan_style,
-                )),
+                Line::from(Span::styled(xai_grok_i18n::t("mode.flag.plan"), plan_style)),
             );
         }
         if let Some(ref goal) = self.goal_state {

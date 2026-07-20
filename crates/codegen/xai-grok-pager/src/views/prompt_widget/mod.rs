@@ -2279,7 +2279,10 @@ impl PromptWidget {
     /// prompt already holds [`Self::IMAGE_CAP`] images.
     #[allow(dead_code)]
     pub(crate) fn cap_reached_toast() -> String {
-        format!("Image limit reached (max {})", Self::IMAGE_CAP)
+        xai_grok_i18n::t_fmt(
+            "prompt.image_limit",
+            &[("max", &Self::IMAGE_CAP.to_string())],
+        )
     }
 
     /// Insert a pasted image as an atomic `[Image #N]` chip.
@@ -2295,15 +2298,23 @@ impl PromptWidget {
         if let Some((w, h)) = image.preview_dimensions()
             && (w < MIN_SIDE || h < MIN_SIDE)
         {
-            return Err(format!(
-                "Image too small ({w}×{h}). Must be at least {MIN_SIDE}×{MIN_SIDE} pixels."
+            return Err(xai_grok_i18n::t_fmt(
+                "prompt.image_too_small",
+                &[
+                    ("width", &w.to_string()),
+                    ("height", &h.to_string()),
+                    ("min", &MIN_SIDE.to_string()),
+                ],
             ));
         }
 
         self.image_counter += 1;
         let display_number = self.image_counter;
         let placeholder = crate::prompt_images::display_text(display_number);
-        let display_line = chip_line(format!("Image #{display_number}"));
+        let display_line = chip_line(xai_grok_i18n::t_fmt(
+            "prompt.image_chip",
+            &[("number", &display_number.to_string())],
+        ));
 
         let buf_len_before = self.textarea.text().len();
         self.textarea.begin_undo_group();
@@ -2744,15 +2755,15 @@ impl PromptWidget {
             .fg(theme.fuzzy_accent)
             .add_modifier(Modifier::BOLD);
         let action = if self.paste_element_at_cursor().is_some() {
-            "enter"
+            xai_grok_i18n::t("prompt.paste_hint.enter")
         } else {
-            "paste again"
+            xai_grok_i18n::t("prompt.paste_hint.paste_again")
         };
         Line::from(vec![
             Span::styled(action, chord),
-            Span::styled(" or ", dim),
-            Span::styled("double-click", chord),
-            Span::styled(" to expand", dim),
+            Span::styled(xai_grok_i18n::t("prompt.paste_hint.or"), dim),
+            Span::styled(xai_grok_i18n::t("prompt.paste_hint.double_click"), chord),
+            Span::styled(xai_grok_i18n::t("prompt.paste_hint.expand_suffix"), dim),
         ])
     }
 
@@ -3396,7 +3407,10 @@ impl PromptWidget {
         // Build right-side spans: "multiline" indicator.
         let mut right_spans: Vec<Span<'static>> = Vec::new();
         if info.multiline {
-            right_spans.push(Span::styled("multiline", flag_style));
+            right_spans.push(Span::styled(
+                xai_grok_i18n::t("prompt.multiline"),
+                flag_style,
+            ));
         }
 
         if !right_spans.is_empty() {
@@ -3644,10 +3658,14 @@ fn normalize_cr(text: &str) -> String {
 ///
 /// Renders as: `[Pasted: N lines]`
 fn paste_chip_display(line_count: usize) -> Line<'static> {
-    chip_line(format!(
-        "Pasted: {} line{}",
-        line_count,
-        if line_count != 1 { "s" } else { "" }
+    let key = if line_count == 1 {
+        "prompt.paste_chip.line"
+    } else {
+        "prompt.paste_chip.lines"
+    };
+    chip_line(xai_grok_i18n::t_fmt(
+        key,
+        &[("count", &line_count.to_string())],
     ))
 }
 
@@ -3659,9 +3677,15 @@ fn paste_chip_display_bytes(byte_len: usize) -> Line<'static> {
     } else if byte_len >= 1000 {
         format!("{} KB", byte_len / 1000)
     } else {
-        format!("{byte_len} bytes")
+        xai_grok_i18n::t_fmt(
+            "prompt.paste_chip.bytes",
+            &[("count", &byte_len.to_string())],
+        )
     };
-    chip_line(format!("Pasted: {size}"))
+    chip_line(xai_grok_i18n::t_fmt(
+        "prompt.paste_chip.size",
+        &[("size", &size)],
+    ))
 }
 
 /// Highest `display_number` present in `images`, or `0` when the slice is empty.

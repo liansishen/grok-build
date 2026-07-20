@@ -346,7 +346,7 @@ pub fn render_btw_panel(
             let loading_style = Style::default().fg(theme.gray).bg(bg);
             let line = Line::from(vec![
                 Span::styled(format!("{spinner} "), loading_style),
-                Span::styled("Answering\u{2026}", loading_style),
+                Span::styled(xai_grok_i18n::t("btw.answering"), loading_style),
             ]);
             buf.set_line(content_x, body_y, &line, content_width as u16);
         }

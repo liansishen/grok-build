@@ -1525,7 +1525,7 @@ fn truncation_indicator_line(theme: &Theme) -> Line<'static> {
             "Ctrl-F",
             Style::default().fg(theme.accent_user).bg(theme.bg_light),
         ),
-        Span::styled(" to expand", style),
+        Span::styled(xai_grok_i18n::t("permission.args.expand_suffix"), style),
     ])
 }
 
@@ -1786,7 +1786,10 @@ fn dynamic_option_label(
             let scope_text = match scope.selected {
                 McpScope::Tool => perm.display_name(),
                 McpScope::Server => match scope.server_prefix.as_deref() {
-                    Some(s) => xai_grok_i18n::t_fmt("permission.mcp.all_tools_from", &[("server", &mcp_titleize_segment(s))]),
+                    Some(s) => xai_grok_i18n::t_fmt(
+                        "permission.mcp.all_tools_from",
+                        &[("server", &mcp_titleize_segment(s))],
+                    ),
                     None => perm.display_name(),
                 },
             };

@@ -82,18 +82,23 @@ impl SlashCommand for ThemeCommand {
         let available = ThemeKind::available();
 
         // Prepend "auto" (follow system appearance) as the first option.
-        let auto_active = if is_auto { " (active)" } else { "" };
+        let active_suffix = xai_grok_i18n::t_or("slash.common.active_suffix", " (active)");
+        let auto_active = if is_auto { active_suffix } else { "" };
         let mut items = vec![ArgItem {
             display: "auto".to_string(),
             match_text: "auto".to_string(),
             insert_text: "auto".to_string(),
-            description: format!("auto (follow system){auto_active}"),
+            description: format!(
+                "{}{}",
+                xai_grok_i18n::t_or("slash.theme.auto_description", "auto (follow system)"),
+                auto_active
+            ),
         }];
 
         // Concrete themes — only show "(active)" when not in auto mode.
         items.extend(available.iter().map(|kind| {
             let active = if *kind == current && !is_auto {
-                " (active)"
+                active_suffix
             } else {
                 ""
             };
@@ -132,11 +137,14 @@ impl SlashCommand for ThemeCommand {
             None => {
                 let all_names: Vec<&str> =
                     ThemeKind::ALL.iter().map(|k| k.display_name()).collect();
-                CommandResult::Error(format!(
-                    "Unknown theme: {}. Available: auto, {}",
-                    trimmed,
-                    all_names.join(", ")
-                ))
+                CommandResult::Error(
+                    xai_grok_i18n::t_or(
+                        "slash.theme.unknown",
+                        "Unknown theme: {theme}. Available: auto, {available}",
+                    )
+                    .replace("{theme}", trimmed)
+                    .replace("{available}", &all_names.join(", ")),
+                )
             }
         }
     }

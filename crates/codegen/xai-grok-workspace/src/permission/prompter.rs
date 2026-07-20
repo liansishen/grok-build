@@ -677,12 +677,19 @@ impl AcpPrompter {
                             acp::PermissionOptionId::new("allow-always-mcp"),
                             acp::PermissionOption::new(
                                 "allow-always-mcp",
-                                format!("{} {}", xai_grok_i18n::t("permission.prefix.always_allow"), tool_name),
+                                format!(
+                                    "{} {}",
+                                    xai_grok_i18n::t("permission.prefix.always_allow"),
+                                    tool_name
+                                ),
                                 acp::PermissionOptionKind::AllowAlways,
                             )
                             .meta(
                                 serde_json::to_value(McpToolPermission {
-                                    prompt_prefix: xai_grok_i18n::t("permission.prefix.always_allow").to_owned(),
+                                    prompt_prefix: xai_grok_i18n::t(
+                                        "permission.prefix.always_allow",
+                                    )
+                                    .to_owned(),
                                     tool_name: tool_name.clone(),
                                     server_prefix,
                                 })
@@ -1188,7 +1195,10 @@ mod tests {
                 serde_json::from_value(serde_json::Value::Object(meta)).unwrap();
             assert_eq!(perm.tool_name, name);
             assert_eq!(perm.server_prefix.as_deref(), Some(server));
-            assert_eq!(perm.prompt_prefix, xai_grok_i18n::t("permission.prefix.always_allow"));
+            assert_eq!(
+                perm.prompt_prefix,
+                xai_grok_i18n::t("permission.prefix.always_allow")
+            );
         }
     }
 

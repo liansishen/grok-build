@@ -381,7 +381,9 @@ impl AgentView {
             saw_todo_update: false,
         });
         self.loading_placeholder_id = Some(self.scrollback.push_block(
-            crate::scrollback::block::RenderBlock::system("Reloading session after reconnect..."),
+            crate::scrollback::block::RenderBlock::system(xai_grok_i18n::t(
+                "session.reloading_after_reconnect",
+            )),
         ));
         self.scrollback.begin_batch();
         self.begin_replay_window();
@@ -638,7 +640,8 @@ impl AgentView {
             return (!first.is_empty()).then_some(first);
         }
         let n = task_ids.len() - 1;
-        let suffix = format!(" + {n} more");
+        let suffix =
+            xai_grok_i18n::t_fmt("turn.activity.more_suffix", &[("count", &n.to_string())]);
         let budget = MAX_ACTIVITY_SUBJECT_CHARS
             .saturating_sub(suffix.chars().count())
             .max(8);

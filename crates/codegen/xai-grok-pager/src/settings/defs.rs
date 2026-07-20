@@ -703,14 +703,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             label: "UI language",
             description: "Language for the Grok Build interface. System follows your OS locale when Chinese or English is detected.",
             keywords: &[
-                "language",
-                "locale",
-                "i18n",
-                "l10n",
-                "chinese",
-                "english",
-                "中文",
-                "ui",
+                "language", "locale", "i18n", "l10n", "chinese", "english", "中文", "ui",
             ],
             kind: SettingKind::Enum {
                 default: "auto",
@@ -930,14 +923,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             label: "Usage refresh interval",
             description: "How often to refresh weekly/monthly usage in the prompt (1–60 minutes, default 5). Also refreshes when a turn completes.",
             keywords: &[
-                "usage",
-                "billing",
-                "credit",
-                "limit",
-                "refresh",
-                "interval",
-                "poll",
-                "weekly",
+                "usage", "billing", "credit", "limit", "refresh", "interval", "poll", "weekly",
                 "reset",
             ],
             kind: SettingKind::Int {

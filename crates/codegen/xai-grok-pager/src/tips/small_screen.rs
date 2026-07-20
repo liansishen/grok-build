@@ -43,11 +43,14 @@ pub fn small_screen_tip() -> EphemeralTip {
     let command = Style::default()
         .fg(theme.text_secondary)
         .add_modifier(Modifier::BOLD);
+    let full = xai_grok_i18n::t("tips.small_screen");
+    let (prefix, suffix) = full.split_once("/compact-mode").unwrap_or((full, ""));
     EphemeralTip::new(
         SMALL_SCREEN_TIP_KEY,
         Line::from(vec![
-            Span::styled("Tight on space? Try ", dim),
+            Span::styled(prefix, dim),
             Span::styled("/compact-mode", command),
+            Span::styled(suffix, dim),
         ]),
     )
     .with_session_seen_cap(SMALL_SCREEN_TIP_SEEN_KEY, SMALL_SCREEN_TIP_SEEN_CAP)

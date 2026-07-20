@@ -2160,10 +2160,13 @@ mod link_click_tests {
             .collect();
         assert!(
             frame.contains("Switched to mode: Plan")
-                || frame.contains(xai_grok_i18n::t_fmt(
-                    "mode.switched",
-                    &[("mode", xai_grok_i18n::t("mode.name.plan"))],
-                ).as_str()),
+                || frame.contains(
+                    xai_grok_i18n::t_fmt(
+                        "mode.switched",
+                        &[("mode", xai_grok_i18n::t("mode.name.plan"))],
+                    )
+                    .as_str()
+                ),
             "mode-switch banner must own the slot"
         );
         assert!(

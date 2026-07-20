@@ -188,15 +188,9 @@ impl SessionEvent {
                 let body = match tokens_before {
                     Some(before) if *before > 0 => xai_grok_i18n::t_fmt(
                         "session.compaction_completed_range",
-                        &[
-                            ("before", &format_tokens(*before)),
-                            ("after", &after),
-                        ],
+                        &[("before", &format_tokens(*before)), ("after", &after)],
                     ),
-                    _ => xai_grok_i18n::t_fmt(
-                        "session.compaction_completed",
-                        &[("after", &after)],
-                    ),
+                    _ => xai_grok_i18n::t_fmt("session.compaction_completed", &[("after", &after)]),
                 };
                 if let Some(ms) = elapsed_ms {
                     let secs = format!("{:.1}", *ms as f64 / 1000.0);
@@ -228,9 +222,7 @@ impl SessionEvent {
                     xai_grok_i18n::t_fmt("session.retry_failed", &[("error", error.as_str())])
                 }
             }
-            SessionEvent::ReAuthRequired => {
-                xai_grok_i18n::t("session.reauth_required").to_string()
-            }
+            SessionEvent::ReAuthRequired => xai_grok_i18n::t("session.reauth_required").to_string(),
             SessionEvent::ContextTooLarge => {
                 xai_grok_i18n::t("session.context_too_large").to_string()
             }
@@ -249,7 +241,10 @@ impl SessionEvent {
                 } else {
                     xai_grok_i18n::t_fmt(
                         "session.model_switched",
-                        &[("reason", reason.as_str()), ("model", new_model_id.as_str())],
+                        &[
+                            ("reason", reason.as_str()),
+                            ("model", new_model_id.as_str()),
+                        ],
                     )
                 }
             }
@@ -265,8 +260,7 @@ impl SessionEvent {
                 &[("duration", &format_duration(*elapsed))],
             ),
             SessionEvent::Recap { summary, auto: _ } => {
-                // Always "Recap —" (manual `/recap` and auto return-from-away).
-                format!("Recap \u{2014} {summary}")
+                xai_grok_i18n::t_fmt("session.recap_summary", &[("summary", summary.as_str())])
             }
         }
     }
@@ -479,8 +473,12 @@ impl SessionEventBlock {
         };
         let header_style = header_text_style.add_modifier(Modifier::BOLD);
         // Non-selectable chrome (same as Thinking / tool label prefixes).
-        let header_line =
-            || BlockLine::separator(Line::from(Span::styled("Recap".to_string(), header_style)));
+        let header_line = || {
+            BlockLine::separator(Line::from(Span::styled(
+                xai_grok_i18n::t("session.recap").to_string(),
+                header_style,
+            )))
+        };
 
         // Loading: header only; the animated gray sidebar is the feedback.
         if ctx.is_running {
@@ -491,7 +489,10 @@ impl SessionEventBlock {
 
         match ctx.mode {
             DisplayMode::Collapsed => {
-                let mut spans = vec![Span::styled("Recap".to_string(), header_style)];
+                let mut spans = vec![Span::styled(
+                    xai_grok_i18n::t("session.recap").to_string(),
+                    header_style,
+                )];
                 let preview = summary.lines().next().unwrap_or(summary).trim();
                 if !preview.is_empty() {
                     spans.push(Span::styled(format!("  {preview}"), theme.muted()));

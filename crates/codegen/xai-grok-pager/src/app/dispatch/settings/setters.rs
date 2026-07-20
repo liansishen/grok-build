@@ -28,7 +28,10 @@ pub(in crate::app::dispatch) fn set_multiline_mode(app: &mut AppView, new: bool)
             surface = "dashboard",
             "setting changed",
         );
-        app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.multiline_mode.label"), new));
+        app.show_toast(&save_success_toast(
+            xai_grok_i18n::t("settings.multiline_mode.label"),
+            new,
+        ));
         return vec![];
     }
 
@@ -50,7 +53,10 @@ pub(in crate::app::dispatch) fn set_multiline_mode(app: &mut AppView, new: bool)
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.multiline_mode.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.multiline_mode.label"),
+        new,
+    ));
     vec![]
 }
 
@@ -372,7 +378,10 @@ pub(in crate::app::dispatch) fn set_vim_mode(app: &mut AppView, new: bool) -> Ve
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.vim_mode.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.vim_mode.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "vim_mode",
         value: crate::settings::SettingValue::Bool(new),
@@ -492,7 +501,10 @@ pub(in crate::app::dispatch) fn set_show_thinking_blocks(
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.show_thinking_blocks.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.show_thinking_blocks.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "show_thinking_blocks",
         value: crate::settings::SettingValue::Bool(new),
@@ -532,7 +544,10 @@ pub(in crate::app::dispatch) fn set_group_tool_verbs(app: &mut AppView, new: boo
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.group_tool_verbs.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.group_tool_verbs.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "group_tool_verbs",
         value: crate::settings::SettingValue::Bool(new),
@@ -579,7 +594,10 @@ pub(in crate::app::dispatch) fn set_collapsed_edit_blocks(
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.collapsed_edit_blocks.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.collapsed_edit_blocks.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "collapsed_edit_blocks",
         value: crate::settings::SettingValue::Bool(new),
@@ -614,7 +632,10 @@ pub(in crate::app::dispatch) fn set_prompt_suggestions(
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.prompt_suggestions.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.prompt_suggestions.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "prompt_suggestions",
         value: crate::settings::SettingValue::Bool(new),
@@ -770,7 +791,10 @@ pub(in crate::app::dispatch) fn set_invert_scroll(app: &mut AppView, new: bool) 
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.invert_scroll.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.invert_scroll.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "invert_scroll",
         value: crate::settings::SettingValue::Bool(new),
@@ -847,7 +871,10 @@ pub(in crate::app::dispatch) fn set_respect_manual_folds(
         value = new,
         "setting changed",
     );
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.respect_manual_folds.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.respect_manual_folds.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "respect_manual_folds",
         value: crate::settings::SettingValue::Bool(new),
@@ -966,7 +993,10 @@ pub(in crate::app::dispatch) fn set_compact_mode(app: &mut AppView, new: bool) -
     if !new && crate::views::agent::effective_compact(false, app.last_known_terminal_rows) {
         app.show_toast(xai_grok_i18n::t("toast.compact_auto"));
     } else {
-        app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.compact_mode.label"), new));
+        app.show_toast(&save_success_toast(
+            xai_grok_i18n::t("settings.compact_mode.label"),
+            new,
+        ));
     }
     vec![Effect::PersistSetting {
         key: "compact_mode",
@@ -998,7 +1028,10 @@ pub(in crate::app::dispatch) fn set_timestamps(app: &mut AppView, new: bool) -> 
     set_timestamps_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "show_timestamps", value = new, "setting changed");
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.show_timestamps.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.show_timestamps.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "show_timestamps",
         value: crate::settings::SettingValue::Bool(new),
@@ -1031,7 +1064,10 @@ pub(in crate::app::dispatch) fn set_timeline(app: &mut AppView, new: bool) -> Ve
     set_timeline_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "show_timeline", value = new, "setting changed");
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.show_timeline.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.show_timeline.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "show_timeline",
         value: crate::settings::SettingValue::Bool(new),
@@ -1053,7 +1089,10 @@ pub(in crate::app::dispatch) fn set_page_flip_on_send(app: &mut AppView, new: bo
     set_page_flip_on_send_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "page_flip_on_send", value = new, "setting changed");
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.page_flip_on_send.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.page_flip_on_send.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "page_flip_on_send",
         value: crate::settings::SettingValue::Bool(new),
@@ -1093,7 +1132,10 @@ pub(in crate::app::dispatch) fn set_simple_mode(app: &mut AppView, new: bool) ->
     // Toast label mirrors the renamed registry label
     // ("Disable vim input mode") so the user sees the same name in the
     // modal and the toast.
-    app.show_toast(&save_success_toast(xai_grok_i18n::t("settings.simple_mode.label"), new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.simple_mode.label"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "simple_mode",
         value: crate::settings::SettingValue::Bool(new),

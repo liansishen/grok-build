@@ -30,7 +30,9 @@ impl SlashCommand for ReleaseNotesCommand {
                 title: "Release Notes".to_string(),
                 content: content.trim().to_string(),
             }),
-            None => CommandResult::Error(xai_grok_i18n::t("slash.err.no_release_notes").to_string()),
+            None => {
+                CommandResult::Error(xai_grok_i18n::t("slash.err.no_release_notes").to_string())
+            }
         }
     }
 }

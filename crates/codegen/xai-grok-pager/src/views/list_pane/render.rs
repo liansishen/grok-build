@@ -555,10 +555,10 @@ fn render_bottom_bar(
     if let Some(mode) = state.input_mode() {
         // Active input bar — left-aligned, editable.
         let label = match mode {
-            super::state::InputBarMode::Search => "search: ",
-            super::state::InputBarMode::Filter => "filter: ",
-            super::state::InputBarMode::GotoLine => "go to: ",
-            super::state::InputBarMode::Comment => "comment: ",
+            super::state::InputBarMode::Search => xai_grok_i18n::t("list_pane.input.search"),
+            super::state::InputBarMode::Filter => xai_grok_i18n::t("list_pane.input.filter"),
+            super::state::InputBarMode::GotoLine => xai_grok_i18n::t("list_pane.input.goto_line"),
+            super::state::InputBarMode::Comment => xai_grok_i18n::t("list_pane.input.comment"),
         };
         let label_style = Style::default()
             .fg(style.input_bar_prompt_fg)
@@ -580,8 +580,8 @@ fn render_bottom_bar(
     } else if let Some(matcher) = state.matcher() {
         // Accepted matcher — right-aligned, dim.
         let mode_word = match matcher.mode {
-            super::state::MatchMode::Filter => "filter",
-            super::state::MatchMode::Search => "search",
+            super::state::MatchMode::Filter => xai_grok_i18n::t("list_pane.mode.filter"),
+            super::state::MatchMode::Search => xai_grok_i18n::t("list_pane.mode.search"),
         };
         let status = format!("[{}: {}]  ", mode_word, matcher.query());
         let status_w = status.len() as u16;

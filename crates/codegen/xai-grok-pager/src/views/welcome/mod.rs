@@ -424,7 +424,7 @@ pub(super) fn render_version_badge(
         } = &mode
     {
         spans.push(Span::styled(
-            format!("Tier: {tier}"),
+            xai_grok_i18n::t_fmt("welcome.tier", &[("tier", tier)]),
             Style::default().fg(theme.gray),
         ));
         spans.push(sep.clone());
@@ -546,7 +546,7 @@ fn render_prompt_and_version(
             .add_modifier(Modifier::BOLD);
         let action_style = Style::default().fg(theme.gray);
         let key_text = pending.shortcut.display();
-        let label = format!("press again to {}", pending.label);
+        let label = xai_grok_i18n::t_fmt("welcome.press_again", &[("label", pending.label)]);
         let line = Line::from(vec![
             Span::styled(format!("  {key_text}"), key_style),
             Span::styled(":", action_style),
@@ -692,7 +692,10 @@ pub fn render_welcome(
         AuthState::Pending { error } => {
             let label = params.login_label.unwrap_or("grok.com");
             let login_text = xai_grok_i18n::t_fmt("welcome.login_with", &[("label", label)]);
-            let menu = [("l", login_text.as_str()), ("q", xai_grok_i18n::t("welcome.quit_menu"))];
+            let menu = [
+                ("l", login_text.as_str()),
+                ("q", xai_grok_i18n::t("welcome.quit_menu")),
+            ];
             let msg = error.as_deref().map(|e| (e, theme.accent_error));
             let info = PromptInfo {
                 model_name: params.model_name,
@@ -763,7 +766,10 @@ pub fn render_welcome(
             }
         }
         AuthState::Done if params.is_zdr_blocked => {
-            let menu = [("l", xai_grok_i18n::t("welcome.switch_account")), ("q", xai_grok_i18n::t("welcome.quit_menu"))];
+            let menu = [
+                ("l", xai_grok_i18n::t("welcome.switch_account")),
+                ("q", xai_grok_i18n::t("welcome.quit_menu")),
+            ];
             let (menu_rects, post_flush_escapes) = render_welcome_blocked(
                 content_area,
                 buf,
@@ -939,7 +945,10 @@ fn render_welcome_trust(
     h_margin: u16,
     compact: bool,
 ) -> WelcomeRenderResult {
-    let menu_items = [("y", xai_grok_i18n::t("welcome.trust.yes")), ("n", xai_grok_i18n::t("welcome.trust.no"))];
+    let menu_items = [
+        ("y", xai_grok_i18n::t("welcome.trust.yes")),
+        ("n", xai_grok_i18n::t("welcome.trust.no")),
+    ];
     let lines = vec![
         Line::from(Span::styled(
             xai_grok_i18n::t("welcome.trust.question"),
@@ -1007,11 +1016,17 @@ fn render_welcome_trust(
 }
 
 /// Header text shared by Loopback and Command auth modes.
-fn auth_header() -> &'static str { xai_grok_i18n::t("auth.browser_open_header") }
+fn auth_header() -> &'static str {
+    xai_grok_i18n::t("auth.browser_open_header")
+}
 /// Header text for the device-flow auth mode.
-fn device_auth_header() -> &'static str { xai_grok_i18n::t("auth.device_header") }
+fn device_auth_header() -> &'static str {
+    xai_grok_i18n::t("auth.device_header")
+}
 /// Caption beneath the device code.
-fn device_code_caption() -> &'static str { xai_grok_i18n::t("auth.device_code_caption") }
+fn device_code_caption() -> &'static str {
+    xai_grok_i18n::t("auth.device_code_caption")
+}
 
 /// Extract `user_code` from a device verification URL (`None` if absent or
 /// malformed). Shown on-screen so the user can confirm it matches the browser
@@ -1026,21 +1041,27 @@ fn extract_user_code(url: &str) -> Option<&str> {
     valid.then_some(code)
 }
 /// Clickable copy prompt shared by Loopback and Command auth modes.
-const AUTH_COPY_PREFIX: &str = "If it doesn't open, click ";
-const AUTH_COPY_HERE: &str = "here";
-const AUTH_COPY_SUFFIX: &str = " to copy.";
+fn auth_copy_prefix() -> &'static str {
+    xai_grok_i18n::t("auth.copy_prefix")
+}
+fn auth_copy_here() -> &'static str {
+    xai_grok_i18n::t("auth.copy_here")
+}
+fn auth_copy_suffix() -> &'static str {
+    xai_grok_i18n::t("auth.copy_suffix")
+}
 
 /// Build the "click here to copy" line with "here" underlined in accent color.
 fn auth_copy_line(theme: &Theme) -> Line<'static> {
     Line::from(vec![
-        Span::styled(AUTH_COPY_PREFIX, Style::default().fg(theme.gray_bright)),
+        Span::styled(auth_copy_prefix(), Style::default().fg(theme.gray_bright)),
         Span::styled(
-            AUTH_COPY_HERE,
+            auth_copy_here(),
             Style::default()
                 .fg(theme.accent_user)
                 .add_modifier(Modifier::UNDERLINED),
         ),
-        Span::styled(AUTH_COPY_SUFFIX, Style::default().fg(theme.gray_bright)),
+        Span::styled(auth_copy_suffix(), Style::default().fg(theme.gray_bright)),
     ])
     .alignment(Alignment::Center)
 }
@@ -1053,16 +1074,18 @@ fn auth_copy_preceding_rows(header: &str, inner_width: u16) -> u16 {
 
 /// Number of physical rows the copy line occupies when wrapped.
 fn auth_copy_line_rows(inner_width: u16) -> u16 {
-    let copy_len = AUTH_COPY_PREFIX.len() + AUTH_COPY_HERE.len() + AUTH_COPY_SUFFIX.len();
+    let copy_len = auth_copy_prefix().len() + auth_copy_here().len() + auth_copy_suffix().len();
     (copy_len as u16).div_ceil(inner_width)
 }
 
-const AUTH_FALLBACK_TEXT: &str = "Copying not working? Click here to show full URL.";
+fn auth_fallback_text() -> &'static str {
+    xai_grok_i18n::t("auth.show_full_url")
+}
 
 /// Build the fallback "show full URL" link line.
 fn auth_fallback_line(theme: &Theme) -> Line<'static> {
     Line::from(Span::styled(
-        AUTH_FALLBACK_TEXT,
+        auth_fallback_text(),
         Style::default()
             .fg(theme.gray)
             .add_modifier(Modifier::UNDERLINED),
@@ -1080,19 +1103,21 @@ fn push_auth_copy_block(
     lines.push(auth_copy_line(theme));
     lines.push(Line::default());
     lines.push(match clipboard_delivery {
-        Some(crate::clipboard::ClipboardDelivery::Confirmed) => {
-            Line::from(Span::styled(xai_grok_i18n::t("auth.copied"), Style::default().fg(theme.gray)))
-                .alignment(Alignment::Center)
-        }
-        Some(crate::clipboard::ClipboardDelivery::Unverified) => Line::from(Span::styled(
-            "copy sent—verify paste",
+        Some(crate::clipboard::ClipboardDelivery::Confirmed) => Line::from(Span::styled(
+            xai_grok_i18n::t("auth.copied"),
             Style::default().fg(theme.gray),
         ))
         .alignment(Alignment::Center),
-        Some(crate::clipboard::ClipboardDelivery::Failed) => {
-            Line::from(Span::styled(xai_grok_i18n::t("auth.copy_failed"), Style::default().fg(theme.gray)))
-                .alignment(Alignment::Center)
-        }
+        Some(crate::clipboard::ClipboardDelivery::Unverified) => Line::from(Span::styled(
+            xai_grok_i18n::t("auth.copy_unverified"),
+            Style::default().fg(theme.gray),
+        ))
+        .alignment(Alignment::Center),
+        Some(crate::clipboard::ClipboardDelivery::Failed) => Line::from(Span::styled(
+            xai_grok_i18n::t("auth.copy_failed"),
+            Style::default().fg(theme.gray),
+        ))
+        .alignment(Alignment::Center),
         None => Line::default(),
     });
     lines.push(Line::default());
@@ -1164,7 +1189,7 @@ fn render_raw_url_mode(
 
     // Render hint above the URL.
     let hint = Line::from(Span::styled(
-        "Select the URL below with your mouse and copy manually.",
+        xai_grok_i18n::t("auth.select_url_hint"),
         Style::default().fg(theme.gray),
     ))
     .alignment(Alignment::Center);
@@ -1219,7 +1244,10 @@ fn render_raw_url_mode(
                 .fg(theme.accent_user)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("  go back", Style::default().fg(theme.gray)),
+        Span::styled(
+            format!("  {}", xai_grok_i18n::t("auth.go_back")),
+            Style::default().fg(theme.gray),
+        ),
     ];
     let hints = Line::from(hint_spans).alignment(Alignment::Center);
     Paragraph::new(hints).render(hint_area, buf);
@@ -1457,7 +1485,10 @@ fn render_welcome_authenticating(
                         .fg(theme.accent_user)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled("  submit    ", Style::default().fg(theme.gray)),
+                Span::styled(
+                    format!("  {}    ", xai_grok_i18n::t("auth.submit")),
+                    Style::default().fg(theme.gray),
+                ),
             ];
             hint_spans.extend(quit_hint_spans(theme));
             let hints = Line::from(hint_spans).alignment(Alignment::Center);
@@ -1734,7 +1765,11 @@ fn render_welcome_done(
     let gate_menu;
     let owned_menu;
     let menu_items: &[(&str, &str)] = if !p.has_access {
-        gate_menu = [(key_g, cta), (key_l, xai_grok_i18n::t("welcome.logout")), (key_q, xai_grok_i18n::t("welcome.quit_menu"))];
+        gate_menu = [
+            (key_g, cta),
+            (key_l, xai_grok_i18n::t("welcome.logout")),
+            (key_q, xai_grok_i18n::t("welcome.quit_menu")),
+        ];
         &gate_menu
     } else {
         let (key_w, key_s, key_q, key_i_with_x) = (
@@ -1752,7 +1787,10 @@ fn render_welcome_done(
             // 3 cells of this row as dismiss instead of open. Keyboard:
             // ctrl-shift-i. The key string is right-aligned by render_menu,
             // so [x] sits at the very end of the row.
-            items.push((key_i_with_x, xai_grok_i18n::t("welcome.import_claude_settings")));
+            items.push((
+                key_i_with_x,
+                xai_grok_i18n::t("welcome.import_claude_settings"),
+            ));
         }
         items.push((key_w, xai_grok_i18n::t("welcome.new_worktree")));
         items.push((key_s, xai_grok_i18n::t("welcome.resume_session")));
@@ -1927,12 +1965,18 @@ fn render_welcome_done(
         .flex(Flex::Center)
         .areas(layout.prompt);
         // Show the user's current tier + clickable refresh button above the gate message.
-        let tier_label = p.subscription_tier.unwrap_or("Free");
-        let tier_prefix = format!("Tier: {tier_label}  ");
-        let refresh_text = "[Refresh]";
+        let tier_label = p
+            .subscription_tier
+            .unwrap_or(xai_grok_i18n::t("welcome.tier_free"));
+        let tier_prefix = xai_grok_i18n::t_fmt("welcome.tier", &[("tier", tier_label)]);
+        let tier_prefix = format!("{tier_prefix}  ");
+        let refresh_text = xai_grok_i18n::t("welcome.refresh");
         let total_width = tier_prefix.len() + refresh_text.len();
         let tier_line = Line::from(vec![
-            Span::styled("Tier: ", Style::default().fg(theme.gray)),
+            Span::styled(
+                xai_grok_i18n::t("welcome.tier_prefix"),
+                Style::default().fg(theme.gray),
+            ),
             Span::styled(
                 tier_label,
                 Style::default()
@@ -2048,13 +2092,16 @@ fn render_welcome_done(
             let key_name = "ctrl+u";
             let line = Line::from(vec![
                 Span::styled(
-                    "Update: ",
+                    xai_grok_i18n::t("welcome.update.prefix"),
                     Style::default()
                         .fg(theme.accent_user)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
-                    format!("v{ver} available \u{2014} press {key_name} to restart"),
+                    xai_grok_i18n::t_fmt(
+                        "welcome.update.available",
+                        &[("version", &format!("v{ver}")), ("key", key_name)],
+                    ),
                     Style::default().fg(theme.accent_user),
                 ),
             ]);
@@ -2085,17 +2132,20 @@ fn render_welcome_done(
             };
             let mins = hint.age.as_secs() / 60;
             let when = if mins == 0 {
-                "moments ago".to_string()
+                xai_grok_i18n::t("welcome.foreign.moments_ago").to_string()
             } else {
-                format!("{mins}m ago")
+                xai_grok_i18n::t_fmt("welcome.foreign.minutes_ago", &[("n", &mins.to_string())])
             };
             let accent = Style::default().fg(theme.accent_user);
             let accent_bold = accent.add_modifier(Modifier::BOLD);
             let tool = crate::app::foreign_tool_display_label(hint.tool);
             let line = Line::from(vec![
-                Span::styled("Coming from ", accent),
+                Span::styled(xai_grok_i18n::t("welcome.foreign.coming_from"), accent),
                 Span::styled(tool, accent_bold),
-                Span::styled(format!("? Resume your session from {when} using "), accent),
+                Span::styled(
+                    xai_grok_i18n::t_fmt("welcome.foreign.resume", &[("when", &when)]),
+                    accent,
+                ),
                 Span::styled("ctrl+u", accent_bold),
             ]);
             Paragraph::new(line)
@@ -2361,8 +2411,11 @@ pub(crate) fn render_session_picker(
     let worktree_shortcut: &'static str = "ctrl+w";
     use crate::views::shortcuts_bar::HintItem;
     let mut default_shortcuts: Vec<HintItem> = vec![
-        HintItem::new(crate::key!(Esc), "back"),
-        HintItem::new(crate::key!(Enter), "select"),
+        HintItem::new(crate::key!(Esc), xai_grok_i18n::t("welcome.picker.back")),
+        HintItem::new(
+            crate::key!(Enter),
+            xai_grok_i18n::t("welcome.picker.select"),
+        ),
     ];
     if !ctx.chat_mode {
         default_shortcuts.push(HintItem {
@@ -2375,7 +2428,7 @@ pub(crate) fn render_session_picker(
     }
     default_shortcuts.push(HintItem {
         keys: vec![],
-        label: "navigate".into(),
+        label: xai_grok_i18n::t("welcome.picker.navigate").into(),
         custom_display: Some("\u{2191}\u{2193}"),
         description: None,
         pinned: false,
@@ -2383,7 +2436,7 @@ pub(crate) fn render_session_picker(
     if !ctx.chat_mode {
         default_shortcuts.push(HintItem {
             keys: vec![],
-            label: "filter".into(),
+            label: xai_grok_i18n::t("welcome.picker.filter").into(),
             custom_display: Some("f"),
             description: None,
             pinned: false,
@@ -2492,7 +2545,8 @@ fn render_startup_warnings(
     // menu now carries the call-to-action with the same visual weight as
     // every other welcome menu item. Showing the warning text in addition to
     // the menu row would be redundant noise.
-    if w.message.starts_with(xai_grok_i18n::t("welcome.import_claude_settings"))
+    if w.message
+        .starts_with(xai_grok_i18n::t("welcome.import_claude_settings"))
         || w.message.starts_with("Claude settings detected")
     {
         return None;
@@ -2548,7 +2602,10 @@ fn build_masked_auth_token(input: &str, cursor_byte: usize) -> MaskedAuthToken {
 
 fn masked_auth_token_view(input: &str, cursor_byte: usize, width: usize) -> (String, usize) {
     if input.is_empty() {
-        return (xai_grok_i18n::t("auth.paste_token_placeholder").to_string(), 0);
+        return (
+            xai_grok_i18n::t("auth.paste_token_placeholder").to_string(),
+            0,
+        );
     }
     let masked = build_masked_auth_token(input, cursor_byte);
     let buffer =
@@ -2571,12 +2628,18 @@ mod tests {
     fn auth_copy_feedback_covers_delivery_states() {
         let theme = Theme::current();
         for (delivery, expected) in [
-            (crate::clipboard::ClipboardDelivery::Confirmed, xai_grok_i18n::t("auth.copied")),
+            (
+                crate::clipboard::ClipboardDelivery::Confirmed,
+                xai_grok_i18n::t("auth.copied"),
+            ),
             (
                 crate::clipboard::ClipboardDelivery::Unverified,
                 "copy sent—verify paste",
             ),
-            (crate::clipboard::ClipboardDelivery::Failed, xai_grok_i18n::t("auth.copy_failed")),
+            (
+                crate::clipboard::ClipboardDelivery::Failed,
+                xai_grok_i18n::t("auth.copy_failed"),
+            ),
         ] {
             let mut lines = Vec::new();
             push_auth_copy_block(&mut lines, &theme, Some(delivery));
@@ -2593,7 +2656,10 @@ mod tests {
     fn masked_auth_token_preserves_reveal_policy() {
         assert_eq!(
             masked_auth_token_view("", 0, 24),
-            (xai_grok_i18n::t("auth.paste_token_placeholder").to_string(), 0)
+            (
+                xai_grok_i18n::t("auth.paste_token_placeholder").to_string(),
+                0
+            )
         );
         assert_eq!(build_masked_auth_token("12345678", 8).display, "12345678");
         assert_eq!(build_masked_auth_token("123456789", 9).display, "•••••6789");

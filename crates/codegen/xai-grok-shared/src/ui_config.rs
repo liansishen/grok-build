@@ -347,8 +347,7 @@ impl UiConfig {
         if let Some(v) = env_transparent_bg() {
             return v;
         }
-        self.transparent_bg
-            .unwrap_or(Self::TRANSPARENT_BG_DEFAULT)
+        self.transparent_bg.unwrap_or(Self::TRANSPARENT_BG_DEFAULT)
     }
 
     /// True when the highlight should not timer-dismiss (`hold` / `word_select`,

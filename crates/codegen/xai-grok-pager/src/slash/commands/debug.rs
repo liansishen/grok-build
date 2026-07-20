@@ -28,11 +28,19 @@ use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, Slas
 /// assertion and locked by construction instead.
 pub const LISTED_IN_COMPLETIONS: bool = cfg!(debug_assertions);
 
-/// Subcommand name/description pairs (single source for run + suggestions).
-const SUBCOMMANDS: &[(&str, &str)] = &[
-    ("scroll", "Toggle the scroll-diagnostics HUD"),
-    ("fps", "Toggle the FPS overlay"),
-    ("log", "Toggle the scroll flight recorder (JSONL)"),
+/// Subcommand names and translation keys (single source for run + suggestions).
+const SUBCOMMANDS: &[(&str, &str, &str)] = &[
+    (
+        "scroll",
+        "slash.debug.arg_scroll",
+        "Toggle the scroll-diagnostics HUD",
+    ),
+    ("fps", "slash.debug.arg_fps", "Toggle the FPS overlay"),
+    (
+        "log",
+        "slash.debug.arg_log",
+        "Toggle the scroll flight recorder (JSONL)",
+    ),
 ];
 
 /// Debug-overlay toggles; listed only on debug binaries.
@@ -68,11 +76,11 @@ impl SlashCommand for DebugCommand {
         Some(
             SUBCOMMANDS
                 .iter()
-                .map(|&(name, desc)| ArgItem {
+                .map(|&(name, key, fallback)| ArgItem {
                     display: name.to_string(),
                     match_text: name.to_string(),
                     insert_text: name.to_string(),
-                    description: desc.to_string(),
+                    description: xai_grok_i18n::t_or(key, fallback).to_string(),
                 })
                 .collect(),
         )
@@ -85,9 +93,13 @@ impl SlashCommand for DebugCommand {
             "scroll" => CommandResult::Action(Action::ToggleScrollDebugHud),
             "fps" => CommandResult::Action(Action::ToggleFpsHud),
             "log" => CommandResult::Action(Action::ToggleScrollLog),
-            other => CommandResult::Error(format!(
-                "Unknown /debug option '{other}'. Usage: /debug [scroll|fps|log]"
-            )),
+            other => CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.debug.unknown_option",
+                    "Unknown /debug option '{option}'. Usage: /debug [scroll|fps|log]",
+                )
+                .replace("{option}", other),
+            ),
         }
     }
 }

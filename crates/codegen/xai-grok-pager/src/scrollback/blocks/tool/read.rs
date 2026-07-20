@@ -172,10 +172,10 @@ impl ReadToolCallBlock {
             theme.muted()
         };
 
-        // SKILL.md reads render as "Skill {skill_name}".
+        // SKILL.md reads render with the localized skill label.
         if let Some(skill) = self.skill_name() {
             return Line::from(vec![
-                Span::styled("Skill ", bold_style),
+                Span::styled(xai_grok_i18n::t("tool.prefix.skill"), bold_style),
                 Span::styled(skill.to_owned(), path_style),
             ]);
         }
@@ -187,19 +187,29 @@ impl ReadToolCallBlock {
                 if let Some(total) = self.total_lines
                     && total > r.end.saturating_sub(r.start) + 1
                 {
-                    format!(" ({} of {total})", r)
+                    xai_grok_i18n::t_fmt(
+                        "tool.read.range_of_total",
+                        &[("range", &r.to_string()), ("total", &total.to_string())],
+                    )
                 } else {
-                    format!(" ({})", r)
+                    xai_grok_i18n::t_fmt("tool.read.range", &[("range", &r.to_string())])
                 }
             })
             .unwrap_or_default();
         // Extra suffix for errors or empty content
         let extra_suffix = if self.content.as_ref().is_some_and(|c| c.is_empty()) {
-            " (empty)".to_string()
+            xai_grok_i18n::t("tool.read.empty").to_string()
         } else if let Some(media) = &self.media_kind {
             match media {
-                ReadMediaKind::Image => " (image)".to_string(),
-                ReadMediaKind::Pdf { pages } => format!(" ({pages} pages)"),
+                ReadMediaKind::Image => xai_grok_i18n::t("tool.read.image").to_string(),
+                ReadMediaKind::Pdf { pages } => xai_grok_i18n::t_fmt(
+                    if *pages == 1 {
+                        "tool.read.pdf_one"
+                    } else {
+                        "tool.read.pdf_many"
+                    },
+                    &[("count", &pages.to_string())],
+                ),
             }
         } else {
             String::new()
@@ -598,7 +608,10 @@ mod tests {
             "main.rs",
             "copy/highlight should match the painted path span, not 'Read …'"
         );
-        assert_eq!(header.content.spans[0].content.as_ref(), xai_grok_i18n::t("tool.prefix.read"));
+        assert_eq!(
+            header.content.spans[0].content.as_ref(),
+            xai_grok_i18n::t("tool.prefix.read")
+        );
         assert!(header.selection_text.is_none());
     }
 

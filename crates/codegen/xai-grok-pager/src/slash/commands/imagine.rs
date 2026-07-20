@@ -15,7 +15,10 @@ impl SlashCommand for ImagineCommand {
     }
 
     fn description(&self) -> &str {
-        "Generate an image from a text description"
+        xai_grok_i18n::t_or(
+            "slash.imagine.description",
+            "Generate an image from a text description",
+        )
     }
 
     fn usage(&self) -> &str {
@@ -31,7 +34,10 @@ impl SlashCommand for ImagineCommand {
     }
 
     fn arg_placeholder(&self) -> Option<&str> {
-        Some("description of the image to generate")
+        Some(xai_grok_i18n::t_or(
+            "slash.imagine.arg_placeholder",
+            "description of the image to generate",
+        ))
     }
 
     fn required_tools(&self) -> &[&str] {

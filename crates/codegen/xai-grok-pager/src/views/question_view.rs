@@ -1550,7 +1550,7 @@ fn build_freeform_line(
     } else {
         // Empty — show placeholder.
         (
-            "Type your answer here".to_string(),
+            xai_grok_i18n::t("question.type_answer").to_string(),
             Style::default().fg(fg(theme.gray)).bg(row_bg),
         )
     };
@@ -1807,7 +1807,7 @@ fn render_truncation_indicator(buf: &mut Buffer, x: u16, y: u16, width: u16, the
             "Ctrl-F",
             Style::default().fg(theme.accent_user).bg(theme.bg_light),
         ),
-        Span::styled(" to expand", style),
+        Span::styled(xai_grok_i18n::t("permission.args.expand_suffix"), style),
     ]);
     buf.set_line(x, y, &indicator, width);
 }

@@ -1068,10 +1068,7 @@ fn set_yolo_mode_toast_format() {
         .as_ref()
         .map(|(s, _)| s.clone())
         .expect("toast must be set");
-    assert_eq!(
-        toast,
-        format!("{warn} Always-approve ON")
-    );
+    assert_eq!(toast, format!("{warn} Always-approve ON"));
 
     let _ = dispatch(Action::SetYoloMode(false), &mut app);
     let toast = app.agents[&AgentId(0)]

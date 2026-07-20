@@ -66,7 +66,13 @@ impl SlashCommand for AcpSlashCommand {
     fn run(&self, _ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         // Malformed skill metadata — surface error, don't silently degrade.
         if self.meta_malformed {
-            return CommandResult::Error(format!("Malformed skill metadata for /{}", self.name));
+            return CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.acp.malformed_skill_metadata",
+                    "Malformed skill metadata for /{name}",
+                )
+                .replace("{name}", &self.name),
+            );
         }
 
         // Non-skill ACP commands: pass through to the shell as before.

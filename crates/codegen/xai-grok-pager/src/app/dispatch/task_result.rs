@@ -76,6 +76,17 @@ pub(super) fn unregister_all_active_sessions(app: &AppView) -> Vec<Effect> {
         .collect()
 }
 pub(super) const X11_PRIMARY_PASTE_HINT: &str = "Try Shift+Insert to paste selected text";
+
+#[cfg(test)]
+fn x11_primary_paste_hint() -> &'static str {
+    X11_PRIMARY_PASTE_HINT
+}
+
+#[cfg(not(test))]
+fn x11_primary_paste_hint() -> &'static str {
+    xai_grok_i18n::t("toast.x11_primary_paste_hint")
+}
+
 fn show_clipboard_toast(target: &ClipboardPasteTarget, message: &str, app: &mut AppView) {
     match target {
         ClipboardPasteTarget::AgentPrompt { agent_id, .. } => {
@@ -99,7 +110,7 @@ pub(super) fn maybe_show_x11_primary_paste_hint(
     if !eligible || completion != ClipboardPasteCompletion::FullMiss {
         return;
     }
-    show_clipboard_toast(target, X11_PRIMARY_PASTE_HINT, app);
+    show_clipboard_toast(target, x11_primary_paste_hint(), app);
 }
 pub(super) fn show_clipboard_failure(
     target: &ClipboardPasteTarget,
@@ -108,9 +119,11 @@ pub(super) fn show_clipboard_failure(
 ) {
     let message = match failure {
         ClipboardPasteFailure::AlreadyReported => return,
-        ClipboardPasteFailure::TextRead => "Couldn't read clipboard text",
-        ClipboardPasteFailure::AttachmentRead => "Couldn't read clipboard contents",
-        ClipboardPasteFailure::TargetInsertion => "Couldn't paste clipboard contents",
+        ClipboardPasteFailure::TextRead => xai_grok_i18n::t("toast.clipboard_text_read_failed"),
+        ClipboardPasteFailure::AttachmentRead => {
+            xai_grok_i18n::t("toast.clipboard_contents_read_failed")
+        }
+        ClipboardPasteFailure::TargetInsertion => xai_grok_i18n::t("toast.clipboard_paste_failed"),
     };
     show_clipboard_toast(target, message, app);
 }
@@ -244,8 +257,9 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         } => {
             if !silent && let Some(agent) = app.agents.get_mut(&agent_id) {
                 agent.scrollback.push_block(RenderBlock::System(
-                    crate::scrollback::blocks::SystemMessageBlock::new(format!(
-                        "Billing error: {error}"
+                    crate::scrollback::blocks::SystemMessageBlock::new(xai_grok_i18n::t_fmt(
+                        "task_result.billing_error",
+                        &[("error", error.as_str())],
                     )),
                 ));
             }
@@ -418,7 +432,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                             crate::app::agent::QueueEntryKind::Prompt,
                         )
                     });
-                agent.show_toast(&format!("Send now failed — requeued: {error}"));
+                agent.show_toast(&xai_grok_i18n::t_fmt(
+                    "toast.send_now_failed_requeued",
+                    &[("error", error.as_str())],
+                ));
             }
             vec![]
         }
@@ -426,9 +443,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             if let Err(err) = result
                 && let Some(agent) = get_active_agent_mut(app)
             {
-                agent.scrollback.push_block(RenderBlock::system(format!(
-                    "Couldn't save preferred model: {err} (still active for this session)"
-                )));
+                agent
+                    .scrollback
+                    .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                        "task_result.preferred_model_save_failed",
+                        &[("error", err.as_str())],
+                    )));
             }
             vec![]
         }
@@ -672,9 +692,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             if let Some(agent) = app.agents.get_mut(&agent_id) {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Session shared: {share_url}"
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt(
+                            "task_result.session_shared",
+                            &[("url", share_url.as_str())],
+                        ),
+                    ));
             }
             vec![]
         }
@@ -682,9 +705,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             if let Some(agent) = app.agents.get_mut(&agent_id) {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Couldn't share session: {error}"
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt(
+                            "task_result.session_share_failed",
+                            &[("error", error.as_str())],
+                        ),
+                    ));
             }
             vec![]
         }
@@ -721,9 +747,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             if let Some(agent) = app.agents.get_mut(&agent_id) {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Couldn't load session info: {error}"
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt(
+                            "task_result.session_info_load_failed",
+                            &[("error", error.as_str())],
+                        ),
+                    ));
             }
             vec![]
         }
@@ -740,9 +769,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 let safe = crate::views::session_title::sanitize_display_text(&title);
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Session renamed to \"{safe}\""
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt(
+                            "task_result.session_renamed",
+                            &[("title", safe.as_str())],
+                        ),
+                    ));
             }
             vec![]
         }
@@ -750,9 +782,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             if let Some(agent) = app.agents.get_mut(&agent_id) {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Couldn't rename session: {error}"
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt(
+                            "task_result.session_rename_failed",
+                            &[("error", error.as_str())],
+                        ),
+                    ));
             }
             vec![]
         }
@@ -770,7 +805,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 source, session_id = % session_id, error = % error,
                 "session delete failed"
             );
-            app.show_toast(&format!("Couldn't delete session: {error}"));
+            app.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.session_delete_failed",
+                &[("error", error.as_str())],
+            ));
             vec![]
         }
         TaskResult::ContextInfoComplete { agent_id, info } => {
@@ -780,9 +818,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             if let Some(agent) = app.agents.get_mut(&agent_id) {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Couldn't load context info: {error}"
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt(
+                            "task_result.context_info_load_failed",
+                            &[("error", error.as_str())],
+                        ),
+                    ));
             }
             vec![]
         }
@@ -791,9 +832,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             if let Some(agent) = app.agents.get_mut(&agent_id) {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Couldn't send feedback: {error}"
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt(
+                            "task_result.feedback_send_failed",
+                            &[("error", error.as_str())],
+                        ),
+                    ));
             }
             vec![]
         }
@@ -866,7 +910,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             {
                 agent
                     .scrollback
-                    .push_block(RenderBlock::system(format!("Couldn't load entry: {error}")));
+                    .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                        "task_result.catalog_entry_load_failed",
+                        &[("error", error.as_str())],
+                    )));
             }
             vec![]
         }
@@ -919,7 +966,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                         chip_elements: Vec::new(),
                         skill_token_ranges: Vec::new(),
                     });
-                agent.show_toast(&format!("Interjection failed — requeued: {error}"));
+                agent.show_toast(&xai_grok_i18n::t_fmt(
+                    "toast.interjection_failed_requeued",
+                    &[("error", error.as_str())],
+                ));
             }
             vec![]
         }
@@ -983,7 +1033,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 return vec![];
             };
             agent.rewind_state = None;
-            app.show_toast(&format!("Undo failed: {error}"));
+            app.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.undo_failed",
+                &[("error", error.as_str())],
+            ));
             vec![]
         }
         TaskResult::RewindPreviewComplete {
@@ -1064,7 +1117,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 "setting persist failed; rolled back"
             );
             let scrubbed = scrub_error_for_toast(&error);
-            app.show_toast(&format!("\u{2717} Could not save {key}: {scrubbed}"));
+            app.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.setting_save_failed",
+                &[("key", key.as_str()), ("error", scrubbed.as_str())],
+            ));
             rollback_effects
         }
         TaskResult::SettingPersistFailedBestEffort { key, error } => {
@@ -1073,7 +1129,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 "setting persist failed (best-effort); in-memory state stays at optimistic value",
             );
             let scrubbed = scrub_error_for_toast(&error);
-            app.show_toast(&format!("\u{2717} Could not save {key}: {scrubbed}"));
+            app.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.setting_save_failed",
+                &[("key", key.as_str()), ("error", scrubbed.as_str())],
+            ));
             vec![]
         }
     }

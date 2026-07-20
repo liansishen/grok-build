@@ -46,37 +46,33 @@ fn is_interval_token(s: &str) -> bool {
 fn interval_to_human(token: &str) -> String {
     let (digits, suffix) = token.split_at(token.len() - 1);
     let n: u64 = digits.parse().unwrap_or(0);
-    match suffix {
-        "s" => {
-            if n <= 1 {
-                "every 1 second".into()
-            } else {
-                format!("every {n} seconds")
-            }
+    let n_string = n.to_string();
+    let key = match (suffix, n) {
+        ("s", 0 | 1) => "slash.loop.every_second",
+        ("s", _) => "slash.loop.every_seconds",
+        ("m", 1) => "slash.loop.every_minute",
+        ("m", _) => "slash.loop.every_minutes",
+        ("h", 1) => "slash.loop.every_hour",
+        ("h", _) => "slash.loop.every_hours",
+        ("d", 1) => "slash.loop.every_day",
+        ("d", _) => "slash.loop.every_days",
+        _ => {
+            return xai_grok_i18n::t_or("slash.loop.every_token", "every {token}")
+                .replace("{token}", token);
         }
-        "m" => {
-            if n == 1 {
-                "every 1 minute".into()
-            } else {
-                format!("every {n} minutes")
-            }
-        }
-        "h" => {
-            if n == 1 {
-                "every 1 hour".into()
-            } else {
-                format!("every {n} hours")
-            }
-        }
-        "d" => {
-            if n == 1 {
-                "every 1 day".into()
-            } else {
-                format!("every {n} days")
-            }
-        }
-        _ => format!("every {token}"),
-    }
+    };
+    let fallback = match (suffix, n) {
+        ("s", 0 | 1) => "every 1 second",
+        ("s", _) => "every {n} seconds",
+        ("m", 1) => "every 1 minute",
+        ("m", _) => "every {n} minutes",
+        ("h", 1) => "every 1 hour",
+        ("h", _) => "every {n} hours",
+        ("d", 1) => "every 1 day",
+        ("d", _) => "every {n} days",
+        _ => unreachable!(),
+    };
+    xai_grok_i18n::t_or(key, fallback).replace("{n}", &n_string)
 }
 
 impl SlashCommand for LoopCommand {
@@ -121,7 +117,7 @@ impl SlashCommand for LoopCommand {
         // replaces this provisional entry.
         let human_schedule = match interval_token {
             Some(token) => interval_to_human(token),
-            None => "scheduling…".to_string(),
+            None => xai_grok_i18n::t_or("slash.loop.scheduling", "scheduling…").to_string(),
         };
 
         CommandResult::InjectSkill {

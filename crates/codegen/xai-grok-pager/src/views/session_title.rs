@@ -48,9 +48,9 @@ pub fn entry_title(agent: &AgentView) -> String {
     match agent.session.session_id.as_ref() {
         Some(sid) => {
             let short: String = sid.0.chars().take(8).collect();
-            format!("session {short}")
+            xai_grok_i18n::t_fmt("session.title_fallback", &[("id", &short)])
         }
-        None => "loading...".to_string(),
+        None => xai_grok_i18n::t("session.loading").to_string(),
     }
 }
 
@@ -161,21 +161,21 @@ pub(crate) fn sanitize_display_text(s: &str) -> Cow<'_, str> {
 pub(crate) fn format_relative_time(elapsed: Duration) -> String {
     let secs = elapsed.as_secs();
     if secs < 1 {
-        return "now".to_string();
+        return xai_grok_i18n::t("session.relative.now").to_string();
     }
     if secs < 60 {
-        return format!("{secs}s ago");
+        return xai_grok_i18n::t_fmt("session.relative.seconds_ago", &[("n", &secs.to_string())]);
     }
     let mins = secs / 60;
     if mins < 60 {
-        return format!("{mins}m ago");
+        return xai_grok_i18n::t_fmt("session.relative.minutes_ago", &[("n", &mins.to_string())]);
     }
     let hours = mins / 60;
     if hours < 24 {
-        return format!("{hours}h ago");
+        return xai_grok_i18n::t_fmt("session.relative.hours_ago", &[("n", &hours.to_string())]);
     }
     let days = hours / 24;
-    format!("{days}d ago")
+    xai_grok_i18n::t_fmt("session.relative.days_ago", &[("n", &days.to_string())])
 }
 
 #[cfg(test)]

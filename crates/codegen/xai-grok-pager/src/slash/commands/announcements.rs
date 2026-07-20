@@ -3,8 +3,6 @@
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 
-const USAGE: &str = "Usage: /announcements hide | show";
-
 /// Control the announcement banner (hide/show).
 pub struct AnnouncementsCommand;
 
@@ -39,13 +37,21 @@ impl SlashCommand for AnnouncementsCommand {
                 display: "hide".to_string(),
                 match_text: "hide".to_string(),
                 insert_text: "hide".to_string(),
-                description: "Hide the announcement banner".to_string(),
+                description: xai_grok_i18n::t_or(
+                    "slash.announcements.arg_hide",
+                    "Hide the announcement banner",
+                )
+                .to_string(),
             },
             ArgItem {
                 display: "show".to_string(),
                 match_text: "show".to_string(),
                 insert_text: "show".to_string(),
-                description: "Show the announcement banner".to_string(),
+                description: xai_grok_i18n::t_or(
+                    "slash.announcements.arg_show",
+                    "Show the announcement banner",
+                )
+                .to_string(),
             },
         ])
     }
@@ -58,7 +64,13 @@ impl SlashCommand for AnnouncementsCommand {
         match args.split_whitespace().next().unwrap_or("") {
             "hide" => CommandResult::Action(Action::AnnouncementsHide),
             "show" => CommandResult::Action(Action::AnnouncementsShow),
-            _ => CommandResult::Error(USAGE.into()),
+            _ => CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.announcements.usage",
+                    "Usage: /announcements hide | show",
+                )
+                .into(),
+            ),
         }
     }
 }

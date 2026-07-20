@@ -237,13 +237,13 @@ impl RowState {
         match self {
             // Shorter, punchier labels. "Done" reads cleaner as a group
             // header than the past-tense "Completed" did.
-            Self::NeedsInput => "Awaiting",
-            Self::Working => "Working",
-            Self::Idle => "Idle",
-            Self::Inactive => "Inactive",
-            Self::Completed => "Done",
-            Self::Failed => "Failed",
-            Self::Blocked => "Blocked",
+            Self::NeedsInput => xai_grok_i18n::t("dashboard.group.awaiting"),
+            Self::Working => xai_grok_i18n::t("dashboard.group.working"),
+            Self::Idle => xai_grok_i18n::t("dashboard.group.idle"),
+            Self::Inactive => xai_grok_i18n::t("dashboard.group.inactive"),
+            Self::Completed => xai_grok_i18n::t("dashboard.group.done"),
+            Self::Failed => xai_grok_i18n::t("dashboard.group.failed"),
+            Self::Blocked => xai_grok_i18n::t("dashboard.group.blocked"),
         }
     }
 }
@@ -2404,7 +2404,9 @@ impl DashboardState {
         let mut attachment = match image {
             ProbedAttachment::Image(pasted) => {
                 if peek_in_question {
-                    self.set_error_toast("Pasted image discarded — reply switched to a question");
+                    self.set_error_toast(xai_grok_i18n::t(
+                        "dashboard.toast.image_discarded_question",
+                    ));
                     ClipboardPasteCompletion::Dropped
                 } else {
                     let (_, completion) = if peek {
@@ -2429,7 +2431,7 @@ impl DashboardState {
             if file_urls.as_deref().is_some_and(|urls| {
                 !crate::prompt_images::try_read_images_from_paste(urls).is_empty()
             }) {
-                self.set_error_toast("Pasted image discarded — reply switched to a question");
+                self.set_error_toast(xai_grok_i18n::t("dashboard.toast.image_discarded_question"));
             }
             attachment = ClipboardPasteCompletion::Dropped;
         }
@@ -2505,12 +2507,12 @@ impl DashboardState {
                 });
             } else if !same_row {
                 // Never reply to a row the user is no longer peeking.
-                self.set_error_toast("Reply canceled — peek panel changed");
+                self.set_error_toast(xai_grok_i18n::t("dashboard.toast.reply_canceled_changed"));
             } else {
                 // A question now owns the panel (Enter answers it there, and the
                 // reply dispatch would silently queue a prompt + wipe the draft
                 // behind the dialog) — drop the stash; the draft stays put.
-                self.set_error_toast("Reply canceled — answer the question first");
+                self.set_error_toast(xai_grok_i18n::t("dashboard.toast.reply_canceled_question"));
             }
         }
         actions
@@ -2648,7 +2650,10 @@ impl DashboardState {
             let valid = self.peek.as_ref().is_some_and(|p| idx < p.options.len());
             if !valid {
                 let n_opts = self.peek.as_ref().map(|p| p.options.len()).unwrap_or(0);
-                self.set_error_toast(&format!("No such option (only {n_opts} available)"));
+                self.set_error_toast(&xai_grok_i18n::t_fmt(
+                    "dashboard.toast.no_such_option",
+                    &[("count", &n_opts.to_string())],
+                ));
                 return Some(InputOutcome::Changed);
             }
             if let Some(p) = self.peek.as_mut() {

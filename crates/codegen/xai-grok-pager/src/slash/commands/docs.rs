@@ -5,7 +5,7 @@
 //! `/docs <title>` opens a single guide by title (case-insensitive).
 
 use crate::app::actions::Action;
-use crate::docs::{all_titles, find_doc};
+use crate::docs::{REFERENCE_DOCS, USER_GUIDE, default_howto_entries};
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 
 /// Online Build docs landing page (hardcoded like other TUI deep-links; docs.x.ai can redirect if the path moves).
@@ -49,20 +49,31 @@ impl SlashCommand for DocsCommand {
                 display: "how-to".into(),
                 match_text: "how-to".into(),
                 insert_text: "how-to".into(),
-                description: "Browse in-TUI How-to Guides".into(),
+                description: xai_grok_i18n::t_or(
+                    "slash.docs.arg_howto",
+                    "Browse in-TUI How-to Guides",
+                )
+                .into(),
             },
             ArgItem {
                 display: "web".into(),
                 match_text: "web".into(),
                 insert_text: "web".into(),
-                description: "Open docs.x.ai/build in the browser".into(),
+                description: xai_grok_i18n::t_or(
+                    "slash.docs.arg_web",
+                    "Open docs.x.ai/build in the browser",
+                )
+                .into(),
             },
         ];
-        items.extend(all_titles().map(|title| ArgItem {
-            display: title.into(),
-            match_text: title.into(),
-            insert_text: title.into(),
-            description: format!("Open \"{title}\""),
+        items.extend(default_howto_entries().into_iter().map(|doc| {
+            ArgItem {
+                display: doc.title.clone(),
+                match_text: doc.title.clone(),
+                insert_text: doc.title.clone(),
+                description: xai_grok_i18n::t_or("slash.docs.open_title", "Open \"{title}\"")
+                    .replace("{title}", &doc.title),
+            }
         }));
         Some(items)
     }
@@ -75,16 +86,35 @@ impl SlashCommand for DocsCommand {
         if is_web_arg(trimmed) {
             return CommandResult::Action(Action::OpenUrl(BUILD_DOCS_URL.into()));
         }
-        match find_doc(trimmed) {
-            Some(doc) => CommandResult::Action(Action::ShowReleaseNotes {
-                title: doc.title.into(),
+        match find_localized_doc(trimmed) {
+            Some((doc, title)) => CommandResult::Action(Action::ShowReleaseNotes {
+                title,
                 content: doc.content.into(),
             }),
-            None => CommandResult::Error(format!(
-                "Unknown docs target {trimmed:?}. Try /docs, /docs web, or a guide title (e.g. /docs Getting Started)."
-            )),
+            None => CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.docs.unknown_target",
+                    "Unknown docs target {target}. Try /docs, /docs web, or a guide title (e.g. /docs Getting Started).",
+                )
+                .replace("{target}", &format!("{trimmed:?}")),
+            ),
         }
     }
+}
+
+fn find_localized_doc(title: &str) -> Option<(&'static crate::docs::Doc, String)> {
+    USER_GUIDE
+        .iter()
+        .chain(REFERENCE_DOCS.iter())
+        .zip(default_howto_entries())
+        .find_map(|(doc, localized)| {
+            if doc.title.eq_ignore_ascii_case(title) || localized.title.eq_ignore_ascii_case(title)
+            {
+                Some((doc, localized.title))
+            } else {
+                None
+            }
+        })
 }
 
 fn is_howto_list_arg(arg: &str) -> bool {

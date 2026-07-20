@@ -20,6 +20,29 @@ pub struct ProjectQuestion {
 }
 
 const MAX_RECENT_DIRS: usize = 5;
+
+fn format_relative_time(elapsed: std::time::Duration) -> String {
+    let secs = elapsed.as_secs();
+    let (key, fallback, value) = if secs < 1 {
+        return xai_grok_i18n::t_or("project_picker.time_now", "now").to_string();
+    } else if secs < 60 {
+        ("project_picker.time_seconds_ago", "{n}s ago", secs)
+    } else {
+        let mins = secs / 60;
+        if mins < 60 {
+            ("project_picker.time_minutes_ago", "{n}m ago", mins)
+        } else {
+            let hours = mins / 60;
+            if hours < 24 {
+                ("project_picker.time_hours_ago", "{n}h ago", hours)
+            } else {
+                ("project_picker.time_days_ago", "{n}d ago", hours / 24)
+            }
+        }
+    };
+    xai_grok_i18n::t_or(key, fallback).replace("{n}", &value.to_string())
+}
+
 pub fn build_project_question(
     recent_dirs: &[(PathBuf, chrono::DateTime<chrono::Utc>)],
     cwd: &Path,
@@ -32,12 +55,15 @@ pub fn build_project_question(
     let cwd_name = if is_home {
         "~"
     } else {
-        cwd.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("current directory")
+        cwd.file_name().and_then(|n| n.to_str()).unwrap_or_else(|| {
+            xai_grok_i18n::t_or("project_picker.current_directory", "current directory")
+        })
     };
     options.push(QuestionOption {
-        label: format!("{cwd_name} (current)"),
+        label: format!(
+            "{cwd_name} {}",
+            xai_grok_i18n::t_or("project_picker.current_suffix", "(current)")
+        ),
         description: sources::display_path(cwd),
         preview: None,
         id: None,
@@ -57,9 +83,7 @@ pub fn build_project_question(
             description: format!(
                 "{}  ({})",
                 sources::display_path(path),
-                crate::views::session_title::format_relative_time(
-                    (chrono::Utc::now() - *ts).to_std().unwrap_or_default()
-                ),
+                format_relative_time((chrono::Utc::now() - *ts).to_std().unwrap_or_default()),
             ),
             preview: None,
             id: None,
@@ -70,17 +94,25 @@ pub fn build_project_question(
     // Kept out of `resolved_paths` so the path options stay index-aligned.
     let dont_ask_index = options.len();
     options.push(QuestionOption {
-        label: "Don't ask me again".to_string(),
-        description: "Always start in the current directory (reset in config.toml)".to_string(),
+        label: xai_grok_i18n::t_or("project_picker.dont_ask_again", "Don't ask me again")
+            .to_string(),
+        description: xai_grok_i18n::t_or(
+            "project_picker.dont_ask_description",
+            "Always start in the current directory (reset in config.toml)",
+        )
+        .to_string(),
         preview: None,
         id: None,
     });
 
     ProjectQuestion {
         question: Question {
-            question: "Run Grok Build in a project directory?\n\n\
-                 This gives Grok Build full context of your codebase for better results."
-                .into(),
+            question: xai_grok_i18n::t_or(
+                "project_picker.question",
+                "Run Grok Build in a project directory?\n\n\
+                 This gives Grok Build full context of your codebase for better results.",
+            )
+            .into(),
             id: None,
             options,
             multi_select: Some(false),
@@ -125,7 +157,7 @@ mod tests {
         assert_eq!(pq.dont_ask_index, pq.question.options.len() - 1);
         assert_eq!(
             pq.question.options[pq.dont_ask_index].label,
-            "Don't ask me again"
+            xai_grok_i18n::t_or("project_picker.dont_ask_again", "Don't ask me again")
         );
     }
 }

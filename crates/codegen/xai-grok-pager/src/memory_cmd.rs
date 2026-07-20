@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Subcommand;
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_shell::session::memory::storage::MemoryStorage;
 
 #[derive(Debug, clap::Args, Clone)]
@@ -13,32 +14,32 @@ pub struct MemoryArgs {
 
 #[derive(Debug, Subcommand, Clone)]
 pub enum MemoryCommand {
-    /// Clear memory files (workspace by default)
+    #[command(about = t("cli.memory.help.clear"))]
     Clear {
-        /// Clear workspace-scoped memory (MEMORY.md, sessions/, index.sqlite)
-        #[arg(long, group = "scope")]
+        #[arg(
+            long,
+            group = "scope",
+            help = t("cli.memory.help.workspace")
+        )]
         workspace: bool,
-        /// Clear global MEMORY.md
-        #[arg(long, group = "scope")]
+        #[arg(long, group = "scope", help = t("cli.memory.help.global"))]
         global: bool,
-        /// Clear both workspace and global memory
-        #[arg(long, group = "scope")]
+        #[arg(long, group = "scope", help = t("cli.memory.help.all"))]
         all: bool,
-        /// Skip confirmation prompt
-        #[arg(long, short = 'y')]
+        #[arg(long, short = 'y', help = t("cli.memory.help.yes"))]
         yes: bool,
     },
 }
 
 struct ClearTarget {
-    label: &'static str,
+    label_key: &'static str,
     path: PathBuf,
     clear: fn(&MemoryStorage) -> std::io::Result<bool>,
 }
 
 fn workspace_target(storage: &MemoryStorage) -> ClearTarget {
     ClearTarget {
-        label: "workspace memory",
+        label_key: "cli.memory.workspace_memory",
         path: storage.workspace_dir().to_path_buf(),
         clear: |s| s.clear_workspace(),
     }
@@ -46,7 +47,7 @@ fn workspace_target(storage: &MemoryStorage) -> ClearTarget {
 
 fn global_target(storage: &MemoryStorage) -> ClearTarget {
     ClearTarget {
-        label: "global MEMORY.md",
+        label_key: "cli.memory.global_memory",
         path: storage.global_memory_file(),
         clear: |s| s.clear_global(),
     }
@@ -77,55 +78,86 @@ fn run_clear(storage: &MemoryStorage, targets: &[ClearTarget], skip_confirm: boo
     let existing: Vec<_> = targets.iter().filter(|t| t.path.exists()).collect();
 
     if existing.is_empty() {
-        println!("Nothing to clear \u{2014} no memory files found.");
+        println!("{}", t("cli.memory.nothing_to_clear"));
         return Ok(());
     }
 
-    println!("The following will be deleted:");
-    for t in &existing {
-        println!("  {}: {}", t.label, t.path.display());
+    println!("{}", t("cli.memory.will_delete"));
+    for target in &existing {
+        println!(
+            "{}",
+            t_fmt(
+                "cli.memory.target_path",
+                &[
+                    ("label", t(target.label_key)),
+                    ("path", target.path.to_string_lossy().as_ref()),
+                ],
+            )
+        );
     }
 
     if !skip_confirm {
-        print!("\nAre you sure? [y/N] ");
-        std::io::stdout().flush()?;
+        print!("\n{}", t("cli.memory.confirm"));
+        std::io::stdout().flush().map_err(|error| {
+            anyhow::anyhow!(t_fmt(
+                "cli.memory.stdout_failed",
+                &[("error", error.to_string().as_str())]
+            ))
+        })?;
 
         let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
+        std::io::stdin().read_line(&mut input).map_err(|error| {
+            anyhow::anyhow!(t_fmt(
+                "cli.memory.stdin_failed",
+                &[("error", error.to_string().as_str())]
+            ))
+        })?;
         if !matches!(input.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
-            println!("Cancelled.");
+            println!("{}", t("cli.memory.cancelled"));
             return Ok(());
         }
     }
 
     let mut cleared = false;
     let mut errors: Vec<String> = Vec::new();
-    for t in targets {
-        match (t.clear)(storage) {
+    for target in targets {
+        match (target.clear)(storage) {
             Ok(true) => {
                 cleared = true;
-                println!("  Cleared: {}", t.label);
+                println!(
+                    "{}",
+                    t_fmt(
+                        "cli.memory.cleared_target",
+                        &[("label", t(target.label_key))]
+                    )
+                );
             }
             Ok(false) => {} // nothing to clear for this scope
-            Err(e) => {
-                errors.push(format!("{}: {e}", t.label));
+            Err(error) => {
+                errors.push(t_fmt(
+                    "cli.memory.target_error",
+                    &[
+                        ("label", t(target.label_key)),
+                        ("error", error.to_string().as_str()),
+                    ],
+                ));
             }
         }
     }
 
     if cleared && errors.is_empty() {
-        println!("Memory cleared.");
+        println!("{}", t("cli.memory.cleared"));
     } else if cleared {
-        println!("Memory partially cleared. Errors:");
-        for e in &errors {
-            eprintln!("  {e}");
+        println!("{}", t("cli.memory.partially_cleared"));
+        for error in &errors {
+            eprintln!("  {error}");
         }
     } else if !errors.is_empty() {
-        eprintln!("Failed to clear memory:");
-        for e in &errors {
-            eprintln!("  {e}");
+        eprintln!("{}", t("cli.memory.clear_failed"));
+        for error in &errors {
+            eprintln!("  {error}");
         }
-        return Err(anyhow::anyhow!("clear failed"));
+        return Err(anyhow::anyhow!(t("cli.memory.clear_failed_error")));
     }
 
     Ok(())

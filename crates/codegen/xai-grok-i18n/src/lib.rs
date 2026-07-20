@@ -317,10 +317,7 @@ mod tests {
         set_locale(Locale::ZhCn);
         // Pick a key that exists only if we intentionally omit — all current
         // zh keys exist; use t_for with En after ensuring EN has settings label.
-        assert_eq!(
-            t_for(Locale::ZhCn, "settings.language.label"),
-            "界面语言"
-        );
+        assert_eq!(t_for(Locale::ZhCn, "settings.language.label"), "界面语言");
         set_locale(Locale::En);
     }
 
@@ -336,10 +333,55 @@ mod tests {
     }
 
     #[test]
-    fn zh_keys_are_subset_of_en() {
-        let en: std::collections::HashSet<_> = en_keys().collect();
-        for k in zh_cn_keys() {
-            assert!(en.contains(k), "zh-CN key `{k}` missing from en.toml");
+    fn catalogs_have_identical_keys() {
+        let en: std::collections::BTreeSet<_> = en_keys().collect();
+        let zh: std::collections::BTreeSet<_> = zh_cn_keys().collect();
+        let missing_zh: Vec<_> = en.difference(&zh).copied().collect();
+        let extra_zh: Vec<_> = zh.difference(&en).copied().collect();
+        assert!(
+            missing_zh.is_empty() && extra_zh.is_empty(),
+            "catalog key mismatch; missing zh-CN: {missing_zh:?}; extra zh-CN: {extra_zh:?}"
+        );
+    }
+
+    fn placeholders(value: &str) -> std::collections::BTreeSet<&str> {
+        let mut out = std::collections::BTreeSet::new();
+        let mut rest = value;
+        while let Some(open) = rest.find('{') {
+            rest = &rest[open + 1..];
+            let Some(close) = rest.find('}') else { break };
+            let name = &rest[..close];
+            if !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+                out.insert(name);
+            }
+            rest = &rest[close + 1..];
+        }
+        out
+    }
+
+    #[test]
+    fn translations_preserve_named_placeholders() {
+        for (key, en) in EN.iter() {
+            let zh = ZH_CN
+                .get(key)
+                .unwrap_or_else(|| panic!("zh-CN missing key `{key}`"));
+            assert_eq!(
+                placeholders(en),
+                placeholders(zh),
+                "placeholder mismatch for `{key}`: en={en:?}, zh-CN={zh:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn catalog_values_are_not_empty() {
+        for (locale, catalog) in [("en", &*EN), ("zh-CN", &*ZH_CN)] {
+            for (key, value) in catalog {
+                assert!(
+                    !value.trim().is_empty(),
+                    "{locale} catalog has an empty value for `{key}`"
+                );
+            }
         }
     }
 

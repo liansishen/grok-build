@@ -41,14 +41,18 @@ pub fn ssh_wrap_tip() -> EphemeralTip {
     let command = Style::default()
         .fg(theme.text_secondary)
         .add_modifier(Modifier::BOLD);
+    let full = xai_grok_i18n::t("tips.ssh_wrap.full");
+    let (prefix, suffix) = full
+        .split_once("grok wrap ssh <host>")
+        .unwrap_or((full, ""));
     EphemeralTip {
         ticks_remaining: SSH_WRAP_TIP_TICKS,
         ..EphemeralTip::new(
             SSH_WRAP_TIP_KEY,
             Line::from(vec![
-                Span::styled("Over SSH? Run ", dim),
+                Span::styled(prefix, dim),
                 Span::styled("grok wrap ssh <host>", command),
-                Span::styled(" locally for clipboard + terminal restore", dim),
+                Span::styled(suffix, dim),
             ]),
         )
         .with_session_seen_cap(SSH_WRAP_TIP_SEEN_KEY, SSH_WRAP_TIP_SEEN_CAP)

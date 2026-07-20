@@ -299,10 +299,14 @@ impl<'a> EntryRenderer<'a> {
         if let Some(GroupHeaderLabel::Truncation(label)) = self.group_header_label {
             spans.extend(label.line.spans.iter().cloned());
         } else {
+            let count = n.to_string();
             let label = if self.group_collapse_header {
-                format!("{n} tool calls & thoughts")
+                xai_grok_i18n::t_fmt(
+                    "scrollback.group.tool_calls_and_thoughts",
+                    &[("count", &count)],
+                )
             } else {
-                format!("{n} more")
+                xai_grok_i18n::t_fmt("scrollback.group.more", &[("count", &count)])
             };
             spans.push(ratatui::text::Span::styled(label, text_style));
         }

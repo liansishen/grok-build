@@ -35,7 +35,9 @@ impl SlashCommand for TranscriptCommand {
 
     fn run(&self, ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
         if ctx.session_id.is_none() {
-            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_session_view").to_string());
+            return CommandResult::Error(
+                xai_grok_i18n::t("slash.err.no_active_session_view").to_string(),
+            );
         }
         CommandResult::Action(Action::OpenTranscriptPager)
     }

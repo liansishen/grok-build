@@ -187,9 +187,9 @@ impl GroupKind {
     /// Display label shown in the group header.
     fn label(self) -> &'static str {
         match self {
-            GroupKind::Subagents => "Subagents",
-            GroupKind::Tasks => "Tasks",
-            GroupKind::Watchers => "Watchers",
+            GroupKind::Subagents => xai_grok_i18n::t("tasks.group.subagents"),
+            GroupKind::Tasks => xai_grok_i18n::t("tasks.group.tasks"),
+            GroupKind::Watchers => xai_grok_i18n::t("tasks.group.watchers"),
         }
     }
 
@@ -272,15 +272,15 @@ impl TaskEntry {
             let text = description
                 .map(|d| d.replace('\n', " "))
                 .unwrap_or_else(|| task.command.trim().replace('\n', " "));
-            const TAG: &str = "Monitor";
+            let tag = xai_grok_i18n::t("tasks.monitor");
             let desc_style = if running {
                 Style::default().fg(theme.text_secondary)
             } else {
                 Style::default().fg(theme.gray_bright)
             };
-            let label = format!("{TAG} {text}");
+            let label = format!("{tag} {text}");
             let styled = Line::from(vec![
-                Span::styled(format!("{TAG} "), Style::default().fg(theme.accent_system)),
+                Span::styled(format!("{tag} "), Style::default().fg(theme.accent_system)),
                 Span::styled(text, desc_style),
             ]);
             (label, styled)
@@ -293,15 +293,15 @@ impl TaskEntry {
             // at a glance, the same way subagent rows lead with their
             // persona/role label. The prefix is included in `label` so it
             // is searchable (the tasks-pane filter matches against `label`).
-            const PREFIX: &str = "Task ";
+            let prefix = xai_grok_i18n::t("tasks.task_prefix");
             let desc_style = if running {
                 Style::default().fg(theme.text_primary)
             } else {
                 Style::default().fg(theme.gray_bright)
             };
-            let label = format!("{PREFIX}{one_line}");
+            let label = format!("{prefix}{one_line}");
             let styled = Line::from(vec![
-                Span::styled(PREFIX, Style::default().fg(theme.text_secondary)),
+                Span::styled(prefix, Style::default().fg(theme.text_secondary)),
                 Span::styled(one_line, desc_style),
             ]);
             (label, styled)
@@ -460,9 +460,10 @@ impl TaskEntry {
                 let approx = created + std::time::Duration::from_secs(secs);
                 let now = std::time::Instant::now();
                 if approx > now {
-                    format!(" (next in {})", format_duration(approx.duration_since(now)))
+                    let duration = format_duration(approx.duration_since(now));
+                    xai_grok_i18n::t_fmt("tasks.next_in", &[("duration", &duration)])
                 } else {
-                    " (due now)".to_string()
+                    xai_grok_i18n::t("tasks.due_now").to_string()
                 }
             } else {
                 String::new()
@@ -470,20 +471,20 @@ impl TaskEntry {
         };
         let is_provisional = info.task_id.starts_with("provisional-");
         let suffix = if current_cron == Some(&info.task_id) {
-            " (running)".to_string()
+            xai_grok_i18n::t("tasks.status_running").to_string()
         } else if is_queued {
-            " (queued)".to_string()
+            xai_grok_i18n::t("tasks.status_queued").to_string()
         } else if is_provisional {
-            " (starting)".to_string()
+            xai_grok_i18n::t("tasks.status_starting").to_string()
         } else if let Some(n) = &info.next_fire_at {
             if let Ok(dt) = DateTime::<chrono::FixedOffset>::parse_from_rfc3339(n) {
                 let dt = dt.with_timezone(&Utc);
                 let now = Utc::now();
                 if dt > now {
-                    let dur = (dt - now).to_std().unwrap_or_default();
-                    format!(" (next in {})", format_duration(dur))
+                    let duration = format_duration((dt - now).to_std().unwrap_or_default());
+                    xai_grok_i18n::t_fmt("tasks.next_in", &[("duration", &duration)])
                 } else {
-                    " (due now)".to_string()
+                    xai_grok_i18n::t("tasks.due_now").to_string()
                 }
             } else {
                 countdown(&info.human_schedule, info.created_at)
@@ -1180,9 +1181,9 @@ impl TasksPane {
                         .fg(theme.text_primary)
                         .add_modifier(Modifier::BOLD);
                     let line = Line::from(vec![
-                        Span::styled("No running tasks. Press ", muted),
+                        Span::styled(xai_grok_i18n::t("tasks.no_running_prefix"), muted),
                         Span::styled("h", key_style),
-                        Span::styled(" to show all.", muted),
+                        Span::styled(xai_grok_i18n::t("tasks.no_running_suffix"), muted),
                     ]);
                     buf.set_line(inner.x, inner.y, &line, inner.width);
                 }
@@ -1355,7 +1356,7 @@ impl TasksPane {
             (
                 frames[frame_idx],
                 Style::default().fg(theme.accent_error),
-                "killing\u{2026} ".to_string(),
+                xai_grok_i18n::t("tasks.killing").to_string(),
                 Style::default().fg(theme.accent_error),
             )
         } else {
@@ -1503,7 +1504,7 @@ impl TasksPane {
             (
                 frames[frame_idx],
                 Style::default().fg(theme.accent_error),
-                "killing\u{2026} ".to_string(),
+                xai_grok_i18n::t("tasks.killing").to_string(),
                 Style::default().fg(theme.accent_error),
             )
         } else if info.is_running() {

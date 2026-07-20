@@ -2,6 +2,7 @@
 
 use xai_grok_shell::sampling::types::{ReasoningEffort, ReasoningEffortOption};
 
+use crate::acp::model_state::EffortTokenError;
 use crate::slash::command::ArgItem;
 
 /// Effort levels in the built-in fallback menu (strongest first). `none`/`minimal`
@@ -13,14 +14,50 @@ pub(crate) const EFFORT_LEVELS: &[ReasoningEffort] = &[
     ReasoningEffort::Low,
 ];
 
+pub(crate) fn effort_error_message(error: &EffortTokenError) -> String {
+    match error {
+        EffortTokenError::Unsupported => xai_grok_i18n::t_or(
+            "slash.effort.error_unsupported",
+            "current model does not support reasoning effort",
+        )
+        .to_string(),
+        EffortTokenError::UnknownToken { token, offered } if offered.is_empty() => {
+            xai_grok_i18n::t_or(
+                "slash.effort.error_unknown_no_levels",
+                "unknown effort level '{token}'; this model has no selectable effort levels",
+            )
+            .replace("{token}", token)
+        }
+        EffortTokenError::UnknownToken { token, offered } => xai_grok_i18n::t_or(
+            "slash.effort.error_unknown",
+            "unknown effort level '{token}'; use one of: {offered}",
+        )
+        .replace("{token}", token)
+        .replace("{offered}", &offered.join(", ")),
+        EffortTokenError::NoActiveModel => xai_grok_i18n::t_or(
+            "slash.effort.error_no_active_model",
+            "no active model to apply effort to",
+        )
+        .to_string(),
+    }
+}
+
 pub(crate) fn effort_description(level: ReasoningEffort) -> &'static str {
     match level {
-        ReasoningEffort::None => "No reasoning",
-        ReasoningEffort::Minimal => "Minimal reasoning",
-        ReasoningEffort::Low => "Faster, lighter reasoning",
-        ReasoningEffort::Medium => "Balanced reasoning",
-        ReasoningEffort::High => "Heavy reasoning",
-        ReasoningEffort::Xhigh => "Maximum reasoning",
+        ReasoningEffort::None => xai_grok_i18n::t_or("slash.effort.level_none", "No reasoning"),
+        ReasoningEffort::Minimal => {
+            xai_grok_i18n::t_or("slash.effort.level_minimal", "Minimal reasoning")
+        }
+        ReasoningEffort::Low => {
+            xai_grok_i18n::t_or("slash.effort.level_low", "Faster, lighter reasoning")
+        }
+        ReasoningEffort::Medium => {
+            xai_grok_i18n::t_or("slash.effort.level_medium", "Balanced reasoning")
+        }
+        ReasoningEffort::High => xai_grok_i18n::t_or("slash.effort.level_high", "Heavy reasoning"),
+        ReasoningEffort::Xhigh => {
+            xai_grok_i18n::t_or("slash.effort.level_xhigh", "Maximum reasoning")
+        }
     }
 }
 
@@ -61,7 +98,11 @@ pub(crate) fn build_effort_arg_items(
         .enumerate()
         .map(|(idx, option)| {
             let active = mark_active && current_effort == Some(option.value);
-            let active_suffix = if active { " (active)" } else { "" };
+            let active_suffix = if active {
+                xai_grok_i18n::t_or("slash.common.active_suffix", " (active)")
+            } else {
+                ""
+            };
             let insert_text = insert_text_for(option);
             // Sort-key prefix: 'a' for top row, 'b' for next, etc. Only
             // affects matcher tiebreak ordering, never rendered.

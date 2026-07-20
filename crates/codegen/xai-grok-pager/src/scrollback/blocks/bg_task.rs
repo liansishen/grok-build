@@ -6,7 +6,6 @@
 
 use std::time::Duration;
 
-use ratatui::style::Modifier;
 use ratatui::text::{Line, Span, Text};
 
 use crate::render::color::blend_color;
@@ -123,17 +122,8 @@ impl BgTaskBlock {
 }
 
 impl BlockContent for BgTaskBlock {
-    fn output(&self, ctx: &BlockContext) -> BlockOutput {
+    fn output(&self, _ctx: &BlockContext) -> BlockOutput {
         let theme = Theme::current();
-        // When selected, lift only the bold "Task" label to `text_primary`
-        // so it reads as undimmed (mirrors `read.rs` / `search.rs`, which
-        // bump only the label and leave the rest at `muted`). The detail
-        // text (verb + description) stays muted in every state.
-        let bold = if ctx.is_selected {
-            theme.primary().add_modifier(Modifier::BOLD)
-        } else {
-            theme.muted().add_modifier(Modifier::BOLD)
-        };
         let muted = theme.muted();
 
         // Collapse newlines for single-line display (ratatui drops '\n' as zero-width,
@@ -147,43 +137,56 @@ impl BlockContent for BgTaskBlock {
             _ => command,
         };
         let line = match &self.kind {
-            BgTaskKind::Started => Line::from(vec![
-                Span::styled("Task ", bold),
-                Span::styled("started: ", muted),
-                Span::styled(display, muted),
-            ]),
-            BgTaskKind::Completed { elapsed } => Line::from(vec![
-                Span::styled("Task ", bold),
-                Span::styled(
-                    format!("completed in {}: ", format_duration(*elapsed)),
+            BgTaskKind::Started => Line::from(Span::styled(
+                xai_grok_i18n::t_fmt("scrollback.bg_task.started", &[("task", &display)]),
+                muted,
+            )),
+            BgTaskKind::Completed { elapsed } => {
+                let duration = format_duration(*elapsed);
+                Line::from(Span::styled(
+                    xai_grok_i18n::t_fmt(
+                        "scrollback.bg_task.completed",
+                        &[("duration", &duration), ("task", &display)],
+                    ),
                     muted,
-                ),
-                Span::styled(display, muted),
-            ]),
+                ))
+            }
             BgTaskKind::Failed {
                 elapsed,
                 exit_code,
                 signal,
             } => {
-                // Detect kill signals to show "killed" instead of "failed"
+                let duration = format_duration(*elapsed);
                 let is_killed = signal
                     .as_deref()
                     .is_some_and(|s| matches!(s, "killed" | "SIGTERM" | "SIGKILL" | "oom"));
-                let verb = if is_killed { "killed" } else { "failed" };
-                let detail = if is_killed {
-                    String::new()
+                let (key, detail) = if is_killed {
+                    ("scrollback.bg_task.killed", String::new())
                 } else {
-                    match (exit_code, signal) {
-                        (_, Some(sig)) => format!(" ({})", sig),
-                        (Some(code), None) => format!(" (exit {})", code),
+                    let detail = match (exit_code, signal) {
+                        (_, Some(sig)) => xai_grok_i18n::t_fmt(
+                            "scrollback.bg_task.signal_detail",
+                            &[("signal", sig)],
+                        ),
+                        (Some(code), None) => xai_grok_i18n::t_fmt(
+                            "scrollback.bg_task.exit_detail",
+                            &[("code", &code.to_string())],
+                        ),
                         (None, None) => String::new(),
-                    }
+                    };
+                    ("scrollback.bg_task.failed", detail)
                 };
-                Line::from(vec![
-                    Span::styled("Task ", bold),
-                    Span::styled(format!("{verb} in {}: ", format_duration(*elapsed)), muted),
-                    Span::styled(format!("{}{}", display, detail), muted),
-                ])
+                Line::from(Span::styled(
+                    xai_grok_i18n::t_fmt(
+                        key,
+                        &[
+                            ("duration", &duration),
+                            ("task", &display),
+                            ("detail", &detail),
+                        ],
+                    ),
+                    muted,
+                ))
             }
         };
 

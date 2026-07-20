@@ -389,7 +389,7 @@ impl AgentView {
     /// inline-image click target, and the Enter-key handler.
     pub(crate) fn open_media_natively(&mut self, path: &std::path::Path) -> bool {
         if crate::app::link_opener::open_path(path) {
-            self.show_toast("Opening in default app\u{2026}");
+            self.show_toast(xai_grok_i18n::t("toast.opening_app"));
             true
         } else {
             self.show_toast(xai_grok_i18n::t("toast.could_not_open_file"));
@@ -414,7 +414,7 @@ impl AgentView {
         let path_owned = path.to_path_buf();
         let (tx, rx) = std::sync::mpsc::channel();
         self.video_load_rx = Some(rx);
-        self.show_toast("Loading video\u{2026}");
+        self.show_toast(xai_grok_i18n::t("toast.loading_video"));
         std::thread::spawn(move || {
             let result =
                 crate::prompt_images::VideoViewerState::open_from_path(&path_owned).map(|viewer| {

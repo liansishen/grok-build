@@ -82,7 +82,10 @@ pub fn handle_voice_event(app: &mut AppView, event: VoiceEvent) -> bool {
             // Tear down the session; `voice_reset` releases the mic when recording
             // (the pipeline reader usually has already on error).
             app.voice_reset();
-            app.show_toast(&format!("Voice: {message}"));
+            app.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.voice_error",
+                &[("message", message.as_str())],
+            ));
             true
         }
     }

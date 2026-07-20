@@ -65,37 +65,43 @@ pub(super) fn dispatch_copy_assistant_message(app: &mut AppView, n: usize) {
         }
 
         if agent_messages.is_empty() {
-            agent
-                .scrollback
-                .push_block(RenderBlock::system("No assistant messages to copy"));
+            agent.scrollback.push_block(RenderBlock::system(
+                xai_grok_i18n::t("transcript.no_assistant_messages").to_string(),
+            ));
             return;
         }
 
         if n > agent_messages.len() {
-            agent.scrollback.push_block(RenderBlock::system(format!(
-                "Only {} assistant {} available to copy",
-                agent_messages.len(),
-                if agent_messages.len() == 1 {
-                    "message"
-                } else {
-                    "messages"
-                }
-            )));
+            let count = agent_messages.len().to_string();
+            let key = if agent_messages.len() == 1 {
+                "transcript.only_assistant_message"
+            } else {
+                "transcript.only_assistant_messages"
+            };
+            agent
+                .scrollback
+                .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                    key,
+                    &[("count", &count)],
+                )));
             return;
         }
 
         let text = &agent_messages[n - 1];
         if text.is_empty() {
-            agent
-                .scrollback
-                .push_block(RenderBlock::system("Assistant message is empty"));
+            agent.scrollback.push_block(RenderBlock::system(
+                xai_grok_i18n::t("transcript.assistant_message_empty").to_string(),
+            ));
             return;
         }
 
         let stats = crate::clipboard::clipboard_stats_suffix(text);
         agent
             .scrollback
-            .push_block(RenderBlock::system(format!("Copied to clipboard{stats}")));
+            .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                "transcript.copied_to_clipboard",
+                &[("stats", &stats)],
+            )));
         agent.copy_to_clipboard(text);
     });
 }
@@ -116,9 +122,9 @@ pub(super) fn dispatch_export_conversation(
         let md = crate::scrollback::export::render_blocks_to_markdown(blocks);
 
         if md.is_empty() {
-            agent
-                .scrollback
-                .push_block(RenderBlock::system("No conversation content to export"));
+            agent.scrollback.push_block(RenderBlock::system(
+                xai_grok_i18n::t("transcript.no_content_to_export").to_string(),
+            ));
             return;
         }
 
@@ -129,33 +135,47 @@ pub(super) fn dispatch_export_conversation(
             if let Some(parent) = expanded.parent()
                 && let Err(e) = std::fs::create_dir_all(parent)
             {
-                agent.scrollback.push_block(RenderBlock::system(format!(
-                    "Failed to create directory: {e}"
-                )));
+                let error = e.to_string();
+                agent
+                    .scrollback
+                    .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                        "transcript.create_directory_failed",
+                        &[("error", &error)],
+                    )));
                 return;
             }
             match std::fs::write(&expanded, &md) {
                 Ok(()) => {
-                    agent.scrollback.push_block(RenderBlock::system(format!(
-                        "Conversation exported to {}",
-                        expanded.display()
-                    )));
+                    let path = expanded.display().to_string();
+                    agent
+                        .scrollback
+                        .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                            "transcript.exported_to",
+                            &[("path", &path)],
+                        )));
                 }
                 Err(e) => {
                     // Do not blindly re-emit a user-supplied path in the error message
                     // (it may contain secrets or PII); the generic failure is sufficient.
+                    let error = e.to_string();
                     agent
                         .scrollback
-                        .push_block(RenderBlock::system(format!("Failed to write file: {}", e)));
+                        .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                            "transcript.write_file_failed",
+                            &[("error", &error)],
+                        )));
                 }
             }
         } else {
             // Clipboard path: stats block (like assistant copy) + route-aware toast
             // (like block content copy / selection). Good UX for a potentially large transcript.
             let stats = crate::clipboard::clipboard_stats_suffix(&md);
-            agent.scrollback.push_block(RenderBlock::system(format!(
-                "Conversation copied to clipboard{stats}"
-            )));
+            agent
+                .scrollback
+                .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                    "transcript.conversation_copied",
+                    &[("stats", &stats)],
+                )));
             agent.copy_to_clipboard(&md);
         }
     });
@@ -197,7 +217,7 @@ pub(crate) fn dispatch_open_transcript_pager(app: &mut AppView) {
     let Some(content) = md else {
         with_active_agent(app, |agent| {
             agent.scrollback.push_block(RenderBlock::system(
-                "No conversation transcript to view yet",
+                xai_grok_i18n::t("transcript.no_transcript_yet").to_string(),
             ));
         });
         return;
@@ -211,9 +231,13 @@ pub(crate) fn dispatch_open_transcript_pager(app: &mut AppView) {
         }
         Err(e) => {
             with_active_agent(app, |agent| {
-                agent.scrollback.push_block(RenderBlock::system(format!(
-                    "Failed to write transcript: {e}"
-                )));
+                let error = e.to_string();
+                agent
+                    .scrollback
+                    .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                        "transcript.write_transcript_failed",
+                        &[("error", &error)],
+                    )));
             });
         }
     }
@@ -516,7 +540,11 @@ pub(super) fn dispatch_dump_input_log(app: &mut AppView) -> Vec<Effect> {
     let json = match serde_json::to_string_pretty(&dump) {
         Ok(j) => j,
         Err(e) => {
-            agent.show_toast(&format!("Failed to serialize input log: {e}"));
+            let error = e.to_string();
+            agent.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.input_log_serialize_failed",
+                &[("error", &error)],
+            ));
             return vec![];
         }
     };
@@ -529,9 +557,11 @@ pub(super) fn dispatch_dump_input_log(app: &mut AppView) -> Vec<Effect> {
 
     match std::fs::write(&path, json) {
         Ok(()) => {
-            let display_path = path.display();
-            agent.show_toast(&format!(
-                "Input log ({entry_count} events) → {display_path}"
+            let display_path = path.display().to_string();
+            let entry_count_display = entry_count.to_string();
+            agent.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.input_log_written",
+                &[("count", &entry_count_display), ("path", &display_path)],
             ));
             crate::unified_log::info(
                 &format!("input debug dump: {entry_count} events, {time_span_ms}ms span"),
@@ -540,7 +570,11 @@ pub(super) fn dispatch_dump_input_log(app: &mut AppView) -> Vec<Effect> {
             );
         }
         Err(e) => {
-            agent.show_toast(&format!("Failed to write input log: {e}"));
+            let error = e.to_string();
+            agent.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.input_log_write_failed",
+                &[("error", &error)],
+            ));
         }
     }
     vec![]
@@ -640,14 +674,24 @@ pub(super) fn handle_marketplace_updates_available(
         let summary = if names.len() <= 2 {
             names.join(", ")
         } else {
-            format!("{} and {} more", names[..2].join(", "), names.len() - 2)
+            let count = (names.len() - 2).to_string();
+            let names = names[..2].join(", ");
+            xai_grok_i18n::t_fmt(
+                "plugins.update_summary_more",
+                &[("names", &names), ("count", &count)],
+            )
         };
         agent
             .scrollback
-            .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                "{} Plugins auto-updated: {summary}.",
-                crate::glyphs::diamond_filled()
-            )));
+            .push_block(crate::scrollback::block::RenderBlock::system(
+                xai_grok_i18n::t_fmt(
+                    "plugins.auto_updated",
+                    &[
+                        ("glyph", crate::glyphs::diamond_filled()),
+                        ("summary", &summary),
+                    ],
+                ),
+            ));
     }
     vec![]
 }

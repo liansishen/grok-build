@@ -5,7 +5,7 @@
 
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
-use crate::slash::commands::effort_levels::build_effort_arg_items;
+use crate::slash::commands::effort_levels::{build_effort_arg_items, effort_error_message};
 
 /// Set reasoning effort for the active model.
 pub struct EffortCommand;
@@ -70,14 +70,24 @@ impl SlashCommand for EffortCommand {
             let current = ctx
                 .models
                 .reasoning_effort
-                .map(|e| format!(" (current: {e})"))
+                .map(|e| {
+                    xai_grok_i18n::t_or("slash.effort.current_suffix", " (current: {effort})")
+                        .replace("{effort}", e.as_str())
+                })
                 .unwrap_or_default();
             let levels = if offered.is_empty() {
                 "<level>".to_string()
             } else {
                 offered.join("|")
             };
-            return CommandResult::Error(format!("Usage: /effort <{levels}>{current}"));
+            return CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.effort.usage_levels",
+                    "Usage: /effort <{levels}>{current}",
+                )
+                .replace("{levels}", &levels)
+                .replace("{current}", &current),
+            );
         }
 
         // Same gate-first policy as the CLI (`--effort`) and headless.
@@ -86,7 +96,7 @@ impl SlashCommand for EffortCommand {
                 model_id,
                 effort: Some(effort),
             }),
-            Err(err) => CommandResult::Error(err.message()),
+            Err(err) => CommandResult::Error(effort_error_message(&err)),
         }
     }
 }

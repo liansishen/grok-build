@@ -29,6 +29,7 @@ use std::path::Path;
 
 use toml::Value as TomlValue;
 use xai_grok_config_types::{BoolFlag, RemoteSettings};
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::trust::{TrustStore, workspace_key};
 
@@ -436,16 +437,14 @@ pub fn prompt_for_trust(key: &Path) -> bool {
 
     let mut err = std::io::stderr();
     let _ = writeln!(err);
+    let _ = writeln!(err, "{}", t("folder_trust.warning"));
+    let folder = key.display().to_string();
     let _ = writeln!(
         err,
-        "This folder contains repo-local config (.mcp.json / .grok/lsp.json / hooks) \
-         that can run commands on your machine."
+        "{}",
+        t_fmt("folder_trust.folder", &[("path", &folder)])
     );
-    let _ = writeln!(err, "  Folder: {}", key.display());
-    let _ = write!(
-        err,
-        "Trust the authors of this folder and allow these servers to start? [y/N] "
-    );
+    let _ = write!(err, "{}", t("folder_trust.prompt"));
     let _ = err.flush();
 
     let mut line = String::new();

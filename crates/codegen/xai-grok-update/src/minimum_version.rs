@@ -7,11 +7,14 @@
 //! Set `GROK_TEST_VERSION` to manually exercise either path without producing
 //! a real out-of-date build.
 
+use std::fmt;
+
 use crate::auto_update::{get_installer, run_install_script};
 use crate::version::{
     UpdateConfig, fetch_latest_version, get_installed_grok_version, write_version_cache,
 };
 use tracing::{info, warn};
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_shell::util::config;
 
 /// Result of comparing the running binary against a configured floor.
@@ -32,36 +35,24 @@ enum EnforcementOutcome {
 /// User-facing enforcement failures; `Display` is printed to stderr.
 /// `AutoUpdateDisabled` and `NoInstaller` share copy but stay separate so
 /// telemetry can distinguish them.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub(crate) enum MinimumVersionError {
     /// `source` chains via `Error::source()`; omitted from `Display`.
-    #[error(
-        "The minimum version \"{value}\" in your Grok configuration \
-         isn't a valid version number. Update `cli.minimum_version` and try again."
-    )]
     InvalidMinimum {
         value: String,
-        #[source]
         source: semver::Error,
     },
-    #[error(
-        "This version of Grok ({current}) is no longer supported. \
-         Run `grok update` to install version {minimum} or later."
-    )]
-    AutoUpdateDisabled { current: String, minimum: String },
+    AutoUpdateDisabled {
+        current: String,
+        minimum: String,
+    },
     /// `npm` / `gh` / `internal` GCS — none detected.
-    #[error(
-        "This version of Grok ({current}) is no longer supported. \
-         Run `grok update` to install version {minimum} or later."
-    )]
-    NoInstaller { current: String, minimum: String },
+    NoInstaller {
+        current: String,
+        minimum: String,
+    },
     /// `detail` is telemetry-only; omitted from `Display` to avoid stacking
     /// the installer's own action language.
-    #[error(
-        "This version of Grok ({current}) is no longer supported, \
-         and the update to version {minimum} didn't complete.\n\n\
-         Run `grok update` to try again."
-    )]
     UpgradeFailed {
         current: String,
         minimum: String,
@@ -69,29 +60,72 @@ pub(crate) enum MinimumVersionError {
     },
     /// Latest release is known but still below the floor (vs `NoReleaseFound`,
     /// which couldn't probe at all).
-    #[error(
-        "This version of Grok ({current}) is no longer supported. \
-         Version {minimum} or later is required, but the most recent release is {latest}. \
-         Contact your administrator."
-    )]
     NoSatisfyingVersion {
         current: String,
         minimum: String,
         latest: String,
     },
     /// Couldn't probe the registry — likely transient.
-    #[error(
-        "This version of Grok ({current}) is no longer supported. \
-         Version {minimum} or later is required, but no release was found. \
-         Check your network connection, or contact your administrator."
-    )]
-    NoReleaseFound { current: String, minimum: String },
+    NoReleaseFound {
+        current: String,
+        minimum: String,
+    },
     /// `grok update --version X` requested a version below the floor.
-    #[error(
-        "Cannot install Grok {target}: the configured minimum is {minimum}. \
-         Run `grok update` to install the latest allowed version."
-    )]
-    TargetBelowFloor { target: String, minimum: String },
+    TargetBelowFloor {
+        target: String,
+        minimum: String,
+    },
+}
+
+impl fmt::Display for MinimumVersionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::InvalidMinimum { value, .. } => {
+                t_fmt("update.minimum.invalid", &[("value", value.as_str())])
+            }
+            Self::AutoUpdateDisabled { current, minimum }
+            | Self::NoInstaller { current, minimum } => t_fmt(
+                "update.minimum.unsupported_run_update",
+                &[("current", current.as_str()), ("minimum", minimum.as_str())],
+            ),
+            Self::UpgradeFailed {
+                current, minimum, ..
+            } => t_fmt(
+                "update.minimum.upgrade_failed",
+                &[("current", current.as_str()), ("minimum", minimum.as_str())],
+            ),
+            Self::NoSatisfyingVersion {
+                current,
+                minimum,
+                latest,
+            } => t_fmt(
+                "update.minimum.no_satisfying_version",
+                &[
+                    ("current", current.as_str()),
+                    ("minimum", minimum.as_str()),
+                    ("latest", latest.as_str()),
+                ],
+            ),
+            Self::NoReleaseFound { current, minimum } => t_fmt(
+                "update.minimum.no_release_found",
+                &[("current", current.as_str()), ("minimum", minimum.as_str())],
+            ),
+            Self::TargetBelowFloor { target, minimum } => t_fmt(
+                "update.minimum.target_below_floor",
+                &[("target", target.as_str()), ("minimum", minimum.as_str())],
+            ),
+        };
+        f.write_str(&message)
+    }
+}
+
+impl std::error::Error for MinimumVersionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::InvalidMinimum { source, .. } => Some(source),
+            _ => None,
+        }
+    }
 }
 
 /// Pure check against the configured floor. Empty / whitespace-only
@@ -219,8 +253,11 @@ async fn enforce_minimum_version(
 
     info!(%current, %target, installer, "minimum_version: installing upgrade");
     eprintln!(
-        "This version of Grok ({current}) is no longer supported. \
-         Updating to {target}…"
+        "{}",
+        t_fmt(
+            "update.minimum.updating",
+            &[("current", current.as_str()), ("target", target.as_str())],
+        )
     );
 
     if let Err(e) = run_install_script(installer, Some(&target), update_config).await {
@@ -281,7 +318,7 @@ pub async fn enforce_minimum_version_or_exit(update_config: &UpdateConfig) {
             // child process ever writes to a broken pipe. For now this
             // path is rare (only fires when the server pushes a minimum
             // version bump), so print a relaunch message instead.
-            eprintln!("Update installed. Run `grok` to start.");
+            eprintln!("{}", t("update.installed_run_grok"));
             std::process::exit(0);
         }
         Err(e) => {

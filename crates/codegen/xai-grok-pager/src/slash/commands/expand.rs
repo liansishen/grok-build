@@ -41,7 +41,9 @@ impl SlashCommand for ExpandCommand {
             );
         }
         if ctx.session_id.is_none() {
-            return CommandResult::Error(xai_grok_i18n::t("slash.err.no_active_session").to_string());
+            return CommandResult::Error(
+                xai_grok_i18n::t("slash.err.no_active_session").to_string(),
+            );
         }
         CommandResult::Action(Action::MinimalExpandLast)
     }

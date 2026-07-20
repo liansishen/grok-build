@@ -33,7 +33,7 @@ fn tip_line(tip: &str) -> Line<'_> {
     let theme = Theme::current();
     Line::from(vec![
         Span::styled(
-            "Tip: ",
+            xai_grok_i18n::t("tips.label"),
             Style::default().fg(theme.gray).add_modifier(Modifier::BOLD),
         ),
         Span::styled(tip, Style::default().fg(theme.gray)),

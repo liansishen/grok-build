@@ -80,34 +80,69 @@ impl SlashCommand for TerminalSetupCommand {
         let mut out = String::new();
 
         // -- Environment --
-        out.push_str("Environment\n");
-        out.push_str(&format!("  terminal     {}\n", ctx.brand));
-        if let Some(v) = crate::terminal::xtversion::detected() {
-            out.push_str(&format!("  xtversion    {}\n", v));
-        }
-        out.push_str(&format!("  multiplexer  {}\n", ctx.multiplexer));
-        if let Some(ref byobu) = ctx.byobu {
-            out.push_str(&format!("  byobu        {}\n", byobu));
-        }
-        out.push_str(&format!(
-            "  ssh          {}\n",
-            if is_ssh { "yes" } else { "no" }
+        out.push_str(xai_grok_i18n::t_or(
+            "slash.terminal-setup.environment",
+            "Environment\n",
         ));
+        out.push_str(
+            &xai_grok_i18n::t_or(
+                "slash.terminal-setup.row_terminal",
+                "  terminal     {value}\n",
+            )
+            .replace("{value}", &ctx.brand.to_string()),
+        );
+        if let Some(v) = crate::terminal::xtversion::detected() {
+            out.push_str(
+                &xai_grok_i18n::t_or(
+                    "slash.terminal-setup.row_xtversion",
+                    "  xtversion    {value}\n",
+                )
+                .replace("{value}", &v),
+            );
+        }
+        out.push_str(
+            &xai_grok_i18n::t_or(
+                "slash.terminal-setup.row_multiplexer",
+                "  multiplexer  {value}\n",
+            )
+            .replace("{value}", &ctx.multiplexer.to_string()),
+        );
+        if let Some(ref byobu) = ctx.byobu {
+            out.push_str(
+                &xai_grok_i18n::t_or("slash.terminal-setup.row_byobu", "  byobu        {value}\n")
+                    .replace("{value}", &byobu.to_string()),
+            );
+        }
+        let ssh_value = if is_ssh {
+            xai_grok_i18n::t_or("slash.terminal-setup.yes", "yes")
+        } else {
+            xai_grok_i18n::t_or("slash.terminal-setup.no", "no")
+        };
+        out.push_str(
+            &xai_grok_i18n::t_or("slash.terminal-setup.row_ssh", "  ssh          {value}\n")
+                .replace("{value}", ssh_value),
+        );
         out.push_str(&crate::diagnostics::format_color_env_line(color_level));
         out.push_str(&crate::diagnostics::format_themes_env_line(color_level));
 
         let kb = ctx.keyboard_capabilities();
         if kb.modifier_delivery.benefits_from_rescue() || kb.enter_needs_rescue() {
             let rescue = if cfg!(target_os = "macos") {
-                "OS rescue active"
+                xai_grok_i18n::t_or("slash.terminal-setup.os_rescue_active", "OS rescue active")
             } else {
-                "OS rescue unavailable on this platform"
+                xai_grok_i18n::t_or(
+                    "slash.terminal-setup.os_rescue_unavailable",
+                    "OS rescue unavailable on this platform",
+                )
             };
-            out.push_str(&format!(
-                "  keyboard     {} ({})\n",
-                kb.modifier_delivery.label(),
-                rescue
-            ));
+            out.push_str(
+                &xai_grok_i18n::t_or(
+                    "slash.terminal-setup.row_keyboard",
+                    "  keyboard     {delivery} ({rescue})\n",
+                )
+                .replace("{delivery}", kb.modifier_delivery.label())
+                .replace("{rescue}", rescue),
+            );
         }
 
         // Some terminals can't distinguish Shift+Enter from bare Enter at
@@ -120,8 +155,16 @@ impl SlashCommand for TerminalSetupCommand {
         if ctx.shift_enter_unavailable() && !wezterm_kkp_off {
             let detail = if ctx.vte_version.is_some() || ctx.brand == TerminalName::Vte {
                 match ctx.vte_version.as_deref() {
-                    Some(v) => format!("VTE {v}; need >= 8200 for Shift+Enter"),
-                    None => "legacy VTE; need VTE >= 0.82 for Shift+Enter".to_owned(),
+                    Some(v) => xai_grok_i18n::t_or(
+                        "slash.terminal-setup.newline_vte_version",
+                        "VTE {version}; need >= 8200 for Shift+Enter",
+                    )
+                    .replace("{version}", v),
+                    None => xai_grok_i18n::t_or(
+                        "slash.terminal-setup.newline_legacy_vte",
+                        "legacy VTE; need VTE >= 0.82 for Shift+Enter",
+                    )
+                    .to_owned(),
                 }
             } else if matches!(
                 ctx.brand,
@@ -130,11 +173,25 @@ impl SlashCommand for TerminalSetupCommand {
                     | TerminalName::Windsurf
                     | TerminalName::Zed
             ) {
-                format!("{}: xterm.js can't distinguish Shift+Enter", ctx.brand)
+                xai_grok_i18n::t_or(
+                    "slash.terminal-setup.newline_xtermjs",
+                    "{terminal}: xterm.js can't distinguish Shift+Enter",
+                )
+                .replace("{terminal}", &ctx.brand.to_string())
             } else {
-                "no Kitty keyboard protocol; Shift+Enter == Enter".to_owned()
+                xai_grok_i18n::t_or(
+                    "slash.terminal-setup.newline_no_kitty",
+                    "no Kitty keyboard protocol; Shift+Enter == Enter",
+                )
+                .to_owned()
             };
-            out.push_str(&format!("  newline      Alt+Enter ({detail})\n"));
+            out.push_str(
+                &xai_grok_i18n::t_or(
+                    "slash.terminal-setup.row_newline",
+                    "  newline      Alt+Enter ({detail})\n",
+                )
+                .replace("{detail}", &detail),
+            );
         }
 
         // -- Clipboard --
@@ -163,34 +220,71 @@ impl SlashCommand for TerminalSetupCommand {
 
         // -- Diagnostics --
         if warnings.is_empty() && !clipboard_diagnostics.has_issue {
-            out.push_str("\nNo issues found.\n");
+            out.push_str(xai_grok_i18n::t_or(
+                "slash.terminal-setup.no_issues",
+                "\nNo issues found.\n",
+            ));
         } else if !warnings.is_empty() {
-            out.push_str(&format!("\n{} additional issue(s)\n", warnings.len()));
+            out.push_str(
+                &xai_grok_i18n::t_or(
+                    "slash.terminal-setup.additional_issues",
+                    "\n{count} additional issue(s)\n",
+                )
+                .replace("{count}", &warnings.len().to_string()),
+            );
             for w in &warnings {
                 out.push_str(&format!("\n  [!] {}\n", w.message));
                 match (w.fix.as_deref(), w.config_path.as_deref()) {
                     (Some(fix), Some(path)) => {
-                        out.push_str(&format!("      Fix: place `{}` in {}\n", fix, path));
+                        out.push_str(
+                            &xai_grok_i18n::t_or(
+                                "slash.terminal-setup.fix_place",
+                                "      Fix: place `{fix}` in {path}\n",
+                            )
+                            .replace("{fix}", fix)
+                            .replace("{path}", path),
+                        );
                     }
                     (Some(fix), None) => {
-                        out.push_str(&format!("      Fix: run `{}`\n", fix));
+                        out.push_str(
+                            &xai_grok_i18n::t_or(
+                                "slash.terminal-setup.fix_run",
+                                "      Fix: run `{fix}`\n",
+                            )
+                            .replace("{fix}", fix),
+                        );
                     }
                     _ => {}
                 }
                 if let Some(note) = w.note.as_deref() {
-                    out.push_str(&format!("      Note: {}\n", note));
+                    out.push_str(
+                        &xai_grok_i18n::t_or("slash.terminal-setup.note", "      Note: {note}\n")
+                            .replace("{note}", note),
+                    );
                 }
             }
         }
 
         // -- Recommendation --
         if let Some(rec) = ssh_wrap_recommendation {
-            out.push_str(&format!("\nRecommendation\n\n  {}\n", rec.message));
+            out.push_str(
+                &xai_grok_i18n::t_or(
+                    "slash.terminal-setup.recommendation",
+                    "\nRecommendation\n\n  {message}\n",
+                )
+                .replace("{message}", &rec.message),
+            );
             if let Some(fix) = rec.fix.as_deref() {
-                out.push_str(&format!("      Run: `{}`\n", fix));
+                out.push_str(
+                    &xai_grok_i18n::t_or("slash.terminal-setup.run", "      Run: `{fix}`\n")
+                        .replace("{fix}", fix),
+                );
             }
             if let Some(note) = rec.note.as_deref() {
-                out.push_str(&format!("      Note: {}\n", note));
+                out.push_str(
+                    &xai_grok_i18n::t_or("slash.terminal-setup.note", "      Note: {note}\n")
+                        .replace("{note}", note),
+                );
             }
         }
 

@@ -3,6 +3,7 @@ use std::path::Path;
 
 use super::{DbStats, GcReport, RebuildReport};
 use xai_fast_worktree::WorktreeRecord;
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_shell::session::worktree::META_KEY_LABEL;
 
 /// Extract the label from a worktree record's metadata JSON.
@@ -16,7 +17,7 @@ fn extract_label(rec: &WorktreeRecord) -> &str {
 
 pub fn print_table(records: &[WorktreeRecord]) {
     if records.is_empty() {
-        println!("No worktrees found.");
+        println!("{}", t("cli.worktree.none_found"));
         return;
     }
 
@@ -37,13 +38,22 @@ pub fn print_table(records: &[WorktreeRecord]) {
         .clamp(5, 24);
 
     let header = format!(
-        "  {:<id_width$} {:<8} {:<6} {:<label_width$} {:<20} {:<10} PATH",
-        "ID", "TYPE", "REPO", "LABEL", "BRANCH", "AGE",
+        "  {:<id_width$} {:<8} {:<6} {:<label_width$} {:<20} {:<10} {}",
+        t("cli.worktree.header.id"),
+        t("cli.worktree.header.type"),
+        t("cli.worktree.header.repo"),
+        t("cli.worktree.header.label"),
+        t("cli.worktree.header.branch"),
+        t("cli.worktree.header.age"),
+        t("cli.worktree.header.path"),
     );
     println!("{header}");
     for rec in records {
         let age = format_age(rec.created_at);
-        let branch = rec.git_ref.as_deref().unwrap_or("(detached)");
+        let branch = rec
+            .git_ref
+            .as_deref()
+            .unwrap_or_else(|| t("cli.worktree.detached"));
         let label = extract_label(rec);
         let path = abbreviate_home(&rec.path);
         let row = format!(
@@ -68,7 +78,16 @@ pub fn print_table(records: &[WorktreeRecord]) {
                 m
             });
     let breakdown: Vec<String> = by_kind.iter().map(|(k, v)| format!("{v} {k}")).collect();
-    println!("  {} worktrees ({})", total, breakdown.join(", "));
+    println!(
+        "{}",
+        t_fmt(
+            "cli.worktree.total",
+            &[
+                ("count", total.to_string().as_str()),
+                ("breakdown", breakdown.join(", ").as_str()),
+            ],
+        )
+    );
 }
 
 pub fn print_json(records: &[WorktreeRecord]) {
@@ -77,13 +96,22 @@ pub fn print_json(records: &[WorktreeRecord]) {
 }
 
 pub fn print_show(rec: &WorktreeRecord) {
-    println!("  Path:           {}", rec.path.display());
-    println!("  ID:             {}", rec.id);
-    println!("  Type:           {}", rec.kind.as_str());
-    println!("  Source Repo:    {}", rec.source_repo.display());
-    println!("  Creation Mode:  {}", rec.creation_mode);
+    print_detail(
+        "cli.worktree.detail.path",
+        rec.path.to_string_lossy().as_ref(),
+    );
+    print_detail("cli.worktree.detail.id", rec.id.as_str());
+    print_detail("cli.worktree.detail.type", rec.kind.as_str());
+    print_detail(
+        "cli.worktree.detail.source_repo",
+        rec.source_repo.to_string_lossy().as_ref(),
+    );
+    print_detail(
+        "cli.worktree.detail.creation_mode",
+        rec.creation_mode.as_str(),
+    );
     if let Some(ref git_ref) = rec.git_ref {
-        println!("  Git Ref:        {git_ref}");
+        print_detail("cli.worktree.detail.git_ref", git_ref);
     }
     if let Some(ref commit) = rec.head_commit {
         let short = if commit.len() > 12 {
@@ -91,55 +119,101 @@ pub fn print_show(rec: &WorktreeRecord) {
         } else {
             commit
         };
-        println!("  HEAD:           {short}");
+        print_detail("cli.worktree.detail.head", short);
     }
-    println!("  Created:        {}", format_timestamp(rec.created_at));
+    print_detail(
+        "cli.worktree.detail.created",
+        format_timestamp(rec.created_at).as_str(),
+    );
     if let Some(ts) = rec.last_accessed_at {
-        println!("  Last Accessed:  {}", format_timestamp(ts));
+        print_detail(
+            "cli.worktree.detail.last_accessed",
+            format_timestamp(ts).as_str(),
+        );
     }
     if let Some(ref sid) = rec.session_id {
-        println!("  Session ID:     {sid}");
+        print_detail("cli.worktree.detail.session_id", sid);
     }
     if let Some(pid) = rec.creator_pid {
-        println!("  Creator PID:    {pid}");
+        print_detail("cli.worktree.detail.creator_pid", pid.to_string().as_str());
     }
-    println!("  Status:         {}", rec.status.as_str());
+    print_detail("cli.worktree.detail.status", rec.status.as_str());
     let label = extract_label(rec);
     if !label.is_empty() {
-        println!("  Label:          {label}");
+        print_detail("cli.worktree.detail.label", label);
     }
 
     if rec.path.exists()
         && let Ok(size) = dir_size(&rec.path)
     {
-        println!("  Disk Usage:     {}", format_bytes(size));
+        print_detail(
+            "cli.worktree.detail.disk_usage",
+            format_bytes(size).as_str(),
+        );
     }
 }
 
+fn print_detail(key: &str, value: &str) {
+    println!("{}", t_fmt(key, &[("value", value)]));
+}
+
 pub fn print_stats(stats: &DbStats) {
-    println!("Worktree DB Statistics");
-    println!("======================");
-    println!("  Total records:  {}", stats.total_records);
-    println!("  Alive:          {}", stats.alive_count);
-    println!("  Dead:           {}", stats.dead_count);
-    println!("  DB size:        {}", format_bytes(stats.db_file_bytes));
+    println!("{}", t("cli.worktree.stats.title"));
+    println!("{}", t("cli.worktree.stats.divider"));
+    print_detail(
+        "cli.worktree.stats.total_records",
+        stats.total_records.to_string().as_str(),
+    );
+    print_detail(
+        "cli.worktree.stats.alive",
+        stats.alive_count.to_string().as_str(),
+    );
+    print_detail(
+        "cli.worktree.stats.dead",
+        stats.dead_count.to_string().as_str(),
+    );
+    print_detail(
+        "cli.worktree.stats.db_size",
+        format_bytes(stats.db_file_bytes).as_str(),
+    );
 }
 
 pub fn print_gc(report: &GcReport) {
-    println!("GC report:");
-    println!("  Dead records removed:    {}", report.dead_removed);
-    println!("  Expired worktrees removed: {}", report.expired_removed);
-    println!("  Skipped (alive process): {}", report.skipped_alive);
+    println!("{}", t("cli.worktree.gc.title"));
+    print_detail(
+        "cli.worktree.gc.dead_removed",
+        report.dead_removed.to_string().as_str(),
+    );
+    print_detail(
+        "cli.worktree.gc.expired_removed",
+        report.expired_removed.to_string().as_str(),
+    );
+    print_detail(
+        "cli.worktree.gc.skipped_alive",
+        report.skipped_alive.to_string().as_str(),
+    );
     if report.remove_failed > 0 {
-        println!("  Removal failures:        {}", report.remove_failed);
+        print_detail(
+            "cli.worktree.gc.remove_failed",
+            report.remove_failed.to_string().as_str(),
+        );
     }
 }
 
 pub fn print_rebuild(report: &RebuildReport) {
-    println!("Rebuild report:");
-    println!("  Discovered:      {}", report.discovered);
-    println!("  Registered:      {}", report.registered);
-    println!("  Already tracked: {}", report.already_tracked);
+    println!("{}", t("cli.worktree.rebuild.title"));
+    print_detail(
+        "cli.worktree.rebuild.discovered",
+        report.discovered.to_string().as_str(),
+    );
+    print_detail(
+        "cli.worktree.rebuild.registered",
+        report.registered.to_string().as_str(),
+    );
+    print_detail(
+        "cli.worktree.rebuild.already_tracked",
+        report.already_tracked.to_string().as_str(),
+    );
 }
 
 fn format_age(created_at: i64) -> String {
@@ -148,15 +222,16 @@ fn format_age(created_at: i64) -> String {
         .unwrap_or_default()
         .as_secs() as i64;
     let delta = now.saturating_sub(created_at);
-    if delta < 60 {
-        format!("{delta}s ago")
+    let (key, value) = if delta < 60 {
+        ("cli.worktree.age.seconds", delta)
     } else if delta < 3600 {
-        format!("{}m ago", delta / 60)
+        ("cli.worktree.age.minutes", delta / 60)
     } else if delta < 86400 {
-        format!("{}h ago", delta / 3600)
+        ("cli.worktree.age.hours", delta / 3600)
     } else {
-        format!("{}d ago", delta / 86400)
-    }
+        ("cli.worktree.age.days", delta / 86400)
+    };
+    t_fmt(key, &[("count", value.to_string().as_str())])
 }
 
 fn format_timestamp(ts: i64) -> String {

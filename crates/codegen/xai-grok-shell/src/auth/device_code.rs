@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 use serde::Deserialize;
 use thiserror::Error;
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::auth::oidc::with_alpha_test_key;
 use crate::auth::{AuthChannels, AuthManager, AuthMode, AuthUrlInfo, AuthUrlMode, GrokAuth};
@@ -23,10 +24,7 @@ const MIN_DEVICE_CODE_EXPIRY_FALLBACK_SECS: i64 = 10 * 60;
 
 #[derive(Debug, Error)]
 pub enum DeviceCodeError {
-    #[error(
-        "Device-code login is not available for this deployment. \
-         Try `grok login` or set XAI_API_KEY instead."
-    )]
+    #[error("{}", t("auth.device.not_enabled"))]
     NotEnabled,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
@@ -166,7 +164,12 @@ pub async fn request_device_code(
         if status.as_u16() == 404 {
             return Err(DeviceCodeError::NotEnabled);
         }
-        return Err(anyhow::anyhow!("Device code request failed (HTTP {status}): {body}").into());
+        let status = status.to_string();
+        return Err(anyhow::anyhow!(t_fmt(
+            "auth.device.request_failed",
+            &[("status", &status), ("body", &body)],
+        ))
+        .into());
     }
 
     let server_resp: DeviceCodeResponse = resp.json().await?;
@@ -177,10 +180,7 @@ pub async fn request_device_code(
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '-')
     {
-        return Err(anyhow::anyhow!(
-            "Server returned invalid user_code format (expected [A-Z0-9-])"
-        )
-        .into());
+        return Err(anyhow::anyhow!(t("auth.device.invalid_user_code")).into());
     }
 
     validate_verification_uri(&server_resp.verification_uri)?;
@@ -232,7 +232,7 @@ pub async fn complete_device_code_login(
         tokio::time::sleep(poll_interval).await;
 
         if tokio::time::Instant::now() > deadline {
-            anyhow::bail!("Device code expired. Run `grok login --device-auth` again.");
+            anyhow::bail!(t("auth.device.expired"));
         }
 
         let resp = with_alpha_test_key(
@@ -269,11 +269,11 @@ pub async fn complete_device_code_login(
             }
             "access_denied" => {
                 tracing::warn!(description = detail, "device auth authorization denied");
-                anyhow::bail!("Authorization denied. The user rejected the request.");
+                anyhow::bail!(t("auth.device.authorization_denied"));
             }
             "expired_token" => {
                 tracing::warn!(description = detail, "device auth token expired");
-                anyhow::bail!("Device code expired. Run `grok login --device-auth` again.");
+                anyhow::bail!(t("auth.device.expired"));
             }
             other => {
                 tracing::warn!(
@@ -281,7 +281,10 @@ pub async fn complete_device_code_login(
                     description = detail,
                     "device auth token exchange failed"
                 );
-                anyhow::bail!("Token exchange error: {detail}");
+                anyhow::bail!(t_fmt(
+                    "auth.device.token_exchange_error",
+                    &[("detail", detail)],
+                ));
             }
         }
     }
@@ -363,32 +366,29 @@ async fn prompt_and_poll(
         .unwrap_or(&device_code.verification_uri);
 
     eprintln!();
-    eprintln!("To sign in, open this URL in your browser:");
+    eprintln!("{}", t("auth.device.open_url"));
     eprintln!();
     eprintln!("  {}", display_uri);
     eprintln!();
 
     if !open_browser_detached(display_uri).await {
-        eprintln!("  (Could not open browser automatically — open the URL above manually.)");
+        eprintln!("  {}", t("auth.device.browser_open_failed"));
         eprintln!();
     }
 
     // Show the code to confirm it matches the browser (anti-phishing): a complete
     // URL pre-fills it (just confirm), otherwise the user types it.
     if device_code.verification_uri_complete.is_some() {
-        eprintln!("Confirm this code in your browser:");
+        eprintln!("{}", t("auth.device.confirm_code"));
     } else {
-        eprintln!("Then enter this code:");
+        eprintln!("{}", t("auth.device.enter_code"));
     }
     eprintln!();
     eprintln!("  {}", device_code.user_code);
     eprintln!();
-    eprintln!(
-        "\x1b[90mOnly continue with a code you requested. \
-         Don't share it with anyone.\x1b[0m"
-    );
+    eprintln!("\x1b[90m{}\x1b[0m", t("auth.device.code_safety_warning"));
     eprintln!();
-    eprintln!("Waiting for authorization...");
+    eprintln!("{}", t("auth.device.waiting_authorization"));
 
     // The caller prints the `✓ Signed in` confirmation (it also owns the
     // external-provider / devbox early-return paths that never reach here).
@@ -492,10 +492,13 @@ async fn build_auth(
 
     auth_manager.enrich_auth_inline(&mut auth).await;
 
-    auth_manager
-        .update(auth)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to save credentials: {e}"))
+    auth_manager.update(auth).await.map_err(|e| {
+        let error = e.to_string();
+        anyhow::anyhow!(t_fmt(
+            "auth.device.save_credentials_failed",
+            &[("error", &error)],
+        ))
+    })
 }
 
 /// Decode JWT payload without signature verification.
@@ -519,16 +522,16 @@ fn decode_jwt_claims(jwt: &str) -> (String, Option<String>) {
 
 fn validate_verification_uri(uri: &str) -> anyhow::Result<()> {
     if uri.chars().any(|c| c.is_ascii_control()) {
-        anyhow::bail!("Server returned invalid verification URI");
+        anyhow::bail!(t("auth.device.invalid_verification_uri"));
     }
 
     let parsed = url::Url::parse(uri)
-        .map_err(|_| anyhow::anyhow!("Server returned invalid verification URI"))?;
+        .map_err(|_| anyhow::anyhow!(t("auth.device.invalid_verification_uri")))?;
 
     match parsed.scheme() {
         "https" => Ok(()),
         "http" if matches!(parsed.host_str(), Some("localhost") | Some("127.0.0.1")) => Ok(()),
-        _ => anyhow::bail!("Server returned unsupported verification URI scheme"),
+        _ => anyhow::bail!(t("auth.device.unsupported_verification_uri_scheme")),
     }
 }
 

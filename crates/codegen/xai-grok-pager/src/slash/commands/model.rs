@@ -8,7 +8,7 @@ use xai_grok_shell::sampling::types::supports_reasoning_effort_meta;
 use crate::acp::model_state::ModelState;
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
-use crate::slash::commands::effort_levels::build_effort_arg_items;
+use crate::slash::commands::effort_levels::{build_effort_arg_items, effort_error_message};
 
 /// Switch the active model (and optionally its reasoning effort).
 pub struct ModelCommand;
@@ -96,11 +96,14 @@ impl SlashCommand for ModelCommand {
                     model_id: id,
                     effort: Some(effort),
                 }),
-                Err(err) => CommandResult::Error(err.message()),
+                Err(err) => CommandResult::Error(effort_error_message(&err)),
             };
         }
 
-        CommandResult::Error(format!("Unknown model: {trimmed}"))
+        CommandResult::Error(
+            xai_grok_i18n::t_or("slash.model.unknown", "Unknown model: {model}")
+                .replace("{model}", trimmed),
+        )
     }
 }
 
@@ -158,7 +161,11 @@ fn build_model_items(models: &ModelState) -> Vec<ArgItem> {
         let supports = supports_reasoning_effort(info);
 
         let display = if is_current {
-            format!("{} (current)", info.name)
+            format!(
+                "{} {}",
+                info.name,
+                xai_grok_i18n::t_or("slash.common.current_suffix", "(current)")
+            )
         } else {
             info.name.clone()
         };

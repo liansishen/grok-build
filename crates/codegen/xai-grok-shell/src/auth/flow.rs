@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use tokio::io::AsyncBufReadExt as _;
 use tokio::sync::{mpsc, oneshot};
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::auth::config::LEGACY_AUTH_SCOPE;
 use crate::auth::{AuthManager, GrokAuth, GrokComConfig, parse_output};
@@ -237,9 +238,13 @@ async fn run_external_auth_provider(
     xai_grok_tools::util::detach_command(&mut cmd);
     cmd.envs(xai_grok_tools::util::pager_env());
 
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| anyhow::anyhow!("failed to start auth provider `{command}`: {e}"))?;
+    let mut child = cmd.spawn().map_err(|e| {
+        let error = e.to_string();
+        anyhow::anyhow!(t_fmt(
+            "auth.flow.external_provider_start_failed",
+            &[("command", command), ("error", &error)],
+        ))
+    })?;
 
     let stderr_task = if let Some(cb) = on_stderr {
         let stderr = child.stderr.take().expect("stderr was set to piped");
@@ -271,15 +276,31 @@ async fn run_external_auth_provider(
         child.wait_with_output(),
     )
     .await
-    .map_err(|_| anyhow::anyhow!("external auth provider `{command}` timed out after 300s"))?
-    .map_err(|e| anyhow::anyhow!("external auth provider `{command}` IO error: {e}"))?;
+    .map_err(|_| {
+        anyhow::anyhow!(t_fmt(
+            "auth.flow.external_provider_timeout",
+            &[("command", command)],
+        ))
+    })?
+    .map_err(|e| {
+        let error = e.to_string();
+        anyhow::anyhow!(t_fmt(
+            "auth.flow.external_provider_io_error",
+            &[("command", command), ("error", &error)],
+        ))
+    })?;
 
     if let Some(task) = stderr_task {
         let _ = task.await;
     }
 
-    let mut auth = parse_output(&output)
-        .map_err(|e| anyhow::anyhow!("external auth provider `{command}`: {e}"))?;
+    let mut auth = parse_output(&output).map_err(|e| {
+        let error = e.to_string();
+        anyhow::anyhow!(t_fmt(
+            "auth.flow.external_provider_error",
+            &[("command", command), ("error", &error)],
+        ))
+    })?;
 
     // Verify the team pin before any persist (parity with the OIDC / device-code
     // completion paths). A mismatch fails the login and writes nothing.
@@ -296,10 +317,13 @@ async fn run_external_auth_provider(
         _ => auth_manager.enrich_auth_inline(&mut auth).await,
     }
 
-    let auth = auth_manager
-        .update(auth)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to save external auth credentials: {e}"))?;
+    let auth = auth_manager.update(auth).await.map_err(|e| {
+        let error = e.to_string();
+        anyhow::anyhow!(t_fmt(
+            "auth.flow.external_provider_save_failed",
+            &[("error", &error)],
+        ))
+    })?;
 
     tracing::info!(
         user_id = %auth.user_id,
@@ -374,7 +398,7 @@ pub async fn run_auth_flow_with_stderr_bridge(
             r = auth => r,
             _ = bridge => {
                 tracing::error!("auth stderr bridge exited unexpectedly during interactive login");
-                Err(anyhow::anyhow!("Login failed. Please try again."))
+                Err(anyhow::anyhow!(t("auth.flow.login_failed")))
             },
         }
     } else {
@@ -391,7 +415,7 @@ pub async fn run_auth_flow_with_stderr_bridge(
             r = auth => r,
             _ = bridge => {
                 tracing::error!("auth stderr bridge exited unexpectedly during login");
-                Err(anyhow::anyhow!("Login failed. Please try again."))
+                Err(anyhow::anyhow!(t("auth.flow.login_failed")))
             },
         }
     }
@@ -574,7 +598,7 @@ async fn run_auth_flow_inner(
                     error = %e,
                     "auth: external auth provider failed, falling through to interactive login"
                 );
-                eprintln!("Signing in with browser instead...");
+                eprintln!("{}", t("auth.flow.browser_fallback"));
             }
         }
     }
@@ -660,9 +684,7 @@ async fn run_auth_flow_inner(
     tracing::error!(
         "auth: no OAuth2 configuration available (neither enterprise OIDC nor xAI OAuth2 configured)"
     );
-    anyhow::bail!(
-        "No OAuth2 configuration available. Run `grok login` to authenticate, or contact your administrator if you use enterprise SSO."
-    )
+    anyhow::bail!(t("auth.flow.no_oauth2_configuration"))
 }
 
 /// Non-interactive auth refresh: returns valid credentials if available without
@@ -773,8 +795,8 @@ async fn persist_or_use_minted(auth_manager: &AuthManager, new_auth: GrokAuth) -
 fn report_signed_in(auth: &GrokAuth) {
     eprint!("\r\x1b[K");
     match auth.email {
-        Some(ref email) => eprintln!("✓ Signed in as {email}"),
-        None => eprintln!("✓ Signed in"),
+        Some(ref email) => eprintln!("{}", t_fmt("auth.flow.signed_in_as", &[("email", email)])),
+        None => eprintln!("{}", t("auth.flow.signed_in")),
     }
 }
 
@@ -881,7 +903,7 @@ pub async fn run_cli_login(
     } else if cli_should_use_device(&config.grok_com_config, login_override).await {
         if config.grok_com_config.oauth2.is_none() {
             // No OIDC and no oauth2 here, so `--oauth` can't help.
-            anyhow::bail!("Sign-in is not available for this deployment. Set XAI_API_KEY instead.");
+            anyhow::bail!(t("auth.flow.sign_in_unavailable"));
         }
         let grok_home = grok_home::grok_home();
         let auth_manager = Arc::new(AuthManager::new(&grok_home, config.grok_com_config.clone()));
@@ -908,9 +930,7 @@ pub async fn run_cli_login(
     } else {
         // OIDC has no device endpoint, so `--device-auth` falls back here.
         if device_auth && crate::auth::oidc::is_configured(&config.grok_com_config) {
-            eprintln!(
-                "Device-code login isn't available for your SSO provider; using browser sign-in."
-            );
+            eprintln!("{}", t("auth.flow.device_unavailable_for_sso"));
         }
         // Loopback. `reauth=true` clears creds up front (legacy-scope hygiene),
         // so abandoning logs you out — unlike the device branch above.
@@ -931,10 +951,10 @@ pub async fn run_cli_login(
     let outcome = crate::managed_config::post_login_sync(Some(authenticated)).await;
     match outcome {
         crate::managed_config::ManagedConfigSync::Updated { is_team: true } => {
-            eprintln!("Applied your team's managed configuration.");
+            eprintln!("{}", t("auth.flow.team_managed_config_applied"));
         }
         crate::managed_config::ManagedConfigSync::Updated { is_team: false } => {
-            eprintln!("Applied your deployment's managed configuration.");
+            eprintln!("{}", t("auth.flow.deployment_managed_config_applied"));
         }
         _ => {}
     }
@@ -1010,22 +1030,24 @@ pub fn perform_logout(
 pub fn run_cli_logout(config: &crate::agent::config::Config) -> anyhow::Result<()> {
     let grok_home = grok_home::grok_home();
     let auth_manager = AuthManager::new(&grok_home, config.grok_com_config.clone());
-    let result = perform_logout(&auth_manager, None)
-        .map_err(|e| anyhow::anyhow!("Failed to clear auth: {e}"))?;
+    let result = perform_logout(&auth_manager, None).map_err(|e| {
+        let error = e.to_string();
+        anyhow::anyhow!(t_fmt("auth.flow.clear_auth_failed", &[("error", &error)],))
+    })?;
     if !result.was_logged_in {
-        eprintln!("No cached session to log out of.");
+        eprintln!("{}", t("auth.flow.no_cached_session"));
         if result.api_key_still_set {
-            eprintln!("You are authenticated via XAI_API_KEY (environment variable).");
+            eprintln!("{}", t("auth.flow.api_key_authenticated"));
         }
         return Ok(());
     }
     if let Some(email) = result.email {
-        eprintln!("Logged out (was signed in as {email})");
+        eprintln!("{}", t_fmt("auth.flow.logged_out_as", &[("email", &email)]));
     } else {
-        eprintln!("Logged out");
+        eprintln!("{}", t("auth.flow.logged_out"));
     }
     if result.api_key_still_set {
-        eprintln!("XAI_API_KEY is still set and will be used for authentication.");
+        eprintln!("{}", t("auth.flow.api_key_still_set"));
     }
     Ok(())
 }
