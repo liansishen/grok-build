@@ -4,26 +4,61 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to publish (example: v0.2.105-fork.1)"
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: build-${{ github.workflow }}-${{ github.ref }}
+  # Keep release dispatches independent from normal main/PR builds so a new
+  # push cannot cancel a release after its binaries have started building.
+  group: build-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ inputs.release_tag || 'snapshot' }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   RUST_BACKTRACE: "1"
+  GROK_RELEASE_REPO: liansishen/grok-build
 
 jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_release: ${{ steps.version.outputs.is_release }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve build version
+        id: version
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          release_tag="$RELEASE_TAG"
+          if [[ -n "$release_tag" ]]; then
+            version="$(./scripts/release-version.sh "$release_tag")"
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            official="$(sed -n 's/^version = "\([^"]*\)"/\1/p' crates/codegen/xai-grok-version/Cargo.toml | head -n1)"
+            version="${official}-fork.0"
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Build version: $version"
+
   build:
     name: ${{ matrix.name }}
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -32,15 +67,17 @@ jobs:
             os: ubuntu-24.04
             artifact: grok-build-linux-x86_64
             binary: target/release/xai-grok-pager
-            packaged_binary: dist/grok
+            release_binary: grok-${{ needs.version.outputs.version }}-linux-x86_64
           - name: Windows x86_64
             os: windows-2022
             artifact: grok-build-windows-x86_64
             binary: target/release/xai-grok-pager.exe
-            packaged_binary: dist/grok.exe
+            release_binary: grok-${{ needs.version.outputs.version }}-windows-x86_64
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
+    env:
+      GROK_VERSION: ${{ needs.version.outputs.version }}
 
     steps:
       - name: Check out source
@@ -102,20 +139,72 @@ jobs:
         shell: bash
         run: cargo build --locked -p xai-grok-pager-bin --release
 
-      - name: Verify binary
+      - name: Verify binary version
         shell: bash
-        run: '"${{ matrix.binary }}" --version'
+        run: |
+          output="$("${{ matrix.binary }}" --version)"
+          echo "$output"
+          [[ "$output" == *"$GROK_VERSION"* ]]
 
-      - name: Prepare artifact
+      - name: Prepare artifacts
         shell: bash
         run: |
           mkdir -p dist
-          cp "${{ matrix.binary }}" "${{ matrix.packaged_binary }}"
+          cp "${{ matrix.binary }}" "dist/${{ matrix.release_binary }}"
 
-      - name: Upload binary
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: dist/
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    if: needs.version.outputs.is_release == 'true'
+    needs:
+      - version
+      - build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: grok-build-linux-x86_64
+          path: release
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: grok-build-windows-x86_64
+          path: release
+
+      - name: Reject an existing release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release tag already exists and will not be overwritten: ${RELEASE_TAG}" >&2
+            exit 1
+          fi
+
+      - name: Generate checksums
+        working-directory: release
+        run: sha256sum grok-* > SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          name: Grok Build Fork ${{ needs.version.outputs.version }}
+          generate_release_notes: true
+          prerelease: false
+          files: |
+            release/grok-${{ needs.version.outputs.version }}-linux-x86_64
+            release/grok-${{ needs.version.outputs.version }}-windows-x86_64
+            release/SHA256SUMS

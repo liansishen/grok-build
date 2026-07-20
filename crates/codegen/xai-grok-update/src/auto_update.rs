@@ -8,6 +8,7 @@ use std::os::unix::process::CommandExt;
 
 use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
 use crate::version::{
@@ -28,19 +29,20 @@ const MSG_AUTO_UPDATE_BACKGROUND: &str = "Auto-update running in background.";
 const MSG_RUN_UPDATE_MANUAL: &str = "Run `grok update` to get the latest version.";
 /// Manual-install one-liner for this platform's bootstrap installer.
 fn manual_install_cmd() -> &'static str {
-    if cfg!(windows) {
-        "irm https://x.ai/cli/install.ps1 | iex"
-    } else {
-        "curl -fsSL https://x.ai/cli/install.sh | bash"
-    }
+    "Download the matching binary from https://github.com/liansishen/grok-build/releases/latest"
 }
 
 /// Build a reinstall hint for a known installer type.
 fn reinstall_hint(installer: &str) -> String {
     match installer {
-        "npm" => "Please reinstall via npm:\n  npm i -g @xai-official/grok".to_string(),
-        "gh-release" => "Please reinstall via GitHub Releases:\n  gh release download --repo xai-org-shared/grok-build --pattern 'grok-*' --output grok && chmod +x grok".to_string(),
-        _ => format!("Please reinstall via:\n  {}", manual_install_cmd()),
+        "gh-release" => format!(
+            "Please reinstall from this fork's GitHub Releases:\n  https://github.com/{}/releases/latest",
+            crate::version::GH_RELEASE_REPO
+        ),
+        "npm" => {
+            "This fork updates through GitHub Releases, not the official npm package.".to_string()
+        }
+        _ => format!("Please reinstall manually:\n  {}", manual_install_cmd()),
     }
 }
 
@@ -133,7 +135,7 @@ pub async fn check_update_status(update_config: &UpdateConfig) -> UpdateStatus {
                         error = Some(if parse_ok {
                             format!(
                                 "Unsupported release channel '{}' (current={}, latest={}). \
-                             Supported channels: stable, alpha, enterprise.",
+                             Supported channels: fork, stable, alpha, enterprise.",
                                 channel, current_version, latest_version
                             )
                         } else {
@@ -168,10 +170,9 @@ pub async fn check_update_status(update_config: &UpdateConfig) -> UpdateStatus {
     }
 }
 
-/// Installer + version the leader/background path should converge to: an
-/// upgrade OR an authoritative-installer rollback. `None` means stay put. Gates
-/// on the installer (via `installer_allows_downgrade`) so npm is never
-/// downgraded — the decision depends on the installer, never the caller.
+/// Installer + version the leader/background path should converge to. `None`
+/// means stay put. Upgrade/downgrade policy is centralized in
+/// [`installer_allows_downgrade`].
 pub async fn auto_update_target(update_config: &UpdateConfig) -> Option<(&'static str, String)> {
     let installer = get_installer().await?;
     let current = get_installed_grok_version();
@@ -294,12 +295,22 @@ fn env_installer() -> Option<&'static str> {
 
 pub async fn get_installer() -> Option<&'static str> {
     if let Some(i) = env_installer() {
+        // Official launchers may leave npm/internal management markers in the
+        // environment. A fork-stamped binary must never follow either marker
+        // back to an upstream update source.
+        if i != "gh-release" && crate::version::is_fork_version(xai_grok_version::VERSION) {
+            return Some("gh-release");
+        }
         return Some(i);
     }
     let cfg = config::load_config().await;
     match cfg.cli.installer.as_deref() {
-        Some("npm") => Some("npm"),
         Some("gh-release") => Some("gh-release"),
+        Some("npm") if !crate::version::is_fork_version(xai_grok_version::VERSION) => Some("npm"),
+        Some("internal") if !crate::version::is_fork_version(xai_grok_version::VERSION) => {
+            Some("internal")
+        }
+        _ if crate::version::is_fork_version(xai_grok_version::VERSION) => Some("gh-release"),
         _ => Some("internal"),
     }
 }
@@ -325,6 +336,16 @@ fn needs_update(current: &str, target: &str, channel: &str, allow_downgrade: boo
             }
         }
         "alpha" => {}
+        "fork" => {
+            if !crate::version::is_fork_version(&target.to_string()) {
+                tracing::warn!(
+                    %current, %target,
+                    channel = %channel,
+                    "fork channel received a non-fork candidate, rejecting"
+                );
+                return Some(false);
+            }
+        }
         _ => return None,
     }
     Some(if allow_downgrade {
@@ -334,17 +355,15 @@ fn needs_update(current: &str, target: &str, channel: &str, allow_downgrade: boo
     })
 }
 
-/// Returns `true` for installer backends whose version source is authoritative
-/// (managed by xAI directly), meaning a pointer rollback is intentional and
-/// should trigger a client downgrade. Returns `false` for backends like npm
-/// where stale corporate registries/proxies can return arbitrarily old versions.
-///
-/// Users who installed via `install.sh` are classified as `"internal"` by
-/// `get_installer()`, so they also get rollback support.
+/// Returns `true` only for the upstream internal pointer backend, where a
+/// pointer rollback is authoritative. Fork GitHub Releases and npm are
+/// append-only version feeds and therefore only move clients forward.
 fn installer_allows_downgrade(installer: &str) -> bool {
     match installer {
-        "internal" | "gh-release" => true,
-        "npm" => false,
+        // Fork releases are append-only SemVer builds. Do not silently roll a
+        // client back if a GitHub Release is deleted or reordered.
+        "internal" => true,
+        "gh-release" | "npm" => false,
         _ => false,
     }
 }
@@ -696,7 +715,7 @@ pub async fn run_install_script(
             &update_config.channel,
             update_config.npm_registry.as_deref(),
         ),
-        "gh-release" => install_gh_release(target).await,
+        "gh-release" => install_gh_release(target, &update_config.channel).await,
         _ => install_internal(target, update_config).await,
     };
     if result.is_ok() {
@@ -1133,14 +1152,37 @@ pub async fn install_internal_from_bases(
 const SMOKE_TEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 async fn smoke_test_binary(binary_path: &std::path::Path) -> bool {
+    smoke_test_binary_version(binary_path, None).await
+}
+
+fn reported_fork_version(output: &[u8]) -> Option<semver::Version> {
+    String::from_utf8_lossy(output)
+        .split(|ch: char| ch.is_whitespace() || ch == '(' || ch == ')')
+        .filter_map(|token| {
+            token
+                .trim_start_matches('v')
+                .parse::<semver::Version>()
+                .ok()
+        })
+        .find(|version| crate::version::is_fork_version(&version.to_string()))
+}
+
+async fn smoke_test_binary_version(
+    binary_path: &std::path::Path,
+    expected_version: Option<&str>,
+) -> bool {
     let mut cmd = tokio::process::Command::new(binary_path);
     cmd.arg("--version")
         .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null());
     xai_grok_tools::util::detach_command(&mut cmd);
-    match tokio::time::timeout(SMOKE_TEST_TIMEOUT, cmd.status()).await {
-        Ok(Ok(status)) => status.success(),
+    match tokio::time::timeout(SMOKE_TEST_TIMEOUT, cmd.output()).await {
+        Ok(Ok(output)) if output.status.success() => expected_version.is_none_or(|expected| {
+            reported_fork_version(&output.stdout)
+                .zip(semver::Version::parse(expected).ok())
+                .is_some_and(|(reported, expected)| reported == expected)
+        }),
         _ => false,
     }
 }
@@ -1956,63 +1998,38 @@ async fn agent_exe_differs(
     }
 }
 
-/// Download a single asset from a GitHub release via `gh release download`.
-async fn gh_release_download(tag: &str, pattern: &str, dest: &std::path::Path) -> Result<()> {
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("  {spinner:.cyan} Downloading from GitHub Releases...")
-            .unwrap(),
-    );
-    pb.enable_steady_tick(Duration::from_millis(100));
-
-    let mut cmd = tokio::process::Command::new("gh");
-    cmd.args([
-        "release",
-        "download",
-        tag,
-        "--repo",
-        crate::version::GH_RELEASE_REPO,
-        "--pattern",
-        pattern,
-        "--output",
-        &dest.to_string_lossy(),
-        "--clobber",
-    ])
-    .stdin(Stdio::null())
-    .stdout(Stdio::null())
-    .stderr(Stdio::piped());
-    xai_grok_tools::util::detach_command(&mut cmd);
-    cmd.envs(xai_grok_tools::util::pager_env());
-    let output = cmd.output().await?;
-
-    pb.finish_and_clear();
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!(
-            "gh release download failed for {} tag {} from {}: {}",
-            pattern,
-            tag,
-            crate::version::GH_RELEASE_REPO,
-            stderr.trim()
-        );
-    }
-    Ok(())
+pub(crate) fn parse_release_checksum(checksums: &str, asset_name: &str) -> Result<String> {
+    checksums
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            let checksum = fields.next()?;
+            let name = fields.next()?.trim_start_matches('*');
+            (name == asset_name).then(|| checksum.to_ascii_lowercase())
+        })
+        .next()
+        .filter(|checksum| {
+            checksum.len() == 64 && checksum.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
+        .ok_or_else(|| anyhow::anyhow!("SHA256SUMS has no valid entry for '{asset_name}'"))
 }
 
-/// Download and install grok from GitHub Releases (xai-org-shared/grok-build).
+async fn sha256_file(path: &std::path::Path) -> Result<String> {
+    let bytes = tokio::fs::read(path).await?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+/// Download and install grok from this fork's public GitHub Releases.
 ///
-/// Uses `gh release download` to fetch the binary matching the current platform.
-/// This works anywhere the `gh` CLI is authenticated, without needing npm or
-/// internal network access.
-async fn install_gh_release(target: Option<&str>) -> Result<()> {
+/// Release metadata and assets are fetched over HTTPS, so users do not need
+/// GitHub CLI or a GitHub login for automatic updates.
+async fn install_gh_release(target: Option<&str>, channel: &str) -> Result<()> {
     let (os, arch) = detect_platform()?;
     let platform = format!("{}-{}", os, arch);
 
     let version = match target {
         Some(v) => v.to_string(),
-        None => crate::version::fetch_gh_release_version("stable").await?,
+        None => crate::version::fetch_gh_release_version(channel).await?,
     };
 
     let grok_home = grok_home();
@@ -2023,20 +2040,54 @@ async fn install_gh_release(target: Option<&str>) -> Result<()> {
 
     let binary_name = format!("grok-{}-{}", version, platform);
     let binary_path = download_dir.join(&binary_name);
-    let tag = format!("v{}", version);
 
     eprintln!(
         "  Downloading grok v{} ({}) from GitHub Releases...",
         version, platform
     );
 
-    gh_release_download(&tag, &binary_name, &binary_path).await?;
+    let asset_url = crate::version::github_release_asset_url(&version, &binary_name).await?;
+    let checksums_url = crate::version::github_release_asset_url(&version, "SHA256SUMS").await?;
+    download_with_progress(&asset_url, &binary_path).await?;
 
-    // chmod +x
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        tokio::fs::set_permissions(&binary_path, std::fs::Permissions::from_mode(0o755)).await?;
+    let verification_result = async {
+        let checksums = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()?
+            .get(&checksums_url)
+            .send()
+            .await?
+            .error_for_status()?
+            .text()
+            .await?;
+        let expected_checksum = parse_release_checksum(&checksums, &binary_name)?;
+        let actual_checksum = sha256_file(&binary_path).await?;
+        if actual_checksum != expected_checksum {
+            anyhow::bail!(
+                "SHA-256 mismatch for '{}': expected {}, got {}",
+                binary_name,
+                expected_checksum,
+                actual_checksum
+            );
+        }
+
+        // chmod +x before the smoke test on Unix.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            tokio::fs::set_permissions(&binary_path, std::fs::Permissions::from_mode(0o755))
+                .await?;
+        }
+
+        if !smoke_test_binary_version(&binary_path, Some(&version)).await {
+            anyhow::bail!("downloaded GitHub Release binary failed version smoke test");
+        }
+        Ok::<(), anyhow::Error>(())
+    }
+    .await;
+    if let Err(error) = verification_result {
+        let _ = tokio::fs::remove_file(&binary_path).await;
+        return Err(error);
     }
 
     // Atomic swap of ~/.grok/bin/{grok,agent} -> downloaded binary.
@@ -2077,9 +2128,10 @@ async fn install_gh_release(target: Option<&str>) -> Result<()> {
     cleanup_old_downloads(&download_dir, "grok", &version).await;
     cleanup_old_downloads(&download_dir, "grok-pager", &version).await;
 
-    // Persist installer to config.toml so future runs auto-detect gh-release.
+    // Persist this fork's update backend/channel for subsequent launches.
     let _ = config::update_config(|st| {
         st.cli.installer = Some("gh-release".to_string());
+        st.cli.channel = Some("fork".to_string());
     })
     .await;
 
@@ -2460,6 +2512,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_reported_fork_version_requires_exact_semver_token() {
+        assert_eq!(
+            reported_fork_version(b"Grok Build 0.2.105-fork.1 (abcdef)").unwrap(),
+            semver::Version::parse("0.2.105-fork.1").unwrap()
+        );
+        assert_ne!(
+            reported_fork_version(b"Grok Build 0.2.105-fork.10").unwrap(),
+            semver::Version::parse("0.2.105-fork.1").unwrap()
+        );
+        assert!(reported_fork_version(b"Grok Build 0.2.105").is_none());
+    }
+
+    #[test]
+    fn test_parse_release_checksum_selects_exact_asset() {
+        let checksums = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  grok-0.2.105-fork.1-linux-x86_64\n\
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb *grok-0.2.105-fork.1-windows-x86_64\n";
+        assert_eq!(
+            parse_release_checksum(checksums, "grok-0.2.105-fork.1-windows-x86_64").unwrap(),
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        );
+        assert!(parse_release_checksum(checksums, "missing").is_err());
+        assert!(parse_release_checksum("not-a-hash  grok", "grok").is_err());
+    }
+
+    #[test]
     fn test_tmp_download_path_is_unique_per_version_and_per_attempt() {
         // The old `with_extension("tmp")` collapsed every 0.1.x versioned
         // name onto a single `grok-0.1.tmp`; the helper must keep distinct
@@ -2514,6 +2591,32 @@ mod tests {
     #[test]
     fn test_needs_update_unknown_channel() {
         assert_eq!(needs_update("0.1.140", "0.1.141", "beta", false), None);
+    }
+
+    #[test]
+    fn test_needs_update_fork_channel_orders_fork_builds() {
+        assert_eq!(
+            needs_update("0.2.105-fork.1", "0.2.105-fork.2", "fork", false),
+            Some(true)
+        );
+        assert_eq!(
+            needs_update("0.2.105-fork.2", "0.2.105-fork.1", "fork", false),
+            Some(false)
+        );
+        assert_eq!(
+            needs_update("0.2.105-fork.2", "0.2.106-fork.1", "fork", false),
+            Some(true)
+        );
+        assert_eq!(
+            needs_update("0.2.105-fork.1", "0.2.106-alpha.1", "fork", false),
+            Some(false),
+            "fork channel must reject unrelated prereleases"
+        );
+        assert_eq!(
+            needs_update("0.2.105-fork.1", "0.2.106", "fork", false),
+            Some(false),
+            "fork channel must reject official stable releases"
+        );
     }
 
     #[test]
@@ -3444,44 +3547,29 @@ mod tests {
     // ──────────────────────────────────────────────────────────────────────
 
     #[test]
-    fn test_reinstall_hint_npm_mentions_npm_command() {
+    fn test_reinstall_hint_npm_redirects_to_fork_releases() {
         let hint = reinstall_hint("npm");
-        assert!(hint.contains("npm i -g"), "should suggest npm i -g: {hint}");
+        assert!(hint.contains("GitHub Releases"), "hint: {hint}");
         assert!(
-            hint.contains("@xai-official/grok"),
-            "should name the package: {hint}"
+            hint.contains("not the official npm package"),
+            "hint: {hint}"
         );
     }
 
     #[test]
-    fn test_reinstall_hint_gh_release_mentions_gh_command() {
+    fn test_reinstall_hint_gh_release_names_fork_repo() {
         let hint = reinstall_hint("gh-release");
+        assert!(hint.contains("GitHub Releases"), "hint: {hint}");
         assert!(
-            hint.contains("gh release download"),
-            "should suggest gh release download: {hint}"
-        );
-        assert!(
-            hint.contains("xai-org-shared/grok-build"),
-            "should name the repo: {hint}"
+            hint.contains(crate::version::GH_RELEASE_REPO),
+            "hint: {hint}"
         );
     }
 
     #[test]
-    fn test_reinstall_hint_internal_mentions_platform_installer() {
+    fn test_reinstall_hint_internal_mentions_fork_release_page() {
         let hint = reinstall_hint("internal");
-        if cfg!(windows) {
-            assert!(hint.contains("irm"), "should suggest irm install: {hint}");
-            assert!(
-                hint.contains("install.ps1"),
-                "should reference install.ps1: {hint}"
-            );
-        } else {
-            assert!(hint.contains("curl"), "should suggest curl install: {hint}");
-            assert!(
-                hint.contains("install.sh"),
-                "should reference install.sh: {hint}"
-            );
-        }
+        assert!(hint.contains("github.com/liansishen/grok-build/releases/latest"));
     }
 
     #[test]
@@ -3915,8 +4003,8 @@ mod tests {
     }
 
     #[test]
-    fn test_installer_allows_downgrade_gh_release() {
-        assert!(installer_allows_downgrade("gh-release"));
+    fn test_installer_allows_downgrade_gh_release_blocked() {
+        assert!(!installer_allows_downgrade("gh-release"));
     }
 
     #[test]

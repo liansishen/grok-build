@@ -105,17 +105,83 @@ grok --version                      # 确认当前 PATH 上的版本
 
 - 向 `main` 分支推送提交；
 - 创建或更新 Pull Request；
-- 推送名称以 `v` 开头的 tag；
-- 在 GitHub Actions 页面手动运行。
+- 在 GitHub Actions 页面手动运行；填写 `release_tag` 时发布 Release。
 
 工作流会分别生成 Linux x86_64 和 Windows x86_64 的 release 二进制。编译完成后，可在对应工作流运行页面的 **Artifacts** 区域下载：
 
 | Artifact | 可执行文件 |
 |----------|------------|
-| `grok-build-linux-x86_64` | `grok` |
-| `grok-build-windows-x86_64` | `grok.exe` |
+| `grok-build-linux-x86_64` | `grok-<版本>-linux-x86_64` |
+| `grok-build-windows-x86_64` | `grok-<版本>-windows-x86_64` |
 
-Artifacts 默认保留 14 天。该工作流只上传构建产物，不会自动创建 GitHub Release。
+Artifacts 默认保留 14 天。在手动运行工作流并填写符合 `v<官方版本>-fork.<编号>` 格式的 `release_tag` 时，工作流还会在构建成功后创建 tag 和 GitHub Release，并上传与内置自动更新器一致的版本化二进制和 `SHA256SUMS`。
+
+### Fork 版本与 Release
+
+Fork 发布版本采用合法 SemVer：
+
+```text
+<官方版本>-fork.<更新编号>
+```
+
+例如官方基线为 `0.2.105`：
+
+```text
+0.2.105-fork.1
+0.2.105-fork.2
+```
+
+同步到官方 `0.2.106` 后，Fork 编号从 `1` 重新开始：
+
+```text
+0.2.106-fork.1
+```
+
+创建发布时，在 GitHub Actions 的 **Build → Run workflow** 中填写：
+
+```text
+release_tag = v0.2.105-fork.1
+```
+
+工作流会先构建并验证 Linux/Windows 二进制，全部成功后才创建该 tag 和 GitHub Release，避免 tag 触发构建失败后留下无法安全重用的版本号。已存在的 tag 会被拒绝，不能覆盖同一版本的资产。工作流会校验 tag 中的官方版本必须与 `crates/codegen/xai-grok-version/Cargo.toml` 一致。Release 资产格式为：
+
+```text
+grok-0.2.105-fork.1-linux-x86_64
+grok-0.2.105-fork.1-windows-x86_64
+SHA256SUMS
+```
+
+Fork 发行二进制默认使用 `fork` 更新通道，并通过公开的 `liansishen/grok-build` GitHub Releases API 检测和下载更新，不要求用户安装或登录 GitHub CLI。更新器只选择同时包含 Linux、Windows 二进制与 `SHA256SUMS` 的正式 Release，并在执行下载内容前校验 SHA-256 和版本输出。可通过以下命令检查：
+
+```bash
+grok update --check
+grok update --check --json
+```
+
+### Linux 下载、替换与还原
+
+Linux x86_64 环境可通过配套脚本安装 `main` 分支最新成功的 CI 产物。该开发快照脚本需要预先安装并登录 [GitHub CLI](https://cli.github.com/)；正式 Release 二进制的内置自动更新不需要 `gh`：
+
+```bash
+gh auth login
+
+# 下载最新成功的 Linux Artifact，备份当前指向并替换 ~/.grok/bin/grok
+./scripts/download-replace.sh
+
+# 还原替换前的版本
+./scripts/restore-downloaded.sh
+```
+
+可选用法：
+
+```bash
+./scripts/download-replace.sh --run-id 29720328041  # 安装指定的成功构建
+./scripts/download-replace.sh --repo owner/repo     # 指定 fork 仓库
+./scripts/restore-downloaded.sh --list              # 列出还原记录
+./scripts/restore-downloaded.sh --state <记录文件>  # 使用指定记录还原
+```
+
+脚本默认操作 `~/.grok/bin`，可通过 `GROK_INSTALL_DIR` 指定其他目录。替换采用独立版本文件和原子符号链接切换，不会覆盖 npm 的 Node.js 启动脚本。已运行的 Grok 进程不会变化，需要退出后重新启动。
 
 ---
 

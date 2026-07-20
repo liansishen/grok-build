@@ -11,7 +11,23 @@ use xai_grok_shell::util::grok_home::grok_home;
 
 const TTL_SECONDS_BEFORE_AUTO_UPDATE: Duration = Duration::from_secs(60 * 30);
 const NPM_PACKAGE: &str = "@xai-official/grok";
-pub const GH_RELEASE_REPO: &str = "xai-org-shared/grok-build";
+
+/// Public GitHub repository that publishes this fork's release binaries.
+pub const GH_RELEASE_REPO: &str = match option_env!("GROK_RELEASE_REPO") {
+    Some(repo) => repo,
+    None => "liansishen/grok-build",
+};
+
+const GH_API_BASE_DEFAULT: &str = "https://api.github.com";
+
+fn github_api_base() -> String {
+    std::env::var("GROK_RELEASE_API_BASE")
+        .ok()
+        .filter(|base| !base.trim().is_empty())
+        .unwrap_or_else(|| GH_API_BASE_DEFAULT.to_string())
+}
+const FORK_CHANNEL: &str = "fork";
+const FORK_PRERELEASE_PREFIX: &str = "fork.";
 
 /// Primary CLI base URL: Cloudflare-fronted x.ai endpoint with edge caching
 /// for binaries and origin-respecting no-cache for channel pointers.
@@ -41,7 +57,8 @@ pub struct UpdateConfig {
     pub deployment_key: Option<String>,
     /// Optional extra auth material forwarded with requests when present.
     pub alpha_test_key: Option<String>,
-    /// Release channel: "stable" or "alpha". Loaded from config.
+    /// Release channel: "fork" for this community build (upstream also uses
+    /// "stable", "alpha", and "enterprise"). Loaded from config.
     pub channel: String,
     /// Custom npm registry URL. When set, passed as `--registry=` to npm CLI.
     pub npm_registry: Option<String>,
@@ -54,7 +71,11 @@ impl UpdateConfig {
             auth_scope: xai_grok_shell::auth::GrokComConfig::default().auth_scope(),
             deployment_key: None,
             alpha_test_key: None,
-            channel: "stable".to_string(),
+            channel: if is_fork_version(xai_grok_version::VERSION) {
+                FORK_CHANNEL.to_string()
+            } else {
+                "stable".to_string()
+            },
             npm_registry: None,
         }
     }
@@ -171,57 +192,194 @@ async fn fetch_npm_tag(tag: &str, npm_registry: Option<&str>) -> Result<String> 
     }
 }
 
-/// Fetch the latest version from GitHub Releases using `gh release list`.
-/// For alpha channel, fetches both pre-release and stable-only, returns the
-/// semver-greater — `gh release list --limit 1` orders by publication date,
-/// not semver, so we need both to guarantee correctness.
-#[doc(hidden)]
-pub async fn fetch_gh_release_version(channel: &str) -> Result<String> {
-    if channel == "alpha" {
-        let (with_pre, stable_only) = tokio::try_join!(
-            fetch_gh_release_latest(false),
-            fetch_gh_release_latest(true),
-        )?;
-        return semver_max(&with_pre, &stable_only);
-    }
-    fetch_gh_release_latest(true).await
+#[derive(Debug, Deserialize)]
+struct GitHubRelease {
+    tag_name: String,
+    #[serde(default)]
+    draft: bool,
+    #[serde(default)]
+    prerelease: bool,
+    #[serde(default)]
+    assets: Vec<GitHubReleaseAsset>,
 }
 
-async fn fetch_gh_release_latest(exclude_pre: bool) -> Result<String> {
-    let mut args = vec![
-        "release",
-        "list",
-        "--repo",
+#[derive(Debug, Deserialize)]
+struct GitHubReleaseAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+fn github_client_with(timeout: Duration) -> Result<reqwest::Client> {
+    Ok(reqwest::Client::builder()
+        .timeout(timeout)
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .user_agent(concat!("grok-build-fork/", env!("CARGO_PKG_VERSION")))
+        .build()?)
+}
+
+fn version_from_release_tag(tag: &str) -> Result<String> {
+    let version = tag.strip_prefix('v').ok_or_else(|| {
+        anyhow::anyhow!(
+            "invalid release tag '{}' in {}: expected a leading 'v'",
+            tag,
+            GH_RELEASE_REPO
+        )
+    })?;
+    semver::Version::parse(version)
+        .map(|v| v.to_string())
+        .map_err(|e| anyhow::anyhow!("invalid release tag '{}' in {}: {e}", tag, GH_RELEASE_REPO))
+}
+
+pub fn is_fork_version(version: &str) -> bool {
+    semver::Version::parse(version).is_ok_and(|version| {
+        version
+            .pre
+            .as_str()
+            .strip_prefix(FORK_PRERELEASE_PREFIX)
+            .is_some_and(|number| !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()))
+    })
+}
+
+async fn fetch_github_releases_from_base(api_base: &str) -> Result<Vec<GitHubRelease>> {
+    fetch_github_releases_from_base_with_timeout(api_base, Duration::from_secs(30)).await
+}
+
+async fn fetch_github_releases_from_base_with_timeout(
+    api_base: &str,
+    timeout: Duration,
+) -> Result<Vec<GitHubRelease>> {
+    let url = format!(
+        "{}/repos/{}/releases?per_page=100",
+        api_base.trim_end_matches('/'),
+        GH_RELEASE_REPO
+    );
+    let response = github_client_with(timeout)?.get(&url).send().await?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        anyhow::bail!(
+            "GitHub Releases request failed: HTTP {} for {}: {}",
+            status,
+            url,
+            body.chars().take(200).collect::<String>().trim()
+        );
+    }
+    Ok(response.json().await?)
+}
+
+/// Fetch the latest fork version from this repository's public GitHub Releases.
+///
+/// Releases are selected by SemVer rather than publication time. Only tags in
+/// the form `v<official-version>-fork.<number>` participate in the fork channel.
+#[doc(hidden)]
+pub async fn fetch_gh_release_version(channel: &str) -> Result<String> {
+    let base = github_api_base();
+    fetch_gh_release_version_from_base(channel, &base).await
+}
+
+/// Test-only/custom-base variant of [`fetch_gh_release_version`].
+#[doc(hidden)]
+pub async fn fetch_gh_release_version_from_base(channel: &str, api_base: &str) -> Result<String> {
+    if channel != FORK_CHANNEL {
+        anyhow::bail!(
+            "GitHub Releases backend only supports the '{}' channel, got '{}'",
+            FORK_CHANNEL,
+            channel
+        );
+    }
+
+    let releases = fetch_github_releases_from_base(api_base).await?;
+    latest_complete_fork_version(releases)
+        .ok_or_else(|| anyhow::anyhow!("No complete fork releases found in {}", GH_RELEASE_REPO))
+}
+
+fn latest_complete_fork_version(releases: Vec<GitHubRelease>) -> Option<String> {
+    releases
+        .into_iter()
+        .filter(|release| !release.draft && !release.prerelease)
+        .filter_map(|release| {
+            let version = version_from_release_tag(&release.tag_name).ok()?;
+            if !is_fork_version(&version) || !release_has_required_assets(&release, &version) {
+                return None;
+            }
+            semver::Version::parse(&version).ok()
+        })
+        .max()
+        .map(|version| version.to_string())
+}
+
+fn release_has_required_assets(release: &GitHubRelease, version: &str) -> bool {
+    [
+        format!("grok-{version}-linux-x86_64"),
+        format!("grok-{version}-windows-x86_64"),
+        "SHA256SUMS".to_string(),
+    ]
+    .iter()
+    .all(|required| release.assets.iter().any(|asset| asset.name == *required))
+}
+
+pub(crate) async fn github_release_asset_url(version: &str, asset_name: &str) -> Result<String> {
+    let base = github_api_base();
+    github_release_asset_url_from_base(version, asset_name, &base).await
+}
+
+#[doc(hidden)]
+pub async fn github_release_asset_url_from_base(
+    version: &str,
+    asset_name: &str,
+    api_base: &str,
+) -> Result<String> {
+    if !is_fork_version(version) {
+        anyhow::bail!("invalid fork release version: '{version}'");
+    }
+    let tag = format!("v{version}");
+    let url = format!(
+        "{}/repos/{}/releases/tags/{}",
+        api_base.trim_end_matches('/'),
         GH_RELEASE_REPO,
-        "--limit",
-        "1",
-        "--exclude-drafts",
-        "--json",
-        "tagName",
-        "--jq",
-        ".[0].tagName",
-    ];
-    if exclude_pre {
-        args.push("--exclude-pre-releases");
+        tag
+    );
+    let response = github_client_with(Duration::from_secs(30))?
+        .get(&url)
+        .send()
+        .await?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        anyhow::bail!(
+            "GitHub release request failed: HTTP {} for {}: {}",
+            status,
+            url,
+            body.chars().take(200).collect::<String>().trim()
+        );
     }
-    let mut cmd = Command::new("gh");
-    cmd.args(&args).stdin(std::process::Stdio::null());
-    xai_grok_tools::util::detach_command(&mut cmd);
-    cmd.envs(xai_grok_tools::util::pager_env());
-    let output = cmd.output().await?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("gh release list failed: {}", stderr.trim());
+    let release: GitHubRelease = response.json().await?;
+    if release.draft {
+        anyhow::bail!("GitHub release {tag} is still a draft");
     }
-
-    let tag = String::from_utf8(output.stdout)?.trim().to_string();
-    // Tags are formatted as "v0.1.141", strip the leading "v"
-    let version = tag.strip_prefix('v').unwrap_or(&tag).to_string();
-    if version.is_empty() {
-        anyhow::bail!("No releases found in {}", GH_RELEASE_REPO);
+    if release.prerelease {
+        anyhow::bail!("GitHub release {tag} is marked as a prerelease");
     }
-    Ok(version)
+    if release.tag_name != tag {
+        anyhow::bail!(
+            "GitHub release tag mismatch: requested {}, received {}",
+            tag,
+            release.tag_name
+        );
+    }
+    release
+        .assets
+        .into_iter()
+        .find(|asset| asset.name == asset_name)
+        .map(|asset| asset.browser_download_url)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Release asset '{}' not found in {} tag {}",
+                asset_name,
+                GH_RELEASE_REPO,
+                tag
+            )
+        })
 }
 
 /// Fetch the latest version from a public CLI channel pointer.
@@ -393,7 +551,7 @@ pub async fn write_version_cache(version: &str, stable_version: Option<&str>) {
 ///
 /// - `"npm"` — uses `npm view` against the public registry.
 /// - `"internal"` — reads the channel pointer from the public GCS bucket.
-/// - `"gh-release"` — uses `gh release list` against GitHub Releases.
+/// - `"gh-release"` — uses the public GitHub Releases REST API.
 pub async fn get_latest_version(installer: &str, config: &UpdateConfig) -> Result<String> {
     let version = fetch_latest_version(installer, config).await?;
     let stable_ptr = try_fetch_stable_pointer().await;
@@ -489,6 +647,18 @@ pub(crate) fn version_from_versioned_binary_name(name: &str, bin_prefix: &str) -
 /// return `None`; the label will populate on the next successful TTL check
 /// (~30 min). This keeps startup and post-install paths fast.
 pub(crate) async fn try_fetch_stable_pointer() -> Option<String> {
+    if is_fork_version(xai_grok_version::VERSION) {
+        let api_base = github_api_base();
+        return tokio::time::timeout(
+            Duration::from_millis(500),
+            fetch_github_releases_from_base_with_timeout(&api_base, Duration::from_millis(450)),
+        )
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .and_then(latest_complete_fork_version);
+    }
+
     tokio::time::timeout(Duration::from_millis(500), async {
         for base in CLI_BASE_URLS {
             if let Ok(v) = fetch_gcs_channel_pointer("stable", base).await {
@@ -534,6 +704,9 @@ fn derive_channel<'a>(current: &str, stable: &str) -> Option<&'a str> {
 ///
 /// The result is computed once and cached for the process lifetime.
 pub fn channel_name() -> Option<&'static str> {
+    if is_fork_version(xai_grok_version::VERSION) {
+        return Some(FORK_CHANNEL);
+    }
     use std::sync::OnceLock;
     static NAME: OnceLock<Option<&'static str>> = OnceLock::new();
     *NAME.get_or_init(|| {
@@ -552,6 +725,9 @@ pub fn channel_name() -> Option<&'static str> {
 ///
 /// The result is computed once and cached for the process lifetime.
 pub fn channel_label() -> &'static str {
+    if is_fork_version(xai_grok_version::VERSION) {
+        return " [fork]";
+    }
     use std::sync::OnceLock;
     static LABEL: OnceLock<&'static str> = OnceLock::new();
     LABEL.get_or_init(|| {
@@ -574,6 +750,25 @@ mod tests {
     /// Verifies that a future `checked_at` timestamp (e.g. from clock skew or
     /// NTP time-warp) is never considered fresh. Without the clock-skew guard
     /// this would return true indefinitely, silently disabling auto-update.
+    #[test]
+    fn test_is_fork_version_requires_exact_prerelease_shape() {
+        for valid in ["0.2.105-fork.0", "0.2.105-fork.1", "1.0.0-fork.42"] {
+            assert!(is_fork_version(valid), "expected fork version: {valid}");
+        }
+        for invalid in [
+            "0.2.105",
+            "0.2.105-alpha.1",
+            "0.2.105-fork",
+            "0.2.105-fork.x",
+            "0.2.105-fork.1.extra",
+        ] {
+            assert!(
+                !is_fork_version(invalid),
+                "unexpected fork version: {invalid}"
+            );
+        }
+    }
+
     #[test]
     fn test_is_fresh_rejects_future_timestamp() {
         let now = time::OffsetDateTime::now_utc();

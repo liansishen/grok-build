@@ -15,7 +15,10 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
 
 use xai_grok_update::auto_update::{download_silent, download_with_progress};
-use xai_grok_update::version::fetch_gcs_version_from_base;
+use xai_grok_update::version::{
+    fetch_gcs_version_from_base, fetch_gh_release_version_from_base,
+    github_release_asset_url_from_base,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Happy-path tests (fast, no retries triggered).
@@ -171,6 +174,118 @@ async fn gcs_pointer_preserves_path_in_base_url() {
     let base = format!("{}/cli", server.uri());
     let v = fetch_gcs_version_from_base("stable", &base).await.unwrap();
     assert_eq!(v, "0.1.181");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public GitHub Releases backend for this fork.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn github_releases_select_latest_fork_semver() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/repos/liansishen/grok-build/releases"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+            {
+                "tag_name":"v0.2.105-fork.2",
+                "draft":false,
+                "prerelease":false,
+                "assets":[
+                    {"name":"grok-0.2.105-fork.2-linux-x86_64","browser_download_url":"https://downloads.example/linux-2"},
+                    {"name":"grok-0.2.105-fork.2-windows-x86_64","browser_download_url":"https://downloads.example/windows-2"},
+                    {"name":"SHA256SUMS","browser_download_url":"https://downloads.example/checksums-2"}
+                ]
+            },
+            {
+                "tag_name":"v0.2.105-fork.10",
+                "draft":false,
+                "prerelease":false,
+                "assets":[
+                    {"name":"grok-0.2.105-fork.10-linux-x86_64","browser_download_url":"https://downloads.example/linux-10"},
+                    {"name":"grok-0.2.105-fork.10-windows-x86_64","browser_download_url":"https://downloads.example/windows-10"},
+                    {"name":"SHA256SUMS","browser_download_url":"https://downloads.example/checksums-10"}
+                ]
+            },
+            {"tag_name":"v0.2.106","draft":false,"prerelease":false,"assets":[]},
+            {"tag_name":"v0.2.105-fork.99","draft":true,"prerelease":false,"assets":[]},
+            {"tag_name":"v0.2.105-fork.100","draft":false,"prerelease":true,"assets":[]},
+            {"tag_name":"v0.2.105-fork.101","draft":false,"prerelease":false,"assets":[]},
+            {"tag_name":"0.2.105-fork.102","draft":false,"prerelease":false,"assets":[]},
+            {"tag_name":"not-semver","draft":false,"prerelease":false,"assets":[]}
+        ])))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let version = fetch_gh_release_version_from_base("fork", &server.uri())
+        .await
+        .unwrap();
+    assert_eq!(version, "0.2.105-fork.10");
+}
+
+#[tokio::test]
+async fn github_releases_reject_non_fork_channel() {
+    let server = MockServer::start().await;
+    let err = fetch_gh_release_version_from_base("stable", &server.uri())
+        .await
+        .unwrap_err();
+    assert!(format!("{err:#}").contains("only supports the 'fork' channel"));
+}
+
+#[tokio::test]
+async fn github_release_resolves_exact_asset_url() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/repos/liansishen/grok-build/releases/tags/v0.2.105-fork.3",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "tag_name":"v0.2.105-fork.3",
+            "draft":false,
+            "assets":[
+                {
+                    "name":"grok-0.2.105-fork.3-linux-x86_64",
+                    "browser_download_url":"https://downloads.example/grok-linux"
+                }
+            ]
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let url = github_release_asset_url_from_base(
+        "0.2.105-fork.3",
+        "grok-0.2.105-fork.3-linux-x86_64",
+        &server.uri(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(url, "https://downloads.example/grok-linux");
+}
+
+#[tokio::test]
+async fn github_release_reports_missing_asset() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/repos/liansishen/grok-build/releases/tags/v0.2.105-fork.3",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "tag_name":"v0.2.105-fork.3",
+            "draft":false,
+            "assets":[]
+        })))
+        .mount(&server)
+        .await;
+
+    let err = github_release_asset_url_from_base(
+        "0.2.105-fork.3",
+        "grok-0.2.105-fork.3-linux-x86_64",
+        &server.uri(),
+    )
+    .await
+    .unwrap_err();
+    assert!(format!("{err:#}").contains("Release asset"));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

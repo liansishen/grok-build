@@ -2106,6 +2106,7 @@ fn build_update_config() -> UpdateConfig {
         .or_else(xai_grok_shell::util::config::load_npm_registry_sync);
     if let Ok(root) = xai_grok_shell::config::load_effective_config_disk_only()
         && let Some(ch) = xai_grok_shell::util::config::channel_from_toml_opt(&root)
+        && !(xai_grok_update::version::is_fork_version(xai_grok_version::VERSION) && ch != "fork")
     {
         config.channel = ch;
     }

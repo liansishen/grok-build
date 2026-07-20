@@ -2,8 +2,8 @@
 //!
 //! Covers every combination of:
 //!   - user's current version vs. channel pointer target
-//!   - installer type (internal, npm, gh-release)
-//!   - channel (stable, alpha, enterprise)
+//!   - upstream installer type (internal, npm)
+//!   - upstream channel (stable, alpha, enterprise)
 //!   - pointer-flip scenarios (stable bumped after user upgraded, alpha
 //!     pointer rolled back, etc.)
 //!
@@ -21,9 +21,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use common::{FakeBinGuard, reset_home, set_test_version, test_home};
 use xai_grok_update::UpdateConfig;
-use xai_grok_update::auto_update::{
-    auto_update_target, check_update_status, ensure_latest_on_disk, install_internal_from_base,
-};
+use xai_grok_update::auto_update::{check_update_status, install_internal_from_base};
 use xai_grok_update::version::installed_on_disk_version;
 
 fn host_platform() -> String {
@@ -268,12 +266,9 @@ async fn internal_install_alpha_user_gets_newer_stable_after_stable_passes_alpha
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Scenario matrix: check_update_status across installer × version direction
-//
-// Uses check_update_status end-to-end with fake npm/gh binaries.
-// The internal (GCS) path can't be end-to-end tested via check_update_status
-// (hardcoded URLs), so its update-detection logic is covered by the
-// needs_update unit tests and the install tests above.
+// Scenario matrix: check_update_status across installer × version direction.
+// npm uses a fake binary; fork GitHub Release API behavior is covered in
+// test_network.rs.
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn setup_npm(current_version: &str) -> FakeBinGuard {
@@ -283,15 +278,6 @@ fn setup_npm(current_version: &str) -> FakeBinGuard {
     // SAFETY: serial_test ensures no race; reset_home clears this between tests.
     unsafe { std::env::set_var("GROK_INSTALLER", "npm") };
     FakeBinGuard::install_npm()
-}
-
-fn setup_gh(current_version: &str) -> FakeBinGuard {
-    let _ = test_home();
-    reset_home();
-    set_test_version(current_version);
-    // SAFETY: serial_test ensures no race; reset_home clears this between tests.
-    unsafe { std::env::set_var("GROK_INSTALLER", "gh-release") };
-    FakeBinGuard::install_gh()
 }
 
 // ── npm: never downgrades ──
@@ -344,103 +330,6 @@ async fn npm_drastically_old_registry_does_not_report_update() {
     assert!(!status.update_available);
 }
 
-// ── gh-release: --check is upgrade-only; rollback handled by auto-install ──
-
-#[tokio::test]
-#[serial]
-async fn gh_release_upgrade_reports_update() {
-    let g = setup_gh("0.2.5");
-    g.set_stable_only_stdout("v0.2.7\n");
-
-    let status = check_update_status(&make_config("stable")).await;
-    assert!(status.update_available);
-    assert_eq!(status.latest_version.as_deref(), Some("0.2.7"));
-}
-
-#[tokio::test]
-#[serial]
-async fn gh_release_rollback_not_advertised_by_check() {
-    // `update --check` advertises upgrades only; a rollback still converges via
-    // the auto-install path (covered by the internal_install_* tests), not here.
-    let g = setup_gh("0.2.7");
-    g.set_stable_only_stdout("v0.2.5\n");
-
-    let status = check_update_status(&make_config("stable")).await;
-    assert!(
-        !status.update_available,
-        "gh-release rollback must not be advertised by --check: current={} latest={:?}",
-        status.current_version, status.latest_version
-    );
-    assert_eq!(status.latest_version.as_deref(), Some("0.2.5"));
-}
-
-#[tokio::test]
-#[serial]
-async fn gh_release_same_version_no_update() {
-    let g = setup_gh("0.2.7");
-    g.set_stable_only_stdout("v0.2.7\n");
-
-    let status = check_update_status(&make_config("stable")).await;
-    assert!(!status.update_available);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// auto_update_target: the leader/background auto-install decision
-//
-// Unlike the upgrade-only `check_update_status` report, this is the
-// downgrade-aware convergence decision. It gates on the installer, so
-// authoritative installers (gh-release/internal) follow a rolled-back pointer
-// while npm never downgrades. `fetch_latest_version` keeps these hermetic.
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[tokio::test]
-#[serial]
-async fn auto_update_target_gh_release_rollback_returns_older() {
-    let g = setup_gh("0.2.26");
-    g.set_stable_only_stdout("v0.2.22\n");
-
-    assert_eq!(
-        auto_update_target(&make_config("stable")).await,
-        Some(("gh-release", "0.2.22".to_string())),
-        "authoritative installer must converge down on a rolled-back pointer"
-    );
-}
-
-#[tokio::test]
-#[serial]
-async fn auto_update_target_gh_release_upgrade_returns_newer() {
-    let g = setup_gh("0.2.5");
-    g.set_stable_only_stdout("v0.2.7\n");
-
-    assert_eq!(
-        auto_update_target(&make_config("stable")).await,
-        Some(("gh-release", "0.2.7".to_string()))
-    );
-}
-
-#[tokio::test]
-#[serial]
-async fn auto_update_target_gh_release_same_version_returns_none() {
-    let g = setup_gh("0.2.7");
-    g.set_stable_only_stdout("v0.2.7\n");
-
-    assert_eq!(auto_update_target(&make_config("stable")).await, None);
-}
-
-#[tokio::test]
-#[serial]
-async fn auto_update_target_npm_rollback_returns_none() {
-    // npm registries can serve stale versions — never downgrade npm installs.
-    let g = setup_npm("0.2.26");
-    g.set_stdout("\"0.2.22\"");
-
-    assert_eq!(
-        auto_update_target(&make_config("stable")).await,
-        None,
-        "npm must never be downgraded even when the registry reports an older version"
-    );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Disk-aware convergence: ensure_latest_on_disk + installed_on_disk_version
 //
@@ -480,52 +369,6 @@ async fn installed_on_disk_version_reads_symlink_target() {
     assert_eq!(installed_on_disk_version().as_deref(), Some("0.2.7"));
 }
 
-#[tokio::test]
-#[serial]
-async fn ensure_latest_skips_download_when_disk_current_but_still_relaunches() {
-    // Running 0.2.5, pointer 0.2.7, disk already at 0.2.7 (another process
-    // downloaded it): no download, but the stale running process must relaunch.
-    let g = setup_gh("0.2.5");
-    g.set_stable_only_stdout("v0.2.7\n");
-    fake_managed_install("0.2.7");
-
-    let outcome = ensure_latest_on_disk(&make_config("stable")).await.unwrap();
-    assert_eq!(outcome.installed, None, "must not re-download");
-    assert!(outcome.relaunch_needed, "running 0.2.5 < disk 0.2.7");
-    assert!(
-        !g.args_log().iter().any(|l| l.contains("release download")),
-        "no gh download invocation expected, got: {:?}",
-        g.args_log()
-    );
-}
-
-#[tokio::test]
-#[serial]
-async fn ensure_latest_noop_when_running_and_disk_current() {
-    let g = setup_gh("0.2.7");
-    g.set_stable_only_stdout("v0.2.7\n");
-    fake_managed_install("0.2.7");
-
-    let outcome = ensure_latest_on_disk(&make_config("stable")).await.unwrap();
-    assert_eq!(outcome.installed, None);
-    assert!(!outcome.relaunch_needed);
-}
-
-#[tokio::test]
-#[serial]
-async fn ensure_latest_relaunches_onto_rolled_back_disk() {
-    // Pointer rolled back to 0.2.22 and the disk already converged; a running
-    // 0.2.26 leader must relaunch onto the older binary (gh-release is an
-    // authoritative installer → downgrades allowed).
-    let g = setup_gh("0.2.26");
-    g.set_stable_only_stdout("v0.2.22\n");
-    fake_managed_install("0.2.22");
-
-    let outcome = ensure_latest_on_disk(&make_config("stable")).await.unwrap();
-    assert_eq!(outcome.installed, None, "disk already at pointer");
-    assert!(outcome.relaunch_needed, "downgrade relaunch expected");
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Pointer-flip timing scenarios
 //
@@ -547,23 +390,6 @@ async fn npm_user_upgraded_then_stable_rolled_back_stays_on_newer() {
     let status = check_update_status(&make_config("stable")).await;
     assert!(!status.update_available);
     assert_eq!(status.latest_version.as_deref(), Some("0.2.5"));
-}
-
-#[tokio::test]
-#[serial]
-async fn gh_release_user_ahead_of_pointer_check_reports_no_update() {
-    // User manually installed 0.2.26 (ahead of the stable pointer 0.2.22);
-    // `update --check` must not present the older pointer as a new version.
-    let g = setup_gh("0.2.26");
-    g.set_stable_only_stdout("v0.2.22\n");
-
-    let status = check_update_status(&make_config("stable")).await;
-    assert!(
-        !status.update_available,
-        "ahead-of-pointer must not be advertised as an update: current={} latest={:?}",
-        status.current_version, status.latest_version
-    );
-    assert_eq!(status.latest_version.as_deref(), Some("0.2.22"));
 }
 
 #[tokio::test]
