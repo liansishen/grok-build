@@ -135,12 +135,13 @@ impl SlashCommand for TerminalSetupCommand {
                     "OS rescue unavailable on this platform",
                 )
             };
+            let delivery = kb.modifier_delivery.label();
             out.push_str(
                 &xai_grok_i18n::t_or(
                     "slash.terminal-setup.row_keyboard",
                     "  keyboard     {delivery} ({rescue})\n",
                 )
-                .replace("{delivery}", kb.modifier_delivery.label())
+                .replace("{delivery}", &delivery)
                 .replace("{rescue}", rescue),
             );
         }

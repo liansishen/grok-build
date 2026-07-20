@@ -181,7 +181,7 @@ pub static USER_GUIDE: &[Doc] = &[
 /// live under `docs/` (not `docs/user-guide/`), are not extracted to disk,
 /// and do not follow the NN-*.md managed naming pattern. Bundled via
 /// `include_str!` so they are available at runtime without a docs path.
-static REFERENCE_DOCS: &[Doc] = &[
+pub(crate) static REFERENCE_DOCS: &[Doc] = &[
     Doc {
         filename: "hooks-and-plugins.md",
         title: "Hooks & Plugins Guide",

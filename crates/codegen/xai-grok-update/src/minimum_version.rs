@@ -56,6 +56,7 @@ pub(crate) enum MinimumVersionError {
     UpgradeFailed {
         current: String,
         minimum: String,
+        #[allow(dead_code)]
         detail: String,
     },
     /// Latest release is known but still below the floor (vs `NoReleaseFound`,

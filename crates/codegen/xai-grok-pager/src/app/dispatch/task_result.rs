@@ -770,10 +770,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 agent
                     .scrollback
                     .push_block(crate::scrollback::block::RenderBlock::system(
-                        xai_grok_i18n::t_fmt(
-                            "task_result.session_renamed",
-                            &[("title", safe.as_str())],
-                        ),
+                        xai_grok_i18n::t_fmt("task_result.session_renamed", &[("title", safe)]),
                     ));
             }
             vec![]
@@ -1119,7 +1116,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             let scrubbed = scrub_error_for_toast(&error);
             app.show_toast(&xai_grok_i18n::t_fmt(
                 "toast.setting_save_failed",
-                &[("key", key.as_str()), ("error", scrubbed.as_str())],
+                &[("key", key), ("error", scrubbed.as_str())],
             ));
             rollback_effects
         }
@@ -1131,7 +1128,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             let scrubbed = scrub_error_for_toast(&error);
             app.show_toast(&xai_grok_i18n::t_fmt(
                 "toast.setting_save_failed",
-                &[("key", key.as_str()), ("error", scrubbed.as_str())],
+                &[("key", key), ("error", scrubbed.as_str())],
             ));
             vec![]
         }

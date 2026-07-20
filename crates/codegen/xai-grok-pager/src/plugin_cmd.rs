@@ -1089,10 +1089,11 @@ fn marketplace_add(
     let config_path = xai_grok_config::grok_home().join("config.toml");
 
     let content = std::fs::read_to_string(&config_path).unwrap_or_default();
-    let mut doc: toml_edit::DocumentMut = content.parse().map_err(|e| {
+    let mut doc = content.parse::<toml_edit::DocumentMut>().map_err(|e| {
+        let error = e.to_string();
         anyhow::anyhow!(t_fmt(
             "cli.plugin.marketplace.add.parse_config_failed",
-            &[("error", e.to_string().as_str())],
+            &[("error", error.as_str())],
         ))
     })?;
 

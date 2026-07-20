@@ -38,7 +38,7 @@ pub async fn list_available_models(agent_config: &AgentConfig) -> Result<()> {
         "{}",
         t_fmt(
             "cli.models.default_model",
-            &[("model", state.current_model_id.0.as_str())]
+            &[("model", state.current_model_id.0)]
         )
     );
     println!();
@@ -47,10 +47,7 @@ pub async fn list_available_models(agent_config: &AgentConfig) -> Result<()> {
         if m.model_id == state.current_model_id {
             println!(
                 "{}",
-                t_fmt(
-                    "cli.models.model_default",
-                    &[("model", m.model_id.0.as_str())]
-                )
+                t_fmt("cli.models.model_default", &[("model", m.model_id.0)])
             );
         } else {
             println!("  - {}", m.model_id.0);

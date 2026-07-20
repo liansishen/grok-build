@@ -350,7 +350,6 @@ impl VerbGroupKind {
             }
             (VerbGroupKind::OtherTool, _, "one") => "scrollback.verb_group.other_tool.done_one",
             (VerbGroupKind::OtherTool, _, _) => "scrollback.verb_group.other_tool.done_many",
-            _ => unreachable!("tense and plurality are fixed literals"),
         }
     }
 }
