@@ -1656,6 +1656,8 @@
 "tool.hooks.skipped" = " skipped"
 "tool.prefix.creating" = "Creating "
 "tool.prefix.edit" = "Edit "
+"tool.list.entries_many" = " ({count} entries)"
+"tool.list.entries_one" = " ({count} entry)"
 "tool.prefix.fetch" = "Fetch "
 "tool.prefix.list" = "List "
 "tool.prefix.memory_search" = "Memory Search "
