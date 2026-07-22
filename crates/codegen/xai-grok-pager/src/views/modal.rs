@@ -54,12 +54,12 @@ impl EditConfirmResult {
     /// Dynamic label based on whether the agent is waiting to drain.
     pub fn label(&self, drain_blocked: bool) -> &'static str {
         match (self, drain_blocked) {
-            (Self::Save, false) => xai_grok_i18n::t("hint.save"),
-            (Self::Save, true) => xai_grok_i18n::t("modal.option.save_and_send"),
-            (Self::Discard, false) => xai_grok_i18n::t("modal.option.discard_changes"),
-            (Self::Discard, true) => xai_grok_i18n::t("modal.option.discard_and_send"),
-            (Self::Delete, _) => xai_grok_i18n::t("modal.option.delete_prompt"),
-            (Self::Cancel, _) => xai_grok_i18n::t("hint.cancel"),
+            (Self::Save, false) => "save",
+            (Self::Save, true) => "save & send",
+            (Self::Discard, false) => "discard changes",
+            (Self::Discard, true) => "discard & send",
+            (Self::Delete, _) => "delete prompt",
+            (Self::Cancel, _) => "cancel",
         }
     }
 }
@@ -100,8 +100,8 @@ impl ResetSettingsResult {
     /// Label for the y/n buttons rendered in the modal footer.
     pub fn label(self) -> &'static str {
         match self {
-            Self::Reset => xai_grok_i18n::t("settings.modal.footer.reset"),
-            Self::Cancel => xai_grok_i18n::t("hint.cancel"),
+            Self::Reset => "reset",
+            Self::Cancel => "cancel",
         }
     }
 }
@@ -142,10 +142,10 @@ impl CancelTurnChoice {
     ];
     pub fn label(&self) -> &'static str {
         match self {
-            Self::StopRunning => xai_grok_i18n::t("modal.stop_running"),
-            Self::ContinueToRun => xai_grok_i18n::t("modal.continue_to_run"),
-            Self::AlwaysStop => xai_grok_i18n::t("modal.always_stop"),
-            Self::AlwaysContinue => xai_grok_i18n::t("modal.always_continue"),
+            Self::StopRunning => "Stop running",
+            Self::ContinueToRun => "Continue to run",
+            Self::AlwaysStop => "Always stop",
+            Self::AlwaysContinue => "Always continue",
         }
     }
 }
@@ -343,8 +343,10 @@ pub enum PaletteCommand {
     NewSessionInWorktree,
     Home,
     Quit,
-    /// Execute a slash command by inserting it into the prompt.
+    /// Execute a slash command through the palette's draft-preserving route.
     SlashCommand(String),
+    /// Edit the minimal-mode composer draft without routing through slash text.
+    EditPromptExternal,
     /// Non-selectable section header for visual grouping.
     SectionHeader(String),
     /// Open the how-to documentation picker.
@@ -364,173 +366,175 @@ pub enum PaletteCommand {
 }
 /// Build the default set of palette entries with section grouping.
 ///
-/// `sharing_enabled` controls whether the `/share` entry is included.
-/// Pass `true` to preserve the default behavior (show `/share`).
-pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
+/// `sharing_enabled` controls whether `/share` is included. `screen_mode`
+/// exposes the draft-preserving external-editor row only in minimal mode.
+pub(crate) fn default_palette_entries(
+    sharing_enabled: bool,
+    screen_mode: crate::app::ScreenMode,
+) -> Vec<PaletteEntry> {
     let mut entries = vec![
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.section.session").into(),
+            label: "Session".into(),
             shortcut: String::new(),
-            command: PaletteCommand::SectionHeader(
-                xai_grok_i18n::t("modal.section.session").into(),
-            ),
+            command: PaletteCommand::SectionHeader("Session".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.new_session").into(),
+            label: "New Session".into(),
             shortcut: "Ctrl+N".into(),
             command: PaletteCommand::NewSession,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.new_session_worktree").into(),
-            shortcut: xai_grok_i18n::t("modal.shortcut_worktree").into(),
+            label: "New Session in Worktree".into(),
+            shortcut: "Ctrl+P → worktree".into(),
             command: PaletteCommand::NewSessionInWorktree,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.agent_dashboard").into(),
+            label: "Agent Dashboard".into(),
             shortcut: "/dashboard".into(),
             command: PaletteCommand::SlashCommand("/dashboard".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.back_home").into(),
+            label: "Back to Home".into(),
             shortcut: "/home".into(),
             command: PaletteCommand::Home,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.resume_session").into(),
+            label: "Resume Session".into(),
             shortcut: "/resume".into(),
             command: PaletteCommand::SlashCommand("/resume".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.share_session").into(),
+            label: "Share Session".into(),
             shortcut: "/share".into(),
             command: PaletteCommand::SlashCommand("/share".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.rename_session").into(),
+            label: "Rename Session".into(),
             shortcut: "/rename ".into(),
             command: PaletteCommand::SlashCommand("/rename ".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.session_info").into(),
+            label: "Session Info".into(),
             shortcut: "/session-info".into(),
             command: PaletteCommand::SlashCommand("/session-info".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.send_feedback").into(),
+            label: "Send Feedback".into(),
             shortcut: "/feedback".into(),
             command: PaletteCommand::SlashCommand("/feedback ".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.section.context").into(),
+            label: "Context".into(),
             shortcut: String::new(),
-            command: PaletteCommand::SectionHeader(
-                xai_grok_i18n::t("modal.section.context").into(),
-            ),
+            command: PaletteCommand::SectionHeader("Context".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.compact_history").into(),
+            label: "Compact History".into(),
             shortcut: "/compact".into(),
             command: PaletteCommand::SlashCommand("/compact".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.context_usage").into(),
+            label: "Context Usage".into(),
             shortcut: "/context".into(),
             command: PaletteCommand::SlashCommand("/context".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.view_plan").into(),
+            label: "View Plan".into(),
             shortcut: "/view-plan".into(),
             command: PaletteCommand::SlashCommand("/view-plan".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.memory").into(),
+            label: "Memory".into(),
             shortcut: "/memory".into(),
             command: PaletteCommand::Memory,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.section.model_input").into(),
+            label: "Model & Input".into(),
             shortcut: String::new(),
-            command: PaletteCommand::SectionHeader(
-                xai_grok_i18n::t("modal.section.model_input").into(),
-            ),
+            command: PaletteCommand::SectionHeader("Model & Input".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.switch_model").into(),
+            label: "Switch Model".into(),
             shortcut: "/model".into(),
             command: PaletteCommand::SlashCommand("/model ".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.always_approve_mode").into(),
+            label: "Always Approve Mode".into(),
             shortcut: "/always-approve".into(),
             command: PaletteCommand::SlashCommand("/always-approve".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.multiline_input").into(),
+            label: "Multiline Input".into(),
             shortcut: "/multiline".into(),
             command: PaletteCommand::SlashCommand("/multiline".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.section.tools").into(),
-            shortcut: String::new(),
-            command: PaletteCommand::SectionHeader(xai_grok_i18n::t("modal.section.tools").into()),
+            label: "Edit Prompt in External Editor".into(),
+            shortcut: "Ctrl+G".into(),
+            command: PaletteCommand::EditPromptExternal,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.hooks").into(),
+            label: "Tools".into(),
+            shortcut: String::new(),
+            command: PaletteCommand::SectionHeader("Tools".into()),
+        },
+        PaletteEntry {
+            label: "Hooks".into(),
             shortcut: "/hooks".into(),
             command: PaletteCommand::OpenExtensionsTab(
                 crate::views::extensions_modal::ExtensionsTab::Hooks,
             ),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.plugins").into(),
+            label: "Plugins".into(),
             shortcut: "/plugins".into(),
             command: PaletteCommand::OpenExtensionsTab(
                 crate::views::extensions_modal::ExtensionsTab::Plugins,
             ),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.marketplace").into(),
+            label: "Marketplace".into(),
             shortcut: "/marketplace".into(),
             command: PaletteCommand::OpenExtensionsTab(
                 crate::views::extensions_modal::ExtensionsTab::Marketplace,
             ),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.skills").into(),
+            label: "Skills".into(),
             shortcut: "/skills".into(),
             command: PaletteCommand::OpenExtensionsTab(
                 crate::views::extensions_modal::ExtensionsTab::Skills,
             ),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.mcp_servers").into(),
+            label: "MCP Servers".into(),
             shortcut: "/mcps".into(),
             command: PaletteCommand::OpenExtensionsTab(
                 crate::views::extensions_modal::ExtensionsTab::McpServers,
             ),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.manage_agents").into(),
+            label: "Manage Agents".into(),
             shortcut: "/config-agents".into(),
             command: PaletteCommand::OpenAgentsModal,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.section.other").into(),
+            label: "Other".into(),
             shortcut: String::new(),
-            command: PaletteCommand::SectionHeader(xai_grok_i18n::t("modal.section.other").into()),
+            command: PaletteCommand::SectionHeader("Other".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.switch_theme").into(),
+            label: "Switch Theme".into(),
             shortcut: "/theme".into(),
             command: PaletteCommand::SlashCommand("/theme ".into()),
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("settings.modal.title").into(),
+            label: "Settings".into(),
             shortcut: "F2".into(),
             command: PaletteCommand::OpenSettings,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.keyboard_shortcuts").into(),
+            label: "Keyboard Shortcuts".into(),
             shortcut: if crate::actions::ctrl_dot_unreliable() {
                 "Ctrl+X".into()
             } else {
@@ -539,29 +543,37 @@ pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
             command: PaletteCommand::KeyboardShortcuts,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("modal.howto_guides").into(),
+            label: "How-to Guides".into(),
             shortcut: "/docs".into(),
             command: PaletteCommand::HowTo,
         },
         PaletteEntry {
-            label: xai_grok_i18n::t("welcome.quit_menu").into(),
+            label: "Quit".into(),
             shortcut: "Ctrl+Q".into(),
             command: PaletteCommand::Quit,
         },
     ];
-    if !sharing_enabled {
-        entries.retain(|e| {
-            !matches!(
-                & e.command, PaletteCommand::SlashCommand(s) if s.trim() == "/share"
+    entries.retain(|entry| {
+        if !sharing_enabled
+            && matches!(
+                & entry.command, PaletteCommand::SlashCommand(s) if s.trim() ==
+                "/share"
             )
-        });
-    }
+        {
+            return false;
+        }
+        screen_mode.is_minimal() || !matches!(entry.command, PaletteCommand::EditPromptExternal)
+    });
     entries
 }
 #[allow(clippy::collapsible_if)]
 /// Filter palette entries for search, preserving section headers when any item in the section matches.
-pub fn filter_palette_entries(query: &str, sharing_enabled: bool) -> Vec<PaletteEntry> {
-    let all = default_palette_entries(sharing_enabled);
+pub(crate) fn filter_palette_entries(
+    query: &str,
+    sharing_enabled: bool,
+    screen_mode: crate::app::ScreenMode,
+) -> Vec<PaletteEntry> {
+    let all = default_palette_entries(sharing_enabled, screen_mode);
     let query_lower = query.to_lowercase();
     if query_lower.is_empty() {
         return all;
@@ -625,32 +637,30 @@ impl ActiveModal {
         match self {
             ActiveModal::EditConfirm { .. } => {
                 if drain_blocked {
-                    xai_grok_i18n::t("modal.save_and_send")
+                    "Save and send?"
                 } else {
-                    xai_grok_i18n::t("modal.save_changes")
+                    "Save changes?"
                 }
             }
-            ActiveModal::CommandPalette { .. } => xai_grok_i18n::t("modal.commands"),
-            ActiveModal::SessionPicker { .. } => xai_grok_i18n::t("modal.resume_session"),
+            ActiveModal::CommandPalette { .. } => "Commands",
+            ActiveModal::SessionPicker { .. } => "Resume session",
             ActiveModal::ArgPicker {
                 command,
                 args_query,
                 ..
             } => match command.as_str() {
-                "model" | "m" if !args_query.is_empty() => {
-                    xai_grok_i18n::t("modal.pick_reasoning_effort")
-                }
-                "model" | "m" => xai_grok_i18n::t("modal.pick_model"),
-                "theme" | "t" => xai_grok_i18n::t("modal.pick_theme"),
-                _ => xai_grok_i18n::t("modal.pick_option"),
+                "model" | "m" if !args_query.is_empty() => "Pick reasoning effort",
+                "model" | "m" => "Pick model",
+                "theme" | "t" => "Pick theme",
+                _ => "Pick option",
             },
-            ActiveModal::DocPicker { .. } => xai_grok_i18n::t("modal.howto_guides"),
+            ActiveModal::DocPicker { .. } => "How-to Guides",
             ActiveModal::DocViewer { title, .. } => title.as_str(),
-            ActiveModal::ShortcutsHelp { .. } => xai_grok_i18n::t("modal.keyboard_shortcuts"),
-            ActiveModal::MemoryBrowser { .. } => xai_grok_i18n::t("modal.memory"),
+            ActiveModal::ShortcutsHelp { .. } => "Keyboard Shortcuts",
+            ActiveModal::MemoryBrowser { .. } => "Memory",
             ActiveModal::Settings { .. } => crate::views::settings_modal::MODAL_TITLE,
-            ActiveModal::ResetSettingsConfirm { .. } => xai_grok_i18n::t("modal.reset_setting"),
-            ActiveModal::RememberNoteReview { .. } => xai_grok_i18n::t("modal.memory_note"),
+            ActiveModal::ResetSettingsConfirm { .. } => "Reset setting?",
+            ActiveModal::RememberNoteReview { .. } => "Memory Note",
         }
     }
 }
@@ -667,15 +677,10 @@ pub fn reset_confirm_prompt(modal: &ActiveModal) -> Option<String> {
     };
     let meta = settings_state.registry.find(key)?;
     let default = crate::settings::default_value_for(meta);
-    Some(xai_grok_i18n::t_fmt(
-        "modal.reset_setting_prompt",
-        &[
-            ("label", meta.label_t()),
-            (
-                "value",
-                &format_default_for_prompt(meta.key, &meta.kind, &default),
-            ),
-        ],
+    Some(format!(
+        "Reset '{}' to default ({})?",
+        meta.label,
+        format_default_for_prompt(&meta.kind, &default),
     ))
 }
 /// Abbreviated title breadcrumb for the reset-confirm dialog, e.g. "Reset 'Compact mode'".
@@ -689,26 +694,22 @@ pub fn reset_confirm_breadcrumb(modal: &ActiveModal) -> Option<String> {
         return None;
     };
     let meta = settings_state.registry.find(key)?;
-    Some(xai_grok_i18n::t_fmt(
-        "modal.reset_setting_breadcrumb",
-        &[("label", meta.label_t())],
-    ))
+    Some(format!("Reset '{}'", meta.label))
 }
 /// Format a `SettingValue` for the prompt's `(<default>)` display.
 fn format_default_for_prompt(
-    key: crate::settings::SettingKey,
     kind: &crate::settings::SettingKind,
     value: &crate::settings::SettingValue,
 ) -> String {
     use crate::settings::{SettingKind, SettingValue};
     match value {
-        SettingValue::Bool(true) => xai_grok_i18n::t("settings.modal.value_on").to_owned(),
-        SettingValue::Bool(false) => xai_grok_i18n::t("settings.modal.value_off").to_owned(),
+        SettingValue::Bool(true) => "on".to_owned(),
+        SettingValue::Bool(false) => "off".to_owned(),
         SettingValue::Enum(canonical) => {
             if let SettingKind::Enum { choices, .. } = kind {
                 for c in *choices {
                     if c.canonical == *canonical {
-                        return c.display_t(key).to_owned();
+                        return c.display.to_owned();
                     }
                 }
             }
@@ -868,19 +869,16 @@ pub fn render_cancel_turn_panel(
         content_x,
         y,
         &Line::from(Span::styled(
-            xai_grok_i18n::t("modal.subagents_running"),
+            "Subagents are still running. Stop them?",
             title_style,
         )),
         content_w as u16,
     );
     y += 1;
     let count_text = if state.running_count == 1 {
-        xai_grok_i18n::t("modal.subagent_running_count_one").to_string()
+        "1 subagent running".to_string()
     } else {
-        xai_grok_i18n::t_fmt(
-            "modal.subagents_running_count",
-            &[("count", &state.running_count.to_string())],
-        )
+        format!("{} subagents running", state.running_count)
     };
     buf.set_line(
         content_x,
@@ -1005,24 +1003,25 @@ fn fit_docs_ask_grok_tip(docs_path: &str, width: usize) -> String {
     if width == 0 {
         return String::new();
     }
-    let long = xai_grok_i18n::t_fmt("modal.tip_docs_long", &[("path", docs_path)]);
+    let long =
+        format!("Tip · Ask Grok about the docs ({docs_path}) — e.g. \"how do I set up MCP?\"");
     if long.width() <= width {
         return long;
     }
-    let short = xai_grok_i18n::t_fmt("modal.tip_docs_short", &[("path", docs_path)]);
+    let short = format!("Tip · Ask Grok about the docs · {docs_path}");
     if short.width() <= width {
         return short;
     }
-    let path_only = xai_grok_i18n::t_fmt("modal.tip_docs_path", &[("path", docs_path)]);
+    let path_only = format!("Tip · {docs_path}");
     if path_only.width() <= width {
         return path_only;
     }
-    let prefix = xai_grok_i18n::t("modal.tip_prefix");
-    let budget = width.saturating_sub(prefix.width());
+    const PREFIX: &str = "Tip · ";
+    let budget = width.saturating_sub(PREFIX.width());
     if budget == 0 {
-        return truncate_str(xai_grok_i18n::t("modal.tip"), width);
+        return truncate_str("Tip", width);
     }
-    format!("{prefix}{}", truncate_str(docs_path, budget))
+    format!("{PREFIX}{}", truncate_str(docs_path, budget))
 }
 pub fn render_doc_picker_overlay(
     buf: &mut ratatui::buffer::Buffer,
@@ -1053,17 +1052,17 @@ pub fn render_doc_picker_overlay(
     let non_sel = vec![false; filtered.len()];
     let mut picker_shortcuts: Vec<Shortcut<'_>> = vec![
         Shortcut {
-            label: xai_grok_i18n::t("shortcuts.footer.nav"),
+            label: "\u{2191}/\u{2193} nav",
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: xai_grok_i18n::t("modal.footer.enter_select"),
+            label: "Enter select",
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: xai_grok_i18n::t("modal.footer.esc_close"),
+            label: "Esc close",
             clickable: false,
             id: 0,
         },
@@ -1084,7 +1083,7 @@ pub fn render_doc_picker_overlay(
         ..base_sizing
     };
     let modal_config = ModalWindowConfig {
-        title: xai_grok_i18n::t("modal.howto_guides"),
+        title: "How-to Guides",
         tabs: None,
         shortcuts: &picker_shortcuts,
         sizing,
@@ -1162,12 +1161,12 @@ pub fn render_doc_viewer_overlay(
     use ratatui::widgets::{Paragraph, Widget, Wrap};
     let doc_shortcuts = vec![
         super::modal_window::Shortcut {
-            label: xai_grok_i18n::t("shortcuts.footer.scroll"),
+            label: "\u{2191}/\u{2193} scroll",
             clickable: false,
             id: 0,
         },
         super::modal_window::Shortcut {
-            label: xai_grok_i18n::t("shortcuts.footer.esc_back"),
+            label: "Esc back",
             clickable: false,
             id: 0,
         },
@@ -1270,7 +1269,7 @@ mod palette_sharing_tests {
     }
     #[test]
     fn default_palette_includes_share_when_enabled() {
-        let entries = default_palette_entries(true);
+        let entries = default_palette_entries(true, crate::app::ScreenMode::Fullscreen);
         assert!(
             has_share(&entries),
             "/share should be present when sharing_enabled=true"
@@ -1278,7 +1277,7 @@ mod palette_sharing_tests {
     }
     #[test]
     fn default_palette_includes_dashboard() {
-        let entries = default_palette_entries(true);
+        let entries = default_palette_entries(true, crate::app::ScreenMode::Fullscreen);
         let has_dashboard = entries.iter().any(|e| {
             matches!(
                 & e.command, PaletteCommand::SlashCommand(s) if s.trim() ==
@@ -1296,8 +1295,23 @@ mod palette_sharing_tests {
         );
     }
     #[test]
+    fn edit_prompt_palette_entry_is_minimal_only() {
+        let minimal = default_palette_entries(true, crate::app::ScreenMode::Minimal);
+        assert!(
+            minimal
+                .iter()
+                .any(|entry| matches!(entry.command, PaletteCommand::EditPromptExternal))
+        );
+        let fullscreen = default_palette_entries(true, crate::app::ScreenMode::Fullscreen);
+        assert!(
+            !fullscreen
+                .iter()
+                .any(|entry| matches!(entry.command, PaletteCommand::EditPromptExternal))
+        );
+    }
+    #[test]
     fn default_palette_omits_share_when_disabled() {
-        let entries = default_palette_entries(false);
+        let entries = default_palette_entries(false, crate::app::ScreenMode::Fullscreen);
         assert!(
             !has_share(&entries),
             "/share must not appear in palette when sharing_enabled=false"
@@ -1305,12 +1319,12 @@ mod palette_sharing_tests {
     }
     #[test]
     fn filter_palette_omits_share_when_disabled() {
-        let entries = filter_palette_entries("", false);
+        let entries = filter_palette_entries("", false, crate::app::ScreenMode::Fullscreen);
         assert!(
             !has_share(&entries),
             "/share must not appear in unfiltered palette when sharing_enabled=false"
         );
-        let entries = filter_palette_entries("share", false);
+        let entries = filter_palette_entries("share", false, crate::app::ScreenMode::Fullscreen);
         assert!(
             !has_share(&entries),
             "/share must not appear when filtering for 'share' with sharing_enabled=false"
@@ -1318,7 +1332,7 @@ mod palette_sharing_tests {
     }
     #[test]
     fn filter_palette_includes_share_when_enabled_and_matched() {
-        let entries = filter_palette_entries("share", true);
+        let entries = filter_palette_entries("share", true, crate::app::ScreenMode::Fullscreen);
         assert!(
             has_share(&entries),
             "/share should match a 'share' query when sharing_enabled=true"
@@ -1327,7 +1341,7 @@ mod palette_sharing_tests {
     #[test]
     fn palette_tools_section_routes_each_tab_to_itself() {
         use crate::views::extensions_modal::ExtensionsTab;
-        let entries = default_palette_entries(true);
+        let entries = default_palette_entries(true, crate::app::ScreenMode::Fullscreen);
         for (label, expected) in [
             ("Hooks", ExtensionsTab::Hooks),
             ("Plugins", ExtensionsTab::Plugins),

@@ -312,10 +312,7 @@ pub fn compute_peek_fields(
                     let reject = if qv.no_freeform {
                         None
                     } else {
-                        opts.push((
-                            "__other__".to_string(),
-                            xai_grok_i18n::t("question.other").to_string(),
-                        ));
+                        opts.push(("__other__".to_string(), "Other".to_string()));
                         Some(opts.len() - 1)
                     };
                     // Prefix a `(i/N)` position marker for multi-question
@@ -357,7 +354,7 @@ pub fn compute_peek_fields(
             let child = parent_agent.subagent_views.get(child_session_id);
             let response_type = child
                 .map(|c| extract_last_response_type(c))
-                .unwrap_or_else(|| xai_grok_i18n::t("dashboard.response.subagent").to_string());
+                .unwrap_or_else(|| "Subagent".to_string());
             let last_user_message = child.and_then(|c| extract_last_user_message(c));
             let time_ago = crate::util::format_time_ago(info.last_progress_at.elapsed());
             Some(PeekFields {
@@ -486,20 +483,20 @@ fn paint_peek_config_badge(
     // honest badge even when yolo stays armed underneath.
     if panel.plan_mode {
         flags.push(PromptFlag {
-            text: xai_grok_i18n::t("mode.flag.plan"),
+            text: "plan",
             color: Some(theme.accent_plan),
             bold: false,
         });
     } else if panel.auto_approve {
         flags.push(PromptFlag {
-            text: xai_grok_i18n::t("mode.flag.always_approve"),
+            text: "always-approve",
             color: None,
             bold: false,
         });
     } else if panel.auto {
         // Auto (LLM classifier) mode. Blue `accent_system`.
         flags.push(PromptFlag {
-            text: xai_grok_i18n::t("mode.flag.auto"),
+            text: "auto",
             color: Some(theme.accent_system),
             bold: false,
         });
@@ -511,7 +508,6 @@ fn paint_peek_config_badge(
         model_name: &model_label,
         flags: &flags,
         multiline,
-        usage_status: None,
         usage_warning: None,
         usage_warning_critical: false,
     };
@@ -708,9 +704,9 @@ pub fn render_peek_panel(
                         // unfocused-only placeholder) so the hint stays
                         // visible while the caret sits on the row.
                         let placeholder_text = if panel.is_ask_question() {
-                            xai_grok_i18n::t("question.other_placeholder")
+                            "Other (type your own answer)"
                         } else {
-                            xai_grok_i18n::t("permission.reject_once.placeholder")
+                            "No, reject (type to add feedback)"
                         };
                         let placeholder = truncate_str(placeholder_text, avail as usize);
                         buf.set_string(
@@ -775,7 +771,7 @@ pub fn render_peek_panel(
         };
         // While Working, the status label is secondary (a touch brighter than
         // dim chrome). Live-tail keeps painting the middle regardless.
-        let working = panel.response_type == xai_grok_i18n::t("dashboard.response.working");
+        let working = panel.response_type == "Working";
         let label_fg = if working {
             theme.text_secondary
         } else {
@@ -812,9 +808,7 @@ pub fn render_peek_panel(
         if let Some(PeekLiveTailArgs { scrollback }) = live_tail {
             if middle_h > 0 {
                 if scrollback.is_empty() {
-                    if let Some(hint) =
-                        empty_hint.or(Some(xai_grok_i18n::t("dashboard.no_activity")))
-                    {
+                    if let Some(hint) = empty_hint.or(Some("No activity yet")) {
                         let trunc = truncate_str(hint, inner.width as usize);
                         buf.set_string(
                             inner.x,
@@ -870,7 +864,7 @@ pub fn render_peek_panel(
         vpad_top: 0,
         chrome: false,
         bg_override: Some(theme.bg_base),
-        placeholder_override: Some(xai_grok_i18n::t("dashboard.reply_placeholder")),
+        placeholder_override: Some("reply\u{2026}"),
         image_preview: false,
         ..PromptStyle::default()
     };
@@ -969,31 +963,21 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
     // execution or waiting for results.
     if running {
         match agent.session.turn_activity() {
-            Some(TurnActivity::Thinking) => {
-                return xai_grok_i18n::t("dashboard.response.thinking").to_string();
-            }
-            Some(TurnActivity::Responding) => {
-                return xai_grok_i18n::t("dashboard.response.response").to_string();
-            }
-            Some(TurnActivity::AutoCompacting) => {
-                return xai_grok_i18n::t("dashboard.response.compacting").to_string();
-            }
-            Some(TurnActivity::Retrying { .. }) => {
-                return xai_grok_i18n::t("dashboard.response.retrying").to_string();
-            }
+            Some(TurnActivity::Thinking) => return "Thinking".to_string(),
+            Some(TurnActivity::Responding) => return "Response".to_string(),
+            Some(TurnActivity::AutoCompacting) => return "Compacting".to_string(),
+            Some(TurnActivity::Retrying { .. }) => return "Retrying".to_string(),
             // A tool is executing: fall through to the scan to recover its
             // specific label (Bash/Read/…); a missing/stale block yields the
             // generic "Working" fallback below.
             Some(TurnActivity::ToolRunning { .. }) => {}
             // Blocked on a suppressed tool (task output / wait / sleep) → keep
             // the compact "Working" the peek showed before this was surfaced.
-            Some(TurnActivity::Waiting(_)) => {
-                return xai_grok_i18n::t("dashboard.response.working").to_string();
-            }
+            Some(TurnActivity::Waiting(_)) => return "Working".to_string(),
             // Turn running but no live activity (e.g. just granted a
             // permission and waiting for tool results / the next inference) →
             // "Working", never a stale response.
-            None => return xai_grok_i18n::t("dashboard.response.working").to_string(),
+            None => return "Working".to_string(),
         }
     }
     let len = agent.scrollback.len();
@@ -1010,38 +994,25 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
                 if running {
                     break;
                 }
-                return xai_grok_i18n::t("dashboard.response.response").to_string();
+                return "Response".to_string();
             }
             RenderBlock::Thinking(_) => {
-                return if running {
-                    xai_grok_i18n::t("dashboard.response.thinking")
-                } else {
-                    xai_grok_i18n::t("dashboard.response.thought")
-                }
-                .to_string();
+                return if running { "Thinking" } else { "Thought" }.to_string();
             }
             RenderBlock::ToolCall(tc) => {
                 let label = match tc {
-                    ToolCallBlock::Execute(_) => Some(xai_grok_i18n::t("dashboard.response.bash")),
-                    ToolCallBlock::Read(_) => Some(xai_grok_i18n::t("dashboard.response.read")),
-                    ToolCallBlock::Edit(_) => Some(xai_grok_i18n::t("dashboard.response.edit")),
-                    ToolCallBlock::ListDir(_) => Some(xai_grok_i18n::t("dashboard.response.list")),
-                    ToolCallBlock::Search(_) => Some(xai_grok_i18n::t("dashboard.response.search")),
-                    ToolCallBlock::WebFetch(_) => {
-                        Some(xai_grok_i18n::t("dashboard.response.fetch"))
-                    }
-                    ToolCallBlock::WebSearch(_) => {
-                        Some(xai_grok_i18n::t("dashboard.response.web_search"))
-                    }
-                    ToolCallBlock::IntegrationSearch(_) => {
-                        Some(xai_grok_i18n::t("dashboard.response.tool_search"))
-                    }
-                    ToolCallBlock::UseTool(_) => Some(xai_grok_i18n::t("dashboard.response.tool")),
-                    ToolCallBlock::MemorySearch(_) => {
-                        Some(xai_grok_i18n::t("dashboard.response.memory"))
-                    }
-                    ToolCallBlock::Skill(_) => Some(xai_grok_i18n::t("dashboard.response.skill")),
-                    ToolCallBlock::Other(_) => Some(xai_grok_i18n::t("dashboard.response.tool")),
+                    ToolCallBlock::Execute(_) => Some("Bash"),
+                    ToolCallBlock::Read(_) => Some("Read"),
+                    ToolCallBlock::Edit(_) => Some("Edit"),
+                    ToolCallBlock::ListDir(_) => Some("List"),
+                    ToolCallBlock::Search(_) => Some("Search"),
+                    ToolCallBlock::WebFetch(_) => Some("Fetch"),
+                    ToolCallBlock::WebSearch(_) => Some("Web search"),
+                    ToolCallBlock::IntegrationSearch(_) => Some("Tool search"),
+                    ToolCallBlock::UseTool(_) => Some("Tool"),
+                    ToolCallBlock::MemorySearch(_) => Some("Memory"),
+                    ToolCallBlock::Skill(_) => Some("Skill"),
+                    ToolCallBlock::Other(_) => Some("Tool"),
                     // Lifecycle events aren't real tool calls — keep scanning.
                     ToolCallBlock::Lifecycle(_) => None,
                 };
@@ -1049,19 +1020,12 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
                     return label.to_string();
                 }
             }
-            RenderBlock::Subagent(_) => {
-                return xai_grok_i18n::t("dashboard.response.subagent").to_string();
-            }
-            RenderBlock::BgTask(_) => {
-                return xai_grok_i18n::t("dashboard.response.task").to_string();
-            }
-            RenderBlock::Btw(_) => return xai_grok_i18n::t("dashboard.response.btw").to_string(),
-            RenderBlock::ContextInfo(_) => {
-                return xai_grok_i18n::t("dashboard.response.context").to_string();
-            }
-            RenderBlock::CreditLimit(_) => {
-                return xai_grok_i18n::t("dashboard.response.credit_limit").to_string();
-            }
+            RenderBlock::Subagent(_) => return "Subagent".to_string(),
+            RenderBlock::Workflow(_) => return "Workflow".to_string(),
+            RenderBlock::BgTask(_) => return "Task".to_string(),
+            RenderBlock::Btw(_) => return "Btw".to_string(),
+            RenderBlock::ContextInfo(_) => return "Context".to_string(),
+            RenderBlock::CreditLimit(_) => return "Credit limit".to_string(),
             // The user's latest input marks the turn boundary — there's
             // no agent response after it yet.
             RenderBlock::UserPrompt(_) => break,
@@ -1070,9 +1034,9 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
         }
     }
     if running {
-        xai_grok_i18n::t("dashboard.response.working").to_string()
+        "Working".to_string()
     } else {
-        xai_grok_i18n::t("dashboard.response.idle").to_string()
+        "Idle".to_string()
     }
 }
 
@@ -1187,6 +1151,7 @@ fn block_short_text(block: &crate::scrollback::block::RenderBlock) -> Option<Str
         RenderBlock::ToolCall(_) => Some("(tool call)".to_string()),
         RenderBlock::BgTask(_) => Some("(background task)".to_string()),
         RenderBlock::Subagent(_) => Some("(subagent)".to_string()),
+        RenderBlock::Workflow(_) => Some("(workflow)".to_string()),
         RenderBlock::Btw(_) => Some("(btw)".to_string()),
         RenderBlock::ContextInfo(_) => Some("(context info)".to_string()),
         RenderBlock::CreditLimit(_) => Some("(credit limit)".to_string()),

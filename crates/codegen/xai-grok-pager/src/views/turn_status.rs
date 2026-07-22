@@ -32,7 +32,7 @@ use crate::theme::Theme;
 pub(crate) const SPINNER_DIVISOR: u64 = 4;
 
 /// Show each monitor-pulse frame for this many animation ticks — twice the
-/// [`SPINNER_DIVISOR`] dwell (~3.75 fps). The idle xai_grok_i18n::t("turn.watchers.watching") cue should
+/// [`SPINNER_DIVISOR`] dwell (~3.75 fps). The idle still-running cue should
 /// breathe calmly rather than read like the active turn spinner, so its
 /// `○ ◎ ◉ ◎` cycle runs at roughly half the speed (~1.07s per loop).
 pub(crate) const MONITOR_PULSE_DIVISOR: u64 = 8;
@@ -81,7 +81,7 @@ pub struct TurnStatusOutput {
 /// `Some(_)` to [`render_turn_status`] renders the buttons; passing `None`
 /// marks a keyboard-only host (minimal mode has no mouse capture) and suppresses
 /// both — that host cancels the turn via `Ctrl+C` and sends to background via
-/// `Ctrl+G` instead.
+/// `Ctrl+B` instead.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MouseButtons {
     /// Whether the mouse is over the `[stop]` cancel button.
@@ -93,7 +93,7 @@ pub struct MouseButtons {
 /// Counts of idle-surviving "watcher" work — background jobs that can wake
 /// the agent for a new turn while it sits idle (commands and monitors on
 /// completion/events, `/loop` tasks on a timer, background subagents on
-/// finish). They share one persistent xai_grok_i18n::t("turn.watchers.watching") cue above the prompt.
+/// finish). They share one persistent still-running cue above the prompt.
 /// Broader than the tasks-pane `Watchers` group (monitors + loops only).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Watchers {
@@ -107,63 +107,63 @@ pub struct Watchers {
     /// subagent is a background one — a foreground subagent would keep the
     /// parent in `TurnRunning`.
     pub subagents: usize,
+    pub workflows: usize,
 }
 
 impl Watchers {
     /// Total watcher count across all kinds.
     pub fn total(self) -> usize {
-        self.commands + self.monitors + self.loops + self.subagents
+        self.commands + self.monitors + self.loops + self.subagents + self.workflows
     }
 
     /// Awaitable in-flight work — the kinds a blocking `wait_tasks` /
     /// `get_task_output` wait can resolve on (commands, monitors, subagents;
-    /// scheduled `/loop` tasks are timers, not awaitable work).
+    /// scheduled `/loop` tasks and workflows are not task waits).
     pub fn awaitable_work(self) -> usize {
         self.commands + self.monitors + self.subagents
     }
 }
 
-/// Build the "watching · …" label for the idle watcher cue, listing only the
-/// non-zero kinds with correct singular/plural nouns — e.g.
-/// `"watching · 1 command · 2 monitors · 1 loop · 1 subagent"`. Assumes
-/// `watchers.total() > 0`.
-fn watching_label(watchers: Watchers) -> String {
+/// Format a counts-first `"… still running"` cue from `(count, noun)` pairs,
+/// listing only the non-zero kinds (plain-`s` plurals) — e.g.
+/// `"1 command · 2 monitors still running"`. `None` when every count is
+/// zero. Single owner of the format mechanics so the agent view's idle cue
+/// and the dashboard's background-work label cannot drift.
+pub(crate) fn format_still_running<'a>(
+    kinds: impl IntoIterator<Item = (usize, &'a str)>,
+) -> Option<String> {
     use std::fmt::Write as _;
-    let mut label = String::with_capacity(32);
-    label.push_str(xai_grok_i18n::t("turn.watchers.watching"));
-    if watchers.commands > 0 {
-        let noun = if watchers.commands == 1 {
-            xai_grok_i18n::t("turn.watchers.command")
-        } else {
-            xai_grok_i18n::t("turn.watchers.commands")
-        };
-        let _ = write!(label, " \u{00b7} {} {noun}", watchers.commands);
+    let mut label = String::with_capacity(48);
+    for (count, noun) in kinds {
+        if count == 0 {
+            continue;
+        }
+        if !label.is_empty() {
+            label.push_str(" \u{00b7} ");
+        }
+        let plural = if count == 1 { "" } else { "s" };
+        let _ = write!(label, "{count} {noun}{plural}");
     }
-    if watchers.monitors > 0 {
-        let noun = if watchers.monitors == 1 {
-            xai_grok_i18n::t("turn.watchers.monitor")
-        } else {
-            xai_grok_i18n::t("turn.watchers.monitors")
-        };
-        let _ = write!(label, " \u{00b7} {} {noun}", watchers.monitors);
+    if label.is_empty() {
+        return None;
     }
-    if watchers.loops > 0 {
-        let noun = if watchers.loops == 1 {
-            xai_grok_i18n::t("turn.watchers.loop")
-        } else {
-            xai_grok_i18n::t("turn.watchers.loops")
-        };
-        let _ = write!(label, " \u{00b7} {} {noun}", watchers.loops);
-    }
-    if watchers.subagents > 0 {
-        let noun = if watchers.subagents == 1 {
-            xai_grok_i18n::t("turn.watchers.subagent")
-        } else {
-            xai_grok_i18n::t("turn.watchers.subagents")
-        };
-        let _ = write!(label, " \u{00b7} {} {noun}", watchers.subagents);
-    }
-    label
+    label.push_str(" still running");
+    Some(label)
+}
+
+/// The idle watcher cue's label — e.g.
+/// `"1 command · 2 monitors · 1 loop · 1 subagent still running"`. Leads
+/// with the counts (not an ambient "watching") so a glance under a
+/// "Worked for X" marker still reads as unfinished work. `None` when no
+/// watchers are live.
+fn still_running_label(watchers: Watchers) -> Option<String> {
+    format_still_running([
+        (watchers.commands, "command"),
+        (watchers.monitors, "monitor"),
+        (watchers.loops, "loop"),
+        (watchers.subagents, "subagent"),
+        (watchers.workflows, "workflow"),
+    ])
 }
 
 /// Whether the turn is blocked in a wait the shell aborts as soon as the
@@ -203,7 +203,7 @@ pub fn is_sendable_wait(activity: &Option<TurnActivity>) -> bool {
 /// - `total_tokens`: Total tokens used (context window usage), shown as `⇣Nk`.
 /// - `parked`: the turn is parked on a sendable wait and renders the stopped
 ///   look (`AgentView::renders_parked`). The running-turn chrome is suppressed;
-///   only the "watching · …" cue renders (the parked turn is by definition
+///   only the "… still running" cue renders (the parked turn is by definition
 ///   waiting on background work, so the cue explains the idle-looking chrome).
 /// - `flat_background`: when `true`, right-side timer/buttons use a transparent
 ///   (`Color::Reset`) background instead of `theme.bg_base`, so the row blends
@@ -245,7 +245,7 @@ pub fn render_turn_status(
 
     let theme = Theme::current();
 
-    // MCP startup seed (total == 0) while idle — show xai_grok_i18n::t("turn.activity.starting_session")
+    // MCP startup seed (total == 0) while idle — show "Starting session…"
     // above the prompt until the shell reports real server counts. Real MCP
     // progress (total > 0) renders as the compact top-bar chip instead, not
     // here. Auto-expires via `is_visible()` if the shell never reports.
@@ -270,7 +270,7 @@ pub fn render_turn_status(
                 Style::default().fg(diamond_color),
             ),
             Span::styled(
-                xai_grok_i18n::t("turn.waiting_on_edit"),
+                "agent idle ~ waiting on your edit",
                 Style::default().fg(theme.gray),
             ),
         ];
@@ -278,13 +278,15 @@ pub fn render_turn_status(
         return TurnStatusOutput::default();
     }
 
-    // Idle or parked with watchers: persistent watching cue (not scrollback
-    // — it must never scroll away). Lower priority than the starting-session
-    // and drain-blocked cues above.
-    if (state.is_idle() || parked) && watchers.total() > 0 {
+    // Idle or parked with watchers: persistent still-running cue (not
+    // scrollback — it must never scroll away). Lower priority than the
+    // starting-session and drain-blocked cues above.
+    if (state.is_idle() || parked)
+        && let Some(cue) = still_running_label(watchers)
+    {
         // Pulsing concentric circle (○ ◎ ◉ ◎) on a calm ambient cadence:
-        // the agent is idle, so this xai_grok_i18n::t("turn.watchers.watching") breath runs slower than the
-        // active turn spinner (see MONITOR_PULSE_DIVISOR).
+        // the agent is idle, so this breath runs slower than the active
+        // turn spinner (see MONITOR_PULSE_DIVISOR).
         let frames = crate::glyphs::monitor_icon_frames();
         let frame_idx = (tick / MONITOR_PULSE_DIVISOR) as usize % frames.len();
         let spans = vec![
@@ -292,7 +294,7 @@ pub fn render_turn_status(
                 format!("{} ", frames[frame_idx]),
                 Style::default().fg(theme.accent_system),
             ),
-            Span::styled(watching_label(watchers), Style::default().fg(theme.gray)),
+            Span::styled(cue, Style::default().fg(theme.gray)),
         ];
         buf.set_line(area.x, area.y, &Line::from(spans), area.width);
         return TurnStatusOutput::default();
@@ -345,7 +347,7 @@ pub fn render_turn_status(
     let show_bg = show_cancel && has_running_execute;
     let bg_str = if show_bg {
         if bg_hovered {
-            xai_grok_i18n::t("turn.button.send_to_bg")
+            " [send to bg]"
         } else {
             " [\u{2193}]"
         }
@@ -360,8 +362,8 @@ pub fn render_turn_status(
     // color (red on hover, see `cancel_style`), not by swapping the label.
     let cancel_str: &str = match (show_cancel, show_bg) {
         (false, _) => "",
-        (true, true) => xai_grok_i18n::t("turn.button.stop"),
-        (true, false) => xai_grok_i18n::t("turn.button.stop_spaced"),
+        (true, true) => "[stop]",
+        (true, false) => " [stop]",
     };
     let cancel_width = cancel_str.width();
 
@@ -458,7 +460,7 @@ pub fn render_turn_status(
                     .strip_prefix("Ask: ")
                     .or_else(|| title.strip_prefix("Ask "))
                     .unwrap_or(title.as_str());
-                let msg = xai_grok_i18n::t_fmt("turn.ask.waiting_answers", &[("detail", detail)]);
+                let msg = format!("Waiting on answers for {detail}");
                 let display = truncate_str(&msg, available_for_label);
                 left_spans.push(Span::styled(display, activity_style));
             } else if let Some(desc) = description
@@ -474,8 +476,8 @@ pub fn render_turn_status(
                 let display = truncate_str(&msg, available_for_label);
                 left_spans.push(Span::styled(display, activity_style));
             } else if let Some(query) = title.strip_prefix("Web search: ") {
-                // Web search: xai_grok_i18n::t("turn.tool.prefix.search") (muted) + query (yellow)
-                let prefix = xai_grok_i18n::t("turn.tool.prefix.search");
+                // Web search: "Search " (muted) + query (yellow)
+                let prefix = "Search ";
                 let prefix_width = prefix.width();
                 let query = query.trim_matches('"');
                 let max_query = available_for_label.saturating_sub(prefix_width).max(5);
@@ -483,21 +485,21 @@ pub fn render_turn_status(
                 left_spans.push(Span::styled(prefix, Style::default().fg(theme.gray)));
                 left_spans.push(Span::styled(display, Style::default().fg(theme.command)));
             } else if let Some(url) = title.strip_prefix("Fetch: ") {
-                // Fetch tools: xai_grok_i18n::t("turn.tool.prefix.fetch") (muted) + URL (yellow)
-                let prefix = xai_grok_i18n::t("turn.tool.prefix.fetch");
+                // Fetch tools: "Fetch " (muted) + URL (yellow)
+                let prefix = "Fetch ";
                 let prefix_width = prefix.width();
                 let max_url = available_for_label.saturating_sub(prefix_width).max(5);
                 let display = truncate_str(url, max_url);
                 left_spans.push(Span::styled(prefix, Style::default().fg(theme.gray)));
                 left_spans.push(Span::styled(display, Style::default().fg(theme.command)));
             } else {
-                // Normal tool: xai_grok_i18n::t("turn.tool.prefix.run") (muted) + command (syntax-highlighted).
+                // Normal tool: "Run " (muted) + command (syntax-highlighted).
                 // For qualified MCP tool names the activity title is the
                 // raw `server__action` string from ACP; prettify it to
                 // `(Server) Action` so the spinner doesn't show the ugly
                 // delimiter form. Non-MCP titles (bash commands etc.) are
                 // returned untouched by `mcp_pretty_name_if_qualified`.
-                let prefix = xai_grok_i18n::t("turn.tool.prefix.run");
+                let prefix = "Run ";
                 let pretty = mcp_pretty_name_if_qualified(title.as_str());
                 let detail = pretty.as_str();
                 let prefix_width = prefix.width();
@@ -518,9 +520,9 @@ pub fn render_turn_status(
         // toast — see `AgentView::held_queue_top_sendable`).
         let suffix = if held_queue > 0 && is_sendable_wait(activity) {
             if held_queue_top_sendable {
-                xai_grok_i18n::t_fmt("turn.queue.send_now", &[("count", &held_queue.to_string())])
+                format!(" · {held_queue} queued — Enter to send now")
             } else {
-                xai_grok_i18n::t_fmt("turn.queue.queued", &[("count", &held_queue.to_string())])
+                format!(" · {held_queue} queued")
             }
         } else {
             String::new()
@@ -615,28 +617,28 @@ fn compute_activity(
     match (state, activity) {
         (AgentState::TurnCancelling | AgentState::CommandCancelling { .. }, _) => (
             Style::default().fg(theme.accent_error),
-            xai_grok_i18n::t("turn.activity.cancelling").to_string(),
+            "Cancelling…".to_string(),
             false,
         ),
         // Goal-mode completion verification runs in-turn after the model
         // stops streaming. The harness drives the skeptic panel (the model
         // itself is idle), but the turn's last streaming activity can still
         // read as `Responding`/`Thinking`; label the whole window
-        // xai_grok_i18n::t("turn.activity.verifying") so the multi-minute panel isn't mislabelled as the
-        // model responding (or a hung xai_grok_i18n::t("turn.activity.waiting")).
+        // "Verifying…" so the multi-minute panel isn't mislabelled as the
+        // model responding (or a hung "Waiting…").
         (AgentState::TurnRunning, _) if goal_verifying => (
             Style::default().fg(theme.text_secondary),
-            xai_grok_i18n::t("turn.activity.verifying").to_string(),
+            "Verifying…".to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Thinking)) => (
             Style::default().fg(theme.text_secondary),
-            xai_grok_i18n::t("turn.activity.thinking").to_string(),
+            "Thinking…".to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Responding)) => (
             Style::default().fg(theme.text_secondary),
-            xai_grok_i18n::t("turn.activity.responding").to_string(),
+            "Responding…".to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::ToolRunning { title, description })) => {
@@ -659,29 +661,26 @@ fn compute_activity(
         }
         (AgentState::TurnRunning, Some(TurnActivity::AutoCompacting)) => (
             Style::default().fg(theme.text_secondary),
-            xai_grok_i18n::t("turn.activity.compacting").to_string(),
+            "Compacting…".to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Retrying { attempt, .. })) => (
             Style::default().fg(theme.warning),
-            xai_grok_i18n::t_fmt(
-                "turn.activity.retrying",
-                &[("attempt", &attempt.to_string())],
-            ),
+            format!("Retrying (attempt {attempt})…"),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Waiting(reason))) => (
             // Explicit wait reason (model / subagent / task output / tasks /
             // sleep): name what the agent is blocked on instead of a generic
-            // xai_grok_i18n::t("turn.activity.waiting"). See `WaitingReason` and `AgentView::resolve_turn_activity`.
+            // "Waiting…". See `WaitingReason` and `AgentView::resolve_turn_activity`.
             Style::default().fg(theme.text_secondary),
             reason.label(),
             false,
         ),
         (AgentState::TurnRunning, None) if is_bash_turn => (
-            // Bash turn: not inference, show generic xai_grok_i18n::t("turn.activity.running").
+            // Bash turn: not inference, show generic "Running…".
             Style::default().fg(theme.text_secondary),
-            xai_grok_i18n::t("turn.activity.running").to_string(),
+            "Running…".to_string(),
             false,
         ),
         (AgentState::TurnRunning, None) => (
@@ -689,7 +688,7 @@ fn compute_activity(
             // view resolves this gap into Waiting(Model/Subagent) before render,
             // so this is now a rarely-hit safety net.
             Style::default().fg(theme.text_secondary),
-            xai_grok_i18n::t("turn.activity.waiting").to_string(),
+            "Waiting…".to_string(),
             false,
         ),
         (
@@ -716,7 +715,7 @@ fn compute_activity(
     }
 }
 
-/// Whether the idle xai_grok_i18n::t("turn.activity.starting_session") indicator wants the turn-status row.
+/// Whether the idle "Starting session…" indicator wants the turn-status row.
 ///
 /// True only for a fresh `total == 0` startup seed (gated by
 /// [`McpInitProgress::is_visible`] so an orphaned seed expires). Real MCP
@@ -726,7 +725,7 @@ fn starting_session_visible(progress: Option<&McpInitProgress>) -> bool {
     progress.is_some_and(|p| p.total == 0 && p.is_visible())
 }
 
-/// Render the idle xai_grok_i18n::t("turn.activity.starting_session") indicator above the prompt.
+/// Render the idle "Starting session…" indicator above the prompt.
 ///
 /// Format: `⠋ Starting session… 0:01` — braille spinner + label + elapsed
 /// timer. Rendered in `theme.gray_dim` (the dimmest gray) so it reads as
@@ -747,7 +746,7 @@ fn render_starting_session(
     let style = Style::default().fg(theme.gray_dim);
     let spans = vec![
         Span::styled(format!("{} ", frames[frame_idx]), style),
-        Span::styled(xai_grok_i18n::t("turn.activity.starting_session"), style),
+        Span::styled("Starting session…", style),
         Span::styled(timer_str, style),
     ];
     buf.set_line(area.x, area.y, &Line::from(spans), area.width);
@@ -757,7 +756,7 @@ fn render_starting_session(
 ///
 /// Returns true when a turn is active (Running or Cancelling), when the drain
 /// is blocked (agent idle, waiting on user edit), while the MCP startup seed
-/// is showing xai_grok_i18n::t("turn.activity.starting_session") (a fresh `total == 0` seed), or when the
+/// is showing "Starting session…" (a fresh `total == 0` seed), or when the
 /// agent is idle but background watchers are still running
 /// (`watchers.total() > 0`) — running commands and monitors wake the agent on
 /// completion/events, scheduled `/loop` tasks fire prompts, and background
@@ -765,7 +764,7 @@ fn render_starting_session(
 ///
 /// A parked turn (`parked` — the stopped look while blocked on a sendable
 /// wait) suppresses the running-turn chrome entirely: the row shows only when
-/// watchers exist, rendering the "watching · …" cue.
+/// watchers exist, rendering the "… still running" cue.
 ///
 /// Real MCP progress (`total > 0`) renders as a compact chip in the top status
 /// bar instead, so it does not affect this row.
@@ -895,15 +894,15 @@ mod tests {
     #[test]
     fn activity_label_reads_verifying_while_goal_verifying_overriding_stale_activity() {
         let theme = Theme::current();
-        // Running turn, no streaming activity, goal verifying → xai_grok_i18n::t("turn.activity.verifying").
+        // Running turn, no streaming activity, goal verifying → "Verifying…".
         let (_, label, _) = compute_activity(&theme, &AgentState::TurnRunning, &None, false, true);
-        assert_eq!(label, xai_grok_i18n::t("turn.activity.verifying"));
-        // Same state without the verifying flag → generic xai_grok_i18n::t("turn.activity.waiting").
+        assert_eq!(label, "Verifying…");
+        // Same state without the verifying flag → generic "Waiting…".
         let (_, label, _) = compute_activity(&theme, &AgentState::TurnRunning, &None, false, false);
-        assert_eq!(label, xai_grok_i18n::t("turn.activity.waiting"));
+        assert_eq!(label, "Waiting…");
         // During verification the model is idle but its last streaming
         // activity (Responding/Thinking) can linger — the flag overrides it
-        // so the panel reads xai_grok_i18n::t("turn.activity.verifying"), not xai_grok_i18n::t("turn.activity.responding") (the bug).
+        // so the panel reads "Verifying…", not "Responding…" (the bug).
         for activity in [TurnActivity::Responding, TurnActivity::Thinking] {
             let (_, label, _) = compute_activity(
                 &theme,
@@ -912,7 +911,7 @@ mod tests {
                 false,
                 true,
             );
-            assert_eq!(label, xai_grok_i18n::t("turn.activity.verifying"));
+            assert_eq!(label, "Verifying…");
         }
         // Without the flag the streaming label stands.
         let (_, label, _) = compute_activity(
@@ -922,7 +921,7 @@ mod tests {
             false,
             false,
         );
-        assert_eq!(label, xai_grok_i18n::t("turn.activity.responding"));
+        assert_eq!(label, "Responding…");
     }
 
     #[test]
@@ -960,10 +959,10 @@ mod tests {
     #[test]
     fn bash_turn_still_renders_running_not_waiting() {
         let theme = Theme::current();
-        // A bash (non-inference) turn with no activity keeps its own xai_grok_i18n::t("turn.activity.running")
+        // A bash (non-inference) turn with no activity keeps its own "Running…"
         // label — the view leaves it as `None` rather than Waiting(Model).
         let (_, label, _) = compute_activity(&theme, &AgentState::TurnRunning, &None, true, false);
-        assert_eq!(label, xai_grok_i18n::t("turn.activity.running"));
+        assert_eq!(label, "Running…");
     }
 
     #[test]
@@ -1011,7 +1010,7 @@ mod tests {
     #[test]
     fn should_show_when_watchers_running() {
         // Idle but a watcher (command, monitor, loop, or subagent) is still
-        // running → row stays visible so the persistent "watching · …" cue
+        // running → row stays visible so the persistent "… still running" cue
         // can show.
         for watchers in [
             Watchers {
@@ -1046,7 +1045,7 @@ mod tests {
     #[test]
     fn should_show_parked_only_with_watchers() {
         // Parked (turn running but rendering the stopped look): the row shows
-        // only to carry the "watching · …" cue — never the running chrome.
+        // only to carry the "… still running" cue — never the running chrome.
         assert!(should_show(
             &AgentState::TurnRunning,
             false,
@@ -1068,7 +1067,7 @@ mod tests {
 
     #[test]
     fn should_show_when_starting_session() {
-        // A fresh total == 0 seed shows xai_grok_i18n::t("turn.activity.starting_session") above the prompt.
+        // A fresh total == 0 seed shows "Starting session…" above the prompt.
         let seed = McpInitProgress {
             total: 0,
             connected: 0,
@@ -1156,7 +1155,12 @@ mod tests {
     /// Invoke `render_turn_status` for an idle agent with the given watcher
     /// counts at animation tick `tick`.
     fn render_idle_with_watchers_at_tick(watchers: Watchers, tick: u64) -> String {
-        let area = Rect::new(0, 0, 60, 1);
+        render_idle_with_watchers_in_width(watchers, tick, 72)
+    }
+
+    /// [`render_idle_with_watchers_at_tick`] with an explicit row width.
+    fn render_idle_with_watchers_in_width(watchers: Watchers, tick: u64, width: u16) -> String {
+        let area = Rect::new(0, 0, width, 1);
         let mut buf = Buffer::empty(area);
         render_turn_status(
             &mut buf,
@@ -1186,7 +1190,7 @@ mod tests {
     /// Invoke `render_turn_status` for a PARKED running turn (the stopped
     /// look) with the given watcher counts.
     fn render_parked_with_watchers(watchers: Watchers) -> String {
-        let area = Rect::new(0, 0, 60, 1);
+        let area = Rect::new(0, 0, 72, 1);
         let mut buf = Buffer::empty(area);
         render_turn_status(
             &mut buf,
@@ -1238,12 +1242,11 @@ mod tests {
     }
 
     #[test]
-    fn idle_with_monitors_renders_watching_line() {
+    fn idle_with_monitors_renders_still_running_cue() {
         let text = render_idle_with_monitors(2);
         assert!(
-            text.contains(xai_grok_i18n::t("turn.watchers.watching"))
-                && text.contains("2 monitors"),
-            "idle with monitors must render the watching cue, got: {text:?}"
+            text.contains("2 monitors still running"),
+            "idle with monitors must render the still-running cue, got: {text:?}"
         );
     }
 
@@ -1251,7 +1254,7 @@ mod tests {
     fn idle_with_one_monitor_uses_singular() {
         let text = render_idle_with_monitors(1);
         assert!(
-            text.contains("watching \u{00b7} 1 monitor") && !text.contains("monitors"),
+            text.contains("1 monitor still running") && !text.contains("monitors"),
             "single monitor must use the singular noun, got: {text:?}"
         );
     }
@@ -1266,14 +1269,14 @@ mod tests {
     }
 
     #[test]
-    fn idle_with_loops_renders_watching_line() {
+    fn idle_with_loops_renders_still_running_cue() {
         let text = render_idle_with_watchers(Watchers {
             loops: 2,
             ..Watchers::default()
         });
         assert!(
-            text.contains(xai_grok_i18n::t("turn.watchers.watching")) && text.contains("2 loops"),
-            "idle with loops must render the watching cue, got: {text:?}"
+            text.contains("2 loops still running"),
+            "idle with loops must render the still-running cue, got: {text:?}"
         );
     }
 
@@ -1284,21 +1287,20 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 1 loop") && !text.contains("loops"),
+            text.contains("1 loop still running") && !text.contains("loops"),
             "single loop must use the singular noun, got: {text:?}"
         );
     }
 
     #[test]
-    fn idle_with_subagents_renders_watching_line() {
+    fn idle_with_subagents_renders_still_running_cue() {
         let text = render_idle_with_watchers(Watchers {
             subagents: 2,
             ..Watchers::default()
         });
         assert!(
-            text.contains(xai_grok_i18n::t("turn.watchers.watching"))
-                && text.contains("2 subagents"),
-            "idle with subagents must render the watching cue, got: {text:?}"
+            text.contains("2 subagents still running"),
+            "idle with subagents must render the still-running cue, got: {text:?}"
         );
     }
 
@@ -1309,9 +1311,18 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 1 subagent") && !text.contains("subagents"),
+            text.contains("1 subagent still running") && !text.contains("subagents"),
             "single subagent must use the singular noun, got: {text:?}"
         );
+    }
+
+    #[test]
+    fn idle_with_one_workflow_counts_run_once() {
+        let text = render_idle_with_watchers(Watchers {
+            workflows: 1,
+            ..Watchers::default()
+        });
+        assert!(text.contains("1 workflow still running"), "got: {text:?}");
     }
 
     #[test]
@@ -1324,7 +1335,7 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 1 monitor \u{00b7} 2 loops"),
+            text.contains("1 monitor \u{00b7} 2 loops still running"),
             "both kinds must be listed in one cue, got: {text:?}"
         );
     }
@@ -1338,17 +1349,37 @@ mod tests {
             monitors: 2,
             loops: 1,
             subagents: 3,
+            workflows: 0,
         });
         assert!(
             text.contains(
-                "watching \u{00b7} 1 command \u{00b7} 2 monitors \u{00b7} 1 loop \u{00b7} 3 subagents"
+                "1 command \u{00b7} 2 monitors \u{00b7} 1 loop \u{00b7} 3 subagents still running"
             ),
             "all kinds must be listed in one cue, got: {text:?}"
         );
     }
 
     #[test]
-    fn idle_with_commands_renders_watching_line() {
+    fn narrow_area_clips_cue_tail_keeping_counts() {
+        // 40 cols with three kinds: the row tail-clips with no ellipsis, so
+        // the leading counts survive and the trailing suffix is what gets
+        // cut. Pins the narrow-pane tradeoff of leading with the counts; a
+        // smarter compact fallback would be a behavior change.
+        let watchers = Watchers {
+            commands: 1,
+            monitors: 2,
+            loops: 1,
+            ..Watchers::default()
+        };
+        let text = render_idle_with_watchers_in_width(watchers, 0, 40);
+        assert!(
+            text.contains("1 command \u{00b7} 2 monitors \u{00b7} 1 loop"),
+            "the counts must survive the clip, got: {text:?}"
+        );
+    }
+
+    #[test]
+    fn idle_with_commands_renders_still_running_cue() {
         // Plain background commands (non-monitor bg tasks) count as watchers:
         // they wake the agent with a task-completed turn, so the cue must show.
         let text = render_idle_with_watchers(Watchers {
@@ -1356,22 +1387,22 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 2 commands"),
-            "idle with bg commands must render the watching cue, got: {text:?}"
+            text.contains("2 commands still running"),
+            "idle with bg commands must render the still-running cue, got: {text:?}"
         );
         let text = render_idle_with_watchers(Watchers {
             commands: 1,
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 1 command") && !text.contains("commands"),
+            text.contains("1 command still running") && !text.contains("commands"),
             "single command must use the singular noun, got: {text:?}"
         );
     }
 
     #[test]
-    fn parked_with_watchers_renders_watching_not_running_chrome() {
-        // A parked running turn renders the watching cue — never the busy
+    fn parked_with_watchers_renders_cue_not_running_chrome() {
+        // A parked running turn renders the still-running cue — never the busy
         // spinner/timers/[stop] chrome (the wait aborts as soon as the user
         // types, so that chrome would lie).
         let text = render_parked_with_watchers(Watchers {
@@ -1379,11 +1410,11 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 2 commands"),
-            "parked with bg work must render the watching cue, got: {text:?}"
+            text.contains("2 commands still running"),
+            "parked with bg work must render the still-running cue, got: {text:?}"
         );
         assert!(
-            !text.contains("Waiting") && !text.contains(xai_grok_i18n::t("turn.button.stop")),
+            !text.contains("Waiting") && !text.contains("[stop]"),
             "parked must not render the running-turn chrome, got: {text:?}"
         );
     }
@@ -1440,52 +1471,57 @@ mod tests {
     }
 
     #[test]
-    fn watching_label_lists_only_nonzero_kinds() {
+    fn still_running_label_lists_only_nonzero_kinds() {
         assert_eq!(
-            watching_label(Watchers {
+            still_running_label(Watchers {
                 commands: 2,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 2 commands"
+            Some("2 commands still running".into())
         );
         assert_eq!(
-            watching_label(Watchers {
+            still_running_label(Watchers {
                 monitors: 2,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 2 monitors"
+            Some("2 monitors still running".into())
         );
         assert_eq!(
-            watching_label(Watchers {
+            still_running_label(Watchers {
                 loops: 1,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 1 loop"
+            Some("1 loop still running".into())
         );
         assert_eq!(
-            watching_label(Watchers {
+            still_running_label(Watchers {
                 subagents: 1,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 1 subagent"
+            Some("1 subagent still running".into())
         );
         assert_eq!(
-            watching_label(Watchers {
+            still_running_label(Watchers {
                 monitors: 1,
                 loops: 2,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 1 monitor \u{00b7} 2 loops"
+            Some("1 monitor \u{00b7} 2 loops still running".into())
         );
         assert_eq!(
-            watching_label(Watchers {
+            still_running_label(Watchers {
                 commands: 1,
                 monitors: 1,
                 loops: 1,
                 subagents: 2,
+                workflows: 0,
             }),
-            "watching \u{00b7} 1 command \u{00b7} 1 monitor \u{00b7} 1 loop \u{00b7} 2 subagents"
+            Some(
+                "1 command \u{00b7} 1 monitor \u{00b7} 1 loop \u{00b7} 2 subagents still running"
+                    .into()
+            )
         );
+        assert_eq!(still_running_label(Watchers::default()), None);
     }
 
     #[test]
@@ -1505,7 +1541,7 @@ mod tests {
 
     #[test]
     fn idle_zero_server_seed_renders_starting_session() {
-        // total == 0 seed → xai_grok_i18n::t("turn.activity.starting_session") above the prompt.
+        // total == 0 seed → "Starting session…" above the prompt.
         let text = render_idle_with_mcp(&McpInitProgress {
             total: 0,
             connected: 0,
