@@ -87,23 +87,23 @@ impl AgentView {
         match pav.focus {
             PlanApprovalFocus::Commenting => {
                 vec![
-                    HintItem::new(key!(Enter), "save comment"),
-                    HintItem::new(key!(Esc), "cancel"),
+                    HintItem::new(key!(Enter), xai_grok_i18n::t("hint.save_comment")),
+                    HintItem::new(key!(Esc), xai_grok_i18n::t("hint.cancel")),
                 ]
             }
             PlanApprovalFocus::Prompt => {
                 let has_content = !pav.comments.is_empty() || !self.prompt.text().trim().is_empty();
                 if has_content {
                     vec![
-                        HintItem::new(key!(Enter), "request changes"),
-                        HintItem::new(key!(Tab), "plan"),
-                        HintItem::new(key!(Esc), "back"),
+                        HintItem::new(key!(Enter), xai_grok_i18n::t("hint.request_changes")),
+                        HintItem::new(key!(Tab), xai_grok_i18n::t("hint.plan")),
+                        HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
                     ]
                 } else {
                     vec![
-                        HintItem::new(key!(Enter), "approve"),
-                        HintItem::new(key!(Tab), "plan"),
-                        HintItem::new(key!(Esc), "back"),
+                        HintItem::new(key!(Enter), xai_grok_i18n::t("hint.approve")),
+                        HintItem::new(key!(Tab), xai_grok_i18n::t("hint.plan")),
+                        HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
                     ]
                 }
             }
@@ -176,18 +176,18 @@ impl AgentView {
                 vec![]
             } else if self.is_casual_commenting() {
                 vec![
-                    HintItem::new(key!(Enter), "save comment"),
-                    HintItem::new(key!(Esc), "cancel"),
+                    HintItem::new(key!(Enter), xai_grok_i18n::t("hint.save_comment")),
+                    HintItem::new(key!(Esc), xai_grok_i18n::t("hint.cancel")),
                 ]
             } else {
                 let mut h = vec![
-                    HintItem::new(key!('c'), "comment"),
-                    HintItem::new(key!('f', CONTROL), "fullscreen"),
+                    HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment")),
+                    HintItem::new(key!('f', CONTROL), xai_grok_i18n::t("hint.fullscreen")),
                 ];
                 if !self.plan_comments.is_empty() {
-                    h.push(HintItem::new(key!('s'), "send"));
+                    h.push(HintItem::new(key!('s'), xai_grok_i18n::t("hint.send")));
                 }
-                h.push(HintItem::new(key!(Esc), "close"));
+                h.push(HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close")));
                 h
             }
         } else if let Some(ref qv) = self.question_view {
@@ -486,7 +486,13 @@ impl AgentView {
             self.subagent_views.get(child_sid).and_then(|cv| {
                 cv.resolve_turn_activity()
                     .map(|a| crate::app::subagent::format_activity_label(&a))
-                    .or_else(|| cv.session.state.is_busy().then(|| "Waiting".to_string()))
+                    .or_else(|| {
+                        cv.session.state.is_busy().then(|| {
+                            xai_grok_i18n::t("turn.activity.waiting")
+                                .trim_end_matches('…')
+                                .to_string()
+                        })
+                    })
             })
         } else {
             None
@@ -808,7 +814,7 @@ impl AgentView {
                     .as_ref()
                     .is_some_and(|pav| pav.focus == PlanApprovalFocus::Commenting)
             {
-                Some("Type your comment...")
+                Some(xai_grok_i18n::t("prompt.placeholder.comment"))
             } else {
                 None
             },
@@ -2114,10 +2120,10 @@ impl AgentView {
             buf.set_string(
                 content_x + 2,
                 rec_area.y,
-                "Recording",
+                xai_grok_i18n::t("voice.recording"),
                 Style::default().fg(theme.accent_error).bg(bg),
             );
-            let stop_str = "[stop]";
+            let stop_str = xai_grok_i18n::t("turn.button.stop");
             let stop_w = unicode_width::UnicodeWidthStr::width(stop_str) as u16;
             let stop_x = rec_area.x
                 + rec_area
@@ -2947,9 +2953,9 @@ impl AgentView {
                     let msg_y = top_border_y + 1;
                     if msg_y < bottom_border_y {
                         let message = if self.prompt_history_loading() {
-                            "  Loading..."
+                            format!("  {}", xai_grok_i18n::t("history.loading"))
                         } else {
-                            "  no matching history"
+                            format!("  {}", xai_grok_i18n::t("history.no_matches"))
                         };
                         buf.set_string_safe(
                             items_x,
@@ -3160,18 +3166,18 @@ impl AgentView {
                 use crate::views::shortcuts_bar::HintItem;
                 let hints = if self.is_casual_commenting() {
                     vec![
-                        HintItem::new(key!(Enter), "save comment"),
-                        HintItem::new(key!(Esc), "cancel"),
+                        HintItem::new(key!(Enter), xai_grok_i18n::t("hint.save_comment")),
+                        HintItem::new(key!(Esc), xai_grok_i18n::t("hint.cancel")),
                     ]
                 } else {
                     let mut h = vec![
-                        HintItem::new(key!('c'), "comment"),
-                        HintItem::new(key!('f', CONTROL), "fullscreen"),
+                        HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment")),
+                        HintItem::new(key!('f', CONTROL), xai_grok_i18n::t("hint.fullscreen")),
                     ];
                     if !self.plan_comments.is_empty() {
-                        h.push(HintItem::new(key!('s'), "send"));
+                        h.push(HintItem::new(key!('s'), xai_grok_i18n::t("hint.send")));
                     }
-                    h.push(HintItem::new(key!(Esc), "close"));
+                    h.push(HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close")));
                     h
                 };
                 ShortcutsBar::new(&hints)
@@ -3321,30 +3327,34 @@ impl AgentView {
                     .is_some_and(|pav| !pav.comments.is_empty());
             let viewer_hints = if in_plan_approval && on_comment {
                 let mut h = vec![
-                    HintItem::new(key!(Enter), "edit"),
-                    HintItem::new(key!('x'), "delete"),
+                    HintItem::new(key!(Enter), xai_grok_i18n::t("hint.edit")),
+                    HintItem::new(key!('x'), xai_grok_i18n::t("hint.delete")),
                 ];
                 if approval_has_comments {
-                    h.push(HintItem::new(key!('s'), "send"));
+                    h.push(HintItem::new(key!('s'), xai_grok_i18n::t("hint.send")));
                 } else {
-                    h.push(HintItem::new(key!('a'), "approve"));
+                    h.push(HintItem::new(key!('a'), xai_grok_i18n::t("hint.approve")));
                 }
-                h.push(HintItem::new(key!('q'), "quit plan"));
-                h.push(HintItem::new(key!(Tab), "prompt"));
+                h.push(HintItem::new(key!('q'), xai_grok_i18n::t("hint.quit_plan")));
+                h.push(HintItem::new(key!(Tab), xai_grok_i18n::t("hint.prompt")));
                 h
             } else if in_plan_approval {
-                let mut h = vec![HintItem::new(key!('c'), "comment")];
+                let mut h = vec![HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment"))];
                 if approval_has_comments {
-                    h.push(HintItem::new(key!('s'), "send"));
+                    h.push(HintItem::new(key!('s'), xai_grok_i18n::t("hint.send")));
                 } else {
-                    h.push(HintItem::new(key!('a'), "approve"));
+                    h.push(HintItem::new(key!('a'), xai_grok_i18n::t("hint.approve")));
                 }
-                h.push(HintItem::new(key!('q'), "quit plan"));
+                h.push(HintItem::new(key!('q'), xai_grok_i18n::t("hint.quit_plan")));
                 if self.vim_mode {
-                    h.push(HintItem::paired(key!('j'), key!('k'), "nav"));
+                    h.push(HintItem::paired(
+                        key!('j'),
+                        key!('k'),
+                        xai_grok_i18n::t("hint.nav"),
+                    ));
                 }
-                h.push(HintItem::new(key!('v'), "select"));
-                h.push(HintItem::new(key!(Tab), "prompt"));
+                h.push(HintItem::new(key!('v'), xai_grok_i18n::t("hint.select")));
+                h.push(HintItem::new(key!(Tab), xai_grok_i18n::t("hint.prompt")));
                 h
             } else if is_plan_viewer {
                 let on_casual_comment = viewer
@@ -3357,37 +3367,48 @@ impl AgentView {
                     .is_some_and(|item| item.comment_id().is_some());
                 let mut h = if on_casual_comment {
                     vec![
-                        HintItem::new(key!(Enter), "edit"),
-                        HintItem::new(key!('x'), "delete"),
+                        HintItem::new(key!(Enter), xai_grok_i18n::t("hint.edit")),
+                        HintItem::new(key!('x'), xai_grok_i18n::t("hint.delete")),
                     ]
                 } else {
-                    vec![HintItem::new(key!('c'), "comment")]
+                    vec![HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment"))]
                 };
                 if has_plan_comments {
-                    h.push(HintItem::new(key!('s'), "send"));
+                    h.push(HintItem::new(key!('s'), xai_grok_i18n::t("hint.send")));
                 }
                 if self.vim_mode {
-                    h.push(HintItem::paired(key!('j'), key!('k'), "nav"));
+                    h.push(HintItem::paired(
+                        key!('j'),
+                        key!('k'),
+                        xai_grok_i18n::t("hint.nav"),
+                    ));
                 }
-                h.push(HintItem::new(key!('v'), "select"));
-                h.push(HintItem::new(key!('f', CONTROL), "fullscreen"));
-                h.push(HintItem::new(key!('/'), "search"));
-                h.push(HintItem::new(key!(Esc), "close"));
+                h.push(HintItem::new(key!('v'), xai_grok_i18n::t("hint.select")));
+                h.push(HintItem::new(
+                    key!('f', CONTROL),
+                    xai_grok_i18n::t("hint.fullscreen"),
+                ));
+                h.push(HintItem::new(key!('/'), xai_grok_i18n::t("hint.search")));
+                h.push(HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close")));
                 h
             } else {
-                let mut h = vec![HintItem::new(key!(Enter), "confirm")];
+                let mut h = vec![HintItem::new(key!(Enter), xai_grok_i18n::t("hint.confirm"))];
                 if self.vim_mode {
-                    h.push(HintItem::paired(key!('j'), key!('k'), "nav"));
+                    h.push(HintItem::paired(
+                        key!('j'),
+                        key!('k'),
+                        xai_grok_i18n::t("hint.nav"),
+                    ));
                 }
-                h.push(HintItem::new(key!('v'), "select"));
-                h.push(HintItem::new(key!('x'), "clear"));
+                h.push(HintItem::new(key!('v'), xai_grok_i18n::t("hint.select")));
+                h.push(HintItem::new(key!('x'), xai_grok_i18n::t("hint.clear")));
                 if self.vim_mode {
-                    h.push(HintItem::new(key!('y'), "copy"));
-                    h.push(HintItem::new(key!('Y'), "filename"));
+                    h.push(HintItem::new(key!('y'), xai_grok_i18n::t("hint.copy")));
+                    h.push(HintItem::new(key!('Y'), xai_grok_i18n::t("hint.filename")));
                 }
-                h.push(HintItem::new(key!(':'), "goto"));
-                h.push(HintItem::new(key!('/'), "search"));
-                h.push(HintItem::new(key!(Esc), "cancel"));
+                h.push(HintItem::new(key!(':'), xai_grok_i18n::t("hint.goto")));
+                h.push(HintItem::new(key!('/'), xai_grok_i18n::t("hint.search")));
+                h.push(HintItem::new(key!(Esc), xai_grok_i18n::t("hint.cancel")));
                 h
             };
             let input_bar_active = viewer.list_state.input_mode().is_some();
@@ -3445,7 +3466,10 @@ impl AgentView {
                 let dim_style = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
                 let border_style = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
                 let title_spans: Vec<ratatui::text::Span> = if viewer.loading {
-                    let name = viewer.title.as_deref().unwrap_or("Loading...");
+                    let name = viewer
+                        .title
+                        .as_deref()
+                        .unwrap_or_else(|| xai_grok_i18n::t("viewer.loading"));
                     vec![
                         ratatui::text::Span::styled("\u{2500} ", border_style),
                         ratatui::text::Span::styled(name.to_owned(), title_style),
@@ -3493,7 +3517,7 @@ impl AgentView {
                         let tick = self.scrollback.animation_tick();
                         let frames = crate::glyphs::braille_spinner_frames();
                         let frame = frames[(tick / SPINNER_DIVISOR) as usize % frames.len()];
-                        let loading = format!("{} Loading...", frame);
+                        let loading = format!("{} {}", frame, xai_grok_i18n::t("viewer.loading"));
                         let lw = loading.width() as u16;
                         let lx = popup_rect.x + 1 + inner_cols.saturating_sub(lw) / 2;
                         let ly = popup_rect.y + 1 + inner_rows / 2;
@@ -3535,14 +3559,17 @@ impl AgentView {
                                     viewer.image_width, viewer.image_height, viewer.mime_type,
                                 )),
                                 ratatui::text::Line::from(""),
-                                ratatui::text::Line::from("  Press Esc to close"),
+                                ratatui::text::Line::from(format!(
+                                    "  {}",
+                                    xai_grok_i18n::t("viewer.esc_close")
+                                )),
                             ];
                             ratatui::widgets::Paragraph::new(meta_lines)
                                 .style(Style::default().fg(theme.gray_dim).bg(theme.bg_base))
                                 .render(inner_rect, buf);
                         } else {
-                            let loading = "Loading...";
-                            let lw = loading.len() as u16;
+                            let loading = xai_grok_i18n::t("viewer.loading");
+                            let lw = unicode_width::UnicodeWidthStr::width(loading) as u16;
                             let lx = inner_rect.x + inner_cols.saturating_sub(lw) / 2;
                             let ly = inner_rect.y + inner_rows / 2;
                             buf.set_span_safe(
@@ -3562,7 +3589,7 @@ impl AgentView {
                 let clear = crate::terminal::overlay::clear_kitty();
                 prompt_post_flush = Some(clear.into());
             }
-            let hints = vec![HintItem::new(key!(Esc), "close")];
+            let hints = vec![HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close"))];
             ShortcutsBar::new(&hints).render(layout.shortcuts, buf);
             self.pane_areas = layout.pane_areas();
             return (None, prompt_post_flush);
@@ -3599,12 +3626,16 @@ impl AgentView {
                     prompt_post_flush = Some(clear.into());
                 }
             }
-            let play_label = if viewer.playing { "pause" } else { "play" };
+            let play_label = if viewer.playing {
+                xai_grok_i18n::t("hint.pause")
+            } else {
+                xai_grok_i18n::t("hint.play")
+            };
             let hints = vec![
-                HintItem::new(key!(Esc), "close"),
+                HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close")),
                 HintItem::new(key!(' '), play_label),
-                HintItem::new(key!(Left), "back"),
-                HintItem::new(key!(Right), "fwd"),
+                HintItem::new(key!(Left), xai_grok_i18n::t("hint.back")),
+                HintItem::new(key!(Right), xai_grok_i18n::t("hint.forward")),
             ];
             ShortcutsBar::new(&hints).render(layout.shortcuts, buf);
             self.pane_areas = layout.pane_areas();
@@ -3805,8 +3836,14 @@ impl AgentView {
                         }
                     }
                     let n = viewer.list_state.copy_range().map(|r| r.len()).unwrap_or(1);
-                    let s = if n == 1 { "" } else { "s" };
-                    let status = format!("Selected: {n} line{s}");
+                    let status = if n == 1 {
+                        xai_grok_i18n::t_fmt(
+                            "viewer.selected_line_one",
+                            &[("count", &n.to_string())],
+                        )
+                    } else {
+                        xai_grok_i18n::t_fmt("viewer.selected_lines", &[("count", &n.to_string())])
+                    };
                     let status_style = Style::default().fg(theme.text_secondary).bg(theme.bg_base);
                     buf.set_string(content_x, status_y, &status, status_style);
                 }
@@ -3956,10 +3993,10 @@ impl AgentView {
                         let spinner_frames = crate::glyphs::braille_spinner_frames();
                         let tick = self.scrollback.current_tick() as usize;
                         let spinner = spinner_frames[tick % spinner_frames.len()];
-                        let label = format!("{spinner} Loading...");
+                        let label = format!("{spinner} {}", xai_grok_i18n::t("viewer.loading"));
                         let cy = rect.y + rect.height / 2;
                         buf.set_string_safe(
-                            center_x(label.len()),
+                            center_x(unicode_width::UnicodeWidthStr::width(label.as_str())),
                             cy,
                             &label,
                             Style::default().fg(theme.gray_dim),

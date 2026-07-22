@@ -890,7 +890,7 @@ fn space_prompt_hint() -> HintItem {
     use crossterm::event::{KeyCode, KeyModifiers};
     HintItem {
         keys: vec![KeyShortcut::new(KeyCode::Char(' '), KeyModifiers::NONE)],
-        label: "prompt".into(),
+        label: xai_grok_i18n::t("hint.prompt").into(),
         custom_display: Some("Space"),
         description: None,
         pinned: false,
@@ -937,16 +937,24 @@ pub fn build_hints(
             let mut hints = Vec::new();
             hints.push(HintItem::new(
                 crate::key!('h'),
-                if show_done { "hide done" } else { "show done" },
+                if show_done {
+                    xai_grok_i18n::t("hint.hide_done")
+                } else {
+                    xai_grok_i18n::t("hint.show_done")
+                },
             ));
             hints
         }
         ActivePane::Queue => {
             let mut hints = vec![
-                HintItem::new(crate::key!('x'), "delete row"),
-                HintItem::new(crate::key!('e'), "edit"),
-                HintItem::paired(crate::key!('J'), crate::key!('K'), "reorder"),
-                HintItem::new(crate::key!('y'), "copy"),
+                HintItem::new(crate::key!('x'), xai_grok_i18n::t("hint.delete_row")),
+                HintItem::new(crate::key!('e'), xai_grok_i18n::t("hint.edit")),
+                HintItem::paired(
+                    crate::key!('J'),
+                    crate::key!('K'),
+                    xai_grok_i18n::t("hint.reorder"),
+                ),
+                HintItem::new(crate::key!('y'), xai_grok_i18n::t("hint.copy")),
             ];
             if is_turn_running && let Some(def) = registry.find(ActionId::InterjectPrompt) {
                 hints.push(def.hint());
@@ -956,9 +964,15 @@ pub fn build_hints(
         ActivePane::Prompt if is_editing_queued => {
             let mut hints = Vec::new();
             if prompt.can_send() {
-                hints.push(HintItem::new(crate::key!(Enter), "save"));
+                hints.push(HintItem::new(
+                    crate::key!(Enter),
+                    xai_grok_i18n::t("hint.save"),
+                ));
             }
-            hints.push(HintItem::new(crate::key!(Esc), "cancel"));
+            hints.push(HintItem::new(
+                crate::key!(Esc),
+                xai_grok_i18n::t("hint.cancel"),
+            ));
             hints
         }
         ActivePane::Prompt if prompt.history_search.is_active() => {
@@ -968,15 +982,21 @@ pub fn build_hints(
                 HintItem::paired(
                     KeyShortcut::key(KeyCode::Up),
                     KeyShortcut::key(KeyCode::Down),
-                    "nav",
+                    xai_grok_i18n::t("hint.nav"),
                 ),
                 HintItem::paired(
                     KeyShortcut::key(KeyCode::PageUp),
                     KeyShortcut::key(KeyCode::PageDown),
-                    "page",
+                    xai_grok_i18n::t("hint.page"),
                 ),
-                HintItem::new(KeyShortcut::key(KeyCode::Enter), "select"),
-                HintItem::new(KeyShortcut::key(KeyCode::Esc), "cancel"),
+                HintItem::new(
+                    KeyShortcut::key(KeyCode::Enter),
+                    xai_grok_i18n::t("hint.select"),
+                ),
+                HintItem::new(
+                    KeyShortcut::key(KeyCode::Esc),
+                    xai_grok_i18n::t("hint.cancel"),
+                ),
             ]
         }
         ActivePane::Prompt => {
@@ -986,31 +1006,48 @@ pub fn build_hints(
             } else {
                 crate::key!(Enter, SHIFT)
             };
-            let submit_label = if is_turn_running { "queue" } else { "send" };
+            let submit_label = if is_turn_running {
+                xai_grok_i18n::t("hint.queue")
+            } else {
+                xai_grok_i18n::t("hint.send")
+            };
             if let Some(key) = registry.key_for(ActionId::SendPrompt) {
                 if prompt.paste_element_at_cursor().is_some() {
-                    hints.push(HintItem::new(key, "expand"));
+                    hints.push(HintItem::new(key, xai_grok_i18n::t("hint.expand")));
                 } else if multiline_mode && prompt.can_send() {
                     hints.push(HintItem::new(newline_key, submit_label));
                 } else if prompt.can_send() {
                     hints.push(HintItem::new(key, submit_label));
                 } else if is_turn_running && has_queued_follow_up {
-                    hints.push(HintItem::new(key, "send now"));
+                    hints.push(HintItem::new(key, xai_grok_i18n::t("hint.send_now")));
                 }
             }
             if shift_enter_unavailable && !multiline_mode && prompt.can_send() {
-                hints.push(HintItem::new(crate::key!(Enter, ALT), "newline"));
+                hints.push(HintItem::new(
+                    crate::key!(Enter, ALT),
+                    xai_grok_i18n::t("hint.newline"),
+                ));
             }
             if prompt.file_ref_near_cursor() {
-                hints.push(HintItem::new(crate::key!(':'), "lines"));
+                hints.push(HintItem::new(
+                    crate::key!(':'),
+                    xai_grok_i18n::t("hint.lines"),
+                ));
             }
             if prompt.prompt_suggestion_visible() {
                 hints.push(
-                    HintItem::paired(crate::key!(Tab), crate::key!(Right), "accept suggestion")
-                        .pinned(),
+                    HintItem::paired(
+                        crate::key!(Tab),
+                        crate::key!(Right),
+                        xai_grok_i18n::t("hint.accept_suggestion"),
+                    )
+                    .pinned(),
                 );
             }
-            hints.push(HintItem::new(crate::key!(BackTab), "mode"));
+            hints.push(HintItem::new(
+                crate::key!(BackTab),
+                xai_grok_i18n::t("hint.mode"),
+            ));
             for def in registry.hints(&[When::PromptFocused, When::AgentScreen, When::Always]) {
                 if def.id == ActionId::SendPrompt
                     || def.id == ActionId::CommandPalette
@@ -1028,17 +1065,30 @@ pub fn build_hints(
         ActivePane::Tasks => {
             let mut hints = Vec::new();
             if selected_supports_fullscreen {
-                hints.push(HintItem::new(crate::key!(Enter), "view"));
+                hints.push(HintItem::new(
+                    crate::key!(Enter),
+                    xai_grok_i18n::t("hint.view"),
+                ));
             }
             if selected_supports_copy {
-                hints.push(HintItem::new(crate::key!('y'), "copy output"));
+                hints.push(HintItem::new(
+                    crate::key!('y'),
+                    xai_grok_i18n::t("hint.copy_output"),
+                ));
             }
             if selected_can_kill {
-                hints.push(HintItem::new(crate::key!('x'), "kill"));
+                hints.push(HintItem::new(
+                    crate::key!('x'),
+                    xai_grok_i18n::t("hint.kill"),
+                ));
             }
             hints.push(HintItem::new(
                 crate::key!('h'),
-                if show_done { "hide done" } else { "show done" },
+                if show_done {
+                    xai_grok_i18n::t("hint.hide_done")
+                } else {
+                    xai_grok_i18n::t("hint.show_done")
+                },
             ));
             hints
         }
@@ -1047,12 +1097,15 @@ pub fn build_hints(
             let mut hints = Vec::new();
             if vim_mode {
                 if scrollback_search.is_some_and(|s| s.is_composing()) {
-                    hints.push(HintItem::new(crate::key!(Enter), "go"));
+                    hints.push(HintItem::new(
+                        crate::key!(Enter),
+                        xai_grok_i18n::t("hint.go"),
+                    ));
                 } else {
                     hints.push(HintItem::paired(
                         crate::key!('n'),
                         crate::key!('N'),
-                        "next/prev",
+                        xai_grok_i18n::t("hint.next_prev"),
                     ));
                 }
             } else {
@@ -1061,10 +1114,13 @@ pub fn build_hints(
                 hints.push(HintItem::paired(
                     KeyShortcut::key(KeyCode::Down),
                     KeyShortcut::key(KeyCode::Up),
-                    "next/prev",
+                    xai_grok_i18n::t("hint.next_prev"),
                 ));
             }
-            hints.push(HintItem::new(crate::key!(Esc), "cancel"));
+            hints.push(HintItem::new(
+                crate::key!(Esc),
+                xai_grok_i18n::t("hint.cancel"),
+            ));
             hints
         }
         ActivePane::Scrollback => {
@@ -1080,7 +1136,7 @@ pub fn build_hints(
             }
             if selected_is_credit_limit {
                 if let Some(key) = registry.key_for(ActionId::OpenBlockViewer) {
-                    hints.push(HintItem::new(key, "open"));
+                    hints.push(HintItem::new(key, xai_grok_i18n::t("hint.open")));
                 }
                 hints.push(space_prompt_hint());
             }
@@ -1089,7 +1145,7 @@ pub fn build_hints(
                     && selected_supports_copy
                     && let Some(key) = registry.key_for(ActionId::CopyBlockContent)
                 {
-                    hints.push(HintItem::new(key, "copy"));
+                    hints.push(HintItem::new(key, xai_grok_i18n::t("hint.copy")));
                 }
                 hints.push(space_prompt_hint());
             }
@@ -1100,7 +1156,7 @@ pub fn build_hints(
                         .key_for_mode(ActionId::ToggleFold, vim_mode)
                         .or_else(|| registry.key_for_mode(ActionId::Expand, vim_mode));
                     if let Some(key) = key {
-                        hints.push(HintItem::new(key, "expand"));
+                        hints.push(HintItem::new(key, xai_grok_i18n::t("hint.expand")));
                     }
                 }
                 if let Some(key) = registry.key_for(ActionId::ExpandAllThinking) {
@@ -1133,7 +1189,7 @@ pub fn build_hints(
                 && selected_supports_fullscreen
                 && let Some(key) = registry.key_for(ActionId::OpenBlockViewer)
             {
-                hints.push(HintItem::new(key, "open"));
+                hints.push(HintItem::new(key, xai_grok_i18n::t("hint.open")));
             }
             if vim_mode
                 && let (Some(j), Some(k)) = (
@@ -1141,7 +1197,7 @@ pub fn build_hints(
                     registry.key_for(ActionId::SelectPrev),
                 )
             {
-                hints.push(HintItem::paired(j, k, "nav").pinned());
+                hints.push(HintItem::paired(j, k, xai_grok_i18n::t("hint.nav")).pinned());
             }
             if vim_mode
                 && let (Some(h), Some(l)) = (
@@ -1149,7 +1205,7 @@ pub fn build_hints(
                     registry.key_for(ActionId::NextTurn),
                 )
             {
-                let mut hint = HintItem::paired(l, h, "turn").pinned();
+                let mut hint = HintItem::paired(l, h, xai_grok_i18n::t("hint.turn")).pinned();
                 hint.custom_display = Some("Shift+l/h");
                 hints.push(hint);
             }
@@ -1171,7 +1227,7 @@ pub fn build_hints(
                 && selected_supports_copy
                 && let Some(key) = registry.key_for(ActionId::CopyBlockContent)
             {
-                hints.push(HintItem::new(key, "copy"));
+                hints.push(HintItem::new(key, xai_grok_i18n::t("hint.copy")));
             }
             if vim_mode
                 && let Some(label) = selected_meta_label
@@ -1180,7 +1236,10 @@ pub fn build_hints(
                 hints.push(HintItem::new(key, label));
             }
             if selected_can_kill {
-                hints.push(HintItem::new(crate::key!('x'), "kill"));
+                hints.push(HintItem::new(
+                    crate::key!('x'),
+                    xai_grok_i18n::t("hint.kill"),
+                ));
             }
             if is_subagent_view {
                 hints.push(HintItem::paired(crate::key!('q'), crate::key!(Esc), "back"));
@@ -1202,7 +1261,7 @@ pub fn build_hints(
         && !is_subagent_view
         && let Some(key) = registry.key_for(ActionId::SendToBackground)
     {
-        hints.push(HintItem::new(key, "send to bg"));
+        hints.push(HintItem::new(key, xai_grok_i18n::t("hint.send_to_bg")));
     }
     hints
 }

@@ -44,7 +44,11 @@ pub(super) fn sync_subagent_activity(
 pub(super) fn subagent_activity_label(child_view: &AgentView) -> Option<String> {
     match child_view.resolve_turn_activity() {
         Some(a) => Some(crate::app::subagent::format_activity_label(&a)),
-        None if child_view.session.state.is_busy() => Some("Waiting".to_string()),
+        None if child_view.session.state.is_busy() => Some(
+            xai_grok_i18n::t("turn.activity.waiting")
+                .trim_end_matches('…')
+                .to_string(),
+        ),
         None => None,
     }
 }

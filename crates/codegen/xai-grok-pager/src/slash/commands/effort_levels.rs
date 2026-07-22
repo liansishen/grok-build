@@ -44,13 +44,21 @@ pub(crate) fn effort_error_message(error: &EffortTokenError) -> String {
 
 pub(crate) fn effort_description(level: ReasoningEffort) -> &'static str {
     match level {
-        ReasoningEffort::None => "No reasoning",
-        ReasoningEffort::Minimal => "Minimal reasoning",
-        ReasoningEffort::Low => "Faster, lighter reasoning",
-        ReasoningEffort::Medium => "Balanced reasoning",
-        ReasoningEffort::High => "Heavy reasoning",
-        ReasoningEffort::Xhigh => "Extended reasoning",
-        ReasoningEffort::Max => "Maximum reasoning",
+        ReasoningEffort::None => xai_grok_i18n::t_or("slash.effort.level_none", "No reasoning"),
+        ReasoningEffort::Minimal => {
+            xai_grok_i18n::t_or("slash.effort.level_minimal", "Minimal reasoning")
+        }
+        ReasoningEffort::Low => {
+            xai_grok_i18n::t_or("slash.effort.level_low", "Faster, lighter reasoning")
+        }
+        ReasoningEffort::Medium => {
+            xai_grok_i18n::t_or("slash.effort.level_medium", "Balanced reasoning")
+        }
+        ReasoningEffort::High => xai_grok_i18n::t_or("slash.effort.level_high", "Heavy reasoning"),
+        ReasoningEffort::Xhigh => {
+            xai_grok_i18n::t_or("slash.effort.level_xhigh", "Extended reasoning")
+        }
+        ReasoningEffort::Max => xai_grok_i18n::t_or("slash.effort.level_max", "Maximum reasoning"),
     }
 }
 
@@ -91,7 +99,11 @@ pub(crate) fn build_effort_arg_items(
         .enumerate()
         .map(|(idx, option)| {
             let active = mark_active && current_effort == Some(option.value);
-            let active_suffix = if active { " (active)" } else { "" };
+            let active_suffix = if active {
+                xai_grok_i18n::t_or("slash.common.active_suffix", " (active)")
+            } else {
+                ""
+            };
             let insert_text = insert_text_for(option);
             // Sort-key prefix: 'a' for top row, 'b' for next, etc. Only
             // affects matcher tiebreak ordering, never rendered.

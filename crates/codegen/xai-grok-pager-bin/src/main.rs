@@ -29,6 +29,7 @@ use anyhow::Result;
 use std::env;
 use std::net::SocketAddr;
 use tokio_util::sync::CancellationToken;
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_pager::app::{
     AgentCmd, Command, HeadlessArgs, LeaderMgmtArgs, LeaderMgmtCommand, LeaderTargetArgs,
     PagerArgs, join_early_prefetch, resolve_use_leader,
@@ -1636,10 +1637,21 @@ fn dispatch_doctor_if_requested(args: &PagerArgs) -> bool {
     }
     true
 }
+fn apply_configured_language() {
+    let config_language = xai_grok_shell::config::load_effective_config_disk_only()
+        .ok()
+        .and_then(|root| root.get("ui")?.get("language")?.as_str().map(str::to_owned));
+    xai_grok_i18n::apply_from_config(config_language.as_deref());
+}
 fn main() {
+    // Mermaid subprocess protocol must remain the very first startup action.
     if let Some(code) = xai_grok_pager::app::mermaid_worker::maybe_run_render_subprocess() {
         std::process::exit(code);
     }
+    // Apply locale before early CLI dispatch and startup diagnostics. This was
+    // lost when upstream moved argument parsing and `doctor` ahead of runtime
+    // startup, leaving the process-wide locale at its English default.
+    apply_configured_language();
     let args = PagerArgs::parse_cli();
     if dispatch_version_if_requested(&args) || dispatch_doctor_if_requested(&args) {
         return;
@@ -1659,12 +1671,13 @@ fn main() {
     );
     raise_fd_limit();
     if let Err(e) = xai_grok_config::validate_requirements() {
-        eprintln!("Couldn't start Grok: {e}");
-        eprintln!();
+        let error = e.to_string();
         eprintln!(
-            "Update Grok to a version the policy allows, or ask your administrator \
-             to fix the managed requirements."
+            "{}",
+            t_fmt("cli.startup.policy_error", &[("error", error.as_str())])
         );
+        eprintln!();
+        eprintln!("{}", t("cli.startup.policy_remediation"));
         std::process::exit(2);
     }
     let _sentry_guard = xai_grok_telemetry::sentry::init(xai_grok_telemetry::sentry::Config {
@@ -1678,19 +1691,36 @@ fn main() {
     if xai_grok_shell::util::config::load_crash_handler_enabled_sync() {
         let crash_dir = xai_grok_shell::util::grok_home::grok_home().join("crash");
         if let Some(report) = xai_crash_handler::check_previous_crash(&crash_dir) {
-            eprintln!("Grok crashed during your last session.");
-            eprintln!("  Signal:  {}", report.signal_name);
-            eprintln!("  Version: {}", report.app_version);
-            eprintln!("  Report:  {}", report.report_path.display());
+            let report_path = report.report_path.display().to_string();
+            eprintln!("{}", t("cli.crash.previous_session"));
+            eprintln!(
+                "{}",
+                t_fmt("cli.crash.signal", &[("signal", report.signal_name)])
+            );
+            eprintln!(
+                "{}",
+                t_fmt(
+                    "cli.crash.version",
+                    &[("version", report.app_version.as_str())]
+                )
+            );
+            eprintln!(
+                "{}",
+                t_fmt("cli.crash.report", &[("path", report_path.as_str())])
+            );
             eprintln!();
         }
         if !xai_crash_handler::install(xai_crash_handler::CrashHandlerConfig {
             app_version: env!("VERSION_WITH_COMMIT").to_string(),
             crash_dir: crash_dir.clone(),
         }) {
+            let crash_dir = crash_dir.display().to_string();
             eprintln!(
-                "warning: crash handler enabled but failed to install (check permissions on {})",
-                crash_dir.display()
+                "{}",
+                t_fmt(
+                    "cli.crash.handler_install_failed",
+                    &[("path", crash_dir.as_str())]
+                )
             );
         }
     }
@@ -1709,7 +1739,11 @@ fn main() {
     xai_grok_telemetry::debug_log::flush();
     if let Err(e) = result {
         xai_tty_utils::restore_native_stderr();
-        eprintln!("Error: {e:#}");
+        let error = format!("{e:#}");
+        eprintln!(
+            "{}",
+            t_fmt("cli.error.generic", &[("error", error.as_str())])
+        );
         drop(_sentry_guard);
         std::process::exit(1);
     }
@@ -1717,6 +1751,9 @@ fn main() {
 async fn async_main(args: PagerArgs) -> Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut args = args.apply_cwd()?;
+    // Reapply after cwd handling so environment/config changes made by wrapper
+    // startup are reflected before any regular CLI subcommand or TUI work.
+    apply_configured_language();
     if let Some(ref mode) = args.compaction_mode {
         unsafe { std::env::set_var("GROK_COMPACTION_MODE", mode) };
     }
@@ -2335,6 +2372,20 @@ mod tests {
             subcommand.command,
             Some(Command::Version { json: false })
         ));
+    }
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn configured_language_applies_environment_override() {
+        let previous = std::env::var_os(xai_grok_i18n::ENV_LANGUAGE);
+        unsafe { std::env::set_var(xai_grok_i18n::ENV_LANGUAGE, "zh-CN") };
+        apply_configured_language();
+        assert_eq!(xai_grok_i18n::current_locale(), xai_grok_i18n::Locale::ZhCn);
+        assert_eq!(xai_grok_i18n::t("welcome.quit"), "退出");
+        match previous {
+            Some(value) => unsafe { std::env::set_var(xai_grok_i18n::ENV_LANGUAGE, value) },
+            None => unsafe { std::env::remove_var(xai_grok_i18n::ENV_LANGUAGE) },
+        }
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
     }
     #[cfg(all(feature = "jemalloc", unix))]
     struct TempHeapDump(std::path::PathBuf);

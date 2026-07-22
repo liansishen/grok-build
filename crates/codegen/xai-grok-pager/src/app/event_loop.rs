@@ -454,8 +454,12 @@ fn defer_suspend_retry(
     should_report
 }
 
-const EDITOR_SUSPEND_WAIT: &str = "Editor is waiting for a safe terminal handoff";
-const TRANSCRIPT_SUSPEND_WAIT: &str = "Transcript is waiting for a safe terminal handoff";
+fn editor_suspend_wait() -> &'static str {
+    xai_grok_i18n::t("toast.editor_suspend_wait")
+}
+fn transcript_suspend_wait() -> &'static str {
+    xai_grok_i18n::t("toast.transcript_suspend_wait")
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SuspendWaitSink {
@@ -595,7 +599,7 @@ fn run_pending_suspends(
                             Instant::now(),
                         );
                         if first_timeout {
-                            report_suspend_wait(app, EDITOR_SUSPEND_WAIT);
+                            report_suspend_wait(app, editor_suspend_wait());
                             presenter.request_presentation(app, terminal, false);
                         }
                         return Ok(());
@@ -686,7 +690,7 @@ fn run_pending_suspends(
                     Instant::now(),
                 );
                 if first_timeout {
-                    report_suspend_wait(app, TRANSCRIPT_SUSPEND_WAIT);
+                    report_suspend_wait(app, transcript_suspend_wait());
                     presenter.request_presentation(app, terminal, false);
                 }
                 return Ok(());
@@ -1255,6 +1259,13 @@ pub(crate) async fn run(
     // Seed app state from disk once at the I/O boundary so dispatch
     // stays sans-IO.
     app.current_ui = load_initial_ui_config();
+    // Keep the process-wide catalog aligned with the language field itself.
+    // Read it independently so a malformed unrelated `[ui]` setting cannot
+    // make whole-UiConfig fallback reset a valid Chinese preference to auto.
+    let config_language = xai_grok_shell::config::load_effective_config()
+        .ok()
+        .and_then(|root| root.get("ui")?.get("language")?.as_str().map(str::to_owned));
+    xai_grok_i18n::apply_from_config(config_language.as_deref());
     // Field-tolerant: a whole-`UiConfig` default (malformed unrelated `[ui]`
     // field) must not wipe a valid `show_timeline` or leave appearance /
     // cache / `current_ui` disagreeing — `/timeline` and the rail all read
@@ -1813,7 +1824,7 @@ pub(crate) async fn run(
             } else if app.voice_cmd_tx.is_none() {
                 app.voice_state = VoiceState::Idle;
                 app.voice_ui_active = false;
-                app.show_toast("Voice pipeline could not start — restart grok");
+                app.show_toast(xai_grok_i18n::t("toast.voice_pipeline_failed"));
             } else {
                 // Defensive: a queued start with the pipeline already up (which
                 // shouldn't occur) — drop it so we don't re-enter every tick.
@@ -2699,7 +2710,7 @@ pub(crate) async fn run(
                         // Pipeline is gone: drop any session/interim entirely.
                         app.voice_reset();
                         if was_listening {
-                            app.show_toast("Voice stopped — pipeline ended");
+                            app.show_toast(xai_grok_i18n::t("toast.voice_stopped"));
                         }
                         presenter.request(false);
                     }
@@ -4078,13 +4089,13 @@ mod tests {
         app.active_view = ActiveView::Agent(id);
         app.screen_mode = crate::app::ScreenMode::Minimal;
 
-        report_suspend_wait(&mut app, EDITOR_SUSPEND_WAIT);
+        report_suspend_wait(&mut app, editor_suspend_wait());
 
         let agent = app.agents.get(&id).expect("active agent");
         let entry = agent.scrollback.last().expect("system block");
         assert!(matches!(
             &entry.block,
-            RenderBlock::System(block) if block.text == EDITOR_SUSPEND_WAIT
+            RenderBlock::System(block) if block.text == editor_suspend_wait()
         ));
         assert!(agent.toast.is_none());
     }
@@ -4098,12 +4109,12 @@ mod tests {
         app.active_view = ActiveView::Agent(id);
         app.screen_mode = crate::app::ScreenMode::Inline;
 
-        report_suspend_wait(&mut app, EDITOR_SUSPEND_WAIT);
+        report_suspend_wait(&mut app, editor_suspend_wait());
 
         let agent = app.agents.get(&id).expect("active agent");
         assert_eq!(
             agent.toast.as_ref().map(|(message, _)| message.as_str()),
-            Some(EDITOR_SUSPEND_WAIT)
+            Some(editor_suspend_wait())
         );
         assert!(agent.scrollback.last().is_none());
     }

@@ -11,7 +11,9 @@ use std::time::{Instant, SystemTime};
 /// Title prefix for a session that has no name / generated title / prompt
 /// yet. The renderer paints this part in the primary colour and the trailing
 /// ` #<id>` suffix in dim gray (see `render::render_row`).
-pub(crate) const NEW_SESSION_LABEL: &str = "New session";
+pub(crate) fn new_session_label() -> &'static str {
+    xai_grok_i18n::t("dashboard.new_session")
+}
 /// A single row in the dashboard. Built per-frame from `app.agents`.
 #[derive(Debug, Clone)]
 pub struct DashboardRow {
@@ -86,11 +88,11 @@ pub enum RowBadge {
 impl RowBadge {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Worktree => "worktree",
-            Self::NeedsInput => "needs-input",
-            Self::BgTask => "bg",
-            Self::Pinned => "pinned",
-            Self::Failed => "failed",
+            Self::Worktree => xai_grok_i18n::t("dashboard.badge.worktree"),
+            Self::NeedsInput => xai_grok_i18n::t("dashboard.badge.needs_input"),
+            Self::BgTask => xai_grok_i18n::t("dashboard.badge.background"),
+            Self::Pinned => xai_grok_i18n::t("dashboard.badge.pinned"),
+            Self::Failed => xai_grok_i18n::t("dashboard.badge.failed"),
         }
     }
 }
@@ -315,8 +317,8 @@ fn append_roster_rows(
             .unwrap_or_else(|| sanitize(&entry.session_id));
         let state = roster_activity_to_state(entry.activity);
         let activity = match state {
-            RowState::NeedsInput => Some("Awaiting input".to_string()),
-            RowState::Working => Some("Working".to_string()),
+            RowState::NeedsInput => Some(xai_grok_i18n::t("dashboard.awaiting_input").to_string()),
+            RowState::Working => Some(xai_grok_i18n::t("dashboard.response.working").to_string()),
             _ => None,
         };
         let mut badges = Vec::new();
@@ -415,10 +417,29 @@ pub fn has_background_work(agent: &AgentView) -> bool {
 /// backend content), so no sanitise.
 fn background_work_label(agent: &AgentView) -> Option<String> {
     let w = agent.watchers();
+    let noun =
+        |count, singular, plural| xai_grok_i18n::t(if count == 1 { singular } else { plural });
     crate::views::turn_status::format_still_running([
-        (w.monitors, "monitor"),
-        (w.loops, "loop"),
-        (w.commands, "task"),
+        (
+            w.monitors,
+            noun(
+                w.monitors,
+                "turn.watchers.monitor",
+                "turn.watchers.monitors",
+            ),
+        ),
+        (
+            w.loops,
+            noun(w.loops, "turn.watchers.loop", "turn.watchers.loops"),
+        ),
+        (
+            w.commands,
+            noun(
+                w.commands,
+                "turn.watchers.command",
+                "turn.watchers.commands",
+            ),
+        ),
     ])
 }
 /// Classify a subagent.
@@ -497,9 +518,9 @@ fn top_level_label(agent: &AgentView) -> String {
     }
     if let Some(sid) = agent.session.session_id.as_ref() {
         let short: String = sid.0.chars().take(8).collect();
-        return format!("{NEW_SESSION_LABEL} #{short}");
+        return format!("{} #{short}", new_session_label());
     }
-    NEW_SESSION_LABEL.to_string()
+    new_session_label().to_string()
 }
 fn top_level_row(
     id: AgentId,
@@ -691,7 +712,7 @@ fn top_level_subtitle(agent: &AgentView) -> Option<String> {
         return None;
     }
     if is_worktree {
-        parts.push("worktree".to_string());
+        parts.push(xai_grok_i18n::t("dashboard.badge.worktree").to_string());
     }
     Some(parts.join(" "))
 }
@@ -722,11 +743,19 @@ fn top_level_secondary_line(
             if let Some(perm) = agent.permission_queue.front() {
                 let title = perm.title.trim();
                 if !title.is_empty() {
-                    return Some(format!("Pending: {}", sanitize(title)));
+                    return Some(format!(
+                        "{} {}",
+                        xai_grok_i18n::t("dashboard.pending_prefix"),
+                        sanitize(title)
+                    ));
                 }
             }
             if agent.question_view.is_some() {
-                return Some("Pending: question".to_string());
+                return Some(format!(
+                    "{} {}",
+                    xai_grok_i18n::t("dashboard.pending_prefix"),
+                    xai_grok_i18n::t("dashboard.pending_question")
+                ));
             }
             activity.map(sanitize)
         }
@@ -772,7 +801,10 @@ fn first_nonempty_line(s: &str) -> Option<&str> {
 fn subagent_subtitle(info: &SubagentInfo, cwd: &std::path::Path) -> Option<String> {
     let name = cwd_basename(cwd)?;
     if info.worktree_path.is_some() {
-        Some(format!("{name} worktree"))
+        Some(format!(
+            "{name} {}",
+            xai_grok_i18n::t("dashboard.badge.worktree")
+        ))
     } else {
         Some(name)
     }
@@ -788,7 +820,7 @@ fn subagent_secondary_line(
 }
 fn top_level_activity(agent: &AgentView, state: RowState) -> Option<String> {
     match state {
-        RowState::NeedsInput => Some("Awaiting your input".to_string()),
+        RowState::NeedsInput => Some(xai_grok_i18n::t("dashboard.awaiting_input").to_string()),
         RowState::Working => {
             if let Some(cmd) = agent.session.state.command_in_flight() {
                 Some(format!("{}…", cmd.display_name()))
@@ -799,7 +831,7 @@ fn top_level_activity(agent: &AgentView, state: RowState) -> Option<String> {
             } else if let Some(bg) = background_work_label(agent) {
                 Some(bg)
             } else {
-                Some("Working".to_string())
+                Some(xai_grok_i18n::t("dashboard.response.working").to_string())
             }
         }
         _ => None,
@@ -817,7 +849,7 @@ fn subagent_activity(info: &SubagentInfo, state: RowState) -> Option<String> {
         }
         let last_tool = info.tools_used.last().map(|s| s.as_ref()).unwrap_or("");
         if last_tool.is_empty() {
-            Some("Working".to_string())
+            Some(xai_grok_i18n::t("dashboard.response.working").to_string())
         } else {
             Some(sanitize(&format_activity_label(
                 &TurnActivity::ToolRunning {

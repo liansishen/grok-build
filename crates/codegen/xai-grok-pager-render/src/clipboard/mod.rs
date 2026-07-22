@@ -357,17 +357,30 @@ impl ClipboardFeedback {
     /// path-bearing toast built from the lead never rewords the static copy.
     fn message(self) -> &'static str {
         match self {
-            Self::Copied => "Copied!",
-            Self::CopiedTmux => "Copied to tmux buffer, paste with prefix + ]",
-            Self::CopiedOscContainer => "Copied via OSC 52 from the container.",
-            Self::CopiedOscRemote => "Copied via OSC 52.",
-            Self::UnverifiedOscRemote | Self::UnverifiedOscContainer => {
-                "Copy sent. If paste fails, use grok wrap or /minimal."
+            Self::Copied => xai_grok_i18n::t_or("clipboard.copied", "Copied!"),
+            Self::CopiedTmux => xai_grok_i18n::t_or(
+                "clipboard.copied_tmux",
+                "Copied to tmux buffer, paste with prefix + ]",
+            ),
+            Self::CopiedOscContainer => xai_grok_i18n::t_or(
+                "clipboard.copied_osc_container",
+                "Copied via OSC 52 from the container.",
+            ),
+            Self::CopiedOscRemote => {
+                xai_grok_i18n::t_or("clipboard.copied_osc_remote", "Copied via OSC 52.")
             }
-            Self::VsCodeSshNonAscii => {
-                "Copied. VS Code over SSH may garble non-ASCII; use /minimal if needed."
-            }
-            Self::FailedRemote | Self::Failed => "Copy failed. Try /doctor or /minimal.",
+            Self::UnverifiedOscRemote | Self::UnverifiedOscContainer => xai_grok_i18n::t_or(
+                "clipboard.copy_sent_unverified",
+                "Copy sent. If paste fails, use grok wrap or /minimal.",
+            ),
+            Self::VsCodeSshNonAscii => xai_grok_i18n::t_or(
+                "clipboard.copied_vscode_ssh",
+                "Copied. VS Code over SSH may garble non-ASCII; use /minimal if needed.",
+            ),
+            Self::FailedRemote | Self::Failed => xai_grok_i18n::t_or(
+                "clipboard.copy_failed",
+                "Copy failed. Try /doctor or /minimal.",
+            ),
         }
     }
 
@@ -377,13 +390,27 @@ impl ClipboardFeedback {
     /// path and the full sentence overflows narrow terminals.
     fn message_lead(self) -> &'static str {
         match self {
-            Self::Copied => "Copied!",
-            Self::CopiedTmux => "Copied to tmux buffer, paste with prefix + ]",
-            Self::CopiedOscContainer => "Copied via OSC 52 from the container",
-            Self::CopiedOscRemote => "Copied via OSC 52",
-            Self::UnverifiedOscRemote | Self::UnverifiedOscContainer => "Copy sent",
-            Self::VsCodeSshNonAscii => "Copied",
-            Self::FailedRemote | Self::Failed => "Copy failed",
+            Self::Copied => xai_grok_i18n::t_or("clipboard.copied_lead", "Copied!"),
+            Self::CopiedTmux => xai_grok_i18n::t_or(
+                "clipboard.copied_tmux_lead",
+                "Copied to tmux buffer, paste with prefix + ]",
+            ),
+            Self::CopiedOscContainer => xai_grok_i18n::t_or(
+                "clipboard.copied_osc_container_lead",
+                "Copied via OSC 52 from the container",
+            ),
+            Self::CopiedOscRemote => {
+                xai_grok_i18n::t_or("clipboard.copied_osc_remote_lead", "Copied via OSC 52")
+            }
+            Self::UnverifiedOscRemote | Self::UnverifiedOscContainer => {
+                xai_grok_i18n::t_or("clipboard.copy_sent_lead", "Copy sent")
+            }
+            Self::VsCodeSshNonAscii => {
+                xai_grok_i18n::t_or("clipboard.copied_vscode_ssh_lead", "Copied")
+            }
+            Self::FailedRemote | Self::Failed => {
+                xai_grok_i18n::t_or("clipboard.copy_failed_lead", "Copy failed")
+            }
         }
     }
 
@@ -481,16 +508,18 @@ impl CopyDelivery {
         use std::borrow::Cow;
         match self {
             Self::Clipboard { result, file } => match file {
-                Some(path) => Cow::Owned(format!(
-                    "{} — saved to {}",
-                    result.message_lead,
-                    display_copy_path(path)
+                Some(path) => Cow::Owned(xai_grok_i18n::t_fmt(
+                    "clipboard.saved_to",
+                    &[
+                        ("message", result.message_lead),
+                        ("path", display_copy_path(path).as_str()),
+                    ],
                 )),
                 None => Cow::Borrowed(result.message),
             },
-            Self::File { path } => Cow::Owned(format!(
-                "Clipboard unreachable — wrote {}",
-                display_copy_path(path)
+            Self::File { path } => Cow::Owned(xai_grok_i18n::t_fmt(
+                "clipboard.unreachable_written",
+                &[("path", display_copy_path(path).as_str())],
             )),
             Self::Failed { clipboard, .. } => Cow::Borrowed(clipboard.message),
         }
@@ -707,14 +736,14 @@ fn log_clipboard_copy_event(
 /// Extracted to eliminate the exact duplication between assistant copy and
 /// full-conversation export (and any future clipboard users).
 pub fn clipboard_stats_suffix(text: &str) -> String {
-    let chars = text.len();
-    let lines = text.lines().count();
-    format!(
-        " ({} chars, {} {})",
-        chars,
-        lines,
-        if lines == 1 { "line" } else { "lines" }
-    )
+    let chars = text.len().to_string();
+    let lines = text.lines().count().to_string();
+    let key = if lines == "1" {
+        "clipboard.stats_one_line"
+    } else {
+        "clipboard.stats_many_lines"
+    };
+    xai_grok_i18n::t_fmt(key, &[("chars", &chars), ("lines", &lines)])
 }
 
 /// CLIPBOARD text read failed.

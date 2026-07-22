@@ -81,7 +81,8 @@ pub fn handle_voice_event(app: &mut AppView, event: VoiceEvent) -> bool {
         VoiceEvent::Error { message, hint } => {
             let target = app.voice_recording_target();
             app.voice_reset();
-            app.show_toast(&format!("Voice: {message}"));
+            let toast = xai_grok_i18n::t_fmt("toast.voice_error", &[("message", &message)]);
+            app.show_toast(&toast);
             // Long fix steps: agent/peek scrollback only (toast is one line;
             // dashboard dispatch has no scrollback).
             if let Some(hint) = hint
@@ -90,9 +91,12 @@ pub fn handle_voice_event(app: &mut AppView, event: VoiceEvent) -> bool {
             {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Voice: {message}. {hint}"
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt(
+                            "voice.error_with_hint",
+                            &[("message", &message), ("hint", &hint)],
+                        ),
+                    ));
             }
             true
         }

@@ -182,8 +182,16 @@ fn render_diff_hunks_core(
             // Add separator between hunks (no background)
             let indent = if config.indent { INDENT } else { "" };
             let sep_text = match hunk_gap_lines(&hunks[i - 1], hunk) {
-                Some(1) => format!("{} 1 unchanged line", config.hunk_separator),
-                Some(n) => format!("{} {n} unchanged lines", config.hunk_separator),
+                Some(1) => format!(
+                    "{} {}",
+                    config.hunk_separator,
+                    xai_grok_i18n::t_fmt("tool.diff.unchanged_one", &[("count", "1")])
+                ),
+                Some(n) => format!(
+                    "{} {}",
+                    config.hunk_separator,
+                    xai_grok_i18n::t_fmt("tool.diff.unchanged_many", &[("count", &n.to_string())])
+                ),
                 None => config.hunk_separator.clone(),
             };
             let sep_line = Line::from(vec![
@@ -931,7 +939,17 @@ impl EditToolCallBlock {
             theme.muted()
         };
 
-        let prefix = self.prefix;
+        let prefix = match self.prefix {
+            "Edit " => xai_grok_i18n::t_or("tool.prefix.edit", "Edit "),
+            "Creating " => xai_grok_i18n::t_or("tool.prefix.creating", "Creating "),
+            "Editing workflow " => {
+                xai_grok_i18n::t_or("tool.prefix.editing_workflow", "Editing workflow ")
+            }
+            "Creating workflow " => {
+                xai_grok_i18n::t_or("tool.prefix.creating_workflow", "Creating workflow ")
+            }
+            other => other,
+        };
 
         // Build the suffix spans first so we can reserve space for them.
         // The suffix (diffstat / "(N edits)") renders only on the collapsed

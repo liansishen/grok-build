@@ -125,30 +125,39 @@ impl Watchers {
 }
 
 /// Format a counts-first `"… still running"` cue from `(count, noun)` pairs,
-/// listing only the non-zero kinds (plain-`s` plurals) — e.g.
-/// `"1 command · 2 monitors still running"`. `None` when every count is
-/// zero. Single owner of the format mechanics so the agent view's idle cue
-/// and the dashboard's background-work label cannot drift.
+/// listing only the non-zero kinds. Callers may pass already-localized singular
+/// or plural nouns; untranslated ASCII base nouns retain the shared dashboard
+/// helper's legacy plain-`s` plural fallback. The translated
+/// `turn.watchers.still_running` template wraps the joined items. `None` when
+/// every count is zero. Single owner of the format mechanics so the agent
+/// view's idle cue and the dashboard's background-work label cannot drift.
 pub(crate) fn format_still_running<'a>(
     kinds: impl IntoIterator<Item = (usize, &'a str)>,
 ) -> Option<String> {
     use std::fmt::Write as _;
-    let mut label = String::with_capacity(48);
+    let mut items = String::with_capacity(48);
     for (count, noun) in kinds {
         if count == 0 {
             continue;
         }
-        if !label.is_empty() {
-            label.push_str(" \u{00b7} ");
+        if !items.is_empty() {
+            items.push_str(" \u{00b7} ");
         }
-        let plural = if count == 1 { "" } else { "s" };
-        let _ = write!(label, "{count} {noun}{plural}");
+        let _ = write!(items, "{count} {noun}");
+        // Callers that already selected a localized plural pass it directly.
+        // Preserve the shared dashboard helper's legacy plain-`s` behavior for
+        // untranslated English base nouns such as `task`.
+        if count != 1 && noun.is_ascii() && !noun.ends_with('s') {
+            items.push('s');
+        }
     }
-    if label.is_empty() {
+    if items.is_empty() {
         return None;
     }
-    label.push_str(" still running");
-    Some(label)
+    Some(xai_grok_i18n::t_fmt(
+        "turn.watchers.still_running",
+        &[("items", &items)],
+    ))
 }
 
 /// The idle watcher cue's label — e.g.
@@ -157,12 +166,45 @@ pub(crate) fn format_still_running<'a>(
 /// "Worked for X" marker still reads as unfinished work. `None` when no
 /// watchers are live.
 fn still_running_label(watchers: Watchers) -> Option<String> {
+    let noun =
+        |count, singular, plural| xai_grok_i18n::t(if count == 1 { singular } else { plural });
     format_still_running([
-        (watchers.commands, "command"),
-        (watchers.monitors, "monitor"),
-        (watchers.loops, "loop"),
-        (watchers.subagents, "subagent"),
-        (watchers.workflows, "workflow"),
+        (
+            watchers.commands,
+            noun(
+                watchers.commands,
+                "turn.watchers.command",
+                "turn.watchers.commands",
+            ),
+        ),
+        (
+            watchers.monitors,
+            noun(
+                watchers.monitors,
+                "turn.watchers.monitor",
+                "turn.watchers.monitors",
+            ),
+        ),
+        (
+            watchers.loops,
+            noun(watchers.loops, "turn.watchers.loop", "turn.watchers.loops"),
+        ),
+        (
+            watchers.subagents,
+            noun(
+                watchers.subagents,
+                "turn.watchers.subagent",
+                "turn.watchers.subagents",
+            ),
+        ),
+        (
+            watchers.workflows,
+            noun(
+                watchers.workflows,
+                "turn.watchers.workflow",
+                "turn.watchers.workflows",
+            ),
+        ),
     ])
 }
 
@@ -270,7 +312,7 @@ pub fn render_turn_status(
                 Style::default().fg(diamond_color),
             ),
             Span::styled(
-                "agent idle ~ waiting on your edit",
+                xai_grok_i18n::t("turn.waiting_on_edit"),
                 Style::default().fg(theme.gray),
             ),
         ];
@@ -347,7 +389,7 @@ pub fn render_turn_status(
     let show_bg = show_cancel && has_running_execute;
     let bg_str = if show_bg {
         if bg_hovered {
-            " [send to bg]"
+            xai_grok_i18n::t("turn.button.send_to_bg")
         } else {
             " [\u{2193}]"
         }
@@ -362,8 +404,8 @@ pub fn render_turn_status(
     // color (red on hover, see `cancel_style`), not by swapping the label.
     let cancel_str: &str = match (show_cancel, show_bg) {
         (false, _) => "",
-        (true, true) => "[stop]",
-        (true, false) => " [stop]",
+        (true, true) => xai_grok_i18n::t("turn.button.stop"),
+        (true, false) => xai_grok_i18n::t("turn.button.stop_spaced"),
     };
     let cancel_width = cancel_str.width();
 
@@ -460,7 +502,7 @@ pub fn render_turn_status(
                     .strip_prefix("Ask: ")
                     .or_else(|| title.strip_prefix("Ask "))
                     .unwrap_or(title.as_str());
-                let msg = format!("Waiting on answers for {detail}");
+                let msg = xai_grok_i18n::t_fmt("turn.ask.waiting_answers", &[("detail", detail)]);
                 let display = truncate_str(&msg, available_for_label);
                 left_spans.push(Span::styled(display, activity_style));
             } else if let Some(desc) = description
@@ -477,7 +519,7 @@ pub fn render_turn_status(
                 left_spans.push(Span::styled(display, activity_style));
             } else if let Some(query) = title.strip_prefix("Web search: ") {
                 // Web search: "Search " (muted) + query (yellow)
-                let prefix = "Search ";
+                let prefix = xai_grok_i18n::t("turn.tool.prefix.search");
                 let prefix_width = prefix.width();
                 let query = query.trim_matches('"');
                 let max_query = available_for_label.saturating_sub(prefix_width).max(5);
@@ -486,7 +528,7 @@ pub fn render_turn_status(
                 left_spans.push(Span::styled(display, Style::default().fg(theme.command)));
             } else if let Some(url) = title.strip_prefix("Fetch: ") {
                 // Fetch tools: "Fetch " (muted) + URL (yellow)
-                let prefix = "Fetch ";
+                let prefix = xai_grok_i18n::t("turn.tool.prefix.fetch");
                 let prefix_width = prefix.width();
                 let max_url = available_for_label.saturating_sub(prefix_width).max(5);
                 let display = truncate_str(url, max_url);
@@ -499,7 +541,7 @@ pub fn render_turn_status(
                 // `(Server) Action` so the spinner doesn't show the ugly
                 // delimiter form. Non-MCP titles (bash commands etc.) are
                 // returned untouched by `mcp_pretty_name_if_qualified`.
-                let prefix = "Run ";
+                let prefix = xai_grok_i18n::t("turn.tool.prefix.run");
                 let pretty = mcp_pretty_name_if_qualified(title.as_str());
                 let detail = pretty.as_str();
                 let prefix_width = prefix.width();
@@ -519,10 +561,11 @@ pub fn render_turn_status(
         // send the top row (bash / client-expanded local rows refuse with a
         // toast — see `AgentView::held_queue_top_sendable`).
         let suffix = if held_queue > 0 && is_sendable_wait(activity) {
+            let count = held_queue.to_string();
             if held_queue_top_sendable {
-                format!(" · {held_queue} queued — Enter to send now")
+                xai_grok_i18n::t_fmt("turn.queue.send_now", &[("count", &count)])
             } else {
-                format!(" · {held_queue} queued")
+                xai_grok_i18n::t_fmt("turn.queue.queued", &[("count", &count)])
             }
         } else {
             String::new()
@@ -617,7 +660,7 @@ fn compute_activity(
     match (state, activity) {
         (AgentState::TurnCancelling | AgentState::CommandCancelling { .. }, _) => (
             Style::default().fg(theme.accent_error),
-            "Cancelling…".to_string(),
+            xai_grok_i18n::t("turn.activity.cancelling").to_string(),
             false,
         ),
         // Goal-mode completion verification runs in-turn after the model
@@ -628,17 +671,17 @@ fn compute_activity(
         // model responding (or a hung "Waiting…").
         (AgentState::TurnRunning, _) if goal_verifying => (
             Style::default().fg(theme.text_secondary),
-            "Verifying…".to_string(),
+            xai_grok_i18n::t("turn.activity.verifying").to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Thinking)) => (
             Style::default().fg(theme.text_secondary),
-            "Thinking…".to_string(),
+            xai_grok_i18n::t("turn.activity.thinking").to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Responding)) => (
             Style::default().fg(theme.text_secondary),
-            "Responding…".to_string(),
+            xai_grok_i18n::t("turn.activity.responding").to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::ToolRunning { title, description })) => {
@@ -661,12 +704,15 @@ fn compute_activity(
         }
         (AgentState::TurnRunning, Some(TurnActivity::AutoCompacting)) => (
             Style::default().fg(theme.text_secondary),
-            "Compacting…".to_string(),
+            xai_grok_i18n::t("turn.activity.compacting").to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Retrying { attempt, .. })) => (
             Style::default().fg(theme.warning),
-            format!("Retrying (attempt {attempt})…"),
+            xai_grok_i18n::t_fmt(
+                "turn.activity.retrying",
+                &[("attempt", &attempt.to_string())],
+            ),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Waiting(reason))) => (
@@ -680,7 +726,7 @@ fn compute_activity(
         (AgentState::TurnRunning, None) if is_bash_turn => (
             // Bash turn: not inference, show generic "Running…".
             Style::default().fg(theme.text_secondary),
-            "Running…".to_string(),
+            xai_grok_i18n::t("turn.activity.running").to_string(),
             false,
         ),
         (AgentState::TurnRunning, None) => (
@@ -688,7 +734,7 @@ fn compute_activity(
             // view resolves this gap into Waiting(Model/Subagent) before render,
             // so this is now a rarely-hit safety net.
             Style::default().fg(theme.text_secondary),
-            "Waiting…".to_string(),
+            xai_grok_i18n::t("turn.activity.waiting").to_string(),
             false,
         ),
         (
@@ -746,7 +792,7 @@ fn render_starting_session(
     let style = Style::default().fg(theme.gray_dim);
     let spans = vec![
         Span::styled(format!("{} ", frames[frame_idx]), style),
-        Span::styled("Starting session…", style),
+        Span::styled(xai_grok_i18n::t("turn.activity.starting_session"), style),
         Span::styled(timer_str, style),
     ];
     buf.set_line(area.x, area.y, &Line::from(spans), area.width);
@@ -896,10 +942,10 @@ mod tests {
         let theme = Theme::current();
         // Running turn, no streaming activity, goal verifying → "Verifying…".
         let (_, label, _) = compute_activity(&theme, &AgentState::TurnRunning, &None, false, true);
-        assert_eq!(label, "Verifying…");
+        assert_eq!(label, xai_grok_i18n::t("turn.activity.verifying"));
         // Same state without the verifying flag → generic "Waiting…".
         let (_, label, _) = compute_activity(&theme, &AgentState::TurnRunning, &None, false, false);
-        assert_eq!(label, "Waiting…");
+        assert_eq!(label, xai_grok_i18n::t("turn.activity.waiting"));
         // During verification the model is idle but its last streaming
         // activity (Responding/Thinking) can linger — the flag overrides it
         // so the panel reads "Verifying…", not "Responding…" (the bug).
@@ -911,7 +957,7 @@ mod tests {
                 false,
                 true,
             );
-            assert_eq!(label, "Verifying…");
+            assert_eq!(label, xai_grok_i18n::t("turn.activity.verifying"));
         }
         // Without the flag the streaming label stands.
         let (_, label, _) = compute_activity(
@@ -921,7 +967,7 @@ mod tests {
             false,
             false,
         );
-        assert_eq!(label, "Responding…");
+        assert_eq!(label, xai_grok_i18n::t("turn.activity.responding"));
     }
 
     #[test]
@@ -929,9 +975,15 @@ mod tests {
         use crate::acp::tracker::WaitingReason;
         let theme = Theme::current();
         let cases = [
-            (WaitingReason::Model, "Waiting for response…"),
-            (WaitingReason::Subagent, "Waiting on subagent…"),
-            (WaitingReason::task_output(), "Waiting on task output…"),
+            (WaitingReason::Model, xai_grok_i18n::t("turn.wait.model")),
+            (
+                WaitingReason::Subagent,
+                xai_grok_i18n::t("turn.wait.subagent"),
+            ),
+            (
+                WaitingReason::task_output(),
+                xai_grok_i18n::t("turn.wait.task_output"),
+            ),
             (
                 WaitingReason::TaskOutput {
                     task_ids: vec!["t1".into()],
@@ -940,8 +992,11 @@ mod tests {
                 },
                 "compile release…",
             ),
-            (WaitingReason::TasksComplete, "Waiting on tasks…"),
-            (WaitingReason::Sleep, "Sleeping…"),
+            (
+                WaitingReason::TasksComplete,
+                xai_grok_i18n::t("turn.wait.tasks_complete"),
+            ),
+            (WaitingReason::Sleep, xai_grok_i18n::t("turn.wait.sleep")),
         ];
         for (reason, expected) in cases {
             let (_, label, is_tool) = compute_activity(
@@ -962,7 +1017,7 @@ mod tests {
         // A bash (non-inference) turn with no activity keeps its own "Running…"
         // label — the view leaves it as `None` rather than Waiting(Model).
         let (_, label, _) = compute_activity(&theme, &AgentState::TurnRunning, &None, true, false);
-        assert_eq!(label, "Running…");
+        assert_eq!(label, xai_grok_i18n::t("turn.activity.running"));
     }
 
     #[test]
@@ -1027,6 +1082,10 @@ mod tests {
             },
             Watchers {
                 subagents: 1,
+                ..Watchers::default()
+            },
+            Watchers {
+                workflows: 1,
                 ..Watchers::default()
             },
         ] {
@@ -1109,6 +1168,16 @@ mod tests {
             Watchers::default(),
             false
         ));
+    }
+
+    fn translated_watcher_item(count: usize, singular_key: &str, plural_key: &str) -> String {
+        let noun = xai_grok_i18n::t(if count == 1 { singular_key } else { plural_key });
+        format!("{count} {noun}")
+    }
+
+    fn translated_still_running(items: &[String]) -> String {
+        let items = items.join(" \u{00b7} ");
+        xai_grok_i18n::t_fmt("turn.watchers.still_running", &[("items", &items)])
     }
 
     /// Collect every rendered glyph in `area` into a single string.
@@ -1244,18 +1313,28 @@ mod tests {
     #[test]
     fn idle_with_monitors_renders_still_running_cue() {
         let text = render_idle_with_monitors(2);
+        let expected = translated_still_running(&[translated_watcher_item(
+            2,
+            "turn.watchers.monitor",
+            "turn.watchers.monitors",
+        )]);
         assert!(
-            text.contains("2 monitors still running"),
-            "idle with monitors must render the still-running cue, got: {text:?}"
+            text.contains(&expected),
+            "idle with monitors must render the translated still-running cue, got: {text:?}"
         );
     }
 
     #[test]
     fn idle_with_one_monitor_uses_singular() {
         let text = render_idle_with_monitors(1);
+        let expected = translated_still_running(&[translated_watcher_item(
+            1,
+            "turn.watchers.monitor",
+            "turn.watchers.monitors",
+        )]);
         assert!(
-            text.contains("1 monitor still running") && !text.contains("monitors"),
-            "single monitor must use the singular noun, got: {text:?}"
+            text.contains(&expected),
+            "single monitor must use the translated singular noun, got: {text:?}"
         );
     }
 
@@ -1274,9 +1353,14 @@ mod tests {
             loops: 2,
             ..Watchers::default()
         });
+        let expected = translated_still_running(&[translated_watcher_item(
+            2,
+            "turn.watchers.loop",
+            "turn.watchers.loops",
+        )]);
         assert!(
-            text.contains("2 loops still running"),
-            "idle with loops must render the still-running cue, got: {text:?}"
+            text.contains(&expected),
+            "idle with loops must render the translated still-running cue, got: {text:?}"
         );
     }
 
@@ -1286,9 +1370,14 @@ mod tests {
             loops: 1,
             ..Watchers::default()
         });
+        let expected = translated_still_running(&[translated_watcher_item(
+            1,
+            "turn.watchers.loop",
+            "turn.watchers.loops",
+        )]);
         assert!(
-            text.contains("1 loop still running") && !text.contains("loops"),
-            "single loop must use the singular noun, got: {text:?}"
+            text.contains(&expected),
+            "single loop must use the translated singular noun, got: {text:?}"
         );
     }
 
@@ -1298,9 +1387,14 @@ mod tests {
             subagents: 2,
             ..Watchers::default()
         });
+        let expected = translated_still_running(&[translated_watcher_item(
+            2,
+            "turn.watchers.subagent",
+            "turn.watchers.subagents",
+        )]);
         assert!(
-            text.contains("2 subagents still running"),
-            "idle with subagents must render the still-running cue, got: {text:?}"
+            text.contains(&expected),
+            "idle with subagents must render the translated still-running cue, got: {text:?}"
         );
     }
 
@@ -1310,9 +1404,14 @@ mod tests {
             subagents: 1,
             ..Watchers::default()
         });
+        let expected = translated_still_running(&[translated_watcher_item(
+            1,
+            "turn.watchers.subagent",
+            "turn.watchers.subagents",
+        )]);
         assert!(
-            text.contains("1 subagent still running") && !text.contains("subagents"),
-            "single subagent must use the singular noun, got: {text:?}"
+            text.contains(&expected),
+            "single subagent must use the translated singular noun, got: {text:?}"
         );
     }
 
@@ -1322,7 +1421,12 @@ mod tests {
             workflows: 1,
             ..Watchers::default()
         });
-        assert!(text.contains("1 workflow still running"), "got: {text:?}");
+        let expected = translated_still_running(&[translated_watcher_item(
+            1,
+            "turn.watchers.workflow",
+            "turn.watchers.workflows",
+        )]);
+        assert!(text.contains(&expected), "got: {text:?}");
     }
 
     #[test]
@@ -1334,9 +1438,13 @@ mod tests {
             loops: 2,
             ..Watchers::default()
         });
+        let expected = translated_still_running(&[
+            translated_watcher_item(1, "turn.watchers.monitor", "turn.watchers.monitors"),
+            translated_watcher_item(2, "turn.watchers.loop", "turn.watchers.loops"),
+        ]);
         assert!(
-            text.contains("1 monitor \u{00b7} 2 loops still running"),
-            "both kinds must be listed in one cue, got: {text:?}"
+            text.contains(&expected),
+            "both translated kinds must be listed in one cue, got: {text:?}"
         );
     }
 
@@ -1351,20 +1459,24 @@ mod tests {
             subagents: 3,
             workflows: 0,
         });
+        let expected = translated_still_running(&[
+            translated_watcher_item(1, "turn.watchers.command", "turn.watchers.commands"),
+            translated_watcher_item(2, "turn.watchers.monitor", "turn.watchers.monitors"),
+            translated_watcher_item(1, "turn.watchers.loop", "turn.watchers.loops"),
+            translated_watcher_item(3, "turn.watchers.subagent", "turn.watchers.subagents"),
+        ]);
         assert!(
-            text.contains(
-                "1 command \u{00b7} 2 monitors \u{00b7} 1 loop \u{00b7} 3 subagents still running"
-            ),
-            "all kinds must be listed in one cue, got: {text:?}"
+            text.contains(&expected),
+            "all translated kinds must be listed in one cue, got: {text:?}"
         );
     }
 
     #[test]
     fn narrow_area_clips_cue_tail_keeping_counts() {
         // 40 cols with three kinds: the row tail-clips with no ellipsis, so
-        // the leading counts survive and the trailing suffix is what gets
-        // cut. Pins the narrow-pane tradeoff of leading with the counts; a
-        // smarter compact fallback would be a behavior change.
+        // the leading counts survive and the trailing items/suffix are what
+        // get cut. Pins the narrow-pane tradeoff of leading with the counts;
+        // a smarter compact fallback would be a behavior change.
         let watchers = Watchers {
             commands: 1,
             monitors: 2,
@@ -1372,9 +1484,14 @@ mod tests {
             ..Watchers::default()
         };
         let text = render_idle_with_watchers_in_width(watchers, 0, 40);
+        let first_two_items = [
+            translated_watcher_item(1, "turn.watchers.command", "turn.watchers.commands"),
+            translated_watcher_item(2, "turn.watchers.monitor", "turn.watchers.monitors"),
+        ]
+        .join(" \u{00b7} ");
         assert!(
-            text.contains("1 command \u{00b7} 2 monitors \u{00b7} 1 loop"),
-            "the counts must survive the clip, got: {text:?}"
+            text.contains(&first_two_items),
+            "the leading translated counts must survive the clip, got: {text:?}"
         );
     }
 
@@ -1386,17 +1503,27 @@ mod tests {
             commands: 2,
             ..Watchers::default()
         });
+        let expected = translated_still_running(&[translated_watcher_item(
+            2,
+            "turn.watchers.command",
+            "turn.watchers.commands",
+        )]);
         assert!(
-            text.contains("2 commands still running"),
-            "idle with bg commands must render the still-running cue, got: {text:?}"
+            text.contains(&expected),
+            "idle with bg commands must render the translated still-running cue, got: {text:?}"
         );
         let text = render_idle_with_watchers(Watchers {
             commands: 1,
             ..Watchers::default()
         });
+        let expected = translated_still_running(&[translated_watcher_item(
+            1,
+            "turn.watchers.command",
+            "turn.watchers.commands",
+        )]);
         assert!(
-            text.contains("1 command still running") && !text.contains("commands"),
-            "single command must use the singular noun, got: {text:?}"
+            text.contains(&expected),
+            "single command must use the translated singular noun, got: {text:?}"
         );
     }
 
@@ -1409,13 +1536,19 @@ mod tests {
             commands: 2,
             ..Watchers::default()
         });
+        let expected = translated_still_running(&[translated_watcher_item(
+            2,
+            "turn.watchers.command",
+            "turn.watchers.commands",
+        )]);
         assert!(
-            text.contains("2 commands still running"),
-            "parked with bg work must render the still-running cue, got: {text:?}"
+            text.contains(&expected),
+            "parked with bg work must render the translated still-running cue, got: {text:?}"
         );
         assert!(
-            !text.contains("Waiting") && !text.contains("[stop]"),
-            "parked must not render the running-turn chrome, got: {text:?}"
+            !text.contains(xai_grok_i18n::t("turn.activity.waiting"))
+                && !text.contains(xai_grok_i18n::t("turn.button.stop")),
+            "parked must not render the translated running-turn chrome, got: {text:?}"
         );
     }
 
@@ -1464,41 +1597,73 @@ mod tests {
             true,
         );
         let text = buffer_text(&buf, area);
+        let expected = format!(
+            "{} 5m59s{}",
+            xai_grok_i18n::t("turn.wait.subagent"),
+            xai_grok_i18n::t_fmt("turn.queue.send_now", &[("count", "1")]),
+        );
         assert!(
-            text.contains("Waiting on subagent… 5m59s · 1 queued — Enter to send now"),
-            "phase timer must sit between the wait label and the queued hint, got: {text:?}"
+            text.contains(&expected),
+            "phase timer must sit between the translated wait label and queued hint, got: {text:?}"
         );
     }
 
     #[test]
-    fn still_running_label_lists_only_nonzero_kinds() {
+    fn still_running_label_lists_only_nonzero_translated_kinds() {
         assert_eq!(
             still_running_label(Watchers {
                 commands: 2,
                 ..Watchers::default()
             }),
-            Some("2 commands still running".into())
+            Some(translated_still_running(&[translated_watcher_item(
+                2,
+                "turn.watchers.command",
+                "turn.watchers.commands",
+            )]))
         );
         assert_eq!(
             still_running_label(Watchers {
                 monitors: 2,
                 ..Watchers::default()
             }),
-            Some("2 monitors still running".into())
+            Some(translated_still_running(&[translated_watcher_item(
+                2,
+                "turn.watchers.monitor",
+                "turn.watchers.monitors",
+            )]))
         );
         assert_eq!(
             still_running_label(Watchers {
                 loops: 1,
                 ..Watchers::default()
             }),
-            Some("1 loop still running".into())
+            Some(translated_still_running(&[translated_watcher_item(
+                1,
+                "turn.watchers.loop",
+                "turn.watchers.loops",
+            )]))
         );
         assert_eq!(
             still_running_label(Watchers {
                 subagents: 1,
                 ..Watchers::default()
             }),
-            Some("1 subagent still running".into())
+            Some(translated_still_running(&[translated_watcher_item(
+                1,
+                "turn.watchers.subagent",
+                "turn.watchers.subagents",
+            )]))
+        );
+        assert_eq!(
+            still_running_label(Watchers {
+                workflows: 2,
+                ..Watchers::default()
+            }),
+            Some(translated_still_running(&[translated_watcher_item(
+                2,
+                "turn.watchers.workflow",
+                "turn.watchers.workflows",
+            )]))
         );
         assert_eq!(
             still_running_label(Watchers {
@@ -1506,7 +1671,10 @@ mod tests {
                 loops: 2,
                 ..Watchers::default()
             }),
-            Some("1 monitor \u{00b7} 2 loops still running".into())
+            Some(translated_still_running(&[
+                translated_watcher_item(1, "turn.watchers.monitor", "turn.watchers.monitors"),
+                translated_watcher_item(2, "turn.watchers.loop", "turn.watchers.loops"),
+            ]))
         );
         assert_eq!(
             still_running_label(Watchers {
@@ -1516,10 +1684,12 @@ mod tests {
                 subagents: 2,
                 workflows: 0,
             }),
-            Some(
-                "1 command \u{00b7} 1 monitor \u{00b7} 1 loop \u{00b7} 2 subagents still running"
-                    .into()
-            )
+            Some(translated_still_running(&[
+                translated_watcher_item(1, "turn.watchers.command", "turn.watchers.commands"),
+                translated_watcher_item(1, "turn.watchers.monitor", "turn.watchers.monitors"),
+                translated_watcher_item(1, "turn.watchers.loop", "turn.watchers.loops"),
+                translated_watcher_item(2, "turn.watchers.subagent", "turn.watchers.subagents",),
+            ]))
         );
         assert_eq!(still_running_label(Watchers::default()), None);
     }
@@ -1548,8 +1718,8 @@ mod tests {
             started_at: Instant::now(),
         });
         assert!(
-            text.contains("Starting session"),
-            "idle 0-server seed must render 'Starting session…', got: {text:?}"
+            text.contains(xai_grok_i18n::t("turn.activity.starting_session")),
+            "idle 0-server seed must render the translated starting-session label, got: {text:?}"
         );
     }
 

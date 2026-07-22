@@ -2253,12 +2253,13 @@ fn render_row(
         // `New session` head in the primary colour, the ` #id` suffix dim.
         // Detected on the shared prefix + a `#` to avoid dimming real titles
         // that merely start with "New session".
+        let new_session_label = super::row::new_session_label();
         let dim_suffix = (!row.is_more_placeholder)
-            .then(|| row.label.strip_prefix(super::row::NEW_SESSION_LABEL))
+            .then(|| row.label.strip_prefix(new_session_label))
             .flatten()
             .filter(|rest| rest.starts_with(" #"));
         if let Some(suffix) = dim_suffix {
-            let head_trunc = truncate_str(super::row::NEW_SESSION_LABEL, title_avail as usize);
+            let head_trunc = truncate_str(new_session_label, title_avail as usize);
             let head_w = UnicodeWidthStr::width(&head_trunc[..]) as u16;
             buf.set_string(cx, title_y, &head_trunc, label_style);
             cx += head_w;
@@ -2350,12 +2351,10 @@ fn render_row(
             } else {
                 theme.gray_dim
             };
-            // The awaiting-input subtitle is `Pending: …`; paint the
-            // `Pending:` prefix in yellow so the actionable state stands out,
-            // and the rest in the normal secondary colour.
-            const SOURCE_PENDING_PREFIX: &str = "Pending:";
-            if let Some(rest) = trunc.strip_prefix(SOURCE_PENDING_PREFIX) {
-                let pending_prefix = xai_grok_i18n::t("dashboard.pending_prefix");
+            // Paint the localized pending prefix in yellow so the actionable
+            // state stands out, and the rest in the normal secondary colour.
+            let pending_prefix = xai_grok_i18n::t("dashboard.pending_prefix");
+            if let Some(rest) = trunc.strip_prefix(pending_prefix) {
                 buf.set_string(
                     content_start_x,
                     sec_y,
@@ -6148,10 +6147,10 @@ mod tests {
         );
         assert!(
             lines.iter().any(|l| matches!(
-                l,
-                DashboardLine::Header { state, count }
-if *state == RowState::Working && *count == 2
-            )),
+                            l,
+                            DashboardLine::Header { state, count }
+            if *state == RowState::Working && *count == 2
+                        )),
             "collapsed Working header must still render with its true count",
         );
         let working_rows = lines
@@ -6251,10 +6250,10 @@ if *state == RowState::Working && *count == 2
         // Header still shows the TRUE total, not the visible count.
         assert!(
             lines.iter().any(|l| matches!(
-                l,
-                DashboardLine::Header { state, count }
-if *state == RowState::Idle && *count == total as usize
-            )),
+                            l,
+                            DashboardLine::Header { state, count }
+            if *state == RowState::Idle && *count == total as usize
+                        )),
             "Idle header keeps the true total count",
         );
     }

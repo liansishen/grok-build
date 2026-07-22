@@ -15,7 +15,7 @@ impl SlashCommand for UsageCommand {
     }
 
     fn description(&self) -> &str {
-        "View usage"
+        xai_grok_i18n::t_or("slash.usage.description", "View usage")
     }
 
     fn usage(&self) -> &str {
@@ -40,13 +40,13 @@ impl SlashCommand for UsageCommand {
                 display: "show".into(),
                 match_text: "show".into(),
                 insert_text: "show".into(),
-                description: "View usage".into(),
+                description: xai_grok_i18n::t_or("slash.usage.arg_show", "View usage").into(),
             },
             ArgItem {
                 display: "manage".into(),
                 match_text: "manage".into(),
                 insert_text: "manage".into(),
-                description: "Manage billing".into(),
+                description: xai_grok_i18n::t_or("slash.usage.arg_manage", "Manage billing").into(),
             },
         ])
     }
@@ -56,15 +56,25 @@ impl SlashCommand for UsageCommand {
         if !ctx.billing_surface_visible {
             return match arg {
                 "" => CommandResult::Action(Action::ShowUsage),
-                _ => CommandResult::Error(format!("Unknown argument: {arg}. Use /usage")),
+                _ => CommandResult::Error(
+                    xai_grok_i18n::t_or(
+                        "slash.usage.unknown_argument_bare",
+                        "Unknown argument: {arg}. Use /usage",
+                    )
+                    .replace("{arg}", arg),
+                ),
             };
         }
         match arg {
             "" | "show" => CommandResult::Action(Action::ShowUsage),
             "manage" => CommandResult::Action(Action::ManageBilling),
-            _ => CommandResult::Error(format!(
-                "Unknown argument: {arg}. Use /usage show or /usage manage"
-            )),
+            _ => CommandResult::Error(
+                xai_grok_i18n::t_or(
+                    "slash.usage.unknown_argument",
+                    "Unknown argument: {arg}. Use /usage show or /usage manage",
+                )
+                .replace("{arg}", arg),
+            ),
         }
     }
 }

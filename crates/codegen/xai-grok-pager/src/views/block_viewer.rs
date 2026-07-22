@@ -534,7 +534,10 @@ impl BlockViewerPane {
                 Style::default().fg(theme.gray_dim),
             )));
             lines.push(Line::from(Span::styled(
-                format!("Sources ({})", ws.citations.len()),
+                xai_grok_i18n::t_fmt(
+                    "viewer.sources",
+                    &[("count", &ws.citations.len().to_string())],
+                ),
                 Style::default().fg(theme.text_secondary),
             )));
             let url_style = Style::default().fg(theme.gray);
@@ -574,13 +577,17 @@ impl BlockViewerPane {
         // Metadata
         if let Some(limit) = st.limit {
             lines.push(Line::from(vec![
-                Span::styled("limit: ", label),
+                Span::styled(xai_grok_i18n::t("viewer.limit"), label),
                 Span::styled(limit.to_string(), value),
             ]));
         }
-        let s = if st.result_count == 1 { "" } else { "s" };
+        let result_key = if st.result_count == 1 {
+            "viewer.result_one"
+        } else {
+            "viewer.results"
+        };
         lines.push(Line::from(Span::styled(
-            format!("{} result{s}", st.result_count),
+            xai_grok_i18n::t_fmt(result_key, &[("count", &st.result_count.to_string())]),
             label,
         )));
 
@@ -1052,33 +1059,48 @@ impl BlockViewerPane {
     /// Build shortcuts bar hints for this viewer.
     pub fn shortcuts_hints(&self) -> Vec<HintItem> {
         let mut hints = vec![
-            HintItem::new(crate::key!(Esc), "close"),
-            HintItem::new(crate::key!('/'), "search"),
-            HintItem::new(crate::key!('f'), "filter"),
-            HintItem::new(crate::key!('v'), "select"),
-            HintItem::new(crate::key!('w'), "wrap"),
+            HintItem::new(crate::key!(Esc), xai_grok_i18n::t("hint.close")),
+            HintItem::new(crate::key!('/'), xai_grok_i18n::t("hint.search")),
+            HintItem::new(crate::key!('f'), xai_grok_i18n::t("hint.filter")),
+            HintItem::new(crate::key!('v'), xai_grok_i18n::t("hint.select")),
+            HintItem::new(crate::key!('w'), xai_grok_i18n::t("hint.wrap")),
         ];
         match self.kind {
             ViewerKind::Markdown => {
-                hints.push(HintItem::new(crate::key!('r'), "raw"));
+                hints.push(HintItem::new(
+                    crate::key!('r'),
+                    xai_grok_i18n::t("hint.raw"),
+                ));
             }
             ViewerKind::Execute => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy cmd"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_command"),
+                ));
             }
-            ViewerKind::Edit => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy path"));
+            ViewerKind::Edit | ViewerKind::Read => {
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_path"),
+                ));
             }
             ViewerKind::WebFetch => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy url"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_url"),
+                ));
             }
             ViewerKind::WebSearch => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy query"));
-            }
-            ViewerKind::Read => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy path"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_query"),
+                ));
             }
             ViewerKind::Grep => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy pattern"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_pattern"),
+                ));
             }
             ViewerKind::BgTask => {}
             ViewerKind::IntegrationSearch | ViewerKind::UseTool | ViewerKind::PlainText => {}

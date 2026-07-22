@@ -448,8 +448,12 @@ pub(crate) fn format_subagent_meta(
 pub(crate) fn format_activity_label(activity: &crate::acp::tracker::TurnActivity) -> String {
     use crate::acp::tracker::TurnActivity;
     match activity {
-        TurnActivity::Thinking => "Thinking".to_string(),
-        TurnActivity::Responding => "Responding".to_string(),
+        TurnActivity::Thinking => xai_grok_i18n::t("turn.activity.thinking")
+            .trim_end_matches('…')
+            .to_string(),
+        TurnActivity::Responding => xai_grok_i18n::t("turn.activity.responding")
+            .trim_end_matches('…')
+            .to_string(),
         TurnActivity::ToolRunning { title, description } => {
             if let Some(desc) = description
                 .as_deref()
@@ -458,31 +462,47 @@ pub(crate) fn format_activity_label(activity: &crate::acp::tracker::TurnActivity
             {
                 crate::acp::tracker::format_waiting_for_subject(desc)
             } else if title.is_empty() {
-                "Running tool".to_string()
+                xai_grok_i18n::t("notification.title.running_tool").to_string()
             } else {
                 let first_line = title.lines().next().unwrap_or(title);
                 let max_len = crate::acp::tracker::MAX_ACTIVITY_SUBJECT_CHARS;
                 if first_line.len() <= max_len {
-                    format!("Running: {first_line}")
+                    xai_grok_i18n::t_fmt(
+                        "notification.title.running_named",
+                        &[("title", first_line)],
+                    )
                 } else {
                     let char_count = first_line.chars().count();
                     if char_count <= max_len {
-                        format!("Running: {first_line}")
+                        xai_grok_i18n::t_fmt(
+                            "notification.title.running_named",
+                            &[("title", first_line)],
+                        )
                     } else {
                         let truncated: String = first_line.chars().take(max_len).collect();
-                        format!("Running: {truncated}\u{2026}")
+                        let title = format!("{truncated}\u{2026}");
+                        xai_grok_i18n::t_fmt(
+                            "notification.title.running_named",
+                            &[("title", &title)],
+                        )
                     }
                 }
             }
         }
-        TurnActivity::AutoCompacting => "Compacting".to_string(),
+        TurnActivity::AutoCompacting => xai_grok_i18n::t("turn.activity.compacting")
+            .trim_end_matches('…')
+            .to_string(),
         TurnActivity::Retrying {
             attempt,
             max_retries,
             ..
-        } => {
-            format!("Retrying ({attempt}/{max_retries})")
-        }
+        } => xai_grok_i18n::t_fmt(
+            "notification.title.retrying",
+            &[
+                ("attempt", &attempt.to_string()),
+                ("max", &max_retries.to_string()),
+            ],
+        ),
         TurnActivity::Waiting(reason) => reason.label(),
     }
 }
