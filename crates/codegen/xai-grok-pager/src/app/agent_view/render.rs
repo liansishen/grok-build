@@ -2212,6 +2212,12 @@ impl AgentView {
         }
         let mode_flags: &[PromptFlag] = &mode_flags_vec;
         let multiline = self.multiline_mode;
+        let usage_visible = self
+            .prompt
+            .slash_controller
+            .registry()
+            .get("usage")
+            .is_some();
         let warning = self.credit_balance.as_ref().and_then(|bal| {
             crate::views::credit_bar::usage_warning_for_session(
                 bal,

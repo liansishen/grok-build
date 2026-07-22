@@ -508,6 +508,7 @@ fn paint_peek_config_badge(
         model_name: &model_label,
         flags: &flags,
         multiline,
+        usage_status: None,
         usage_warning: None,
         usage_warning_critical: false,
     };
