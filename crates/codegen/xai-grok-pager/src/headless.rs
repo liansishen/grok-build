@@ -2106,8 +2106,7 @@ mod tests {
         );
         assert!(matches!(
             handle_ext_notification(&notif, OutputFormat::Plain),
-            ExtEvent::TaskBackgrounded { task_id, is_monitor: false }
-if task_id == "task-abc"
+            ExtEvent::TaskBackgrounded { task_id, is_monitor: false } if task_id == "task-abc"
         ));
     }
 
@@ -2123,8 +2122,7 @@ if task_id == "task-abc"
         );
         assert!(matches!(
             handle_ext_notification(&notif, OutputFormat::Plain),
-            ExtEvent::TaskBackgrounded { task_id, is_monitor: true }
-if task_id == "mon-1"
+            ExtEvent::TaskBackgrounded { task_id, is_monitor: true } if task_id == "mon-1"
         ));
     }
 
@@ -2144,8 +2142,7 @@ if task_id == "mon-1"
         );
         assert!(matches!(
             handle_ext_notification(&notif, OutputFormat::Plain),
-            ExtEvent::TaskCompleted { task_id }
-if task_id == "task-abc"
+            ExtEvent::TaskCompleted { task_id } if task_id == "task-abc"
         ));
     }
 
@@ -2164,8 +2161,7 @@ if task_id == "task-abc"
         );
         assert!(matches!(
             handle_ext_notification(&spawned, OutputFormat::Plain),
-            ExtEvent::SubagentSpawned { subagent_id }
-if subagent_id == "sub-1"
+            ExtEvent::SubagentSpawned { subagent_id } if subagent_id == "sub-1"
         ));
         let finished = make_ext_notif(
             "x.ai/session_notification",
@@ -2181,8 +2177,7 @@ if subagent_id == "sub-1"
         );
         assert!(matches!(
             handle_ext_notification(&finished, OutputFormat::Plain),
-            ExtEvent::SubagentFinished { subagent_id }
-if subagent_id == "sub-1"
+            ExtEvent::SubagentFinished { subagent_id } if subagent_id == "sub-1"
         ));
     }
 
