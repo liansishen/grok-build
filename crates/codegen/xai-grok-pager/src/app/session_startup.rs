@@ -174,16 +174,18 @@ impl std::fmt::Display for StartupFlagError {
             Self::SessionIdRequiresFork => {
                 write!(
                     f,
-                    "Error: --session-id can only be used with --continue or --resume if --fork-session is also specified."
+                    "{}",
+                    xai_grok_i18n::t("startup.session_id_requires_fork")
                 )
             }
             Self::ForkRequiresResumeOrContinue => {
-                write!(f, "Error: --fork-session requires --resume or --continue.")
+                write!(f, "{}", xai_grok_i18n::t("startup.fork_requires_resume"))
             }
             Self::ForkWithWorktree => {
                 write!(
                     f,
-                    "Error: --fork-session cannot be combined with --worktree."
+                    "{}",
+                    xai_grok_i18n::t("startup.fork_with_worktree")
                 )
             }
         }
@@ -613,7 +615,7 @@ async fn resolve_existing_session(
         });
     }
     if !ctx.allow_remote_restore {
-        anyhow::bail!("Session does not exist");
+        anyhow::bail!("{}", xai_grok_i18n::t("startup.session_does_not_exist"));
     }
     let raw_config = xai_grok_shell::config::load_effective_config()
         .map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
@@ -621,8 +623,11 @@ async fn resolve_existing_session(
         xai_grok_shell::util::config::session_registry_local_override_sourced(Some(&raw_config))
     {
         anyhow::bail!(
-            "Session does not exist locally (session registry is disabled by {})",
-            source.label()
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.session_not_exist_registry_disabled",
+                &[("source", source.label())],
+            )
         );
     }
     eprintln!(

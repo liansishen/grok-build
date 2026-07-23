@@ -7,6 +7,7 @@ use xai_grok_config::managed_text::{
     CommentSyntax, ManagedConfig, ManagedConfigPlan, ManagedConfigRequest, ManagedConfigStatus,
     ManagedItem, SyntaxValidator,
 };
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::diagnostics::{DiagnosticId, DiagnosticReport};
 use crate::terminal::TerminalContext;
@@ -139,36 +140,40 @@ impl std::fmt::Display for FixError {
         match self {
             Self::UnknownId(id) => write!(
                 formatter,
-                "`{id}` is not an available Doctor fix. Run `grok doctor fix` to list available fixes."
+                "{}",
+                t_fmt("doctor_fix.error_unknown_id", &[("id", id)])
             ),
             Self::PlatformUnsupported => write!(
                 formatter,
-                "Automatic SSH setup is not available on Windows. Run `{SSH_WRAP_ONE_OFF}` when needed."
+                "{}",
+                t_fmt("doctor_fix.error_platform_unsupported", &[("command", SSH_WRAP_ONE_OFF)])
             ),
             Self::HomeUnavailable => {
-                formatter.write_str("Grok could not find your home directory.")
+                formatter.write_str(t("doctor_fix.error_home_unavailable"))
             }
             Self::NotApplicable => {
-                formatter.write_str("This fix does not apply to VS Code Remote sessions.")
+                formatter.write_str(t("doctor_fix.error_not_applicable"))
             }
             Self::RemoteSession => {
-                formatter.write_str("Run this fix on your local computer, not in the SSH session.")
+                formatter.write_str(t("doctor_fix.error_remote_session"))
             }
             Self::UnsupportedShell => write!(
                 formatter,
-                "Automatic setup supports Bash, zsh, and fish. For another shell, run `{SSH_WRAP_ONE_OFF}` when needed."
+                "{}",
+                t_fmt("doctor_fix.error_unsupported_shell", &[("command", SSH_WRAP_ONE_OFF)])
             ),
             Self::ExistingCustomization { path, detail } => write!(
                 formatter,
-                "Grok found an existing SSH alias or function in {} and did not change it: {detail}",
-                path.display()
+                "{}",
+                t_fmt("doctor_fix.error_existing_customization", &[("path", &path.display().to_string()), ("detail", detail)])
             ),
             Self::Managed(error) => write!(
                 formatter,
-                "Could not update your shell configuration: {error}"
+                "{}",
+                t_fmt("doctor_fix.error_managed", &[("error", &error.to_string())])
             ),
             Self::PostconditionFailed => formatter
-                .write_str("The configuration changed, but Grok could not verify the SSH alias."),
+                .write_str(t("doctor_fix.error_postcondition_failed")),
         }
     }
 }
@@ -252,19 +257,22 @@ pub(crate) fn format_applicable_automatic_fixes(
 ) -> String {
     let fixes = applicable_automatic_fixes(report, terminal);
     if fixes.is_empty() {
-        return "No automatic fixes are available here.\n".to_owned();
+        return format!("{}\n", t("doctor_fix.no_automatic_fixes"));
     }
 
-    let mut output = String::from("Automatic fixes:\n");
+    let mut output = format!("{}\n", t("doctor_fix.automatic_fixes_header"));
     for (_id, handle, availability) in fixes {
-        output.push_str(&format!("  {handle:<16} Set up local SSH wrapping\n"));
+        output.push_str(&format!("  {handle:<16} {}\n", t("doctor_fix.setup_local_ssh_wrapping")));
         match availability {
             AutomaticFixAvailability::Here => output.push_str(&format!(
-                "    Run: grok doctor fix {handle}\n    In Grok: /doctor fix {handle}\n"
+                "    {}\n    {}\n",
+                t_fmt("doctor_fix.run_fix_command", &[("handle", handle)]),
+                t_fmt("doctor_fix.in_grok_fix_command", &[("handle", handle)])
             )),
             AutomaticFixAvailability::RunLocally => {
                 output.push_str(&format!(
-                    "    On your local computer, run: grok doctor fix {handle}\n"
+                    "    {}\n",
+                    t_fmt("doctor_fix.run_locally_fix_command", &[("handle", handle)])
                 ));
             }
         }
@@ -275,38 +283,40 @@ pub(crate) fn format_applicable_automatic_fixes(
 pub(crate) fn format_fix_preview(plan: &FixPlan) -> String {
     use std::fmt::Write as _;
 
-    let mut output = String::from("Doctor Fix\n\n");
-    let _ = writeln!(output, "Fix: {}", plan.id);
-    let _ = writeln!(output, "Shell: {}", plan.shell.name());
+    let mut output = format!("{}\n\n", t("doctor_fix.preview_title"));
+    let _ = writeln!(output, "{}", t_fmt("doctor_fix.preview_fix", &[("id", &plan.id.to_string())]));
+    let _ = writeln!(output, "{}", t_fmt("doctor_fix.preview_shell", &[("shell", plan.shell.name())]));
     for change in &plan.changes {
-        let _ = writeln!(output, "File: {}", change.requested_path.display());
+        let _ = writeln!(output, "{}", t_fmt("doctor_fix.preview_file", &[("path", &change.requested_path.display().to_string())]));
         if change.target_path != change.requested_path {
             let _ = writeln!(
                 output,
-                "Actual file: {} (symlink target)",
-                change.target_path.display()
+                "{}",
+                t_fmt("doctor_fix.preview_actual_file", &[("path", &change.target_path.display().to_string())])
             );
         }
-        let _ = writeln!(output, "\nText to add:\n{}", change.block);
+        let _ = writeln!(output, "\n{}\n{}", t("doctor_fix.preview_text_to_add"), change.block);
         match &change.backup_path_hint {
             Some(path) => {
                 let _ = writeln!(
                     output,
-                    "\nBackup will be saved to: {}\nIf that file exists, Grok will choose a unique name.",
-                    path.display()
+                    "\n{}",
+                    t_fmt("doctor_fix.preview_backup_hint", &[("path", &path.display().to_string())])
                 );
             }
-            None => output.push_str("\nBackup: None. The file is new or no changes are needed.\n"),
+            None => output.push_str(&format!("\n{}\n", t("doctor_fix.preview_backup_none"))),
         }
     }
-    output.push_str(
-        "\nWhat this changes:\n  In new interactive shells, `ssh ...` runs as `grok wrap ssh ...`.\n",
-    );
+    output.push_str(&format!(
+        "\n{}\n",
+        t("doctor_fix.preview_what_changes")
+    ));
     let _ = writeln!(
         output,
-        "  To use once without changing config: `{SSH_WRAP_ONE_OFF}`."
+        "  {}",
+        t_fmt("doctor_fix.preview_one_off", &[("command", SSH_WRAP_ONE_OFF)])
     );
-    output.push_str("Caveats:\n");
+    output.push_str(&format!("{}\n", t("doctor_fix.preview_caveats")));
     for caveat in &plan.caveats {
         let _ = writeln!(output, "  - {caveat}");
     }
@@ -370,11 +380,11 @@ pub fn plan_fix(
         shell,
         changes: vec![change],
         caveats: vec![
-            "The alias loads only in new interactive shells.",
-            "Use `command ssh ...` to bypass the alias.",
-            "For manually entered `ssh -f`, ControlPersist workflows, or OpenSSH `~^Z` local suspend, use `command ssh ...`. Wrapping does not fully preserve those behaviors.",
-            "`grok wrap` starts the SSH process directly, so the alias does not loop.",
-            "Grok checks this file for direct SSH aliases and functions. Review sourced files, plugins, and generated shell setup yourself.",
+            t("doctor_fix.caveat_alias_new_shells"),
+            t("doctor_fix.caveat_bypass_alias"),
+            t("doctor_fix.caveat_ssh_f_controlpersist"),
+            t("doctor_fix.caveat_no_loop"),
+            t("doctor_fix.caveat_review_sourced_files"),
         ],
         managed,
     })

@@ -338,12 +338,12 @@ impl PromptInputMode {
     pub fn placeholder_override(self, multiline: bool) -> Option<&'static str> {
         match self {
             PromptInputMode::Normal | PromptInputMode::Bash => None,
-            PromptInputMode::Feedback => Some("Type your feedback..."),
+            PromptInputMode::Feedback => Some(xai_grok_i18n::t("prompt_ph.feedback")),
             PromptInputMode::Remember => {
                 if multiline {
-                    Some("Save a memory note... (Enter for newline, Shift+Enter to save)")
+                    Some(xai_grok_i18n::t("prompt_ph.memory_multiline"))
                 } else {
-                    Some("Save a memory note... (Shift+Enter for multiline)")
+                    Some(xai_grok_i18n::t("prompt_ph.memory_singleline"))
                 }
             }
         }
@@ -351,9 +351,9 @@ impl PromptInputMode {
     pub fn prompt_info_override(self) -> Option<&'static str> {
         match self {
             PromptInputMode::Normal => None,
-            PromptInputMode::Bash => Some("Run shell command"),
-            PromptInputMode::Feedback => Some("Send feedback"),
-            PromptInputMode::Remember => Some("Save memory note"),
+            PromptInputMode::Bash => Some(xai_grok_i18n::t("prompt_ph.run_shell")),
+            PromptInputMode::Feedback => Some(xai_grok_i18n::t("prompt_ph.send_feedback")),
+            PromptInputMode::Remember => Some(xai_grok_i18n::t("prompt_ph.save_memory")),
         }
     }
     pub fn send_action(self, text: String) -> Action {
@@ -3467,19 +3467,19 @@ mod prompt_input_mode_tests {
         assert_eq!(PromptInputMode::Bash.placeholder_override(true), None);
         assert_eq!(
             PromptInputMode::Feedback.placeholder_override(false),
-            Some("Type your feedback...")
+            Some(xai_grok_i18n::t("prompt_ph.feedback"))
         );
         assert_eq!(
             PromptInputMode::Feedback.placeholder_override(true),
-            Some("Type your feedback...")
+            Some(xai_grok_i18n::t("prompt_ph.feedback"))
         );
         assert_eq!(
             PromptInputMode::Remember.placeholder_override(false),
-            Some("Save a memory note... (Shift+Enter for multiline)")
+            Some(xai_grok_i18n::t("prompt_ph.memory_singleline"))
         );
         assert_eq!(
             PromptInputMode::Remember.placeholder_override(true),
-            Some("Save a memory note... (Enter for newline, Shift+Enter to save)")
+            Some(xai_grok_i18n::t("prompt_ph.memory_multiline"))
         );
     }
     #[test]
@@ -3487,15 +3487,15 @@ mod prompt_input_mode_tests {
         assert_eq!(PromptInputMode::Normal.prompt_info_override(), None);
         assert_eq!(
             PromptInputMode::Bash.prompt_info_override(),
-            Some("Run shell command")
+            Some(xai_grok_i18n::t("prompt_ph.run_shell"))
         );
         assert_eq!(
             PromptInputMode::Feedback.prompt_info_override(),
-            Some("Send feedback")
+            Some(xai_grok_i18n::t("prompt_ph.send_feedback"))
         );
         assert_eq!(
             PromptInputMode::Remember.prompt_info_override(),
-            Some("Save memory note")
+            Some(xai_grok_i18n::t("prompt_ph.save_memory"))
         );
     }
     #[test]

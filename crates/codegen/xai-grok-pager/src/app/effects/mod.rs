@@ -29,6 +29,7 @@ use actions::PermissionModePersist;
 #[cfg(test)]
 use agent::AgentId;
 use crate::unified_log as ulog;
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_shell::sampling::error::http_status_from_error;
 use xai_grok_shell::session::{ExtMethodResult, SessionInfoResponse};
 pub(crate) fn execute(
@@ -897,7 +898,7 @@ pub(crate) fn execute(
                     else {
                         return TaskResult::SessionRestoreFailed {
                             agent_id,
-                            error: "Failed to load configuration.".into(),
+                            error: t("restore.config_failed").into(),
                         };
                     };
                     let _ = auth_manager.auth().await;
@@ -909,54 +910,60 @@ pub(crate) fn execute(
                             Box::new(move |event| {
                                 let msg = match (event.phase, event.step) {
                                     (RestorePhase::Download, PhaseStep::Start) => {
-                                        Some("Downloading session archives...".to_string())
+                                        Some(t("restore.downloading").to_string())
                                     }
                                     (RestorePhase::Download, PhaseStep::End) => {
                                         Some(
-                                            format!(
-                                "Downloads finished ({}).",
-                                format_restore_elapsed(event.elapsed),
+                                            t_fmt(
+                                "restore.downloads_finished",
+                                &[("elapsed", &format_restore_elapsed(event.elapsed))],
                             ),
                                         )
                                     }
                                     (RestorePhase::Codebase, PhaseStep::Start) => {
-                                        Some("Restoring code...".to_string())
+                                        Some(t("restore.restoring_code").to_string())
                                     }
                                     (RestorePhase::Codebase, PhaseStep::End) => {
                                         event
                                             .detail
                                             .as_ref()
-                                            .map(|detail| format!("Code restored ({detail})."))
+                                            .map(|detail| t_fmt("restore.code_restored", &[("detail", detail)]))
                                     }
                                     (RestorePhase::Memory, PhaseStep::Start) => {
-                                        Some("Restoring memory...".to_string())
+                                        Some(t("restore.restoring_memory").to_string())
                                     }
                                     (RestorePhase::SessionState, PhaseStep::Start) => {
-                                        Some("Restoring session state...".to_string())
+                                        Some(t("restore.restoring_session_state").to_string())
                                     }
                                     (RestorePhase::SessionState, PhaseStep::End) => {
                                         event
                                             .detail
                                             .as_ref()
-                                            .map(|detail| format!("Session state restored ({detail})."))
+                                            .map(|detail| t_fmt("restore.session_state_restored", &[("detail", detail)]))
                                     }
                                     (RestorePhase::Finalize, _) => {
                                         let elapsed_secs = event.elapsed.as_secs();
                                         let status = if event.incomplete {
-                                            "Restore incomplete"
+                                            t("restore.incomplete")
                                         } else {
-                                            "Restore complete"
+                                            t("restore.complete")
                                         };
                                         if elapsed_secs >= 60 {
+                                            let mins_str = (elapsed_secs / 60).to_string();
+                                            let secs_padded = format!("{:02}", elapsed_secs % 60);
                                             Some(
-                                                format!(
-                                        "{status} ({}m{:02}s).",
-                                        elapsed_secs / 60,
-                                        elapsed_secs % 60
+                                                t_fmt(
+                                        "restore.finalize_long",
+                                        &[
+                                            ("status", &status),
+                                            ("mins", &mins_str),
+                                            ("secs", &secs_padded),
+                                        ],
                                     ),
                                             )
                                         } else {
-                                            Some(format!("{status} ({elapsed_secs}s)."))
+                                            let secs_str = elapsed_secs.to_string();
+                                            Some(t_fmt("restore.finalize_short", &[("status", &status), ("secs", &secs_str)]))
                                         }
                                     }
                                     _ => None,
@@ -1856,7 +1863,7 @@ pub(crate) fn execute(
                             }
                         })
                         .await
-                        .map_err(|error| format!("Could not prepare the fix: {error}"))
+                        .map_err(|error| t_fmt("restore.prepare_fix_failed", &[("error", &error.to_string())]))
                         .and_then(|result| result);
                     TaskResult::DoctorFixPlanned {
                         target,
@@ -1872,7 +1879,7 @@ pub(crate) fn execute(
                             *plan,
                         ))
                         .await
-                        .map_err(|error| format!("Could not apply the fix: {error}"))
+                        .map_err(|error| t_fmt("restore.apply_fix_failed", &[("error", &error.to_string())]))
                         .and_then(|result| result.map_err(|error| error.to_string()));
                     TaskResult::DoctorFixApplied {
                         target,
@@ -3552,7 +3559,7 @@ pub(crate) fn execute(
                                 .get("result")
                                 .and_then(|r| r.get("answer"))
                                 .and_then(|a| a.as_str())
-                                .unwrap_or("No response")
+                                .unwrap_or(t("restore.no_response"))
                                 .to_string();
                             TaskResult::BtwResponse {
                                 agent_id,

@@ -510,9 +510,9 @@ pub(in crate::app::dispatch) fn dispatch_toggle_vim_mode(app: &mut AppView) -> V
     set_vim_mode_inner(app, enabled);
     refresh_open_settings_modals(app);
     let msg = if enabled {
-        "Vim mode: on"
+        xai_grok_i18n::t("settings_ui.vim_mode_on")
     } else {
-        "Vim mode: off"
+        xai_grok_i18n::t("settings_ui.vim_mode_off")
     };
     tracing::info!(vim_mode = enabled, "Vim mode toggled");
     match app.active_view {
@@ -930,6 +930,11 @@ pub(in crate::app::dispatch) fn action_for_reset(
 /// so the guard can't be silently defeated by a wording edit.
 pub(crate) const ROLLBACK_NO_ARM_TOAST: &str =
     "Settings rolled back, but local state may be out of sync — restart to reload";
+
+/// Localized accessor for [`ROLLBACK_NO_ARM_TOAST`].
+pub(crate) fn rollback_no_arm_toast() -> &'static str {
+    xai_grok_i18n::t("settings_ui.rollback_no_arm_toast")
+}
 
 /// Apply a rollback `SettingValue` to the in-memory cache. Does NOT
 /// re-emit `PersistSetting` (avoids infinite loop on persistent

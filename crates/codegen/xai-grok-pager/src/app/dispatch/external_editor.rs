@@ -4,7 +4,7 @@ use crate::app::actions::Effect;
 use crate::app::agent_view::ExternalPromptEditorAccess;
 use crate::app::app_view::{ActiveView, AppView, VoiceTarget};
 use crate::app::external_editor::{
-    ATTACHMENT_MESSAGE, PASTE_MESSAGE, PendingEditorRequest, VOICE_MESSAGE, report_prompt_failure,
+    PendingEditorRequest, attachment_message, paste_message, report_prompt_failure, voice_message,
 };
 
 pub(super) fn dispatch_edit_prompt_external(app: &mut AppView) -> Vec<Effect> {
@@ -19,17 +19,17 @@ pub(super) fn dispatch_edit_prompt_external(app: &mut AppView) -> Vec<Effect> {
     };
     let access = agent.external_prompt_editor_access(true);
     if app.voice_recording_target() == Some(VoiceTarget::Agent(agent_id)) {
-        report_prompt_failure(app, agent_id, VOICE_MESSAGE);
+        report_prompt_failure(app, agent_id, voice_message());
         return vec![];
     }
     match access {
         ExternalPromptEditorAccess::OwnedElsewhere => return vec![],
         ExternalPromptEditorAccess::PastePending => {
-            report_prompt_failure(app, agent_id, PASTE_MESSAGE);
+            report_prompt_failure(app, agent_id, paste_message());
             return vec![];
         }
         ExternalPromptEditorAccess::Attachments => {
-            report_prompt_failure(app, agent_id, ATTACHMENT_MESSAGE);
+            report_prompt_failure(app, agent_id, attachment_message());
             return vec![];
         }
         ExternalPromptEditorAccess::Ready => {}

@@ -310,8 +310,8 @@ impl AgentView {
             return true;
         }
         let msg = match crate::terminal::terminal_context().graphics_protocol_skip_reason() {
-            Some("tmux") => "Inline images disabled within tmux.",
-            _ => "Image rendering not supported in this terminal",
+            Some("tmux") => xai_grok_i18n::t("notice.images_disabled_tmux"),
+            _ => xai_grok_i18n::t("notice.image_not_supported"),
         };
         self.show_toast_ticks(msg, 60);
         false

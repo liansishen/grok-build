@@ -2,6 +2,7 @@ use std::io::{IsTerminal as _, Write};
 use std::path::Path;
 
 use anyhow::Result;
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::diagnostics::{DiagnosticReport, FixPlan, FixStatus, ShellKind};
 
@@ -50,7 +51,7 @@ pub fn run(args: DoctorArgs) -> Result<()> {
 pub fn run_with_writer(args: DoctorArgs, writer: &mut impl Write) -> Result<()> {
     match args.command {
         None => run_report(args.json, writer),
-        Some(_) => anyhow::bail!("Doctor fixes require interactive input and output."),
+        Some(_) => anyhow::bail!("{}", t("doctor_cmd.interactive_required")),
     }
 }
 
@@ -137,15 +138,16 @@ fn apply_fix_plan(
     if !args.yes {
         if !stdin_is_terminal {
             anyhow::bail!(
-                "Cannot apply this fix without confirmation. Run it in an interactive terminal or add `--yes`."
+                "{}",
+                t("doctor_cmd.cannot_apply_without_confirmation")
             );
         }
-        write!(writer, "\nApply this fix? [y/N] ")?;
+        write!(writer, "\n{} ", t("doctor_cmd.apply_fix_prompt"))?;
         writer.flush()?;
         let mut answer = String::new();
         input.read_line(&mut answer)?;
         if !matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
-            writeln!(writer, "Fix cancelled.")?;
+            writeln!(writer, "{}", t("doctor_cmd.fix_cancelled"))?;
             return Ok(());
         }
     }
@@ -162,27 +164,27 @@ fn apply_fix_plan(
         .any(|finding| finding.id == outcome.id)
     {
         anyhow::bail!(
-            "The change was applied, but Doctor still reports `{}`.",
-            outcome.id
+            "{}",
+            t_fmt("doctor_cmd.change_applied_but_still_reports", &[("id", &outcome.id.to_string())])
         );
     }
 
     match outcome.status {
         FixStatus::Applied => writeln!(
             writer,
-            "\nSet up SSH wrapping in {}.",
-            outcome.changed_path.display()
+            "\n{}",
+            t_fmt("doctor_cmd.ssh_wrap_setup", &[("path", &outcome.changed_path.display().to_string())])
         )?,
         FixStatus::AlreadyConfigured => writeln!(
             writer,
-            "\nSSH wrapping is already set up in {}.",
-            outcome.changed_path.display()
+            "\n{}",
+            t_fmt("doctor_cmd.ssh_wrap_already_setup", &[("path", &outcome.changed_path.display().to_string())])
         )?,
     }
     if let Some(backup) = outcome.backup_path {
-        writeln!(writer, "Backup: {}", backup.display())?;
+        writeln!(writer, "{}", t_fmt("doctor_cmd.backup_path", &[("path", &backup.display().to_string())]))?;
     }
-    writeln!(writer, "Start a new shell to use the alias.")?;
+    writeln!(writer, "{}", t("doctor_cmd.start_new_shell"))?;
     Ok(())
 }
 

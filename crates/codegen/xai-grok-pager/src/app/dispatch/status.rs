@@ -192,7 +192,11 @@ pub(super) fn coding_data_sharing_toast(opted_in: bool) -> String {
 /// Display string for the canonical bool. Keep aligned with
 /// `CODING_DATA_SHARING_CHOICES` in `settings/defs.rs`.
 fn display_for_coding_data_sharing_canonical(opted_in: bool) -> &'static str {
-    if opted_in { "Opt in" } else { "Opt out" }
+    if opted_in {
+        xai_grok_i18n::t("status.opt_in")
+    } else {
+        xai_grok_i18n::t("status.opt_out")
+    }
 }
 
 /// Scrub an untrusted error string for toast display. Substitutes a
@@ -268,7 +272,7 @@ pub(super) fn dispatch_show_usage(app: &mut AppView) -> Vec<Effect> {
         None => {
             if let Some(agent) = app.agents.get_mut(&id) {
                 agent.scrollback.push_block(RenderBlock::system(
-                    "Session usage is unavailable until the session starts.".to_string(),
+                    xai_grok_i18n::t("status.session_usage_unavailable").to_string(),
                 ));
             }
             append_consumer_billing_surface(app, id)
@@ -303,8 +307,9 @@ pub(super) fn append_consumer_billing_surface(app: &mut AppView, agent_id: Agent
     if let Some(url) = app.usage_billing_redirect_url.clone() {
         if let Some(agent) = app.agents.get_mut(&agent_id) {
             agent.scrollback.push_block(RenderBlock::System(
-                crate::scrollback::blocks::SystemMessageBlock::new(format!(
-                    "Please check your usage on {url}"
+                crate::scrollback::blocks::SystemMessageBlock::new(xai_grok_i18n::t_fmt(
+                    "status.check_usage_on_url",
+                    &[("url", url.as_str())],
                 )),
             ));
         }
@@ -340,8 +345,9 @@ pub(crate) fn commit_minimal_update_notice(app: &mut AppView, latest_version: &s
     if let ActiveView::Agent(id) = app.active_view
         && let Some(agent) = app.agents.get_mut(&id)
     {
-        agent.scrollback.push_block(RenderBlock::system(format!(
-            "Update available: v{latest_version} — restart to apply."
+        agent.scrollback.push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+            "status.update_available",
+            &[("latest_version", latest_version)],
         )));
     }
 }
@@ -393,8 +399,7 @@ pub(super) fn dispatch_open_gboom(app: &mut AppView) -> Vec<Effect> {
     };
     if detect_graphics_protocol() == GraphicsProtocol::None {
         agent.show_toast(
-            "No demons here \u{2014} GBOOM needs a graphics-capable terminal \
-             (kitty, Ghostty, WezTerm, iTerm2)",
+            xai_grok_i18n::t("status.gboom_no_graphics"),
         );
         return vec![];
     }
@@ -418,7 +423,7 @@ pub(super) fn notify_session_ready(
 ) {
     notification_service.notify(NotificationEvent {
         kind: NotificationEventKind::SessionReady,
-        title: "Grok".into(),
+        title: xai_grok_i18n::t("status.notification_title").into(),
         body: NotificationEventKind::SessionReady.as_str().into(),
         session_id: agent.session.session_id.as_ref().map(|s| s.0.to_string()),
     });

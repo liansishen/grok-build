@@ -1,3 +1,5 @@
+use xai_grok_i18n::{t, t_fmt};
+
 use crate::clipboard::{ClipboardDelivery, NativeClipboardPreflight};
 use crate::diagnostics::{
     DataControlFact, DiagnosticFinding, DiagnosticReport, FindingDisposition, NewlineFact,
@@ -5,28 +7,27 @@ use crate::diagnostics::{
 };
 use crate::host::{DisplayServer, HostOs};
 
-const LIVE_TUI_PROBE_CTA: &str = "Some checks only run in Grok. Start Grok and run /doctor.";
-
 pub(super) fn format(report: &DiagnosticReport) -> String {
     let facts = &report.facts;
-    let mut out = String::from("Grok Doctor\n\nEnvironment\n");
+    let mut out = String::from(t("doctor_cli.title"));
+    out.push_str(t("doctor_cli.section_environment"));
 
-    fact(&mut out, "terminal", &facts.terminal.to_string());
+    fact(&mut out, t("doctor_cli.label_terminal"), &facts.terminal.to_string());
     match &facts.xtversion {
-        RuntimeFact::Available(value) => fact(&mut out, "terminal version", value),
-        RuntimeFact::NoReply => unavailable(&mut out, "terminal version", "no reply"),
-        RuntimeFact::Unavailable => unavailable(&mut out, "terminal version", "unavailable"),
+        RuntimeFact::Available(value) => fact(&mut out, t("doctor_cli.label_terminal_version"), value),
+        RuntimeFact::NoReply => unavailable(&mut out, t("doctor_cli.label_terminal_version"), t("doctor_cli.value_no_reply")),
+        RuntimeFact::Unavailable => unavailable(&mut out, t("doctor_cli.label_terminal_version"), t("doctor_cli.value_unavailable")),
     }
-    fact(&mut out, "multiplexer", &facts.multiplexer.to_string());
+    fact(&mut out, t("doctor_cli.label_multiplexer"), &facts.multiplexer.to_string());
     if let Some(byobu) = facts.byobu {
-        fact(&mut out, "byobu", &byobu.to_string());
+        fact(&mut out, t("doctor_cli.label_byobu"), &byobu.to_string());
     }
-    fact(&mut out, "ssh", if facts.ssh { "yes" } else { "no" });
+    fact(&mut out, t("doctor_cli.label_ssh"), if facts.ssh { t("doctor_cli.value_yes") } else { t("doctor_cli.value_no") });
     match &facts.color.level {
         RuntimeFact::Available(level) => {
-            fact(&mut out, "color", level.as_str());
+            fact(&mut out, t("doctor_cli.label_color"), level.as_str());
             let themes = if facts.color.available_themes.len() == facts.color.total_themes {
-                "all".to_owned()
+                t("doctor_cli.value_all").to_owned()
             } else {
                 format!(
                     "{}/{}: {}",
@@ -41,68 +42,70 @@ pub(super) fn format(report: &DiagnosticReport) -> String {
                         .join(", ")
                 )
             };
-            fact(&mut out, "themes", &themes);
+            fact(&mut out, t("doctor_cli.label_themes"), &themes);
         }
         RuntimeFact::NoReply | RuntimeFact::Unavailable => {
-            unavailable(&mut out, "color", "unavailable");
-            unavailable(&mut out, "themes", "unavailable");
+            unavailable(&mut out, t("doctor_cli.label_color"), t("doctor_cli.value_unavailable"));
+            unavailable(&mut out, t("doctor_cli.label_themes"), t("doctor_cli.value_unavailable"));
         }
     }
 
     if let Some(keyboard) = &facts.keyboard {
         let rescue = if keyboard.os == HostOs::Macos {
-            "OS rescue active"
+            t("doctor_cli.os_rescue_active")
         } else {
-            "OS rescue unavailable on this platform"
+            t("doctor_cli.os_rescue_unavailable")
         };
         fact(
             &mut out,
-            "keyboard",
+            t("doctor_cli.label_keyboard"),
             &format!("{} ({rescue})", keyboard.modifier_delivery.label()),
         );
     }
     if let Some(newline) = &facts.newline {
-        fact(&mut out, "newline", &format_newline(newline));
+        fact(&mut out, t("doctor_cli.label_newline"), &format_newline(newline));
     }
 
     let clipboard = &facts.clipboard;
     let native = match clipboard.native_preflight {
         NativeClipboardPreflight::LocalAvailable => {
-            format!("local ({})", clipboard.native_tool)
+            t_fmt("doctor_cli.native_local", &[("tool", &clipboard.native_tool)])
         }
         NativeClipboardPreflight::RemoteOnly if clipboard.container_no_display => {
-            format!("container ({})", clipboard.native_tool)
+            t_fmt("doctor_cli.native_container", &[("tool", &clipboard.native_tool)])
         }
-        NativeClipboardPreflight::RemoteOnly => format!("remote ({})", clipboard.native_tool),
-        NativeClipboardPreflight::Unavailable => "unavailable".to_owned(),
-        NativeClipboardPreflight::Disabled => "off".to_owned(),
+        NativeClipboardPreflight::RemoteOnly => {
+            t_fmt("doctor_cli.native_remote", &[("tool", &clipboard.native_tool)])
+        }
+        NativeClipboardPreflight::Unavailable => t("doctor_cli.value_unavailable").to_owned(),
+        NativeClipboardPreflight::Disabled => t("doctor_cli.value_off").to_owned(),
     };
-    out.push_str("\nClipboard\n");
-    fact(&mut out, "native", &native);
+    out.push_str(t("doctor_cli.section_clipboard"));
+    fact(&mut out, t("doctor_cli.label_native"), &native);
     fact(
         &mut out,
-        "tmux",
-        if clipboard.tmux_route { "on" } else { "off" },
+        t("doctor_cli.label_tmux"),
+        if clipboard.tmux_route { t("doctor_cli.value_on") } else { t("doctor_cli.value_off") },
     );
     fact(
         &mut out,
-        "osc 52",
+        t("doctor_cli.label_osc52"),
         if clipboard.osc52_route {
             clipboard.osc52_capability.label()
         } else {
-            "off"
+            t("doctor_cli.value_off")
         },
     );
     fact(
         &mut out,
-        "SSH wrap",
-        if clipboard.wrap_sink { "on" } else { "off" },
+        t("doctor_cli.label_ssh_wrap"),
+        if clipboard.wrap_sink { t("doctor_cli.value_on") } else { t("doctor_cli.value_off") },
     );
     if clipboard.display_server == DisplayServer::Wayland {
         match clipboard.data_control {
-            DataControlFact::Available => fact(&mut out, "data-control", "on"),
-            DataControlFact::Missing => fact(&mut out, "data-control", "off"),
-            DataControlFact::Unavailable => unavailable(&mut out, "data-control", "unavailable"),
+            DataControlFact::Available => fact(&mut out, t("doctor_cli.label_data_control"), t("doctor_cli.value_on")),
+            DataControlFact::Missing => fact(&mut out, t("doctor_cli.label_data_control"), t("doctor_cli.value_off")),
+            DataControlFact::Unavailable => unavailable(&mut out, t("doctor_cli.label_data_control"), t("doctor_cli.value_unavailable")),
             DataControlFact::Error => {
                 let detail = report
                     .probe_notes
@@ -111,35 +114,35 @@ pub(super) fn format(report: &DiagnosticReport) -> String {
                     .and_then(|note| note.message.as_deref());
                 match detail {
                     Some(message) => {
-                        unavailable(&mut out, "data-control", &format!("error: {message}"))
+                        unavailable(&mut out, t("doctor_cli.label_data_control"), &t_fmt("doctor_cli.value_error_detail", &[("message", message)]))
                     }
-                    None => unavailable(&mut out, "data-control", "error"),
+                    None => unavailable(&mut out, t("doctor_cli.label_data_control"), t("doctor_cli.value_error")),
                 }
             }
             DataControlFact::NotApplicable => {}
         }
     }
     let status = match clipboard.delivery {
-        ClipboardDelivery::Confirmed => "confirmed",
-        ClipboardDelivery::Unverified => "unverified",
-        ClipboardDelivery::Failed => "unavailable",
+        ClipboardDelivery::Confirmed => t("doctor_cli.value_confirmed"),
+        ClipboardDelivery::Unverified => t("doctor_cli.value_unverified"),
+        ClipboardDelivery::Failed => t("doctor_cli.value_unavailable"),
     };
-    fact(&mut out, "status", status);
+    fact(&mut out, t("doctor_cli.label_status"), status);
 
     if let Some(voice) = &facts.voice {
-        out.push_str("\nVoice\n");
+        out.push_str(t("doctor_cli.section_voice"));
         match voice {
             VoiceFacts::Device { name, detail } => {
-                fact(&mut out, "microphone", &format!("{name} ({detail})"));
+                fact(&mut out, t("doctor_cli.label_microphone"), &format!("{name} ({detail})"));
             }
             VoiceFacts::Missing { error } => {
-                fact(&mut out, "microphone", &format!("none detected ({error})"));
+                fact(&mut out, t("doctor_cli.label_microphone"), &t_fmt("doctor_cli.microphone_none_detected", &[("error", error)]));
             }
         }
     }
 
     if !report.findings.is_empty() {
-        out.push_str("\nFindings\n");
+        out.push_str(t("doctor_cli.section_findings"));
         for finding in &report.findings {
             format_finding(&mut out, finding);
         }
@@ -151,7 +154,7 @@ pub(super) fn format(report: &DiagnosticReport) -> String {
         .filter(|note| !fact_already_shows_probe(note.probe));
     let mut notes = visible_notes.peekable();
     if notes.peek().is_some() {
-        out.push_str("\nChecks not completed\n");
+        out.push_str(t("doctor_cli.section_checks_not_completed"));
         for note in notes {
             let message = match &note.message {
                 Some(message) => format!("{}: {message}", probe_status(note.status)),
@@ -166,8 +169,8 @@ pub(super) fn format(report: &DiagnosticReport) -> String {
         .iter()
         .any(crate::diagnostics::probe_requires_live_tui)
     {
-        out.push_str("\nNeeds a running session\n");
-        out.push_str(&format!("  {LIVE_TUI_PROBE_CTA}\n"));
+        out.push_str(t("doctor_cli.section_needs_session"));
+        out.push_str(&format!("  {}\n", t("doctor_cli.live_tui_probe_cta")));
     }
 
     let issues = report.issue_count();
@@ -176,9 +179,9 @@ pub(super) fn format(report: &DiagnosticReport) -> String {
     out.push_str(&format!(
         "{} {}, {} {}\n",
         issues,
-        plural(issues, "issue", "issues"),
+        plural(issues, t("doctor_cli.issue_singular"), t("doctor_cli.issue_plural")),
         recommendations,
-        plural(recommendations, "recommendation", "recommendations")
+        plural(recommendations, t("doctor_cli.recommendation_singular"), t("doctor_cli.recommendation_plural"))
     ));
     out
 }
@@ -211,13 +214,13 @@ fn format_finding(out: &mut String, finding: &DiagnosticFinding) {
     if let Some(automatic) = finding.automatic_remediation {
         let command = crate::diagnostics::human_fix_command(automatic.fix_id)
             .unwrap_or_else(|| automatic.command.to_owned());
-        out.push_str(&format!("    → Automatic setup: `{command}`\n"));
+        out.push_str(&format!("    → {}\n", t_fmt("doctor_cli.automatic_setup", &[("command", &command)])));
     }
     if let Some(remediation) = &finding.remediation {
         let instruction = match (&remediation.config_path, &finding.automatic_remediation) {
-            (Some(path), _) => format!("Add `{}` to {path}", remediation.fix),
-            (None, Some(_)) => format!("One-off: `{}`", remediation.fix),
-            (None, None) => format!("Run: `{}`", remediation.fix),
+            (Some(path), _) => t_fmt("doctor_cli.add_to_path", &[("fix", &remediation.fix), ("path", path)]),
+            (None, Some(_)) => t_fmt("doctor_cli.one_off", &[("fix", &remediation.fix)]),
+            (None, None) => t_fmt("doctor_cli.run_fix", &[("fix", &remediation.fix)]),
         };
         out.push_str(&format!("    → {instruction}\n"));
     }
@@ -230,18 +233,18 @@ fn format_newline(newline: &NewlineFact) -> String {
     let detail = match newline {
         NewlineFact::Vte {
             version: Some(version),
-        } => format!("VTE {version}; need >= 8200 for Shift+Enter"),
+        } => t_fmt("doctor_cli.newline_vte_version", &[("version", version)]),
         NewlineFact::Vte { version: None } => {
-            "legacy VTE; need VTE >= 0.82 for Shift+Enter".to_owned()
+            t("doctor_cli.newline_vte_legacy").to_owned()
         }
         NewlineFact::XtermJs { terminal } => {
-            format!("{terminal}: xterm.js cannot distinguish Shift+Enter")
+            t_fmt("doctor_cli.newline_xtermjs", &[("terminal", &terminal.to_string())])
         }
         NewlineFact::NoKittyKeyboardProtocol => {
-            "no Kitty keyboard protocol; Shift+Enter equals Enter".to_owned()
+            t("doctor_cli.newline_no_kitty").to_owned()
         }
     };
-    format!("Alt+Enter ({detail})")
+    t_fmt("doctor_cli.newline_alt_enter", &[("detail", &detail)])
 }
 
 fn plural<'a>(count: usize, singular: &'a str, plural: &'a str) -> &'a str {
@@ -250,8 +253,8 @@ fn plural<'a>(count: usize, singular: &'a str, plural: &'a str) -> &'a str {
 
 fn probe_status(status: ProbeStatus) -> &'static str {
     match status {
-        ProbeStatus::Unsupported => "unsupported",
-        ProbeStatus::Unavailable => "unavailable",
-        ProbeStatus::Error => "error",
+        ProbeStatus::Unsupported => t("doctor_cli.probe_unsupported"),
+        ProbeStatus::Unavailable => t("doctor_cli.probe_unavailable"),
+        ProbeStatus::Error => t("doctor_cli.probe_error"),
     }
 }

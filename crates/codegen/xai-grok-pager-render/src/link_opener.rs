@@ -48,7 +48,7 @@ pub fn browser_open_likely_available() -> bool {
 /// User-facing copy when the browser opener cannot run. Includes the full
 /// URL on its own line so it is easy to select/copy in the TUI.
 pub fn browser_unavailable_message(url: &str) -> String {
-    format!("Could not open a browser. Open this URL manually:\n{url}")
+    xai_grok_i18n::t_fmt("link.browser_unavailable", &[("url", url)])
 }
 
 /// Open a URL in the system's default browser/handler.

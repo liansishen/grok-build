@@ -52,7 +52,7 @@ fn no_login_method_error(app: &AppView) -> String {
     if app.auth_methods.is_empty() {
         xai_grok_shell::agent::auth_method::PREFERRED_API_KEY_UNAVAILABLE.to_string()
     } else {
-        "No login method available".to_string()
+        xai_grok_i18n::t("auth.no_login_method").to_string()
     }
 }
 
@@ -483,7 +483,7 @@ pub(super) fn handle_mcp_auth_trigger_done(
                 let msg = if e.starts_with("To authenticate") {
                     format!("{server_name}: {e}")
                 } else if e.contains(&server_name) {
-                    format!("Auth failed: {e}")
+                    xai_grok_i18n::t_fmt("auth.auth_failed", &[("error", e.as_str())])
                 } else {
                     format!("{server_name} auth failed: {e}")
                 };

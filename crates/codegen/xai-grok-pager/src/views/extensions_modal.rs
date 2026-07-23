@@ -10,6 +10,8 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use unicode_width::UnicodeWidthStr;
 
+use xai_grok_i18n::{t, t_fmt};
+
 use crate::input::line_editor::{LineEditOutcome, LineEditor};
 use crate::theme::Theme;
 use crate::views::modal_window::{
@@ -183,9 +185,9 @@ type GroupedPlugins<'a> = std::collections::BTreeMap<
 /// Header count suffix: `1 plugin`, `2 plugins`.
 fn plugin_count_label(n: usize) -> String {
     if n == 1 {
-        "1 plugin".to_string()
+        t("extensions.plugin_count_one").to_string()
     } else {
-        format!("{n} plugins")
+        t_fmt("extensions.plugin_count_many", &[("n", &n.to_string())])
     }
 }
 
@@ -199,14 +201,14 @@ pub fn plugin_group(plugin: &xai_hooks_plugins_types::PluginInfo) -> PluginGroup
     use xai_hooks_plugins_types::{PluginOrigin, PluginScope};
 
     match &plugin.origin {
-        Some(PluginOrigin::ProjectGrok) => PluginGroup::new(0, "origin:project", "Project"),
+        Some(PluginOrigin::ProjectGrok) => PluginGroup::new(0, "origin:project", t("extensions.group.project")),
         Some(PluginOrigin::ProjectClaude) => {
-            PluginGroup::new(1, "origin:project-claude", "Project (Claude)")
+            PluginGroup::new(1, "origin:project-claude", t("extensions.group.project_claude"))
         }
-        Some(PluginOrigin::UserGrok) => PluginGroup::new(2, "origin:user", "User"),
+        Some(PluginOrigin::UserGrok) => PluginGroup::new(2, "origin:user", t("extensions.group.user")),
         Some(PluginOrigin::UserClaude)
         | Some(PluginOrigin::ClaudeInstalled { marketplace: None }) => {
-            PluginGroup::new(3, "origin:user-claude", "User (Claude)")
+            PluginGroup::new(3, "origin:user-claude", t("extensions.group.user_claude"))
         }
         Some(PluginOrigin::ClaudeMarketplace { marketplace })
         | Some(PluginOrigin::ClaudeInstalled {
@@ -226,24 +228,24 @@ pub fn plugin_group(plugin: &xai_hooks_plugins_types::PluginInfo) -> PluginGroup
         },
         Some(PluginOrigin::MarketplaceInstall {
             source_name: None, ..
-        }) => PluginGroup::new(6, "origin:direct", "Direct installs"),
-        Some(PluginOrigin::CliOverride) => PluginGroup::new(7, "origin:cli", "CLI override"),
-        Some(PluginOrigin::ConfigPath) => PluginGroup::new(8, "origin:config", "Custom paths"),
+        }) => PluginGroup::new(6, "origin:direct", t("extensions.group.direct_installs")),
+        Some(PluginOrigin::CliOverride) => PluginGroup::new(7, "origin:cli", t("extensions.group.cli_override")),
+        Some(PluginOrigin::ConfigPath) => PluginGroup::new(8, "origin:config", t("extensions.group.custom_paths")),
         Some(PluginOrigin::Unknown) | None => match plugin.scope {
-            PluginScope::Project => PluginGroup::new(0, "origin:project", "Project"),
+            PluginScope::Project => PluginGroup::new(0, "origin:project", t("extensions.group.project")),
             PluginScope::User => match plugin.marketplace_source.as_deref() {
                 Some(source) if source.starts_with("git: ") => {
-                    PluginGroup::new(6, "origin:direct", "Direct installs")
+                    PluginGroup::new(6, "origin:direct", t("extensions.group.direct_installs"))
                 }
                 Some(source) => PluginGroup {
                     rank: 5,
                     key: format!("grok-mp:{source}"),
                     label: source.to_string(),
                 },
-                None => PluginGroup::new(2, "origin:user", "User"),
+                None => PluginGroup::new(2, "origin:user", t("extensions.group.user")),
             },
-            PluginScope::Cli => PluginGroup::new(7, "origin:cli", "CLI override"),
-            PluginScope::Config => PluginGroup::new(8, "origin:config", "Custom paths"),
+            PluginScope::Cli => PluginGroup::new(7, "origin:cli", t("extensions.group.cli_override")),
+            PluginScope::Config => PluginGroup::new(8, "origin:config", t("extensions.group.custom_paths")),
         },
     }
 }
@@ -513,11 +515,11 @@ impl ExtensionsTab {
     /// Display label for the tab bar.
     pub fn label(self) -> &'static str {
         match self {
-            Self::Hooks => "Hooks",
-            Self::Plugins => "Plugins",
-            Self::Marketplace => "Marketplace",
-            Self::Skills => "Skills",
-            Self::McpServers => "MCP Servers",
+            Self::Hooks => t("extensions.tab.hooks"),
+            Self::Plugins => t("extensions.tab.plugins"),
+            Self::Marketplace => t("extensions.tab.marketplace"),
+            Self::Skills => t("extensions.tab.skills"),
+            Self::McpServers => t("extensions.tab.mcp_servers"),
         }
     }
 
@@ -570,9 +572,9 @@ pub enum StatusFilter {
 impl StatusFilter {
     pub fn label(self) -> &'static str {
         match self {
-            Self::All => "All",
-            Self::Enabled => "Enabled",
-            Self::Disabled => "Disabled",
+            Self::All => t("extensions.filter.all"),
+            Self::Enabled => t("extensions.filter.enabled"),
+            Self::Disabled => t("extensions.filter.disabled"),
         }
     }
 
@@ -1081,7 +1083,9 @@ pub const MCP_SERVERS_ACTION_KEYS: &[(char, &str)] = &[
 ];
 
 /// Footer label for the MCP tab Ctrl+O shortcut (not in [`MCP_SERVERS_ACTION_KEYS`]).
-pub const MCP_SERVERS_OPEN_CONNECTORS_FOOTER: &str = "ctrl-o open";
+pub fn mcp_servers_open_connectors_footer() -> &'static str {
+    t("extensions.footer.ctrl_o_open")
+}
 
 /// Map an action key character to its display string for shortcut hints.
 ///
@@ -1090,7 +1094,7 @@ pub const MCP_SERVERS_OPEN_CONNECTORS_FOOTER: &str = "ctrl-o open";
 /// Returns `""` for unmapped characters.
 pub fn action_key_display(ch: char) -> &'static str {
     match ch {
-        ' ' => "space",
+        ' ' => t("extensions.key.space"),
         'a' => "a",
         'd' => "d",
         'e' => "e",
@@ -1167,9 +1171,9 @@ fn action_key_footer_desc_for_mapping(
 ) -> &'static str {
     if ch == ' ' && desc == "toggle" {
         match selected_item_enabled_at(state, entry_data_indices, entry_group_keys, selected) {
-            Some(true) => "disable",
-            Some(false) => "enable",
-            None => "enable/disable",
+            Some(true) => t("extensions.action.disable"),
+            Some(false) => t("extensions.action.enable"),
+            None => t("extensions.action.enable_disable"),
         }
     } else {
         desc
@@ -1178,7 +1182,7 @@ fn action_key_footer_desc_for_mapping(
 
 pub fn action_key_cheatsheet_desc(ch: char, desc: &'static str) -> &'static str {
     if ch == ' ' && desc == "toggle" {
-        "enable/disable"
+        t("extensions.action.enable_disable")
     } else {
         desc
     }
@@ -1283,16 +1287,16 @@ pub fn tab_all_hints(tab: ExtensionsTab) -> Vec<crate::views::shortcuts_bar::Hin
         let display_key = KeyShortcut::new(KeyCode::Char(ch), KeyModifiers::NONE);
         let mut item = HintItem::new(display_key, action_key_cheatsheet_desc(ch, label));
         if ch == ' ' {
-            item.custom_display = Some("Space");
+            item.custom_display = Some(t("extensions.key.space"));
         }
         hints.push(item);
     }
     // Common navigation.
-    hints.push(HintItem::paired(crate::key!('j'), crate::key!('k'), "nav"));
-    hints.push(HintItem::new(crate::key!(Tab), "switch tab"));
-    hints.push(HintItem::new(crate::key!('/'), "search"));
-    hints.push(HintItem::new(crate::key!(Enter), "expand"));
-    hints.push(HintItem::new(crate::key!(Esc), "close"));
+    hints.push(HintItem::paired(crate::key!('j'), crate::key!('k'), t("extensions.hint.nav")));
+    hints.push(HintItem::new(crate::key!(Tab), t("extensions.hint.switch_tab")));
+    hints.push(HintItem::new(crate::key!('/'), t("extensions.hint.search")));
+    hints.push(HintItem::new(crate::key!(Enter), t("extensions.hint.expand")));
+    hints.push(HintItem::new(crate::key!(Esc), t("extensions.hint.close")));
     hints
 }
 
@@ -1316,9 +1320,9 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
         (ExtensionsTab::Plugins, 'a') => Some(ButtonAction::StartInput {
             command_prefix: "plugins_install".into(),
             fields: vec![FieldSpec {
-                label: "Source".into(),
+                label: t("extensions.form.source").into(),
                 required: true,
-                placeholder: Some("owner/repo, URL, or local path".into()),
+                placeholder: Some(t("extensions.form.source_placeholder").into()),
             }],
         }),
         // Toggle enable/disable on the selected plugin.
@@ -1329,7 +1333,7 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
         (ExtensionsTab::Hooks, 'a') => Some(ButtonAction::StartInput {
             command_prefix: "hooks_add".into(),
             fields: vec![FieldSpec {
-                label: "Path".into(),
+                label: t("extensions.form.path").into(),
                 required: true,
                 placeholder: None,
             }],
@@ -1349,9 +1353,9 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
         (ExtensionsTab::Marketplace, 'a') => Some(ButtonAction::StartInput {
             command_prefix: "marketplace_add_source".into(),
             fields: vec![FieldSpec {
-                label: "Source".into(),
+                label: t("extensions.form.source").into(),
                 required: true,
-                placeholder: Some("owner/repo, git URL, or local path".into()),
+                placeholder: Some(t("extensions.form.marketplace_source_placeholder").into()),
             }],
         }),
         (ExtensionsTab::Marketplace, 'x') => Some(ButtonAction::RemoveSelectedMarketplaceSource),
@@ -1365,14 +1369,14 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
             // `build_action_from_input` reads matching indices.
             fields: vec![
                 FieldSpec {
-                    label: "URL / Command".into(),
+                    label: t("extensions.form.url_command").into(),
                     required: true,
-                    placeholder: Some("https://... or command [args...]".into()),
+                    placeholder: Some(t("extensions.form.url_command_placeholder").into()),
                 },
                 FieldSpec {
-                    label: "Name".into(),
+                    label: t("extensions.form.name").into(),
                     required: false,
-                    placeholder: Some("Auto generated by URL".into()),
+                    placeholder: Some(t("extensions.form.name_placeholder").into()),
                 },
             ],
         }),
@@ -2413,7 +2417,9 @@ fn build_plugin_fields(plugin: &xai_hooks_plugins_types::PluginInfo) -> Vec<Stri
 const COMPONENT_ITEMS_CAP: usize = 8;
 
 /// Copy for a catalog entry verified to provide nothing detectable.
-const NO_DETECTABLE_COMPONENTS: &str = "no detectable components";
+fn no_detectable_components() -> &'static str {
+    t("extensions.no_detectable_components")
+}
 
 fn component_categories(
     components: &xai_hooks_plugins_types::PluginComponents,
@@ -2607,7 +2613,7 @@ pub fn render_extensions_modal(
                         entry_data_indices.push(Some(si));
                         entry_group_keys.push(None);
                         if !skill.enabled {
-                            entry_badge_text.push("[disabled]".into());
+                            entry_badge_text.push(t("extensions.badge.disabled").into());
                             entry_badge_color.push(Some(theme.accent_error));
                         } else {
                             entry_badge_text.push(String::new());
@@ -2615,7 +2621,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.skills_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -2641,7 +2647,7 @@ pub fn render_extensions_modal(
                             })
                             .collect();
                         if !visible.is_empty() {
-                            entry_labels.push("Workflows".to_string());
+                            entry_labels.push(t("extensions.workflows_header").to_string());
                             entry_right_labels.push(String::new());
                             entry_desc_lines.push(vec![]);
                             entry_summary_lines.push(vec![]);
@@ -2770,7 +2776,7 @@ pub fn render_extensions_modal(
                             entry_data_indices.push(Some(pi));
                             entry_group_keys.push(None);
                             entry_badge_text.push(if !plugin.enabled {
-                                "[disabled]".into()
+                                t("extensions.badge.disabled").into()
                             } else {
                                 String::new()
                             });
@@ -2782,7 +2788,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.plugins_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -2822,7 +2828,7 @@ pub fn render_extensions_modal(
                         let searching = !state.picker_state.query().is_empty();
                         let collapsed =
                             !searching && state.hooks_collapsed_groups.contains(source_dir);
-                        entry_labels.push(format!("{} ({} hooks)", label, hooks.len()));
+                        entry_labels.push(t_fmt("extensions.hooks_count", &[("label", &label), ("n", &hooks.len().to_string())]));
                         entry_right_labels.push(String::new());
                         entry_desc_lines.push(vec![]);
                         entry_summary_lines.push(vec![]);
@@ -2848,7 +2854,7 @@ pub fn render_extensions_modal(
                             let cmd = hook
                                 .command
                                 .as_deref()
-                                .unwrap_or(hook.url.as_deref().unwrap_or("(no command)"));
+                                .unwrap_or(hook.url.as_deref().unwrap_or(t("extensions.no_command")));
                             entry_right_labels.push(String::new());
                             entry_desc_lines.push(vec![format!("\u{2192} {}", cmd)]);
                             entry_summary_lines.push(vec![]);
@@ -2859,7 +2865,7 @@ pub fn render_extensions_modal(
                             entry_data_indices.push(Some(hi));
                             entry_group_keys.push(None);
                             entry_badge_text.push(if hook.disabled {
-                                "[disabled]".into()
+                                t("extensions.badge.disabled").into()
                             } else {
                                 String::new()
                             });
@@ -2871,7 +2877,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.hooks_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -2912,7 +2918,7 @@ pub fn render_extensions_modal(
                         entry_data_indices.push(None);
                         entry_group_keys.push(Some(si.to_string()));
                         if source.error.is_some() {
-                            entry_badge_text.push("[error]".into());
+                            entry_badge_text.push(t("extensions.badge.error").into());
                             entry_badge_color.push(Some(theme.accent_error));
                         } else {
                             entry_badge_text.push(String::new());
@@ -2926,8 +2932,8 @@ pub fn render_extensions_modal(
                                 continue;
                             }
                             let status_label = match plugin.install_status.as_str() {
-                                "installed" => "[installed]",
-                                "update_available" => "[update available]",
+                                "installed" => t("extensions.badge.installed"),
+                                "update_available" => t("extensions.badge.update_available"),
                                 _ => "",
                             };
                             entry_labels.push(plugin.name.clone());
@@ -2970,14 +2976,14 @@ pub fn render_extensions_modal(
                                 Some(_) => {
                                     fields.push((
                                         "provides".to_string(),
-                                        NO_DETECTABLE_COMPONENTS.to_string(),
+                                        no_detectable_components().to_string(),
                                     ));
                                 }
                                 None => {
                                     if plugin.remote_url.is_some() {
                                         fields.push((
                                             "provides".to_string(),
-                                            "contents shown after install".to_string(),
+                                            t("extensions.contents_after_install").to_string(),
                                         ));
                                     }
                                 }
@@ -3003,7 +3009,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.marketplace_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -3085,7 +3091,7 @@ pub fn render_extensions_modal(
                             // Summary line: tools count + enabled count.
                             if server.tools.is_empty() {
                                 entry_desc_lines.push(vec![
-                                    "no tools (server may not be connected)".to_string(),
+                                    t("extensions.no_tools").to_string(),
                                 ]);
                             } else {
                                 let enabled_count =
@@ -3110,7 +3116,7 @@ pub fn render_extensions_modal(
                             entry_data_indices.push(Some(si));
                             entry_group_keys.push(Some(tools_group_key));
                             let (badge_text, badge_col) = if !server.enabled {
-                                ("[disabled]".to_string(), Some(theme.accent_error))
+                                (t("extensions.badge.disabled").to_string(), Some(theme.accent_error))
                             } else {
                                 (
                                     format!("[{}]", server.status.label()),
@@ -3139,7 +3145,7 @@ pub fn render_extensions_modal(
                                     entry_data_indices.push(Some(si));
                                     entry_group_keys.push(None);
                                     let tool_badge = if !t.enabled {
-                                        ("[disabled]".to_string(), Some(theme.accent_error))
+                                        (xai_grok_i18n::t("extensions.badge.disabled").to_string(), Some(theme.accent_error))
                                     } else {
                                         (String::new(), None)
                                     };
@@ -3150,7 +3156,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.mcps_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -3290,17 +3296,17 @@ pub fn render_extensions_modal(
         // Input-mode is handled below; it owns its own footer.
     } else if state.mcp_setup.is_some() {
         shortcuts.push(Shortcut {
-            label: "Enter save and authenticate",
+            label: t("extensions.footer.enter_save_auth"),
             clickable: false,
             id: 0,
         });
         shortcuts.push(Shortcut {
-            label: "↑/↓ select",
+            label: t("extensions.footer.arrow_select"),
             clickable: false,
             id: 0,
         });
         shortcuts.push(Shortcut {
-            label: "Esc cancel",
+            label: t("extensions.footer.esc_cancel"),
             clickable: false,
             id: 0,
         });
@@ -3309,21 +3315,21 @@ pub fn render_extensions_modal(
         // handles. Tab is either path completion (single-field) or
         // field navigation (multi-field).
         shortcuts.push(Shortcut {
-            label: "Enter submit",
+            label: t("extensions.footer.enter_submit"),
             clickable: false,
             id: 0,
         });
         shortcuts.push(Shortcut {
             label: if input.is_multi_field() {
-                "Tab/Shift+Tab field"
+                t("extensions.footer.tab_field")
             } else {
-                "Tab complete"
+                t("extensions.footer.tab_complete")
             },
             clickable: false,
             id: 0,
         });
         shortcuts.push(Shortcut {
-            label: "Esc cancel",
+            label: t("extensions.footer.esc_cancel"),
             clickable: false,
             id: 0,
         });
@@ -3335,7 +3341,7 @@ pub fn render_extensions_modal(
         // cycles forward; `Shift+Tab` is still listed in the
         // cheatsheet (`?` shortcut help).
         shortcuts.push(Shortcut {
-            label: "Tab tabs",
+            label: t("extensions.footer.tab_tabs"),
             clickable: true,
             id: 98,
         });
@@ -3348,7 +3354,7 @@ pub fn render_extensions_modal(
         }
         if state.active_tab == ExtensionsTab::McpServers {
             shortcuts.push(Shortcut {
-                label: MCP_SERVERS_OPEN_CONNECTORS_FOOTER,
+                label: mcp_servers_open_connectors_footer(),
                 clickable: false,
                 id: 0,
             });
@@ -3358,7 +3364,7 @@ pub fn render_extensions_modal(
         // from the footer to save space — the cheatsheet still lists it.
         // ID 99 = close action, handled in the mouse handler.
         shortcuts.push(Shortcut {
-            label: "Esc close",
+            label: t("extensions.footer.esc_close"),
             clickable: true,
             id: 99,
         });
@@ -3702,8 +3708,8 @@ pub fn render_extensions_modal(
     // footer shortcut style.
     if let Some(kind) = modal_msg_kind {
         let segments: &[(&str, &str)] = match kind {
-            ModalMsgKind::Error => &[("any key", " back")],
-            ModalMsgKind::Confirm => &[("y", " confirm"), ("any other key", " cancel")],
+            ModalMsgKind::Error => &[(t("extensions.footer.any_key"), t("extensions.footer.back"))],
+            ModalMsgKind::Confirm => &[(t("extensions.footer.y_confirm_key"), t("extensions.footer.confirm")), (t("extensions.footer.any_other_key"), t("extensions.footer.cancel"))],
         };
         render_footer_hint_segments(buf, footer_area, segments, &theme);
     } else if let Some(ref n) = state.result_notice
@@ -3768,7 +3774,7 @@ fn render_mcp_setup_form(buf: &mut Buffer, area: Rect, setup: &McpSetupFormState
             .bg(theme.bg_base)
             .add_modifier(Modifier::BOLD),
     );
-    let hint = "Save and authenticate";
+    let hint = t("extensions.save_and_authenticate");
     buf.set_string(
         x,
         top.saturating_add(1),

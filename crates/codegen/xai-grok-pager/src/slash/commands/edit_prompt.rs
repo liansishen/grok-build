@@ -12,7 +12,7 @@ impl SlashCommand for EditPromptCommand {
     }
 
     fn description(&self) -> &str {
-        "Open an external editor for an empty prompt; use the command palette to preserve a draft"
+        xai_grok_i18n::t("slash.edit_prompt.description")
     }
 
     fn usage(&self) -> &str {
@@ -34,7 +34,7 @@ impl SlashCommand for EditPromptCommand {
             );
         }
         if ctx.session_id.is_none() {
-            return CommandResult::Error("No active session".to_owned());
+            return CommandResult::Error(xai_grok_i18n::t("slash.edit_prompt.no_active_session").to_owned());
         }
         CommandResult::Action(Action::EditPromptExternal)
     }

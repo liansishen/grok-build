@@ -10,6 +10,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::Widget;
+use xai_grok_i18n::t;
 
 use super::actions::Action;
 use super::agent_view::{AgentView, active_contexts_for_pane, apply_settings_outcome};
@@ -319,7 +320,7 @@ impl AgentView {
                 shortcuts_help::modal_footer(*filter_active)
             };
             let chrome_cfg = mw::ModalWindowConfig {
-                title: "Keyboard Shortcuts",
+                title: t("modal.keyboard_shortcuts"),
                 tabs: None,
                 shortcuts: &footer,
                 sizing: crate::views::shortcuts_help::modal_sizing(
@@ -993,7 +994,7 @@ impl AgentView {
                 // source filter and local-disk delete are dead weight there.
                 let chat_mode = self.app_chat_mode;
                 let config = PickerConfig {
-                    title: Some("Resume session"),
+                    title: Some(t("modal.resume_session")),
                     show_search_hint: true,
                     expandable: true,
                     esc_clears_query: false, // Esc returns to palette or closes
@@ -1310,7 +1311,7 @@ impl AgentView {
                 })
                 .collect();
             let config = PickerConfig {
-                title: Some("How-to Guides"),
+                title: Some(t("modal.howto_guides")),
                 show_search_hint: false,
                 expandable: false,
                 esc_clears_query: true,
@@ -1683,17 +1684,17 @@ impl AgentView {
             // Standard footer shortcuts for picker-style modals.
             let mut picker_shortcuts: Vec<Shortcut> = vec![
                 Shortcut {
-                    label: "\u{2191}/\u{2193} nav",
+                    label: t("modal.nav"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "Enter select",
+                    label: t("modal.enter_select"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "Esc close",
+                    label: t("modal.esc_close"),
                     clickable: false,
                     id: 0,
                 },
@@ -1748,7 +1749,7 @@ impl AgentView {
                 // Surface `i search` in the footer when vim nav mode is active.
                 mw::push_vim_nav_search_hint(&mut picker_shortcuts, state.search_active);
                 let modal_config = ModalWindowConfig {
-                    title: "Commands",
+                    title: t("modal.commands"),
                     tabs: None,
                     shortcuts: &picker_shortcuts,
                     sizing: ModalSizing {
@@ -1788,10 +1789,10 @@ impl AgentView {
             {
                 // Arg picker: ModalWindow chrome + picker content.
                 let title = match command.as_str() {
-                    "model" | "m" if !args_query.is_empty() => "Pick reasoning effort",
-                    "model" | "m" => "Pick model",
-                    "theme" | "t" => "Pick theme",
-                    _ => "Pick option",
+                    "model" | "m" if !args_query.is_empty() => t("modal.pick_reasoning_effort"),
+                    "model" | "m" => t("modal.pick_model"),
+                    "theme" | "t" => t("modal.pick_theme"),
+                    _ => t("modal.pick_option"),
                 };
                 let picker_entries: Vec<PickerEntry> = items
                     .iter()
@@ -1930,7 +1931,7 @@ impl AgentView {
                 }
                 let compact = self.scrollback.appearance().prompt.compact;
                 let modal_config = ModalWindowConfig {
-                    title: "Resume session",
+                    title: t("modal.resume_session"),
                     tabs: None,
                     shortcuts: &session_shortcuts,
                     sizing: ModalSizing {
@@ -2182,21 +2183,21 @@ impl AgentView {
 
                 let has_enhanced = enhanced_content.is_some();
                 let tab_label = if showing_enhanced {
-                    "Tab raw"
+                    t("modal.tab_raw")
                 } else if has_enhanced {
-                    "Tab enhanced"
+                    t("modal.tab_enhanced")
                 } else {
-                    "enhancing\u{2026}"
+                    t("modal.enhancing")
                 };
 
                 let shortcuts: Vec<Shortcut> = vec![
                     Shortcut {
-                        label: "\u{2191}/\u{2193} scroll",
+                        label: t("modal.scroll"),
                         clickable: false,
                         id: 0,
                     },
                     Shortcut {
-                        label: "Enter save",
+                        label: t("modal.enter_save"),
                         clickable: false,
                         id: 0,
                     },
@@ -2206,7 +2207,7 @@ impl AgentView {
                         id: 0,
                     },
                     Shortcut {
-                        label: "Esc cancel",
+                        label: t("modal.esc_cancel"),
                         clickable: false,
                         id: 0,
                     },
@@ -2214,7 +2215,7 @@ impl AgentView {
 
                 let compact = self.scrollback.appearance().prompt.compact;
                 let modal_config = mw::ModalWindowConfig {
-                    title: "Memory Note",
+                    title: t("modal.memory_note"),
                     tabs: None,
                     shortcuts: &shortcuts,
                     sizing: mw::ModalSizing {
@@ -2295,7 +2296,7 @@ impl AgentView {
                 let non_sel: Vec<bool> = vec![false; picker_entries.len()];
                 let footer = shortcuts_help::modal_footer(*filter_active);
                 let modal_config = mw::ModalWindowConfig {
-                    title: "Keyboard Shortcuts",
+                    title: t("modal.keyboard_shortcuts"),
                     tabs: None,
                     shortcuts: &footer,
                     sizing: shortcuts_help::modal_sizing(compact),
@@ -2337,9 +2338,9 @@ impl AgentView {
             ) {
                 // Render settings modal with reset-confirm overlay.
                 let prompt = crate::views::modal::reset_confirm_prompt(active_modal)
-                    .unwrap_or_else(|| "Reset setting to default?".to_owned());
+                    .unwrap_or_else(|| t("modal.reset_confirm_prompt").to_owned());
                 let breadcrumb = crate::views::modal::reset_confirm_breadcrumb(active_modal)
-                    .unwrap_or_else(|| "Reset setting".to_owned());
+                    .unwrap_or_else(|| t("modal.reset_confirm_breadcrumb").to_owned());
                 if let modal::ActiveModal::ResetSettingsConfirm { settings_state, .. } =
                     active_modal
                 {

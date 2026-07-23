@@ -6,30 +6,43 @@ use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
+use xai_grok_i18n::t;
+
 use crate::app::agent::AgentId;
 use crate::app::app_view::{ActiveView, AppView};
 use crate::scrollback::block::RenderBlock;
 
 const PROMPT_EDITOR_MAX_BYTES: u64 = 4 * 1024 * 1024;
-pub(crate) const ATTACHMENT_MESSAGE: &str =
-    "External prompt editing is not available while the draft has attachments.";
-pub(crate) const VOICE_MESSAGE: &str =
-    "External prompt editing is not available while voice input is active.";
-pub(crate) const PASTE_MESSAGE: &str =
-    "External prompt editing is not available while a paste is still being processed.";
-pub(crate) const OWNERSHIP_MESSAGE: &str =
-    "External prompt editing was cancelled because another input surface became active.";
-const PROMPT_EDITOR_PREPARE_FAILURE: &str =
-    "Could not open the draft in an external editor; the original draft was kept.";
-const PROMPT_EDITOR_FAILURE: &str = "External prompt editor failed; the original draft was kept.";
-const PROMPT_EDITOR_NONZERO: &str =
-    "External prompt editor exited unsuccessfully; the original draft was kept.";
-const PROMPT_EDITOR_INVALID_UTF8: &str =
-    "External prompt editor saved invalid UTF-8; the original draft was kept.";
-const PROMPT_EDITOR_TOO_LARGE: &str =
-    "External prompt editor saved a draft larger than 4 MiB; the original draft was kept.";
-const PROMPT_EDITOR_STALE: &str =
-    "The draft changed while the external editor was open; the newer draft was kept.";
+pub(crate) fn attachment_message() -> &'static str {
+    t("ext_editor.attachments")
+}
+pub(crate) fn voice_message() -> &'static str {
+    t("ext_editor.voice")
+}
+pub(crate) fn paste_message() -> &'static str {
+    t("ext_editor.paste")
+}
+pub(crate) fn ownership_message() -> &'static str {
+    t("ext_editor.ownership")
+}
+fn prompt_editor_prepare_failure() -> &'static str {
+    t("ext_editor.prepare_failure")
+}
+fn prompt_editor_failure() -> &'static str {
+    t("ext_editor.failure")
+}
+fn prompt_editor_nonzero() -> &'static str {
+    t("ext_editor.nonzero")
+}
+fn prompt_editor_invalid_utf8() -> &'static str {
+    t("ext_editor.invalid_utf8")
+}
+fn prompt_editor_too_large() -> &'static str {
+    t("ext_editor.too_large")
+}
+fn prompt_editor_stale() -> &'static str {
+    t("ext_editor.stale")
+}
 
 #[derive(Clone, Debug)]
 pub(crate) enum PendingEditorRequest {
@@ -97,18 +110,18 @@ impl PromptEditorFile {
     }
 
     fn read(&self) -> Result<String, &'static str> {
-        let file = std::fs::File::open(&self.path).map_err(|_| PROMPT_EDITOR_FAILURE)?;
-        if file.metadata().map_err(|_| PROMPT_EDITOR_FAILURE)?.len() > PROMPT_EDITOR_MAX_BYTES {
-            return Err(PROMPT_EDITOR_TOO_LARGE);
+        let file = std::fs::File::open(&self.path).map_err(|_| prompt_editor_failure())?;
+        if file.metadata().map_err(|_| prompt_editor_failure())?.len() > PROMPT_EDITOR_MAX_BYTES {
+            return Err(prompt_editor_too_large());
         }
         let mut bytes = Vec::new();
         file.take(PROMPT_EDITOR_MAX_BYTES + 1)
             .read_to_end(&mut bytes)
-            .map_err(|_| PROMPT_EDITOR_FAILURE)?;
+            .map_err(|_| prompt_editor_failure())?;
         if bytes.len() as u64 > PROMPT_EDITOR_MAX_BYTES {
-            return Err(PROMPT_EDITOR_TOO_LARGE);
+            return Err(prompt_editor_too_large());
         }
-        String::from_utf8(bytes).map_err(|_| PROMPT_EDITOR_INVALID_UTF8)
+        String::from_utf8(bytes).map_err(|_| prompt_editor_invalid_utf8())
     }
 }
 
@@ -125,7 +138,7 @@ impl Drop for PromptEditorFile {
 fn parse_editor_argv(command: &str) -> Result<Vec<String>, String> {
     shlex::split(command)
         .filter(|parts| parts.first().is_some_and(|program| !program.is_empty()))
-        .ok_or_else(|| "could not parse $VISUAL or $EDITOR".to_owned())
+        .ok_or_else(|| t("ext_editor.parse_error").to_owned())
 }
 
 fn resolve_editor_argv(visual: Option<&str>, editor: Option<&str>) -> Result<Vec<String>, String> {
@@ -155,18 +168,18 @@ fn revalidate(app: &mut AppView, request: PendingEditorRequest) -> Option<Pendin
     let message = if app.voice_recording_target()
         == Some(crate::app::app_view::VoiceTarget::Agent(agent_id))
     {
-        Some(VOICE_MESSAGE)
+        Some(voice_message())
     } else {
         match access {
             Some(crate::app::agent_view::ExternalPromptEditorAccess::Ready) => None,
             Some(crate::app::agent_view::ExternalPromptEditorAccess::Attachments) => {
-                Some(ATTACHMENT_MESSAGE)
+                Some(attachment_message())
             }
             Some(crate::app::agent_view::ExternalPromptEditorAccess::PastePending) => {
-                Some(PASTE_MESSAGE)
+                Some(paste_message())
             }
             Some(crate::app::agent_view::ExternalPromptEditorAccess::OwnedElsewhere) => {
-                Some(OWNERSHIP_MESSAGE)
+                Some(ownership_message())
             }
             None => return None,
         }
@@ -220,7 +233,7 @@ pub(crate) fn prepare(
                         agent_id,
                         original_text,
                     },
-                    message: PROMPT_EDITOR_PREPARE_FAILURE.to_owned(),
+                    message: prompt_editor_prepare_failure().to_owned(),
                 })
             }
         },
@@ -290,10 +303,10 @@ pub(crate) fn finish(
         } => {
             let outcome = match editor_result {
                 Ok(status) if status.success() => file.read(),
-                Ok(_) => Err(PROMPT_EDITOR_NONZERO),
+                Ok(_) => Err(prompt_editor_nonzero()),
                 Err(error) => {
                     tracing::warn!(%error, "external prompt editor: child failed");
-                    Err(PROMPT_EDITOR_FAILURE)
+                    Err(prompt_editor_failure())
                 }
             };
             apply_prompt_outcome(app, agent_id, original_text, outcome);
@@ -316,7 +329,7 @@ fn apply_prompt_outcome(
             agent_id = agent_id.0,
             "external prompt editor: draft changed while editor was open"
         );
-        report_prompt_failure(app, agent_id, PROMPT_EDITOR_STALE);
+        report_prompt_failure(app, agent_id, prompt_editor_stale());
         return;
     }
     match outcome {
@@ -395,7 +408,7 @@ mod tests {
 
         let file = PromptEditorFile::create("").unwrap();
         std::fs::write(file.path(), [0xff, 0xfe]).unwrap();
-        assert_eq!(file.read(), Err(PROMPT_EDITOR_INVALID_UTF8));
+        assert_eq!(file.read(), Err(prompt_editor_invalid_utf8()));
 
         let file = PromptEditorFile::create("").unwrap();
         std::fs::File::options()
@@ -404,7 +417,7 @@ mod tests {
             .unwrap()
             .set_len(PROMPT_EDITOR_MAX_BYTES + 1)
             .unwrap();
-        assert_eq!(file.read(), Err(PROMPT_EDITOR_TOO_LARGE));
+        assert_eq!(file.read(), Err(prompt_editor_too_large()));
     }
 
     #[test]
@@ -498,7 +511,7 @@ mod tests {
             app.agents[&id]
                 .scrollback
                 .iter_entries()
-                .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(VOICE_MESSAGE))
+                .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(voice_message()))
         );
     }
 
@@ -515,7 +528,7 @@ mod tests {
             app.agents[&id]
                 .scrollback
                 .iter_entries()
-                .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(VOICE_MESSAGE))
+                .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(voice_message()))
         );
     }
 
@@ -529,7 +542,7 @@ mod tests {
             app.agents[&id]
                 .scrollback
                 .iter_entries()
-                .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(PASTE_MESSAGE))
+                .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(paste_message()))
         );
     }
 
@@ -560,14 +573,14 @@ mod tests {
         apply_prompt_outcome(&mut app, id, "original".to_owned(), Ok("stale".to_owned()));
         assert_eq!(app.agents[&id].prompt.text(), "newer");
 
-        apply_prompt_outcome(&mut app, id, "newer".to_owned(), Err(PROMPT_EDITOR_NONZERO));
+        apply_prompt_outcome(&mut app, id, "newer".to_owned(), Err(prompt_editor_nonzero()));
         assert_eq!(app.agents[&id].prompt.text(), "newer");
         assert!(
             app.agents[&id]
                 .scrollback
                 .iter_entries()
                 .any(|(_, entry)| entry.block.searchable_text().as_deref()
-                    == Some(PROMPT_EDITOR_NONZERO))
+                    == Some(prompt_editor_nonzero()))
         );
     }
 

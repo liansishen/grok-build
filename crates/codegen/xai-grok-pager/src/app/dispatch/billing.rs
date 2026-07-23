@@ -7,6 +7,7 @@ use crate::app::agent_view::AgentView;
 use crate::app::app_view::AppView;
 use crate::scrollback::block::RenderBlock;
 use std::time::Duration;
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_telemetry::events::{SuperGrokUpsell, SuperGrokUpsellClicked};
 use xai_grok_telemetry::session_ctx::log_event;
 
@@ -117,28 +118,28 @@ pub(super) fn open_credit_limit_upsell(
         bool,
     ) = match mode {
         CreditLimitUpsellMode::UnifiedCredits => (
-            "You hit your weekly limit.",
-            "Upgrade to a higher tier for more usage",
-            "Buy more credits",
-            "Purchase credits to keep using Grok Build",
+            t("billing.heading_weekly_limit"),
+            t("billing.upgrade_tier_desc_usage"),
+            t("billing.buy_more_credits"),
+            t("billing.buy_credits_desc"),
             CreditLimitCardAction::PurchaseCredits,
             xai_grok_telemetry::events::CreditLimitChoice::PurchaseCredits,
             false,
         ),
         CreditLimitUpsellMode::LegacyPayg { enabled: true } => (
-            "You\u{2019}ve hit your spending cap.",
-            "Upgrade to a higher tier for more credits",
-            "Increase limit",
-            "Raise your pay-as-you-go spending cap",
+            t("billing.heading_spending_cap"),
+            t("billing.upgrade_tier_desc_credits"),
+            t("billing.increase_limit"),
+            t("billing.increase_limit_desc"),
             CreditLimitCardAction::IncreasePaygLimit,
             xai_grok_telemetry::events::CreditLimitChoice::PayAsYouGo,
             true,
         ),
         CreditLimitUpsellMode::LegacyPayg { enabled: false } => (
-            "You\u{2019}ve hit the credit limit for your plan.",
-            "Upgrade to a higher tier for more credits",
-            "Pay as you go",
-            "Enable pay-as-you-go credits for on-demand usage",
+            t("billing.heading_credit_limit"),
+            t("billing.upgrade_tier_desc_credits"),
+            t("billing.pay_as_you_go"),
+            t("billing.pay_as_you_go_desc"),
             CreditLimitCardAction::EnablePayg,
             xai_grok_telemetry::events::CreditLimitChoice::PayAsYouGo,
             false,
@@ -184,7 +185,7 @@ pub(super) fn open_credit_limit_upsell(
         question: heading.into(),
         options: vec![
             QuestionOption {
-                label: "Upgrade tier".into(),
+                label: t("billing.upgrade_tier").into(),
                 description: upgrade_tier_desc.into(),
                 preview: None,
                 id: Some(UPSELL_URL_UPGRADE.into()),
@@ -272,12 +273,12 @@ fn open_supergrok_upsell(
 
     let (heading, source, modal_id_prefix) = match reason {
         UpsellReason::FreeUsageLimit => (
-            "You hit your free usage limit.",
+            t("billing.heading_free_usage"),
             SuperGrokUpsell::FreeUsagePaywall,
             "free-usage-upsell",
         ),
         UpsellReason::RestrictedCommand => (
-            "Unlock all features with SuperGrok.",
+            t("billing.heading_unlock_features"),
             SuperGrokUpsell::RestrictedCommand,
             "restricted-command-upsell",
         ),
@@ -290,14 +291,14 @@ fn open_supergrok_upsell(
 
     let options = vec![
         QuestionOption {
-            label: "Upgrade to SuperGrok".into(),
-            description: "For everyday coding and productivity tasks".into(),
+            label: t("billing.upgrade_supergrok").into(),
+            description: t("billing.upgrade_supergrok_desc").into(),
             preview: None,
             id: Some(UPSELL_URL_UPGRADE.into()),
         },
         QuestionOption {
-            label: "Upgrade to SuperGrok Heavy".into(),
-            description: "Get the most out of Grok Build. Highest usage limits.".into(),
+            label: t("billing.upgrade_supergrok_heavy").into(),
+            description: t("billing.upgrade_supergrok_heavy_desc").into(),
             preview: None,
             // No Heavy-specific URL exists; the /supergrok page lists
             // both plans, so both upgrade options land there.
@@ -377,7 +378,7 @@ pub(super) fn handle_billing_fetched(
                 Some(bal) => {
                     crate::views::credit_bar::format_usage_summary(bal, summary_topup.as_ref())
                 }
-                None => "No billing data available.".to_string(),
+                None => t("billing.no_data").to_string(),
             };
             agent.scrollback.push_block(RenderBlock::System(
                 crate::scrollback::blocks::SystemMessageBlock::new(msg),
@@ -503,9 +504,9 @@ pub(super) fn handle_credit_limit_recheck_complete(
     if tier_changed && !user_moved_on {
         if let Some(prompt) = agent.credit_limit_stashed_prompt.take() {
             let tier_name = app.subscription_tier.as_deref().unwrap_or("a higher tier");
-            agent.scrollback.push_block(RenderBlock::system(format!(
-                "Subscription upgraded to {tier_name}. Retrying\u{2026}"
-            )));
+            agent.scrollback.push_block(RenderBlock::system(
+                t_fmt("billing.subscription_upgraded", &[("tier_name", tier_name)])
+            ));
             agent.session.enqueue_in_flight_prompt_front(prompt);
         }
     } else if !user_moved_on {

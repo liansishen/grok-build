@@ -1,5 +1,7 @@
 //! Feedback, remember-note, btw, and recap dispatchers.
 
+use xai_grok_i18n::{t, t_fmt};
+
 use super::ctx::with_active_agent;
 use crate::app::actions::Effect;
 use crate::app::agent::AgentId;
@@ -56,7 +58,7 @@ pub(super) fn dispatch_send_feedback(app: &mut AppView, text: String) -> Vec<Eff
     let trimmed = text.trim().to_string();
     if trimmed.is_empty() {
         agent.scrollback.push_block(RenderBlock::system(
-            "Please provide feedback text.".to_string(),
+            t("sys.feedback_empty").to_string(),
         ));
         return vec![];
     }
@@ -64,12 +66,12 @@ pub(super) fn dispatch_send_feedback(app: &mut AppView, text: String) -> Vec<Eff
     let Some(session_id) = agent.session.session_id.clone() else {
         agent
             .scrollback
-            .push_block(RenderBlock::system("No active session.".to_string()));
+            .push_block(RenderBlock::system(t("sys.no_active_session").to_string()));
         return vec![];
     };
 
     agent.scrollback.push_block(RenderBlock::system(
-        "Thanks for the feedback! The Grok Build team is on it.".to_string(),
+        t("sys.feedback_thanks").to_string(),
     ));
 
     vec![Effect::SendFeedback {
@@ -100,7 +102,7 @@ pub(super) fn dispatch_send_remember_note(app: &mut AppView, text: String) -> Ve
     let trimmed = text.trim().to_string();
     if trimmed.is_empty() {
         agent.scrollback.push_block(RenderBlock::system(
-            "Please provide a memory note.".to_string(),
+            t("sys.memory_note_empty").to_string(),
         ));
         return vec![];
     }
@@ -180,7 +182,7 @@ pub(super) fn dispatch_save_remember_note_from_modal(app: &mut AppView) -> Vec<E
     agent.active_modal = None;
     agent
         .scrollback
-        .push_block(RenderBlock::system("Saving memory note...".to_string()));
+        .push_block(RenderBlock::system(t("sys.saving_memory_note").to_string()));
 
     vec![Effect::SaveMemoryNote {
         agent_id: id,
@@ -295,7 +297,7 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
                 agent
                     .scrollback
                     .push_block(crate::scrollback::block::RenderBlock::system(
-                        "No active session",
+                        t("sys.no_active_session"),
                     ));
             } else {
                 agent.show_toast(xai_grok_i18n::t("toast.no_active_session"));
@@ -333,9 +335,9 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
 /// the generic failure toast.
 pub(crate) fn recap_unavailable_toast(has_user_messages: bool) -> &'static str {
     if has_user_messages {
-        "Couldn't generate recap"
+        t("sys.recap_failed")
     } else {
-        "No messages yet"
+        t("sys.no_messages_yet")
     }
 }
 
@@ -443,16 +445,17 @@ pub(super) fn handle_memory_note_saved(
             Ok(()) => {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Memory saved to {}",
-                        crate::util::display_user_grok_path("memory/MEMORY.md")
+                    .push_block(crate::scrollback::block::RenderBlock::system(t_fmt(
+                        "sys.memory_saved",
+                        &[("path", &crate::util::display_user_grok_path("memory/MEMORY.md"))],
                     )));
             }
             Err(error) => {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Couldn't save memory note: {error}"
+                    .push_block(crate::scrollback::block::RenderBlock::system(t_fmt(
+                        "sys.memory_save_failed",
+                        &[("error", &error)],
                     )));
             }
         }

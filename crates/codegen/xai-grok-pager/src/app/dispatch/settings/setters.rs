@@ -1117,7 +1117,7 @@ pub(in crate::app::dispatch) fn set_combine_queued_prompts(
     set_combine_queued_prompts_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "combine_queued_prompts", value = new, "setting changed");
-    app.show_toast(&save_success_toast("Combine queued prompts", new));
+    app.show_toast(&save_success_toast(xai_grok_i18n::t("setter.combine_queued_prompts"), new));
     vec![Effect::PersistSetting {
         key: "combine_queued_prompts",
         value: crate::settings::SettingValue::Bool(new),
@@ -1229,7 +1229,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_undo(
     set_contextual_hint(
         app,
         "contextual_hints.undo",
-        "Undo hint",
+        xai_grok_i18n::t("setter.undo_hint"),
         prev,
         |h, v| h.undo = v,
         new,
@@ -1244,7 +1244,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_plan_mode(
     set_contextual_hint(
         app,
         "contextual_hints.plan_mode",
-        "Plan mode hint",
+        xai_grok_i18n::t("setter.plan_mode_hint"),
         prev,
         |h, v| h.plan_mode = v,
         new,
@@ -1259,7 +1259,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_image_input(
     set_contextual_hint(
         app,
         "contextual_hints.image_input",
-        "Image input hint",
+        xai_grok_i18n::t("setter.image_input_hint"),
         prev,
         |h, v| h.image_input = v,
         new,
@@ -1274,7 +1274,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_send_now(
     set_contextual_hint(
         app,
         "contextual_hints.send_now",
-        "Send now hint",
+        xai_grok_i18n::t("setter.send_now_hint"),
         prev,
         |h, v| h.send_now = v,
         new,
@@ -1289,7 +1289,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_small_screen(
     set_contextual_hint(
         app,
         "contextual_hints.small_screen",
-        "Small screen hint",
+        xai_grok_i18n::t("setter.small_screen_hint"),
         prev,
         |h, v| h.small_screen = v,
         new,
@@ -1304,7 +1304,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_word_select(
     set_contextual_hint(
         app,
         "contextual_hints.word_select",
-        "Word select hint",
+        xai_grok_i18n::t("setter.word_select_hint"),
         prev,
         |h, v| h.word_select = v,
         new,
@@ -1442,7 +1442,7 @@ pub(in crate::app::dispatch) fn set_theme(app: &mut AppView, new: String) -> Vec
         "setting changed",
     );
     app.show_toast(&save_theme_toast(
-        "Theme",
+        xai_grok_i18n::t("setter.theme"),
         crate::theme::display_name_for_canonical(new_canonical),
     ));
     vec![Effect::PersistSetting {
@@ -1546,7 +1546,7 @@ pub(in crate::app::dispatch) fn set_auto_dark_theme(app: &mut AppView, new: Stri
         "setting changed",
     );
     app.show_toast(&save_theme_toast(
-        "Auto dark theme",
+        xai_grok_i18n::t("setter.auto_dark_theme"),
         crate::theme::display_name_for_canonical(new_canonical),
     ));
     vec![Effect::PersistSetting {
@@ -1659,7 +1659,7 @@ pub(in crate::app::dispatch) fn set_auto_light_theme(
         "setting changed",
     );
     app.show_toast(&save_theme_toast(
-        "Auto light theme",
+        xai_grok_i18n::t("setter.auto_light_theme"),
         crate::theme::display_name_for_canonical(new_canonical),
     ));
     vec![Effect::PersistSetting {

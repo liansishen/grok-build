@@ -46,7 +46,7 @@ pub(super) fn dispatch_import_claude_confirm(app: &mut AppView) -> Vec<Effect> {
     let selected_count = filtered.global_items.len() + filtered.project_items.len();
 
     let mut summary = if selected_count == 0 {
-        "No items selected.".to_string()
+        xai_grok_i18n::t("import.no_items_selected").to_string()
     } else {
         filtered.summary(&cwd).trim_end().to_string()
     };
@@ -55,9 +55,14 @@ pub(super) fn dispatch_import_claude_confirm(app: &mut AppView) -> Vec<Effect> {
         match xai_grok_shell::claude_import::apply_import(&filtered, &cwd) {
             Ok(result) => {
                 summary.push_str(&format!(
-                    "\nImported {} of {} setting(s).",
-                    result.total(),
-                    total_in_modal
+                    "\n{}",
+                    xai_grok_i18n::t_fmt(
+                        "import.imported_count",
+                        &[
+                            ("imported", &result.total().to_string()),
+                            ("total", &total_in_modal.to_string()),
+                        ],
+                    )
                 ));
                 for path in &result.modified_files {
                     summary.push_str(&format!("\n  Updated: {}", path));
@@ -66,7 +71,10 @@ pub(super) fn dispatch_import_claude_confirm(app: &mut AppView) -> Vec<Effect> {
             Err(e) => {
                 app.startup_warnings.push(crate::startup::StartupWarning {
                     severity: crate::startup::WarningSeverity::Warning,
-                    message: format!("Failed to import Claude settings: {}", e),
+                    message: xai_grok_i18n::t_fmt(
+                        "import.import_failed",
+                        &[("error", &e.to_string())],
+                    ),
                     action: None,
                 });
                 return vec![];

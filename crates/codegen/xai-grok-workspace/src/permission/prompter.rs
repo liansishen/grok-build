@@ -387,7 +387,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("allow-once"),
             acp::PermissionOption::new(
                 "allow-once",
-                "Yes".to_owned(),
+                xai_grok_i18n::t("perm.yes").to_owned(),
                 acp::PermissionOptionKind::AllowOnce,
             ),
         );
@@ -462,7 +462,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("always-allow"),
             acp::PermissionOption::new(
                 "always-allow",
-                "always allow".to_owned(),
+                xai_grok_i18n::t("perm.always_allow").to_owned(),
                 acp::PermissionOptionKind::AllowAlways,
             ),
         );
@@ -470,7 +470,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("allow-once"),
             acp::PermissionOption::new(
                 "allow-once",
-                "allow once".to_owned(),
+                xai_grok_i18n::t("perm.allow_once").to_owned(),
                 acp::PermissionOptionKind::AllowOnce,
             ),
         );
@@ -478,7 +478,7 @@ impl AcpPrompter {
             acp::PermissionOptionId::new("reject-once"),
             acp::PermissionOption::new(
                 "reject-once",
-                "reject once".to_owned(),
+                xai_grok_i18n::t("perm.reject_once").to_owned(),
                 acp::PermissionOptionKind::RejectOnce,
             ),
         );
@@ -635,7 +635,10 @@ impl AcpPrompter {
                     acp::PermissionOptionId::new("allow-always-domain"),
                     acp::PermissionOption::new(
                         "allow-always-domain",
-                        format!("Yes, always allow {domain} this session"),
+                        xai_grok_i18n::t_fmt(
+                            "perm.always_allow_domain",
+                            &[("domain", domain.as_str())],
+                        ),
                         acp::PermissionOptionKind::AllowAlways,
                     ),
                 );

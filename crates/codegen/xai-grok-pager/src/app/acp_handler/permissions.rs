@@ -223,7 +223,7 @@ fn resolve_subagent_label(agent: &AgentView, session_id: &acp::SessionId) -> Opt
         ));
     }
     // Tier 2: non-root session with no tracked info.
-    Some("Child session (untracked):".to_string())
+    Some(xai_grok_i18n::t("perm.child_session_untracked").to_string())
 }
 
 /// Build title, description lines, and optional raw command for a permission request.

@@ -5,6 +5,7 @@
 
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
+use xai_grok_i18n::t_fmt;
 
 use crate::theme::Theme;
 
@@ -236,7 +237,7 @@ pub fn usage_warning_for_session(
                 let used = balance.on_demand_used_cents.unwrap_or(0).abs();
                 let remaining = (cap - used).max(0);
                 if remaining <= LOW_BALANCE_CENTS {
-                    let text = format!("Pay-as-you-go limit left: {}", fmt_dollars(remaining));
+                    let text = t_fmt("credit.payg_limit_left", &[("amount", &fmt_dollars(remaining))]);
                     return Some((text, remaining <= PAY_AS_YOU_GO_CRITICAL_CENTS));
                 }
             }
@@ -261,7 +262,7 @@ pub fn usage_warning_for_session(
 
     let credits_warning = || {
         (
-            format!("Credits left: {}", fmt_dollars(credits_cents)),
+            t_fmt("credit.credits_left", &[("amount", &fmt_dollars(credits_cents))]),
             true,
         )
     };
@@ -312,7 +313,8 @@ pub fn credit_bar_line_for_session(
         theme.accent_success
     };
 
-    let text = format!("Credits used: {pct:.0}%");
+    let pct_str = format!("{pct:.0}");
+    let text = t_fmt("credit.credits_used", &[("pct", pct_str.as_str())]);
 
     let style = Style::default().fg(color).bg(theme.bg_base);
     Some(Line::from(Span::styled(text, style)))

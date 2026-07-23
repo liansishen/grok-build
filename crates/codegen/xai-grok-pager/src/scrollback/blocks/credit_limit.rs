@@ -7,6 +7,7 @@
 
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
+use xai_grok_i18n::t;
 
 use crate::scrollback::block::BlockContent;
 use crate::scrollback::types::{AccentStyle, BlockContext, BlockLine, BlockOutput, DisplayMode};
@@ -63,13 +64,13 @@ impl BlockContent for CreditLimitBlock {
         let muted = theme.muted();
         let body = match self.action {
             CreditLimitCardAction::IncreasePaygLimit => {
-                "You can continue by increasing your spending limit."
+                t("credit_limit.increase_spending")
             }
             CreditLimitCardAction::EnablePayg => {
-                "You can continue by enabling pay-as-you-go usage."
+                t("credit_limit.enable_payg")
             }
             CreditLimitCardAction::PurchaseCredits => {
-                "You can continue by purchasing more credits."
+                t("credit_limit.purchase_credits")
             }
         };
         let body_line = Line::from(Span::styled(body.to_string(), muted));

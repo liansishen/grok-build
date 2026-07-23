@@ -9,7 +9,7 @@ impl SlashCommand for WorkflowsCommand {
     }
 
     fn description(&self) -> &str {
-        "Show workflow runs (phases, agents, progress)"
+        xai_grok_i18n::t("slash.workflows.description")
     }
 
     fn usage(&self) -> &str {

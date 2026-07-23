@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span, Text};
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::render::color::blend_color;
 use crate::scrollback::block::BlockContent;
@@ -85,24 +86,34 @@ impl BlockContent for WorkflowBlock {
         };
         let muted = theme.muted();
 
-        let mut spans = vec![Span::styled("Workflow ", bold)];
+        let mut spans = vec![Span::styled(t("workflow_block.prefix"), bold)];
         let verb = match &self.status {
-            WorkflowBlockStatus::Running => format!("{}: ", self.name),
+            WorkflowBlockStatus::Running => {
+                t_fmt("workflow_block.running", &[("name", &self.name)])
+            }
             WorkflowBlockStatus::Done { elapsed } => {
-                format!("{} done in {}: ", self.name, format_duration(*elapsed))
+                t_fmt(
+                    "workflow_block.done",
+                    &[("name", &self.name), ("duration", &format_duration(*elapsed))],
+                )
             }
             WorkflowBlockStatus::Failed { elapsed } => {
-                format!("{} failed in {}: ", self.name, format_duration(*elapsed))
+                t_fmt(
+                    "workflow_block.failed",
+                    &[("name", &self.name), ("duration", &format_duration(*elapsed))],
+                )
             }
             WorkflowBlockStatus::Cancelled { elapsed } => {
-                format!(
-                    "{} ◌ cancelled after {}: ",
-                    self.name,
-                    format_duration(*elapsed)
+                t_fmt(
+                    "workflow_block.cancelled",
+                    &[("name", &self.name), ("duration", &format_duration(*elapsed))],
                 )
             }
             WorkflowBlockStatus::Paused { elapsed } => {
-                format!("{} paused at {}: ", self.name, format_duration(*elapsed))
+                t_fmt(
+                    "workflow_block.paused",
+                    &[("name", &self.name), ("duration", &format_duration(*elapsed))],
+                )
             }
         };
         let text_style = if matches!(self.status, WorkflowBlockStatus::Cancelled { .. }) {
@@ -118,8 +129,9 @@ impl BlockContent for WorkflowBlock {
             spans.push(Span::styled(format!("  [{trail}]"), text_style));
         }
         if matches!(self.status, WorkflowBlockStatus::Running) && self.active_agents > 0 {
+            let count_str = self.active_agents.to_string();
             spans.push(Span::styled(
-                format!("  ({} agents)", self.active_agents),
+                t_fmt("workflow_block.agents", &[("count", &count_str)]),
                 muted,
             ));
         }

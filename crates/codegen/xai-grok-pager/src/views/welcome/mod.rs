@@ -2270,7 +2270,9 @@ fn render_welcome_done(
 }
 
 /// Legal line copy — used for both render spans and mouse hit width.
-const PRIVACY_BANNER_LEGAL: &str = "Learn more and read Terms and Privacy Policy.";
+fn privacy_banner_legal() -> &'static str {
+    xai_grok_i18n::t("privacy.legal_line")
+}
 
 /// Welcome privacy banner: copy left, `[Customize in settings]` / `[Accept]` right.
 /// Returns (accept_rect, customize_rect, legal_rect) for mouse hit-testing.
@@ -2310,10 +2312,10 @@ fn render_privacy_banner(
         mouse_pos.is_some_and(|(mx, my)| r.contains(ratatui::layout::Position::new(mx, my)))
     };
 
-    let legal_w = if left.width as usize >= PRIVACY_BANNER_LEGAL.len() {
-        PRIVACY_BANNER_LEGAL.len()
+    let legal_w = if left.width as usize >= privacy_banner_legal().len() {
+        privacy_banner_legal().len()
     } else {
-        "Learn more".len().min(left.width as usize)
+        xai_grok_i18n::t("privacy.learn_more").len().min(left.width as usize)
     };
     // The legal line only exists when the slot really has a second row —
     // otherwise its rect would make the blank row below clickable.
@@ -2340,10 +2342,10 @@ fn render_privacy_banner(
         .fg(link_fg)
         .add_modifier(Modifier::UNDERLINED);
     let gray = Style::default().fg(theme.gray);
-    let title = Span::styled("Help improve Grok", Style::default().fg(theme.text_primary));
-    let desc = "Allow your sessions to improve SpaceXAI's models.";
+    let title = Span::styled(xai_grok_i18n::t("privacy.title"), Style::default().fg(theme.text_primary));
+    let desc = xai_grok_i18n::t("privacy.desc");
     // Drop trailing spans whole rather than clipping mid-word when narrow.
-    let line1 = if left.width as usize >= "Help improve Grok  ".len() + desc.len() {
+    let line1 = if left.width as usize >= xai_grok_i18n::t("privacy.title").len() + 2 + desc.len() {
         Line::from(vec![
             title,
             Span::raw("  "),
@@ -2352,18 +2354,18 @@ fn render_privacy_banner(
     } else {
         Line::from(title)
     };
-    // Span pieces must reassemble to PRIVACY_BANNER_LEGAL.
-    let line2 = if left.width as usize >= PRIVACY_BANNER_LEGAL.len() {
+    // Span pieces must reassemble to privacy_banner_legal().
+    let line2 = if left.width as usize >= privacy_banner_legal().len() {
         Line::from(vec![
-            Span::styled("Learn more", link),
-            Span::styled(" and read ", gray),
-            Span::styled("Terms", link),
-            Span::styled(" and ", gray),
-            Span::styled("Privacy Policy", link),
+            Span::styled(xai_grok_i18n::t("privacy.learn_more"), link),
+            Span::styled(xai_grok_i18n::t("privacy.and_read"), gray),
+            Span::styled(xai_grok_i18n::t("privacy.terms"), link),
+            Span::styled(xai_grok_i18n::t("privacy.and"), gray),
+            Span::styled(xai_grok_i18n::t("privacy.privacy_policy"), link),
             Span::styled(".", gray),
         ])
     } else {
-        Line::from(Span::styled("Learn more", link))
+        Line::from(Span::styled(xai_grok_i18n::t("privacy.learn_more"), link))
     };
     Paragraph::new(vec![line1, line2]).render(left, buf);
 

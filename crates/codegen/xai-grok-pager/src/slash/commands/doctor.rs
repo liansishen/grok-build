@@ -9,6 +9,11 @@ use crate::slash::command::{
 
 const USAGE: &str = "Usage: /doctor [fix [ssh-wrap]]";
 
+/// Localized usage string for error messages.
+fn usage_str() -> &'static str {
+    xai_grok_i18n::t("slash.doctor.usage")
+}
+
 pub struct DoctorCommand;
 
 impl DoctorCommand {
@@ -50,7 +55,7 @@ impl SlashCommand for DoctorCommand {
     }
 
     fn description(&self) -> &str {
-        "Check this session and show available fixes"
+        xai_grok_i18n::t("slash.doctor.description")
     }
 
     fn usage(&self) -> &str {
@@ -75,14 +80,14 @@ impl SlashCommand for DoctorCommand {
                 display: "ssh-wrap".into(),
                 match_text: "fix ssh-wrap terminal.ssh-wrap".into(),
                 insert_text: "fix ssh-wrap".into(),
-                description: "Set up SSH wrapping on this computer".into(),
+                description: xai_grok_i18n::t("slash.doctor.arg_ssh_wrap").to_owned(),
             }
         } else {
             ArgItem {
                 display: "fix".into(),
                 match_text: "fix".into(),
                 insert_text: "fix".into(),
-                description: "Show automatic fixes available here".into(),
+                description: xai_grok_i18n::t("slash.doctor.arg_fix").to_owned(),
             }
         };
         Some(vec![item])

@@ -131,7 +131,7 @@ pub(super) fn open_doctor_fix_question(
     };
     if agent.question_view.is_some() {
         agent.scrollback.push_block(RenderBlock::system(
-            "Close the current question before applying this fix.",
+            xai_grok_i18n::t("fix_confirm.close_current_question"),
         ));
         return;
     }
@@ -140,17 +140,17 @@ pub(super) fn open_doctor_fix_question(
         .scrollback
         .push_block(RenderBlock::system(preview.clone()));
     let question = Question {
-        question: "Apply this fix?".to_owned(),
+        question: xai_grok_i18n::t("fix_confirm.apply_this_fix").to_owned(),
         options: vec![
             QuestionOption {
-                label: "Apply".to_owned(),
-                description: "Make the changes shown above.".to_owned(),
+                label: xai_grok_i18n::t("fix_confirm.apply").to_owned(),
+                description: xai_grok_i18n::t("fix_confirm.apply_description").to_owned(),
                 preview: Some(preview),
                 id: None,
             },
             QuestionOption {
-                label: "Cancel".to_owned(),
-                description: "Do not change your shell configuration.".to_owned(),
+                label: xai_grok_i18n::t("fix_confirm.cancel").to_owned(),
+                description: xai_grok_i18n::t("fix_confirm.cancel_description").to_owned(),
                 preview: None,
                 id: None,
             },

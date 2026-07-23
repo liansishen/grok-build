@@ -619,8 +619,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 deliver_doctor_message(
                     app,
                     target.agent_id,
-                    "This fix was cancelled because the session changed. Run `/doctor fix` again."
-                        .to_owned(),
+                    xai_grok_i18n::t("task_result.fix_cancelled_session_changed").to_owned(),
                 );
                 return vec![];
             };
@@ -635,8 +634,9 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     deliver_doctor_message(
                         app,
                         target.agent_id,
-                        format!(
-                            "This fix configures your local computer, not this SSH session.\nOn your local computer, run: {command}"
+                        xai_grok_i18n::t_fmt(
+                            "task_result.fix_local_computer",
+                            &[("command", command.as_str())],
                         ),
                     );
                 }
@@ -646,7 +646,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     if error.starts_with("Could not prepare the fix:") {
                         error
                     } else {
-                        format!("Could not prepare the fix: {error}")
+                        xai_grok_i18n::t_fmt(
+                            "task_result.could_not_prepare_fix",
+                            &[("error", error.as_str())],
+                        )
                     },
                 ),
             }
@@ -728,7 +731,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     }
                 }
                 Err(error) if error.starts_with("Could not apply the fix:") => error,
-                Err(error) => format!("Could not apply the fix: {error}"),
+                Err(error) => xai_grok_i18n::t_fmt(
+                    "task_result.could_not_apply_fix",
+                    &[("error", error.as_str())],
+                ),
             };
             deliver_doctor_message(app, target.agent_id, message);
             vec![]
@@ -1044,7 +1050,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             app,
             agent_id,
             &session_id,
-            format!("Couldn't load session usage: {error}"),
+            xai_grok_i18n::t_fmt(
+                "task_result.session_usage_load_failed",
+                &[("error", error.as_str())],
+            ),
         ),
         TaskResult::FeedbackComplete { .. } => vec![],
         TaskResult::FeedbackFailed { agent_id, error } => {
