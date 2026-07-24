@@ -172,7 +172,7 @@ pub async fn check_update_status(update_config: &UpdateConfig) -> UpdateStatus {
                                 &[
                                     ("channel", channel.as_str()),
                                     ("current", current_version.as_str()),
-                                    ("latest", latest_version.as_str()),
+                                    ("latest", target.as_str()),
                                 ],
                             )
                         } else {
@@ -180,7 +180,7 @@ pub async fn check_update_status(update_config: &UpdateConfig) -> UpdateStatus {
                                 "update.error.parse_status_versions",
                                 &[
                                     ("current", current_version.as_str()),
-                                    ("latest", latest_version.as_str()),
+                                    ("latest", target.as_str()),
                                 ],
                             )
                         });
