@@ -179,6 +179,9 @@ pub enum MarketplaceCommand {
     Add {
         /// Git URL, GitHub shorthand (e.g. user/repo), or local directory path.
         url: String,
+        /// Skip the reachability probe (e.g. for hosts only reachable on VPN).
+        #[arg(long)]
+        force: bool,
     },
     /// Remove a marketplace source and uninstall its plugins
     Remove {
@@ -977,7 +980,7 @@ async fn run_marketplace(cmd: MarketplaceCommand) -> Result<()> {
 
     match cmd {
         MarketplaceCommand::List { json } => marketplace_list(&sources, json),
-        MarketplaceCommand::Add { url } => marketplace_add(&sources, &url),
+        MarketplaceCommand::Add { url, force } => marketplace_add(&sources, &url, force),
         MarketplaceCommand::Remove { source } => marketplace_remove(&sources, &source),
         MarketplaceCommand::Update { name } => marketplace_update(&sources, name.as_deref()),
     }
@@ -1025,6 +1028,7 @@ fn marketplace_list(
 fn marketplace_add(
     sources: &[xai_grok_plugin_marketplace::MarketplaceSource],
     url: &str,
+    force: bool,
 ) -> Result<()> {
     use xai_grok_shell::plugin::MarketplaceAddInput;
 
@@ -1080,6 +1084,15 @@ fn marketplace_add(
             "cli.plugin.marketplace.add.already_configured",
             &[("source", identity.as_str())],
         ));
+    }
+
+    if !force && let MarketplaceAddInput::GitUrl(git_url) = &input {
+        xai_grok_plugin_marketplace::git::probe_git_remote(git_url).map_err(|e| {
+            anyhow::anyhow!(
+                "{e}\nNot adding \"{url}\": it doesn't look like a reachable git repository. \
+                 Re-run with --force to add it anyway (e.g. a host only reachable on VPN)."
+            )
+        })?;
     }
 
     let name = match &input {
