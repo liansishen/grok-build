@@ -700,6 +700,7 @@
 "hint.copy_pattern" = "复制模式"
 "hint.copy_query" = "复制查询"
 "hint.copy_url" = "复制网址"
+"hint.copy_plan" = "复制计划"
 "hint.delete" = "删除"
 "hint.delete_row" = "删除行"
 "hint.edit" = "编辑"

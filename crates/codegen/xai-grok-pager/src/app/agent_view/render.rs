@@ -128,7 +128,7 @@ impl AgentView {
                     ]
                 }
             }
-            PlanApprovalFocus::Preview => vec![],
+            PlanApprovalFocus::Preview => vec![HintItem::new(key!('y'), "copy plan")],
         }
     }
     /// Returns the *exact* hints the bottom shortcuts bar would render right now.
@@ -211,6 +211,7 @@ impl AgentView {
             } else {
                 let mut h = vec![
                     HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment")),
+                    HintItem::new(key!('y'), xai_grok_i18n::t("hint.copy_plan")),
                     HintItem::new(key!('f', CONTROL), xai_grok_i18n::t("hint.fullscreen")),
                 ];
                 if !self.plan_comments.is_empty() {
@@ -3237,6 +3238,7 @@ impl AgentView {
                 } else {
                     let mut h = vec![
                         HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment")),
+                        HintItem::new(key!('y'), xai_grok_i18n::t("hint.copy_plan")),
                         HintItem::new(key!('f', CONTROL), xai_grok_i18n::t("hint.fullscreen")),
                     ];
                     if !self.plan_comments.is_empty() {
@@ -3329,6 +3331,7 @@ impl AgentView {
                 .with_pending(pending_hint)
                 .render(layout.shortcuts, buf);
         }
+        let line_viewer_toast = self.active_toast_message().map(|s| s.to_string());
         let is_plan_viewer = self.is_plan_viewer();
         let has_plan_comments = !self.plan_comments.is_empty();
         let casual_commenting = self.is_casual_commenting();
@@ -3375,6 +3378,26 @@ impl AgentView {
                 &theme,
                 effective_comment_count,
             );
+            let toast_area = viewer
+                .last_popup_area
+                .or(viewer.last_modal_area)
+                .unwrap_or(overlay_area);
+            if let Some(ref msg) = line_viewer_toast
+                && toast_area.height > 0
+                && let Some(toast_text) = fit_toast_text(msg, toast_area.width.saturating_sub(1))
+            {
+                let w = toast_text.chars().count() as u16;
+                let tx = toast_area.right().saturating_sub(w + 1);
+                let ty = toast_area.bottom().saturating_sub(1);
+                for (i, ch) in toast_text.chars().enumerate() {
+                    if let Some(cell) = buf.cell_mut((tx + i as u16, ty)) {
+                        cell.set_char(ch);
+                        cell.fg = theme.accent_user;
+                        cell.bg = theme.bg_base;
+                        cell.modifier = ratatui::prelude::Modifier::BOLD;
+                    }
+                }
+            }
             let in_plan_approval = self.plan_approval_view.is_some();
             let on_comment = in_plan_approval
                 && viewer
@@ -3400,11 +3423,15 @@ impl AgentView {
                 } else {
                     h.push(HintItem::new(key!('a'), xai_grok_i18n::t("hint.approve")));
                 }
+                h.push(HintItem::new(key!('y'), xai_grok_i18n::t("hint.copy_plan")));
                 h.push(HintItem::new(key!('q'), xai_grok_i18n::t("hint.quit_plan")));
                 h.push(HintItem::new(key!(Tab), xai_grok_i18n::t("hint.prompt")));
                 h
             } else if in_plan_approval {
-                let mut h = vec![HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment"))];
+                let mut h = vec![
+                    HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment")),
+                    HintItem::new(key!('y'), xai_grok_i18n::t("hint.copy_plan")),
+                ];
                 if approval_has_comments {
                     h.push(HintItem::new(key!('s'), xai_grok_i18n::t("hint.send")));
                 } else {
@@ -3434,9 +3461,13 @@ impl AgentView {
                     vec![
                         HintItem::new(key!(Enter), xai_grok_i18n::t("hint.edit")),
                         HintItem::new(key!('x'), xai_grok_i18n::t("hint.delete")),
+                        HintItem::new(key!('y'), xai_grok_i18n::t("hint.copy_plan")),
                     ]
                 } else {
-                    vec![HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment"))]
+                    vec![
+                        HintItem::new(key!('c'), xai_grok_i18n::t("hint.comment")),
+                        HintItem::new(key!('y'), xai_grok_i18n::t("hint.copy_plan")),
+                    ]
                 };
                 if has_plan_comments {
                     h.push(HintItem::new(key!('s'), xai_grok_i18n::t("hint.send")));

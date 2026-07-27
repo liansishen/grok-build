@@ -700,6 +700,7 @@
 "hint.copy_pattern" = "copy pattern"
 "hint.copy_query" = "copy query"
 "hint.copy_url" = "copy url"
+"hint.copy_plan" = "copy plan"
 "hint.delete" = "delete"
 "hint.delete_row" = "delete row"
 "hint.edit" = "edit"
