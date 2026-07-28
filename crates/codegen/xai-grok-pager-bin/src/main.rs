@@ -417,6 +417,12 @@ fn env_flag_enabled(value: &str) -> bool {
 fn fetch_remote_settings() -> Option<xai_grok_shell::util::config::RemoteSettings> {
     join_early_prefetch(xai_grok_shell::agent::models::start_early_prefetch(None))
 }
+fn workspace_sandbox_profile_error(profile: &str) -> String {
+    t_fmt(
+        "cli.workspace.sandbox_profile_unavailable",
+        &[("profile", profile)],
+    )
+}
 async fn run_workspace_mgmt(args: WorkspaceMgmtArgs) -> Result<()> {
     if matches!(
         &args.command,
@@ -425,12 +431,7 @@ async fn run_workspace_mgmt(args: WorkspaceMgmtArgs) -> Result<()> {
             | WorkspaceMgmtCommand::Resume { .. }
     ) && let Some(profile) = xai_grok_sandbox::requested_confinement_profile()
     {
-        anyhow::bail!(
-            "`grok workspace` start/restart/resume is unavailable under sandbox profile '{profile}': \
-             those commands (re)activate shared-leader workspace exposure that this session cannot \
-             prove is confined by that profile. Disable the profile at the source that selected it \
-             (CLI, env, config, or a managed requirement)."
-        );
+        anyhow::bail!("{}", workspace_sandbox_profile_error(profile));
     }
     let env_override = workspace_command_env_override();
     let remote_settings = if env_override.is_none() {
@@ -1848,9 +1849,11 @@ async fn async_main(args: PagerArgs) -> Result<()> {
         xai_grok_pager::app::cli::SandboxStartup::Apply(profile) => profile,
         xai_grok_pager::app::cli::SandboxStartup::Conflict { requested, saved } => {
             eprintln!(
-                "error: cannot resume this session under sandbox profile '{requested}' — \
-                 it was created with '{saved}'. Omit --sandbox to resume with '{saved}', \
-                 or start a new session to use '{requested}'."
+                "{}",
+                t_fmt(
+                    "cli.sandbox.resume_profile_conflict",
+                    &[("requested", requested.as_str()), ("saved", saved.as_str())],
+                )
             );
             std::process::exit(1);
         }
@@ -2691,6 +2694,29 @@ mod tests {
             std::env::var("GROK_OPEN_DASHBOARD_AT_STARTUP").is_err(),
             "failure path must not flag the startup hook",
         );
+    }
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn workspace_sandbox_profile_error_is_localized() {
+        struct RestoreEn;
+        impl Drop for RestoreEn {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
+            }
+        }
+        let _guard = RestoreEn;
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
+        let en = workspace_sandbox_profile_error("strict");
+        assert!(en.contains("'strict'"), "must name the profile: {en}");
+        assert!(
+            en.contains("start/restart/resume is unavailable"),
+            "must explain the blocked commands: {en}"
+        );
+
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        let zh = workspace_sandbox_profile_error("strict");
+        assert!(zh.contains("“strict”"), "must name the profile: {zh}");
+        assert!(zh.contains("无法使用"), "must be localized: {zh}");
     }
     #[test]
     fn workspace_command_gate_resolution() {

@@ -497,13 +497,11 @@ pub fn warn_leader_disabled_by_sandbox(profile: &str) {
 ///
 /// Write errors are dropped — `eprintln!` would panic on a closed stderr.
 fn print_leader_disabled_by_sandbox(profile: &str, w: &mut impl Write) {
-    let _ = writeln!(
-        w,
-        "note: sandbox profile '{profile}' was requested, so leader mode is off for this \
-         session and tool calls stay in this process instead of the shared leader. \
-         Disable the profile at the source that selected it (CLI, env, config, or a \
-         managed requirement) to use the leader."
+    let message = xai_grok_i18n::t_fmt(
+        "cli.sandbox.leader_disabled_by_profile",
+        &[("profile", profile)],
     );
+    let _ = writeln!(w, "{message}");
 }
 /// Join early prefetch to get remote settings (with timeout).
 ///
@@ -1809,7 +1807,16 @@ mod tests {
         }
     }
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn sandbox_notice_names_the_profile_without_promising_enforcement() {
+        struct RestoreEn;
+        impl Drop for RestoreEn {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
+            }
+        }
+        let _guard = RestoreEn;
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
         let mut out = Vec::new();
         print_leader_disabled_by_sandbox("strict", &mut out);
         let msg = String::from_utf8(out).expect("utf-8");
@@ -1826,6 +1833,14 @@ mod tests {
             msg.contains("Disable the profile at the source"),
             "must say how to get leader mode back: {msg}"
         );
+        assert_eq!(msg.lines().count(), 1, "single line: {msg}");
+
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        let mut out = Vec::new();
+        print_leader_disabled_by_sandbox("strict", &mut out);
+        let msg = String::from_utf8(out).expect("utf-8");
+        assert!(msg.contains("“strict”"), "must name the profile: {msg}");
+        assert!(msg.contains("已请求沙箱配置"), "must be localized: {msg}");
         assert_eq!(msg.lines().count(), 1, "single line: {msg}");
     }
     #[test]
