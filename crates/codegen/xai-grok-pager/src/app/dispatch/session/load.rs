@@ -887,6 +887,7 @@ pub(in crate::app::dispatch) fn handle_session_loaded(
     restore_summary: Option<String>,
     restore_degree: Option<xai_grok_workspace::session::git::RestoreDegree>,
     running_prompt_id: Option<String>,
+    scheduler_background_loops: Option<bool>,
 ) -> Vec<Effect> {
     tracing::info!(
         "Session loaded for agent {:?} session {:?}",
@@ -899,6 +900,7 @@ pub(in crate::app::dispatch) fn handle_session_loaded(
         }
         let hydrate_sid = session_id.clone();
         agent.bind_session_id(session_id);
+        agent.scheduler_background_loops = scheduler_background_loops;
         agent.scrollback.end_batch();
         agent.session.loading_replay = false;
         agent.session.restore_degree = restore_degree;
