@@ -341,19 +341,55 @@ pub(super) fn apply_auto_topup(
 
 // TaskResult handlers.
 
+/// Append a `/usage` account summary from the newest app-scoped cache.
+pub(super) fn push_cached_usage_summary(app: &mut AppView, agent_id: AgentId) {
+    let balance = app.credit_balance.clone();
+    let auto_topup = app.auto_topup.clone();
+    let Some(agent) = app.agents.get_mut(&agent_id) else {
+        return;
+    };
+    if agent.chat_kind {
+        return;
+    }
+    let message = match balance.as_ref() {
+        Some(balance) => {
+            crate::views::credit_bar::format_usage_summary(balance, auto_topup.as_ref())
+        }
+        None => "No billing data available.".to_string(),
+    };
+    agent.scrollback.push_block(RenderBlock::System(
+        crate::scrollback::blocks::SystemMessageBlock::new(message),
+    ));
+}
+
 pub(super) fn handle_billing_fetched(
     app: &mut AppView,
     agent_id: AgentId,
+    request: crate::app::actions::BillingRequestId,
     balance: Option<crate::views::credit_bar::CreditBalance>,
     silent: bool,
     subscription_tier: Option<String>,
     autotopup: crate::views::credit_bar::AutoTopupFetch,
 ) -> Vec<Effect> {
+    // Reject hidden, old-account, and out-of-order results before they can
+    // repopulate or roll back the app-scoped cache.
+    if !app.usage_visible || request.generation != app.billing_generation {
+        if !app.usage_visible {
+            app.billing_poll_wanted = false;
+        }
+        return vec![];
+    }
+    if request.sequence <= app.billing_applied_seq {
+        if !silent {
+            push_cached_usage_summary(app, agent_id);
+        }
+        return vec![];
+    }
+    app.billing_applied_seq = request.sequence;
     // Parse/transport failures route to `BillingError`, so a `None`
     // balance here means the response carried no billing config. Clear
-    // the cached balance + polling so the status bar agrees with the
-    // "No billing data available." message rather than showing a stale
-    // value.
+    // the cached balance so every tab agrees with the "No billing data
+    // available." message rather than showing a stale value.
     app.credit_balance = balance.clone();
     // `Resolved` updates the cached rule, `Cleared` resets it to unknown
     // (no credits), `Unchanged` keeps the last-known-good (fetch failed).
@@ -365,24 +401,11 @@ pub(super) fn handle_billing_fetched(
     if let Some(tier) = subscription_tier {
         app.subscription_tier = Some(tier);
     }
-    // Render the `/usage` summary from the now-current cached rule.
-    let summary_topup = app.auto_topup.clone();
-    if let Some(agent) = app.agents.get_mut(&agent_id) {
-        // Gateway/chat-kind: do not attach Build coding credits.
-        let mut topup = agent.auto_topup.clone();
-        apply_auto_topup(&mut topup, &autotopup);
-        agent.apply_credit_balance(balance.clone(), topup);
-        if !silent && !agent.chat_kind {
-            let msg = match &balance {
-                Some(bal) => {
-                    crate::views::credit_bar::format_usage_summary(bal, summary_topup.as_ref())
-                }
-                None => "No billing data available.".to_string(),
-            };
-            agent.scrollback.push_block(RenderBlock::System(
-                crate::scrollback::blocks::SystemMessageBlock::new(msg),
-            ));
-        }
+    app.sync_billing_cache_to_agents();
+    // The account cache has already fanned out to every Build agent; only
+    // the explicitly requested tab receives the non-silent transcript block.
+    if !silent {
+        push_cached_usage_summary(app, agent_id);
     }
     vec![]
 }
@@ -414,11 +437,12 @@ pub(super) fn handle_check_subscription_complete(
     meta: Option<serde_json::Value>,
 ) -> Vec<Effect> {
     let was_blocked = !app.has_access();
+    let mut billing_refresh_needed = false;
     let applied = match meta {
         Some(meta_val) => {
             match serde_json::from_value::<xai_grok_shell::auth::AuthMeta>(meta_val) {
                 Ok(auth_meta) => {
-                    app.apply_auth_meta(&auth_meta);
+                    billing_refresh_needed = app.apply_auth_meta(&auth_meta);
                     true
                 }
                 Err(e) => {
@@ -455,7 +479,11 @@ pub(super) fn handle_check_subscription_complete(
             "tier": app.subscription_tier,
         })),
     );
-    maybe_start_paywall_chain(app, was_blocked)
+    let mut effects = maybe_start_paywall_chain(app, was_blocked);
+    if billing_refresh_needed {
+        effects.push(Effect::FetchAppBilling { request: None });
+    }
+    effects
 }
 
 /// Safety net for a hung verification check: show the still-pending
@@ -484,15 +512,20 @@ pub(super) fn handle_credit_limit_recheck_complete(
     meta: Option<serde_json::Value>,
 ) -> Vec<Effect> {
     let old_tier = app.subscription_tier.clone();
+    let mut billing_refresh_needed = false;
     if let Some(meta_val) = meta
         && let Ok(auth_meta) = serde_json::from_value::<xai_grok_shell::auth::AuthMeta>(meta_val)
     {
-        app.apply_auth_meta(&auth_meta);
+        billing_refresh_needed = app.apply_auth_meta(&auth_meta);
     }
     let tier_changed = app.subscription_tier != old_tier && app.subscription_tier.is_some();
 
     let Some(agent) = app.agents.get_mut(&agent_id) else {
-        return vec![];
+        return if billing_refresh_needed {
+            vec![Effect::FetchAppBilling { request: None }]
+        } else {
+            vec![]
+        };
     };
 
     // If the user already submitted another prompt while the
@@ -524,7 +557,13 @@ pub(super) fn handle_credit_limit_recheck_complete(
     drain.effects.push(Effect::FetchBilling {
         agent_id,
         silent: true,
+        request: None,
     });
+    if billing_refresh_needed {
+        drain
+            .effects
+            .push(Effect::FetchAppBilling { request: None });
+    }
     note_peek_page_flip(app, agent_id, drain.page_flip_entry);
     drain.effects
 }

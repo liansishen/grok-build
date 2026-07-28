@@ -870,6 +870,7 @@ pub(in crate::app::dispatch) fn handle_session_created(
         effects.push(Effect::FetchBilling {
             agent_id,
             silent: true,
+            request: None,
         });
         if let Some((model_id, effort)) = deferred {
             effects.push(Effect::SwitchModel {
@@ -973,6 +974,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
         effects.push(Effect::FetchBilling {
             agent_id,
             silent: true,
+            request: None,
         });
         if let Some((model_id, effort)) = deferred {
             effects.push(Effect::SwitchModel {

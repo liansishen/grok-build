@@ -1374,6 +1374,13 @@ pub struct DoctorFixTarget {
     pub session_binding_epoch: u32,
     pub cwd: std::path::PathBuf,
 }
+/// Identity stamped onto every account-billing request. `generation` isolates
+/// auth principals; `sequence` rejects older overlapping responses.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BillingRequestId {
+    pub generation: u64,
+    pub sequence: u64,
+}
 #[derive(Debug)]
 pub enum Effect {
     /// Create a new ACP session.
@@ -2060,10 +2067,18 @@ pub enum Effect {
     /// When `silent` is true the result updates `credit_balance` without
     /// pushing a system message into scrollback (used for automatic refreshes
     /// on session init and after each turn).
-    FetchBilling { agent_id: AgentId, silent: bool },
+    FetchBilling {
+        agent_id: AgentId,
+        silent: bool,
+        /// Stamped by the effect processor immediately before execution.
+        request: Option<BillingRequestId>,
+    },
     /// Fetch billing data at the app level (no agent required).
     /// Used on startup to populate the welcome-screen credit warning.
-    FetchAppBilling,
+    FetchAppBilling {
+        /// Stamped by the effect processor immediately before execution.
+        request: Option<BillingRequestId>,
+    },
     /// Fetch per-session token/cost via `x.ai/session/usage` (auth-agnostic).
     FetchSessionUsage {
         agent_id: AgentId,
@@ -2775,6 +2790,7 @@ pub enum TaskResult {
     /// Billing data fetched from the agent.
     BillingFetched {
         agent_id: AgentId,
+        request: BillingRequestId,
         balance: Option<crate::views::credit_bar::CreditBalance>,
         /// When true, update `credit_balance` silently (no scrollback message).
         silent: bool,
@@ -2783,17 +2799,22 @@ pub enum TaskResult {
         /// Auto top-up rule fetch result; `Unchanged` keeps any cached rule.
         autotopup: crate::views::credit_bar::AutoTopupFetch,
     },
-    /// App-level billing data (welcome screen).
+    /// Authoritative app-level billing data (welcome screen and all Build tabs).
     AppBillingFetched {
+        request: BillingRequestId,
         balance: Option<crate::views::credit_bar::CreditBalance>,
         autotopup: crate::views::credit_bar::AutoTopupFetch,
     },
+    /// App-level billing transport or payload parsing failed. The last-known-good
+    /// cache is retained and periodic refresh remains armed for a later retry.
+    AppBillingFetchFailed { request: BillingRequestId },
     GateRefreshed {
         settings: Option<xai_grok_shell::util::config::RemoteSettings>,
     },
     /// Billing fetch failed with an error message.
     BillingError {
         agent_id: AgentId,
+        request: BillingRequestId,
         error: String,
         /// When true, swallow the error silently (background refresh).
         silent: bool,

@@ -318,6 +318,7 @@ pub(super) fn append_consumer_billing_surface(app: &mut AppView, agent_id: Agent
     vec![Effect::FetchBilling {
         agent_id,
         silent: false,
+        request: None,
     }]
 }
 

@@ -1746,6 +1746,44 @@ fn agent_profile_names_are_valid_builtins() {
             );
     }
 }
+#[tokio::test]
+async fn hidden_billing_surface_drops_account_billing_effects() {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (progress_tx, _progress_rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut tasks = JoinSet::new();
+    let flags = SessionFlags::default();
+    let request = BillingRequestId {
+        generation: 0,
+        sequence: 1,
+    };
+
+    for effect in [
+        Effect::FetchBilling {
+            agent_id: AgentId(7),
+            silent: true,
+            request: Some(request),
+        },
+        Effect::FetchAppBilling {
+            request: Some(request),
+        },
+    ] {
+        let (quit, _) = execute(
+            effect,
+            &mut tasks,
+            &tx,
+            Path::new("."),
+            &flags,
+            &progress_tx,
+        );
+        assert!(!quit);
+        assert!(tasks.is_empty(), "hidden billing must not spawn an RPC task");
+    }
+    assert!(
+        rx.try_recv().is_err(),
+        "hidden billing must not send an ACP request"
+    );
+}
+
 /// Default flags produce no agent profile (uses grok-build default).
 #[test]
 fn default_flags_produce_no_profile() {

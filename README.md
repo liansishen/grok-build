@@ -34,7 +34,7 @@ language = "zh-CN"   # auto | en | zh-CN
 transparent_bg = true
 ```
 
-环境变量：`GROK_TRANSPARENT_BG=1`。
+环境变量：`GROK_TRANSPARENT_BG=1`。该选项在启动时读取；修改配置或环境变量后需要重启 Grok。
 
 ### 3. 提示栏用量状态（周/月限额 + 重置时间）
 

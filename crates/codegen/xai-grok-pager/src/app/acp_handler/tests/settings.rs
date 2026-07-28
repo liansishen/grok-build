@@ -81,6 +81,12 @@
         assert!(app.usage_visible);
         assert!(!app.tier_restricted_commands.is_empty());
         assert!(!app.voice_mode_enabled);
+        assert!(
+            app.pending_effects
+                .iter()
+                .any(|effect| matches!(effect, Effect::FetchAppBilling { .. })),
+            "returning to a personal tier should refresh account billing immediately"
+        );
 
         // Paid tier after API Key must not force voice off (omit voice field).
         let mut app = make_app_with_agent("sess-paid-keep-voice");

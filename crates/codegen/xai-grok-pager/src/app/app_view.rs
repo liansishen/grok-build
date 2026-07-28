@@ -715,8 +715,18 @@ pub struct AppView {
     pub credit_balance: Option<crate::views::credit_bar::CreditBalance>,
     /// App-level auto top-up rule paired with `credit_balance` for the warning.
     pub auto_topup: Option<crate::views::credit_bar::AutoTopupInfo>,
-    /// Periodic billing poll requested (credits >= 99%).
+    /// Whether periodic consumer account billing refresh is armed.
     pub billing_poll_wanted: bool,
+    /// Auth/account generation attached to billing requests. Visibility or
+    /// principal transitions advance it so old-account responses are ignored.
+    pub billing_generation: u64,
+    /// Monotonic sequence assigned when each billing request is executed.
+    pub billing_request_seq: u64,
+    /// Newest request sequence whose successful payload updated the app cache.
+    pub billing_applied_seq: u64,
+    /// Last explicit auth principal that owns the account-scoped billing cache.
+    /// Missing identity in partial/legacy metadata leaves this unchanged.
+    pub billing_account_key: Option<String>,
     /// Leader-mode session roster (FleetView dashboard). Populated from
     /// `x.ai/sessions/list` polls and `x.ai/sessions/changed` broadcasts.
     /// Empty in non-leader mode, which naturally gates roster rendering.
@@ -1297,9 +1307,29 @@ impl AppView {
         })
     }
     /// Apply typed auth metadata from the shell.
-    pub fn apply_auth_meta(&mut self, meta: &xai_grok_shell::auth::AuthMeta) {
+    pub fn apply_auth_meta(&mut self, meta: &xai_grok_shell::auth::AuthMeta) -> bool {
         self.pending_gate_verification = None;
         let was_gated = self.gate.is_some();
+        let was_usage_visible = self.usage_visible;
+        // Missing email in a partial/legacy auth payload is not evidence that
+        // the principal changed; only an explicit identity can replace it.
+        let account_key_changed = meta
+            .email
+            .as_ref()
+            .is_some_and(|email| self.billing_account_key.as_ref() != Some(email));
+        if meta.email.is_some() {
+            self.billing_account_key = meta.email.clone();
+        }
+        if account_key_changed && was_usage_visible {
+            // Personal-account switches can remain visible throughout. Invalidate
+            // old requests/caches just like a team/API-key hide transition. A
+            // previously hidden surface is invalidated below exactly once.
+            self.billing_generation = self.billing_generation.wrapping_add(1);
+            self.billing_poll_wanted = false;
+            self.credit_balance = None;
+            self.auto_topup = None;
+            self.sync_billing_cache_to_agents();
+        }
         self.team_id = meta.team_id.clone();
         self.team_name = meta.team_name.clone();
         self.is_zdr = meta.is_zdr;
@@ -1324,6 +1354,8 @@ impl AppView {
                 .is_some_and(is_api_key_label);
         self.usage_visible = meta.team_name.is_none() && !self.is_api_key_auth;
         self.sync_billing_surface_to_agents();
+        let billing_refresh_needed =
+            self.usage_visible && (!was_usage_visible || account_key_changed);
         self.apply_tier_restrictions();
         if self.is_api_key_auth {
             self.ensure_voice_for_api_key();
@@ -1335,11 +1367,42 @@ impl AppView {
         if let Some(show) = meta.show_resolved_model {
             self.show_resolved_model = show;
         }
+        billing_refresh_needed
+    }
+    /// Copy the app-scoped billing cache into every existing agent.
+    ///
+    /// Build coding credits are account-scoped, not tab-scoped. Chat/gateway
+    /// sessions still clear the values through `AgentView::apply_credit_balance`.
+    pub(crate) fn sync_billing_cache_to_agents(&mut self) {
+        let balance = self.credit_balance.clone();
+        let auto_topup = self.auto_topup.clone();
+        for agent in self.agents.values_mut() {
+            agent.apply_credit_balance(balance.clone(), auto_topup.clone());
+        }
     }
     /// Mirror [`Self::usage_visible`] onto every slash surface that can run
-    /// `/usage` (agents, welcome, dashboard dispatch / peek-reply).
+    /// `/usage` (agents, welcome, dashboard dispatch / peek-reply), and keep
+    /// periodic account billing refresh aligned with that surface.
     pub(crate) fn sync_billing_surface_to_agents(&mut self) {
         let visible = self.usage_visible;
+        if !visible {
+            self.billing_poll_wanted = false;
+            // Invalidate every in-flight account request once per visible→hidden
+            // transition. Repeated hidden-surface synchronization is idempotent.
+            let was_surface_visible = self
+                .welcome_prompt
+                .slash_controller
+                .billing_surface_visible();
+            if was_surface_visible {
+                self.billing_generation = self.billing_generation.wrapping_add(1);
+            }
+            // A team/API-key transition can race an in-flight consumer billing
+            // request. Clear account-only data now; a transition-invalidated
+            // late result is ignored even if the surface becomes visible again.
+            self.credit_balance = None;
+            self.auto_topup = None;
+            self.sync_billing_cache_to_agents();
+        }
         for agent in self.agents.values_mut() {
             agent.set_billing_surface_visible(visible);
         }
@@ -1555,6 +1618,10 @@ impl AppView {
             credit_balance: None,
             auto_topup: None,
             billing_poll_wanted: false,
+            billing_generation: 0,
+            billing_request_seq: 0,
+            billing_applied_seq: 0,
+            billing_account_key: None,
             leader_roster: Vec::new(),
             dashboard_local_sessions: Vec::new(),
             dashboard_sessions_loading: false,
@@ -5831,6 +5898,10 @@ pub(crate) mod tests {
             credit_balance: None,
             auto_topup: None,
             billing_poll_wanted: false,
+            billing_generation: 0,
+            billing_request_seq: 0,
+            billing_applied_seq: 0,
+            billing_account_key: None,
             leader_roster: Vec::new(),
             dashboard_local_sessions: Vec::new(),
             dashboard_sessions_loading: false,
@@ -7018,7 +7089,7 @@ pub(crate) mod tests {
             team_name: Some("Acme Corp".into()),
             ..Default::default()
         };
-        app.apply_auth_meta(&meta);
+        let _ = app.apply_auth_meta(&meta);
         assert!(!app.usage_visible);
         assert_eq!(app.team_id.as_deref(), Some("team-uuid"));
         assert!(
@@ -7032,7 +7103,7 @@ pub(crate) mod tests {
         let mut app = test_app();
         app.usage_visible = false;
         let meta = xai_grok_shell::auth::AuthMeta::default();
-        app.apply_auth_meta(&meta);
+        let _ = app.apply_auth_meta(&meta);
         assert!(app.usage_visible);
     }
     #[test]
@@ -7040,7 +7111,7 @@ pub(crate) mod tests {
         let mut app = test_app();
         app.is_api_key_auth = true;
         app.usage_visible = false;
-        app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
+        let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
         assert!(!app.is_api_key_auth);
         assert!(app.usage_visible);
     }
@@ -7049,7 +7120,7 @@ pub(crate) mod tests {
         let mut app = test_app();
         advertise_media_tools(&mut app);
         assert!(!app.voice_mode_enabled);
-        app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
             auth_mode: Some("ApiKey".into()),
             subscription_tier: Some("API Key".into()),
             ..Default::default()
@@ -7061,14 +7132,14 @@ pub(crate) mod tests {
         assert!(!app.is_voice_tier_restricted());
         assert!(app.voice_mode_enabled);
         let mut app = test_app();
-        app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
             subscription_tier: Some("api_key".into()),
             ..Default::default()
         });
         assert!(app.is_api_key_auth);
         assert!(app.voice_mode_enabled);
         assert!(app.tier_restricted_commands.is_empty());
-        app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
             auth_mode: Some("Oidc".into()),
             subscription_tier: Some("Free".into()),
             ..Default::default()
@@ -7128,7 +7199,7 @@ pub(crate) mod tests {
     fn apply_auth_meta_restricts_usage_for_free_tier() {
         let mut app = test_app();
         advertise_media_tools(&mut app);
-        app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
+        let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
         assert_eq!(
             app.tier_restricted_commands,
             expected_tier_restricted_commands()
@@ -7144,7 +7215,7 @@ pub(crate) mod tests {
             subscription_tier: Some("X Basic".into()),
             ..Default::default()
         };
-        app.apply_auth_meta(&meta);
+        let _ = app.apply_auth_meta(&meta);
         assert_eq!(
             app.tier_restricted_commands,
             expected_tier_restricted_commands()
@@ -7159,12 +7230,12 @@ pub(crate) mod tests {
             subscription_tier: Some("SuperGrok".into()),
             ..Default::default()
         };
-        app.apply_auth_meta(&meta);
+        let _ = app.apply_auth_meta(&meta);
         assert!(app.tier_restricted_commands.is_empty());
         assert_tier_restricted_commands_present(&app);
         let mut app = test_app();
         advertise_media_tools(&mut app);
-        app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
+        let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
         assert!(!app.tier_restricted_commands.is_empty());
         app.subscription_tier = Some("SuperGrok".into());
         app.apply_tier_restrictions();
@@ -7176,7 +7247,7 @@ pub(crate) mod tests {
             team_name: Some("Acme Corp".into()),
             ..Default::default()
         };
-        app.apply_auth_meta(&meta);
+        let _ = app.apply_auth_meta(&meta);
         assert!(app.tier_restricted_commands.is_empty());
     }
     #[test]
@@ -7199,14 +7270,14 @@ pub(crate) mod tests {
     #[test]
     fn is_voice_tier_restricted_tracks_tier() {
         let mut app = test_app();
-        app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
+        let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
         assert!(app.is_voice_tier_restricted());
         let mut app = test_app();
         let meta = xai_grok_shell::auth::AuthMeta {
             subscription_tier: Some("SuperGrok".into()),
             ..Default::default()
         };
-        app.apply_auth_meta(&meta);
+        let _ = app.apply_auth_meta(&meta);
         assert!(!app.is_voice_tier_restricted());
     }
     #[test]
@@ -7219,7 +7290,7 @@ pub(crate) mod tests {
         });
         assert!(app.is_access_blocked());
         let meta = xai_grok_shell::auth::AuthMeta::default();
-        app.apply_auth_meta(&meta);
+        let _ = app.apply_auth_meta(&meta);
         assert!(app.gate.is_none());
         assert!(app.has_access());
     }
@@ -7236,7 +7307,7 @@ pub(crate) mod tests {
             gate: Some(gate),
             ..Default::default()
         };
-        app.apply_auth_meta(&meta);
+        let _ = app.apply_auth_meta(&meta);
         assert!(app.gate.is_some());
         assert!(app.is_access_blocked());
     }

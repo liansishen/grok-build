@@ -1600,6 +1600,7 @@ pub(super) fn handle_prompt_response(
         effects.push(Effect::FetchBilling {
             agent_id,
             silent: true,
+            request: None,
         });
         note_peek_page_flip(app, agent_id, page_flip_entry);
         return effects;

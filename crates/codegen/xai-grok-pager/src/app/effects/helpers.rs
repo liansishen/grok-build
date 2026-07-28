@@ -279,6 +279,9 @@ pub(crate) struct SessionFlags {
     /// Active auth is API key (not OAuth/session). Drives rate-limit copy in
     /// `format_acp_error`. Default `false` (OAuth copy) for tests.
     pub is_api_key_auth: bool,
+    /// Whether consumer account billing is currently visible. Billing effects
+    /// are dropped at the execution boundary when team/API-key auth hides it.
+    pub billing_surface_visible: bool,
     /// Startup resume target deferred to the worktree handler after missing
     /// local id/title resolution. Worktree failure messages append the
     /// no-match hint only when the failing target equals this value.

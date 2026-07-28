@@ -24,11 +24,10 @@ use agent_client_protocol as acp;
 use tokio::task::JoinSet;
 use xai_acp_lib::{AcpAgentTx, acp_send};
 use actions::{
-    ClipboardPasteTarget, Effect, ProbedAttachment, SubagentKillOutcome,
-    SwitchModelError, TaskResult,
+    ClipboardPasteTarget, Effect, ProbedAttachment, SubagentKillOutcome, SwitchModelError, TaskResult,
 };
 #[cfg(test)]
-use actions::PermissionModePersist;
+use actions::{BillingRequestId, PermissionModePersist};
 #[cfg(test)]
 use agent::AgentId;
 use crate::unified_log as ulog;
@@ -4148,7 +4147,18 @@ pub(crate) fn execute(
                     }
                 });
         }
-        Effect::FetchBilling { agent_id, silent } => {
+        Effect::FetchBilling {
+            agent_id,
+            silent,
+            request,
+        } => {
+            if !session_flags.billing_surface_visible {
+                return (false, meta);
+            }
+            let Some(request) = request else {
+                tracing::error!("billing effect executed without a request id");
+                return (false, meta);
+            };
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -4173,6 +4183,7 @@ pub(crate) fn execute(
                         Err(e) => {
                             return TaskResult::BillingError {
                                 agent_id,
+                                request,
                                 error: sanitize_user_error(&format!("{e}")),
                                 silent,
                             };
@@ -4183,6 +4194,7 @@ pub(crate) fn execute(
                         Err(e) => {
                             return TaskResult::BillingError {
                                 agent_id,
+                                request,
                                 error: format!("Parse error: {e}"),
                                 silent,
                             };
@@ -4197,6 +4209,7 @@ pub(crate) fn execute(
                     };
                     TaskResult::BillingFetched {
                         agent_id,
+                        request,
                         balance,
                         silent,
                         subscription_tier,
@@ -4244,7 +4257,14 @@ pub(crate) fn execute(
                     }
                 });
         }
-        Effect::FetchAppBilling => {
+        Effect::FetchAppBilling { request } => {
+            if !session_flags.billing_surface_visible {
+                return (false, meta);
+            }
+            let Some(request) = request else {
+                tracing::error!("app billing effect executed without a request id");
+                return (false, meta);
+            };
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -4266,35 +4286,27 @@ pub(crate) fn execute(
                                 BillingConfigResponse,
                             >(result.clone()) {
                                 Ok(billing) => {
-                                    let balance = billing
-                                        .config
-                                        .map(|c| crate::views::credit_bar::CreditBalance {
-                                            period_end_display: None,
-                                            ..credit_balance_from_config(c)
-                                        });
+                                    let balance = billing.config.map(credit_balance_from_config);
                                     let autotopup = if has_prepaid_credits(balance.as_ref()) {
                                         fetch_auto_topup_info(&tx).await
                                     } else {
                                         crate::views::credit_bar::AutoTopupFetch::Cleared
                                     };
                                     TaskResult::AppBillingFetched {
+                                        request,
                                         balance,
                                         autotopup,
                                     }
                                 }
-                                Err(_) => {
-                                    TaskResult::AppBillingFetched {
-                                        balance: None,
-                                        autotopup: crate::views::credit_bar::AutoTopupFetch::Unchanged,
-                                    }
+                                Err(e) => {
+                                    tracing::debug!(error = %e, "app billing response parse failed");
+                                    TaskResult::AppBillingFetchFailed { request }
                                 }
                             }
                         }
-                        Err(_) => {
-                            TaskResult::AppBillingFetched {
-                                balance: None,
-                                autotopup: crate::views::credit_bar::AutoTopupFetch::Unchanged,
-                            }
+                        Err(e) => {
+                            tracing::debug!(error = %e, "app billing fetch failed");
+                            TaskResult::AppBillingFetchFailed { request }
                         }
                     }
                 });

@@ -318,7 +318,7 @@ pub(super) fn handle_auth_complete(
             && let Ok(auth_meta) =
                 serde_json::from_value::<xai_grok_shell::auth::AuthMeta>(meta_val.clone())
         {
-            app.apply_auth_meta(&auth_meta);
+            let _ = app.apply_auth_meta(&auth_meta);
         }
 
         app.auth_state = AuthState::Done;
@@ -368,7 +368,7 @@ pub(super) fn handle_auth_complete(
             }
             let mut effects = dispatch(Action::RequestBundleStatus, app);
             if app.usage_visible {
-                effects.push(Effect::FetchAppBilling);
+                effects.push(Effect::FetchAppBilling { request: None });
             }
             effects.extend(retry_effects);
             return effects;
@@ -386,7 +386,7 @@ pub(super) fn handle_auth_complete(
         }
         // Fetch billing so the welcome screen can show a credit warning.
         if app.usage_visible {
-            effects.push(Effect::FetchAppBilling);
+            effects.push(Effect::FetchAppBilling { request: None });
         }
         // Fetch changelog (mirrors startup path for interactive login).
         effects.push(Effect::FetchChangelog);

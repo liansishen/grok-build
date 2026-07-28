@@ -1002,7 +1002,9 @@ pub(crate) async fn run(
 
     if let Some(meta) = connection.auth_meta.as_ref() {
         match serde_json::from_value::<xai_grok_shell::auth::AuthMeta>(meta.clone()) {
-            Ok(auth_meta) => app.apply_auth_meta(&auth_meta),
+            Ok(auth_meta) => {
+                let _ = app.apply_auth_meta(&auth_meta);
+            }
             Err(e) => tracing::warn!("failed to deserialize auth_meta: {e}"),
         }
     } else {
@@ -1540,8 +1542,8 @@ pub(crate) async fn run(
     // iteration so it is popped on every close path.
     let mut gboom_keyboard_pushed = false;
 
-    const BILLING_POLL_INTERVAL: Duration = Duration::from_secs(30);
     let mut billing_poll_at: Option<Instant> = None;
+    let mut billing_poll_interval = billing_poll_interval(&app);
 
     const GATE_POLL_INTERVAL: Duration = Duration::from_secs(30);
     let mut gate_poll_at: Option<Instant> = None;
@@ -1593,7 +1595,7 @@ pub(crate) async fn run(
         }
         // Fetch billing early so the welcome screen can show a credit warning.
         if app.usage_visible {
-            let effs = vec![super::actions::Effect::FetchAppBilling];
+            let effs = vec![super::actions::Effect::FetchAppBilling { request: None }];
             if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
                 return Ok(make_run_result(&app));
             }
@@ -1837,6 +1839,16 @@ pub(crate) async fn run(
     crate::app::signal_handler::set_quit_notify(quit_notify.clone());
 
     loop {
+        // Billing refresh is app-scoped and live-configurable. Reconcile at
+        // loop-top so settings/auth changes from any select arm can reschedule
+        // or cancel the deadline without waiting for an unrelated task result.
+        reconcile_billing_poll_deadline(
+            &app,
+            &mut billing_poll_at,
+            &mut billing_poll_interval,
+            Instant::now(),
+        );
+
         // Pending $EDITOR / $PAGER suspends first: they can be armed by ANY
         // arm of the select below (input, ticks — e.g. minimal's incremental
         // /transcript build finishing inside a tick draw — tasks, ACP), so
@@ -2134,12 +2146,9 @@ pub(crate) async fn run(
                         schedule_tick(&mut animation_tick_at, &app, tick_interval);
                         resize_debounce_at = None;
 
-                        // Schedule/clear poll timers.
-                        if app.billing_poll_wanted && billing_poll_at.is_none() {
-                            billing_poll_at = Some(Instant::now() + BILLING_POLL_INTERVAL);
-                        } else if !app.billing_poll_wanted {
-                            billing_poll_at = None;
-                        }
+                        // Billing polling is reconciled at loop-top so config
+                        // and auth changes from every event source share one
+                        // scheduling path.
                         if !app.has_access() && gate_poll_at.is_none() {
                             gate_poll_at = Some(Instant::now() + GATE_POLL_INTERVAL);
                         } else if app.has_access() {
@@ -2303,17 +2312,15 @@ pub(crate) async fn run(
 
             _ = billing_poll => {
                 billing_poll_at = None;
-                if let ActiveView::Agent(id) = app.active_view {
-                    let effs = vec![Effect::FetchBilling {
-                        agent_id: id,
-                        silent: true,
-                    }];
+                if app.usage_visible && app.billing_poll_wanted {
+                    // Consumer billing is account-scoped. Fetch even while the
+                    // welcome/dashboard is active; the result fans out to all
+                    // existing Build agents.
+                    let effs = vec![Effect::FetchAppBilling { request: None }];
                     if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
                         break;
                     }
-                }
-                if app.billing_poll_wanted {
-                    billing_poll_at = Some(Instant::now() + BILLING_POLL_INTERVAL);
+                    billing_poll_at = Some(Instant::now() + billing_poll_interval);
                 }
             }
 
@@ -2807,6 +2814,40 @@ pub(crate) async fn run(
     app.notification_service.shutdown();
 
     Ok(make_run_result(&app))
+}
+
+/// Reconcile the account billing timer with live visibility and cadence state.
+fn reconcile_billing_poll_deadline(
+    app: &AppView,
+    poll_at: &mut Option<Instant>,
+    current_interval: &mut Duration,
+    now: Instant,
+) {
+    let wanted_interval = billing_poll_interval(app);
+    if !app.usage_visible || !app.billing_poll_wanted {
+        *poll_at = None;
+    } else if poll_at.is_none() || *current_interval != wanted_interval {
+        *current_interval = wanted_interval;
+        *poll_at = Some(now + wanted_interval);
+    }
+}
+
+/// Resolve the account billing refresh cadence from the live UI snapshot.
+///
+/// Dispatch clamps persisted values, but this boundary also clamps defensively
+/// so malformed/legacy state cannot create a zero-delay loop or an excessively
+/// stale prompt status.
+fn billing_poll_interval(app: &AppView) -> Duration {
+    let minutes = i64::from(
+        app.current_ui
+            .usage_refresh_interval_minutes
+            .unwrap_or(crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT as u8),
+    )
+    .clamp(
+        crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_MIN,
+        crate::settings::defs::USAGE_REFRESH_INTERVAL_MINUTES_MAX,
+    ) as u64;
+    Duration::from_secs(minutes * 60)
 }
 
 /// Load `UiConfig` from the shell's layered config at startup.
@@ -3653,6 +3694,22 @@ fn merge_paste_fragments(events: Vec<TimedInputEvent>) -> Vec<TimedInputEvent> {
     result
 }
 
+/// Stamp account identity/order immediately before a billing effect executes.
+pub(super) fn stamp_billing_request(effect: &mut Effect, app: &mut AppView) {
+    let request_slot = match effect {
+        Effect::FetchBilling { request, .. } | Effect::FetchAppBilling { request } => request,
+        _ => return,
+    };
+    if request_slot.is_some() {
+        return;
+    }
+    app.billing_request_seq = app.billing_request_seq.wrapping_add(1);
+    *request_slot = Some(super::actions::BillingRequestId {
+        generation: app.billing_generation,
+        sequence: app.billing_request_seq,
+    });
+}
+
 /// Spawn effects into the task set. Returns `true` if the app should quit.
 fn process_effects(
     effs: Vec<super::actions::Effect>,
@@ -3674,9 +3731,11 @@ fn process_effects(
         chat_mode: app.chat_mode,
         screen_mode_label: Some(app.screen_mode.meta_label()),
         is_api_key_auth: app.is_api_key_auth,
+        billing_surface_visible: app.usage_visible,
         resume_local_miss: app.resume_local_miss.clone(),
     };
-    for eff in effs {
+    for mut eff in effs {
+        stamp_billing_request(&mut eff, app);
         let (quit, meta) = effects::execute(eff, tasks, &app.acp_tx, &app.cwd, &flags, progress_tx);
         // Install auth abort handle if the current auth state still matches.
         if let Some((seq, abort_handle)) = meta.auth_abort_handle
@@ -3712,6 +3771,74 @@ fn process_effects(
 mod tests {
     use super::*;
     use crossterm::event::{KeyEvent, KeyEventState};
+
+    #[test]
+    fn billing_request_stamping_preserves_existing_identity() {
+        let mut app = crate::app::app_view::tests::test_app();
+        app.billing_generation = 3;
+        app.billing_request_seq = 9;
+        let existing = super::super::actions::BillingRequestId {
+            generation: 2,
+            sequence: 7,
+        };
+        let mut effect = Effect::FetchAppBilling {
+            request: Some(existing),
+        };
+        stamp_billing_request(&mut effect, &mut app);
+        assert!(matches!(
+            effect,
+            Effect::FetchAppBilling {
+                request: Some(request)
+            } if request == existing
+        ));
+        assert_eq!(app.billing_request_seq, 9);
+
+        let mut fresh = Effect::FetchAppBilling { request: None };
+        stamp_billing_request(&mut fresh, &mut app);
+        assert!(matches!(
+            fresh,
+            Effect::FetchAppBilling {
+                request: Some(super::super::actions::BillingRequestId {
+                    generation: 3,
+                    sequence: 10,
+                })
+            }
+        ));
+    }
+
+    #[test]
+    fn billing_poll_interval_defaults_to_five_minutes() {
+        let app = crate::app::app_view::tests::test_app();
+        assert_eq!(billing_poll_interval(&app), Duration::from_secs(5 * 60));
+    }
+
+    #[test]
+    fn billing_poll_interval_uses_live_ui_value() {
+        let mut app = crate::app::app_view::tests::test_app();
+        app.current_ui.usage_refresh_interval_minutes = Some(1);
+        assert_eq!(billing_poll_interval(&app), Duration::from_secs(60));
+        app.current_ui.usage_refresh_interval_minutes = Some(60);
+        assert_eq!(billing_poll_interval(&app), Duration::from_secs(60 * 60));
+    }
+
+    #[test]
+    fn billing_poll_deadline_rearms_when_interval_changes() {
+        let mut app = crate::app::app_view::tests::test_app();
+        app.usage_visible = true;
+        app.billing_poll_wanted = true;
+        let now = Instant::now();
+        let mut interval = Duration::from_secs(5 * 60);
+        let mut poll_at = Some(now + interval);
+
+        app.current_ui.usage_refresh_interval_minutes = Some(1);
+        reconcile_billing_poll_deadline(&app, &mut poll_at, &mut interval, now);
+        assert_eq!(interval, Duration::from_secs(60));
+        assert_eq!(poll_at, Some(now + Duration::from_secs(60)));
+
+        app.usage_visible = false;
+        reconcile_billing_poll_deadline(&app, &mut poll_at, &mut interval, now);
+        assert!(poll_at.is_none());
+    }
 
     #[test]
     fn tty_suspend_arm_stops_same_batch_before_later_ownership_changes() {

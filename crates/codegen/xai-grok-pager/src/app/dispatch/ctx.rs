@@ -230,6 +230,13 @@ pub(crate) fn switch_to_agent(app: &mut AppView, target: AgentId, _cause: Switch
         return;
     }
     app.active_view = ActiveView::Agent(target);
+    // Account billing is app-scoped. Refresh the selected tab from the latest
+    // cache immediately instead of waiting for its next turn or poll tick.
+    let balance = app.credit_balance.clone();
+    let auto_topup = app.auto_topup.clone();
+    if let Some(agent) = app.agents.get_mut(&target) {
+        agent.apply_credit_balance(balance, auto_topup);
+    }
     // Re-anchor the global permission-mode mirror to the now-active agent so the
     // cycle's `sync_active_auto_flag` (which derives from the global) can't copy a
     // different agent's stale Auto/Always-Approve onto this one. Per-session

@@ -6,7 +6,7 @@ use super::auth::{
 use super::billing::{
     PAYWALL_AUTO_CHECK_TIMEOUT, apply_auto_topup, handle_billing_fetched,
     handle_check_subscription_complete, handle_credit_limit_recheck_complete,
-    handle_gate_refreshed, handle_gate_verify_timeout,
+    handle_gate_refreshed, handle_gate_verify_timeout, push_cached_usage_summary,
 };
 use super::cta::{
     handle_cta_plugin_install_done, handle_cta_plugin_reload_done,
@@ -315,16 +315,35 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         }
         TaskResult::BillingFetched {
             agent_id,
+            request,
             balance,
             silent,
             subscription_tier,
             autotopup,
-        } => handle_billing_fetched(app, agent_id, balance, silent, subscription_tier, autotopup),
+        } => handle_billing_fetched(
+            app,
+            agent_id,
+            request,
+            balance,
+            silent,
+            subscription_tier,
+            autotopup,
+        ),
         TaskResult::BillingError {
             agent_id,
+            request,
             error,
             silent,
         } => {
+            if !app.usage_visible || request.generation != app.billing_generation {
+                return vec![];
+            }
+            if request.sequence <= app.billing_applied_seq {
+                if !silent {
+                    push_cached_usage_summary(app, agent_id);
+                }
+                return vec![];
+            }
             if !silent && let Some(agent) = app.agents.get_mut(&agent_id) {
                 agent.scrollback.push_block(RenderBlock::System(
                     crate::scrollback::blocks::SystemMessageBlock::new(xai_grok_i18n::t_fmt(
@@ -335,9 +354,38 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             }
             vec![]
         }
-        TaskResult::AppBillingFetched { balance, autotopup } => {
+        TaskResult::AppBillingFetched {
+            request,
+            balance,
+            autotopup,
+        } => {
+            // Reject hidden, old-account, and out-of-order results before they
+            // can repopulate or roll back the app-scoped cache.
+            if !app.usage_visible
+                || request.generation != app.billing_generation
+                || request.sequence <= app.billing_applied_seq
+            {
+                if !app.usage_visible {
+                    app.billing_poll_wanted = false;
+                }
+                return vec![];
+            }
+            app.billing_applied_seq = request.sequence;
             app.credit_balance = balance;
             apply_auto_topup(&mut app.auto_topup, &autotopup);
+            app.billing_poll_wanted = true;
+            app.sync_billing_cache_to_agents();
+            vec![]
+        }
+        TaskResult::AppBillingFetchFailed { request } => {
+            // A periodic/startup transport failure is not an authoritative
+            // empty account. Keep the last-known-good cache and retry later,
+            // but never let an old account's failure alter current cadence.
+            if request.generation == app.billing_generation
+                && request.sequence > app.billing_applied_seq
+            {
+                app.billing_poll_wanted = app.usage_visible;
+            }
             vec![]
         }
         TaskResult::GateRefreshed { settings } => handle_gate_refreshed(app, settings),

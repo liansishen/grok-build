@@ -152,9 +152,11 @@ impl ClusterClient {
             chat_mode: self.app.chat_mode,
             screen_mode_label: Some(self.app.screen_mode.meta_label()),
             is_api_key_auth: self.app.is_api_key_auth,
+            billing_surface_visible: self.app.usage_visible,
             resume_local_miss: self.app.resume_local_miss.clone(),
         };
-        for eff in effs {
+        for mut eff in effs {
+            super::event_loop::stamp_billing_request(&mut eff, &mut self.app);
             let (_quit, _meta) = effects::execute(
                 eff,
                 &mut self.tasks,

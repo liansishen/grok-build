@@ -361,4 +361,4 @@ $env:GROK_TRANSPARENT_BG = "1"
 grok
 ```
 
-Elevated surfaces (hover, selection, highlight) keep theme colors. Minimal mode already uses a fully terminal-native palette and does not need this setting.
+Elevated surfaces (hover, selection, highlight) keep theme colors. Minimal mode already uses a fully terminal-native palette and does not need this setting. The transparent-canvas option is resolved at process startup; restart Grok after changing the config or environment variable.

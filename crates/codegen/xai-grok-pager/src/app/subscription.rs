@@ -485,7 +485,7 @@ mod tests {
         let mut app = test_app();
         let _effs = app.impose_gate(watch_gate());
 
-        app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
+        let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta::default());
 
         assert!(app.pending_gate_verification.is_none());
         assert!(app.has_access());

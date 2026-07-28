@@ -42,6 +42,14 @@ fn last_credit_limit_block(
     }
 }
 
+fn next_billing_request(app: &mut AppView) -> crate::app::actions::BillingRequestId {
+    app.billing_request_seq = app.billing_request_seq.wrapping_add(1);
+    crate::app::actions::BillingRequestId {
+        generation: app.billing_generation,
+        sequence: app.billing_request_seq,
+    }
+}
+
 /// Dispatch a `BillingFetched` task result with sensible defaults.
 fn dispatch_billing(
     app: &mut AppView,
@@ -49,9 +57,11 @@ fn dispatch_billing(
     silent: bool,
     subscription_tier: Option<String>,
 ) {
+    let request = next_billing_request(app);
     dispatch(
         Action::TaskComplete(TaskResult::BillingFetched {
             agent_id: AgentId(0),
+            request,
             balance,
             silent,
             subscription_tier,
@@ -104,6 +114,33 @@ fn credit_limit_retry_preserves_image_submission_state() {
         .unwrap();
     assert_eq!(in_flight.images.len(), 1);
     assert_eq!(in_flight.chip_elements.len(), 1);
+}
+
+#[test]
+fn subscription_check_returning_to_personal_auth_immediately_fetches_billing() {
+    let mut app = test_app_with_agent();
+    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        auth_mode: Some("ApiKey".into()),
+        ..Default::default()
+    });
+
+    let effects = dispatch(
+        Action::TaskComplete(TaskResult::CheckSubscriptionComplete {
+            verify: None,
+            meta: Some(serde_json::json!({
+                "email": "personal@example.com",
+                "subscription_tier": "Free"
+            })),
+        }),
+        &mut app,
+    );
+
+    assert!(app.usage_visible);
+    assert!(
+        effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::FetchAppBilling { request: None }))
+    );
 }
 
 #[test]
@@ -495,7 +532,7 @@ fn is_session_usage_fetch(effects: &[Effect]) -> bool {
 fn is_nonsilent_billing(effects: &[Effect]) -> bool {
     matches!(
         effects,
-        [Effect::FetchBilling { agent_id, silent }] if *agent_id == AgentId(0) && !*silent
+        [Effect::FetchBilling { agent_id, silent, request: None }] if *agent_id == AgentId(0) && !*silent
     )
 }
 
@@ -558,7 +595,7 @@ fn team_auth_disables_agent_billing_surface() {
         .get_mut(&AgentId(0))
         .unwrap()
         .billing_surface_visible = true;
-    app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
         team_id: Some("team-uuid".into()),
         team_name: Some("Acme Corp".into()),
         ..Default::default()
@@ -779,8 +816,17 @@ fn billing_fetched_keeps_poll_at_low_usage() {
 }
 
 #[test]
-fn billing_fetched_propagates_balance_to_agent() {
+fn billing_fetched_propagates_balance_to_all_build_agents() {
     let mut app = test_app_with_agent();
+    let second_id = AgentId(1);
+    app.agents.insert(
+        second_id,
+        crate::test_util::make_agent_view(Some("session-2"), "/tmp"),
+    );
+    let chat_id = AgentId(2);
+    let mut chat = crate::test_util::make_agent_view(Some("chat-session"), "/tmp");
+    chat.chat_kind = true;
+    app.agents.insert(chat_id, chat);
     let bal = crate::views::credit_bar::CreditBalance {
         effective_usage_pct: 60.0,
         pay_as_you_go: true,
@@ -790,18 +836,21 @@ fn billing_fetched_propagates_balance_to_agent() {
         ..test_bal(88.0)
     };
     dispatch_billing(&mut app, Some(bal), true, None);
-    let agent_bal = app
-        .agents
-        .get(&AgentId(0))
-        .unwrap()
-        .credit_balance
-        .as_ref()
-        .unwrap();
-    assert_eq!(agent_bal.usage_pct, 88.0);
-    assert_eq!(agent_bal.effective_usage_pct, 60.0);
-    assert!(agent_bal.pay_as_you_go);
-    assert_eq!(agent_bal.on_demand_cap_cents, Some(5000));
-    assert_eq!(agent_bal.on_demand_used_cents, Some(1200));
+    for id in [AgentId(0), second_id] {
+        let agent_bal = app
+            .agents
+            .get(&id)
+            .unwrap()
+            .credit_balance
+            .as_ref()
+            .unwrap();
+        assert_eq!(agent_bal.usage_pct, 88.0);
+        assert_eq!(agent_bal.effective_usage_pct, 60.0);
+        assert!(agent_bal.pay_as_you_go);
+        assert_eq!(agent_bal.on_demand_cap_cents, Some(5000));
+        assert_eq!(agent_bal.on_demand_used_cents, Some(1200));
+    }
+    assert!(app.agents.get(&chat_id).unwrap().credit_balance.is_none());
 }
 
 #[test]
@@ -819,6 +868,7 @@ fn billing_fetched_stores_autotopup_on_app_and_agent() {
     dispatch(
         Action::TaskComplete(TaskResult::BillingFetched {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             balance: Some(bal),
             silent: true,
             subscription_tier: None,
@@ -848,6 +898,7 @@ fn billing_fetched_unchanged_autotopup_keeps_cached_rule() {
     dispatch(
         Action::TaskComplete(TaskResult::BillingFetched {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             balance: Some(bal()),
             silent: true,
             subscription_tier: None,
@@ -859,6 +910,7 @@ fn billing_fetched_unchanged_autotopup_keeps_cached_rule() {
     dispatch(
         Action::TaskComplete(TaskResult::BillingFetched {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             balance: Some(bal()),
             silent: true,
             subscription_tier: None,
@@ -878,6 +930,7 @@ fn billing_fetched_cleared_autotopup_resets_cache() {
     dispatch(
         Action::TaskComplete(TaskResult::BillingFetched {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             balance: Some(crate::views::credit_bar::CreditBalance {
                 prepaid_balance_cents: Some(1500),
                 ..test_bal(100.0)
@@ -899,6 +952,7 @@ fn billing_fetched_cleared_autotopup_resets_cache() {
     dispatch(
         Action::TaskComplete(TaskResult::BillingFetched {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             balance: Some(test_bal(50.0)),
             silent: true,
             subscription_tier: None,
@@ -911,7 +965,7 @@ fn billing_fetched_cleared_autotopup_resets_cache() {
 }
 
 #[test]
-fn app_billing_fetched_stores_autotopup() {
+fn app_billing_fetched_stores_autotopup_and_arms_polling() {
     let mut app = test_app_with_agent();
     let bal = crate::views::credit_bar::CreditBalance {
         prepaid_balance_cents: Some(500),
@@ -919,6 +973,7 @@ fn app_billing_fetched_stores_autotopup() {
     };
     dispatch(
         Action::TaskComplete(TaskResult::AppBillingFetched {
+            request: next_billing_request(&mut app),
             balance: Some(bal),
             autotopup: crate::views::credit_bar::AutoTopupFetch::Resolved(
                 crate::views::credit_bar::AutoTopupInfo::disabled(),
@@ -927,10 +982,171 @@ fn app_billing_fetched_stores_autotopup() {
         &mut app,
     );
     assert_eq!(
-        app.credit_balance.and_then(|b| b.prepaid_balance_cents),
+        app.credit_balance
+            .as_ref()
+            .and_then(|b| b.prepaid_balance_cents),
         Some(500)
     );
-    assert!(app.auto_topup.is_some_and(|at| !at.enabled));
+    assert!(app.auto_topup.as_ref().is_some_and(|at| !at.enabled));
+    assert!(app.billing_poll_wanted);
+    assert_eq!(
+        app.agents
+            .get(&AgentId(0))
+            .and_then(|a| a.credit_balance.as_ref())
+            .and_then(|b| b.prepaid_balance_cents),
+        Some(500)
+    );
+}
+
+#[test]
+fn app_billing_failure_keeps_last_known_cache_and_retries() {
+    let mut app = test_app_with_agent();
+    let cached = crate::views::credit_bar::CreditBalance {
+        prepaid_balance_cents: Some(2500),
+        ..test_bal(42.0)
+    };
+    dispatch_billing(&mut app, Some(cached), true, None);
+
+    dispatch(
+        Action::TaskComplete(TaskResult::AppBillingFetchFailed {
+            request: next_billing_request(&mut app),
+        }),
+        &mut app,
+    );
+
+    assert!(app.billing_poll_wanted);
+    assert_eq!(app.credit_balance.as_ref().map(|b| b.usage_pct), Some(42.0));
+    assert_eq!(
+        app.agents
+            .get(&AgentId(0))
+            .and_then(|a| a.credit_balance.as_ref())
+            .map(|b| b.usage_pct),
+        Some(42.0)
+    );
+}
+
+#[test]
+fn newer_billing_result_wins_over_older_overlapping_request() {
+    let mut app = test_app_with_agent();
+    let older = next_billing_request(&mut app);
+    let newer = next_billing_request(&mut app);
+
+    dispatch(
+        Action::TaskComplete(TaskResult::AppBillingFetched {
+            request: newer,
+            balance: Some(test_bal(25.0)),
+            autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+        }),
+        &mut app,
+    );
+    let before = agent_scrollback_len(&app);
+    dispatch(
+        Action::TaskComplete(TaskResult::BillingFetched {
+            agent_id: AgentId(0),
+            request: older,
+            balance: Some(test_bal(90.0)),
+            silent: false,
+            subscription_tier: None,
+            autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+        }),
+        &mut app,
+    );
+
+    assert_eq!(app.credit_balance.as_ref().map(|b| b.usage_pct), Some(25.0));
+    assert_eq!(app.billing_applied_seq, newer.sequence);
+    assert_eq!(
+        agent_scrollback_len(&app),
+        before + 1,
+        "a superseded explicit /usage request still reports the newest cache"
+    );
+}
+
+#[test]
+fn older_app_failure_does_not_change_cadence_after_newer_success() {
+    let mut app = test_app_with_agent();
+    let older = next_billing_request(&mut app);
+    let newer = next_billing_request(&mut app);
+    dispatch(
+        Action::TaskComplete(TaskResult::AppBillingFetched {
+            request: newer,
+            balance: Some(test_bal(30.0)),
+            autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+        }),
+        &mut app,
+    );
+    app.billing_poll_wanted = false;
+
+    dispatch(
+        Action::TaskComplete(TaskResult::AppBillingFetchFailed { request: older }),
+        &mut app,
+    );
+
+    assert!(!app.billing_poll_wanted);
+    assert_eq!(app.credit_balance.as_ref().map(|b| b.usage_pct), Some(30.0));
+}
+
+#[test]
+fn old_account_result_is_ignored_after_billing_surface_returns() {
+    let mut app = test_app_with_agent();
+    let old_request = next_billing_request(&mut app);
+    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        auth_mode: Some("ApiKey".into()),
+        ..Default::default()
+    });
+    let refresh_needed = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        email: Some("new@example.com".into()),
+        ..Default::default()
+    });
+    assert!(refresh_needed);
+    assert!(app.usage_visible);
+
+    dispatch(
+        Action::TaskComplete(TaskResult::AppBillingFetched {
+            request: old_request,
+            balance: Some(test_bal(99.0)),
+            autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+        }),
+        &mut app,
+    );
+
+    assert!(app.credit_balance.is_none());
+    assert!(!app.billing_poll_wanted);
+}
+
+#[test]
+fn hidden_billing_surface_stops_polling_and_ignores_late_result() {
+    let mut app = test_app_with_agent();
+    dispatch_billing(&mut app, Some(test_bal(50.0)), true, None);
+    assert!(app.billing_poll_wanted);
+    let old_request = next_billing_request(&mut app);
+
+    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        auth_mode: Some("ApiKey".into()),
+        ..Default::default()
+    });
+    assert!(!app.usage_visible);
+    assert!(!app.billing_poll_wanted);
+    assert!(app.credit_balance.is_none());
+    assert!(app.agents.get(&AgentId(0)).unwrap().credit_balance.is_none());
+
+    dispatch(
+        Action::TaskComplete(TaskResult::AppBillingFetched {
+            request: old_request,
+            balance: Some(test_bal(99.0)),
+            autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+        }),
+        &mut app,
+    );
+    assert!(!app.billing_poll_wanted);
+    assert!(app.credit_balance.is_none());
+
+    dispatch(
+        Action::TaskComplete(TaskResult::AppBillingFetchFailed {
+            request: old_request,
+        }),
+        &mut app,
+    );
+    assert!(!app.billing_poll_wanted);
 }
 
 // ── BillingError dispatch tests ─────────────────────────────────────
@@ -942,6 +1158,7 @@ fn billing_error_silent_does_not_push_scrollback() {
     dispatch(
         Action::TaskComplete(TaskResult::BillingError {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             error: "network timeout".into(),
             silent: true,
         }),
@@ -955,12 +1172,38 @@ fn billing_error_silent_does_not_push_scrollback() {
 }
 
 #[test]
+fn old_account_billing_error_is_ignored() {
+    let mut app = test_app_with_agent();
+    let before = agent_scrollback_len(&app);
+    let old_request = next_billing_request(&mut app);
+    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        auth_mode: Some("ApiKey".into()),
+        ..Default::default()
+    });
+    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        email: Some("new@example.com".into()),
+        ..Default::default()
+    });
+    dispatch(
+        Action::TaskComplete(TaskResult::BillingError {
+            agent_id: AgentId(0),
+            request: old_request,
+            error: "old account failed".into(),
+            silent: false,
+        }),
+        &mut app,
+    );
+    assert_eq!(agent_scrollback_len(&app), before);
+}
+
+#[test]
 fn billing_error_non_silent_pushes_error_message() {
     let mut app = test_app_with_agent();
     let before = agent_scrollback_len(&app);
     dispatch(
         Action::TaskComplete(TaskResult::BillingError {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             error: "service unavailable".into(),
             silent: false,
         }),
