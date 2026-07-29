@@ -2426,11 +2426,24 @@ fn gate_refreshed_without_gate_clears_pending_verification() {
     );
 }
 
-/// Logout clears any deferred gate and the check debounce.
+/// Logout clears deferred auth state and any account-scoped billing cache.
 #[test]
-fn logout_clears_pending_gate_verification() {
-    let mut app = test_app();
+fn logout_clears_pending_gate_and_billing_state() {
+    let mut app = test_app_with_agent();
     let _effs = app.impose_gate(test_gate());
+    app.billing_account_key = Some("user:old".into());
+    app.billing_poll_wanted = true;
+    app.credit_balance = Some(test_bal(50.0));
+    app.sync_billing_cache_to_agents();
+    let generation = app.billing_generation;
+
+    let effects = dispatch(Action::Logout, &mut app);
+    assert!(effects.iter().any(|effect| matches!(effect, Effect::Logout)));
+    assert_eq!(app.billing_generation, generation + 1);
+    assert!(app.billing_account_key.is_none());
+    assert!(!app.billing_poll_wanted);
+    assert!(app.credit_balance.is_none());
+    assert!(!app.usage_visible);
 
     dispatch_task_result(TaskResult::LogoutComplete, &mut app);
 

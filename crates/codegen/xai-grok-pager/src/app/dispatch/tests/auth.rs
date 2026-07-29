@@ -694,6 +694,10 @@ fn stale_auth_complete_after_relogin_is_ignored() {
 fn switch_account_while_authenticating_aborts_prior_task() {
     let rt = test_runtime();
     let mut app = test_app_with_agent();
+    app.billing_generation = 4;
+    app.billing_account_key = Some("user:old".into());
+    app.billing_poll_wanted = true;
+    app.credit_balance = Some(test_bal(50.0));
     let (prior_task, first_seq) = install_live_auth_task(&mut app, &rt);
 
     dispatch(Action::SwitchAccount, &mut app);
@@ -710,6 +714,10 @@ fn switch_account_while_authenticating_aborts_prior_task() {
         }
         other => panic!("expected Authenticating after SwitchAccount, got {other:?}"),
     }
+    assert_eq!(app.billing_generation, 5);
+    assert!(app.billing_account_key.is_none());
+    assert!(!app.billing_poll_wanted);
+    assert!(app.credit_balance.is_none());
 }
 
 /// Cancelling a mid-session login aborts the in-flight auth task (not just

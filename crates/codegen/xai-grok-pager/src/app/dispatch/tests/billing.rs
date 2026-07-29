@@ -145,9 +145,15 @@ fn subscription_check_returning_to_personal_auth_immediately_fetches_billing() {
 
 #[test]
 fn is_max_tier_positive_match() {
-    assert!(is_max_tier(Some("supergrok_heavy")));
-    assert!(is_max_tier(Some("SuperGrok Heavy")));
-    assert!(is_max_tier(Some("SUPERGROK_HEAVY")));
+    for tier in [
+        "supergrok_heavy",
+        "SuperGrok Heavy",
+        "SUPERGROK_HEAVY",
+        "SuperGrokPro",
+        "SuperGrok Pro",
+    ] {
+        assert!(is_max_tier(Some(tier)), "{tier} must be max tier");
+    }
 }
 
 #[test]
@@ -590,18 +596,25 @@ fn show_usage_without_session_still_surfaces_credits() {
 
 #[test]
 fn team_auth_disables_agent_billing_surface() {
-    let mut app = test_app_with_agent();
-    app.agents
-        .get_mut(&AgentId(0))
-        .unwrap()
-        .billing_surface_visible = true;
-    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
-        team_id: Some("team-uuid".into()),
-        team_name: Some("Acme Corp".into()),
-        ..Default::default()
-    });
-    assert!(!app.usage_visible);
-    assert!(!app.agents.get(&AgentId(0)).unwrap().billing_surface_visible);
+    for meta in [
+        xai_grok_shell::auth::AuthMeta {
+            team_id: Some("team-uuid".into()),
+            ..Default::default()
+        },
+        xai_grok_shell::auth::AuthMeta {
+            principal_type: Some("Team".into()),
+            ..Default::default()
+        },
+    ] {
+        let mut app = test_app_with_agent();
+        app.agents
+            .get_mut(&AgentId(0))
+            .unwrap()
+            .billing_surface_visible = true;
+        let _ = app.apply_auth_meta(&meta);
+        assert!(!app.usage_visible);
+        assert!(!app.agents.get(&AgentId(0)).unwrap().billing_surface_visible);
+    }
 }
 
 #[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]
@@ -1083,6 +1096,30 @@ fn older_app_failure_does_not_change_cadence_after_newer_success() {
 
     assert!(!app.billing_poll_wanted);
     assert_eq!(app.credit_balance.as_ref().map(|b| b.usage_pct), Some(30.0));
+}
+
+#[test]
+fn stable_user_id_changes_billing_owner_without_email() {
+    let mut app = test_app_with_agent();
+    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        user_id: Some("old-user".into()),
+        email: Some("shared@example.com".into()),
+        ..Default::default()
+    });
+    app.credit_balance = Some(test_bal(50.0));
+    app.sync_billing_cache_to_agents();
+    let generation = app.billing_generation;
+
+    let refresh_needed = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+        user_id: Some("new-user".into()),
+        ..Default::default()
+    });
+
+    assert!(refresh_needed);
+    assert_eq!(app.billing_generation, generation + 1);
+    assert_eq!(app.billing_account_key.as_deref(), Some("user:new-user"));
+    assert!(app.credit_balance.is_none());
+    assert!(app.agents.get(&AgentId(0)).unwrap().credit_balance.is_none());
 }
 
 #[test]

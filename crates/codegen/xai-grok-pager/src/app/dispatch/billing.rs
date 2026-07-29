@@ -24,9 +24,13 @@ pub(super) fn is_max_tier(subscription_tier: Option<&str>) -> bool {
     let Some(t) = subscription_tier else {
         return false; // Unknown — default to Q&A.
     };
-    // Normalize: lowercase + spaces→underscores to match both JWT-derived
-    // keys ("supergrok_heavy") and CCP display names ("SuperGrok Heavy").
-    t.to_ascii_lowercase().replace(' ', "_") == "supergrok_heavy"
+    // Normalize display and wire identifiers. The live subscription endpoint
+    // currently reports `SuperGrokPro` / `SuperGrok Pro` for the same max tier
+    // that JWT/catalog paths identify as `supergrok_heavy`.
+    matches!(
+        t.trim().to_ascii_lowercase().replace(' ', "_").as_str(),
+        "supergrok_heavy" | "supergrokpro" | "supergrok_pro"
+    )
 }
 
 /// URL for upgrading the subscription tier.

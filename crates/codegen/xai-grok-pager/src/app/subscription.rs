@@ -48,7 +48,7 @@ impl AppView {
     fn is_consumer_session(&self) -> bool {
         matches!(self.auth_state, AuthState::Done)
             && !self.is_api_key_auth
-            && self.team_name.is_none()
+            && !self.is_team_principal
     }
 
     /// `None` tier counts as potentially-free so detection works before the
@@ -291,11 +291,13 @@ mod tests {
             "API-key auth never watches"
         );
         app.is_api_key_auth = false;
+        app.is_team_principal = true;
         app.team_name = Some("Acme Corp".into());
         assert!(
             !app.subscription_watch_wanted(),
             "team session never watches"
         );
+        app.is_team_principal = false;
         app.team_name = None;
 
         app.auth_state = AuthState::Pending { error: None };
@@ -399,6 +401,7 @@ mod tests {
     fn impose_gate_direct_for_non_consumer_and_already_gated() {
         // Team session: no live verification possible — show directly.
         let mut app = test_app();
+        app.is_team_principal = true;
         app.team_name = Some("Acme Corp".into());
         assert!(app.impose_gate(watch_gate()).is_empty());
         assert!(!app.has_access());

@@ -13,10 +13,16 @@ pub struct GateInfo {
 /// Typed auth metadata passed from the shell to the pager via ACP.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthMeta {
+    /// Stable user identity used to scope account-level caches.
+    #[serde(default)]
+    pub user_id: Option<String>,
     #[serde(default)]
     pub email: Option<String>,
     #[serde(default)]
     pub auth_mode: Option<String>,
+    /// Principal kind reported by auth (for example `Team`).
+    #[serde(default)]
+    pub principal_type: Option<String>,
     /// Team principal UUID when the session is a team login (`None` for personal).
     #[serde(default)]
     pub team_id: Option<String>,
@@ -43,8 +49,10 @@ pub struct AuthMeta {
 impl Default for AuthMeta {
     fn default() -> Self {
         Self {
+            user_id: None,
             email: None,
             auth_mode: None,
+            principal_type: None,
             team_id: None,
             team_name: None,
             is_zdr: false,

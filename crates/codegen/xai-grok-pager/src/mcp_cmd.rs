@@ -81,6 +81,16 @@ pub enum McpCommand {
         #[arg(short = 's', long, value_enum)]
         scope: Option<McpScope>,
     },
+    /// Enable an MCP server
+    Enable {
+        /// Server name
+        name: String,
+    },
+    /// Disable an MCP server
+    Disable {
+        /// Server name
+        name: String,
+    },
     /// Diagnose MCP server configuration and connectivity
     Doctor {
         /// Emit machine-readable JSON output
@@ -143,6 +153,8 @@ pub async fn run(mcp_args: McpArgs) -> Result<()> {
         McpCommand::List { json } => run_list(json),
         McpCommand::Add(args) => run_add(args).await,
         McpCommand::Remove { name, scope } => run_remove(&name, scope).await,
+        McpCommand::Enable { name } => run_set_enabled(&name, true).await,
+        McpCommand::Disable { name } => run_set_enabled(&name, false).await,
         McpCommand::Doctor { json, name } => run_doctor(json, name).await,
     }
 }
@@ -152,6 +164,7 @@ fn run_list(json: bool) -> Result<()> {
     // a session started in this directory would load from config.toml files.
     let cwd = current_dir_or_exit();
     let servers = xai_grok_shell::util::config::load_mcp_server_configs_with_project(&cwd);
+    let disabled = xai_grok_shell::util::config::disabled_mcp_server_names(&cwd);
 
     if json {
         let payload: serde_json::Value = servers
@@ -161,6 +174,10 @@ fn run_list(json: bool) -> Result<()> {
                 if let Some(obj) = entry.as_object_mut() {
                     obj.insert("name".into(), serde_json::Value::String(name.clone()));
                     obj.insert("scope".into(), serde_json::Value::String(scope.to_string()));
+                    obj.insert(
+                        "enabled".into(),
+                        serde_json::Value::Bool(!disabled.contains(name)),
+                    );
                 }
                 entry
             })
@@ -180,10 +197,10 @@ fn run_list(json: bool) -> Result<()> {
                 }
                 McpServerTransportConfig::StreamableHttp { url, .. } => url.clone(),
             };
-            let status = if config.enabled {
-                ""
-            } else {
+            let status = if disabled.contains(name) {
                 t("cli.mcp.list.disabled")
+            } else {
+                ""
             };
             let scope_note = if *scope == "project" {
                 " (project)"
@@ -562,6 +579,115 @@ fn surviving_definition(
                 )
             })
         })
+}
+
+/// TOML / disabled list / compat JSON / legacy `grok_com_*` (not gateway).
+fn mcp_server_is_known(name: &str, cwd: &Path) -> bool {
+    if name.starts_with("grok_com_") {
+        return true;
+    }
+    xai_grok_shell::util::config::cli_known_mcp_server_names(cwd).contains(name)
+}
+
+fn available_mcp_server_names(cwd: &Path) -> Vec<String> {
+    let mut names: Vec<String> = xai_grok_shell::util::config::cli_known_mcp_server_names(cwd)
+        .into_iter()
+        .collect();
+    names.sort();
+    names
+}
+
+async fn run_set_enabled(name: &str, enabled: bool) -> Result<()> {
+    // Do not use validate_server_name (add-only: [A-Za-z0-9_-]). Enable/disable
+    // also targets compat/plugin names that may contain dots or other keys.
+    if name.is_empty() {
+        bail!(t("cli.mcp.set_enabled.error.empty_name"));
+    }
+    if name.starts_with("managed_gateway:") || name.contains(':') {
+        eprintln!("{}", t("cli.mcp.set_enabled.error.gateway_connector"));
+        std::process::exit(1);
+    }
+    let cwd = current_dir_or_exit();
+
+    if !mcp_server_is_known(name, &cwd) {
+        eprintln!(
+            "{}",
+            t_fmt("cli.mcp.set_enabled.not_found", &[("name", name)])
+        );
+        let available = available_mcp_server_names(&cwd);
+        if !available.is_empty() {
+            let servers = available.join(", ");
+            eprintln!(
+                "{}",
+                t_fmt(
+                    "cli.mcp.doctor.available_servers",
+                    &[("servers", servers.as_str())]
+                )
+            );
+        } else {
+            eprintln!("{}", t("cli.mcp.list.empty"));
+        }
+        std::process::exit(1);
+    }
+
+    let was_disabled = xai_grok_shell::util::config::disabled_mcp_server_names(&cwd).contains(name);
+
+    let modified =
+        xai_grok_shell::util::config::save_mcp_server_enabled_in(name, enabled, &cwd).await?;
+
+    let now_disabled = xai_grok_shell::util::config::disabled_mcp_server_names(&cwd).contains(name);
+    let now_enabled = !now_disabled;
+
+    if enabled && now_disabled {
+        eprintln!(
+            "{}",
+            t_fmt(
+                "cli.mcp.set_enabled.warning.still_disabled",
+                &[("name", name)]
+            )
+        );
+        std::process::exit(1);
+    }
+    if !enabled && now_enabled {
+        eprintln!(
+            "{}",
+            t_fmt(
+                "cli.mcp.set_enabled.warning.still_enabled",
+                &[("name", name)]
+            )
+        );
+        std::process::exit(1);
+    }
+
+    let result_key = if was_disabled == now_disabled {
+        if now_enabled {
+            "cli.mcp.set_enabled.already_enabled"
+        } else {
+            "cli.mcp.set_enabled.already_disabled"
+        }
+    } else if now_enabled {
+        "cli.mcp.set_enabled.enabled"
+    } else {
+        "cli.mcp.set_enabled.disabled"
+    };
+    println!("{}", t_fmt(result_key, &[("name", name)]));
+
+    let user_config = xai_grok_shell::util::config::user_config_path();
+    for path in &modified {
+        let display_path = if path == &user_config {
+            display_user_grok_path("config.toml")
+        } else {
+            path.display().to_string()
+        };
+        println!(
+            "{}",
+            t_fmt(
+                "cli.common.file_modified",
+                &[("path", display_path.as_str())]
+            )
+        );
+    }
+    Ok(())
 }
 
 async fn run_remove(name: &str, requested_scope: Option<McpScope>) -> Result<()> {
@@ -1150,6 +1276,38 @@ mod tests {
             }
             other => panic!("expected mcp remove, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn enable_and_disable_parse_name() {
+        let args = PagerArgs::try_parse_from(["grok", "mcp", "enable", "user-grafana"])
+            .expect("enable should parse");
+        match args.command {
+            Some(Command::Mcp(McpArgs {
+                command: McpCommand::Enable { name },
+            })) => assert_eq!(name, "user-grafana"),
+            other => panic!("expected mcp enable, got {other:?}"),
+        }
+
+        let args = PagerArgs::try_parse_from(["grok", "mcp", "disable", "grok_com_slack"])
+            .expect("disable should parse");
+        match args.command {
+            Some(Command::Mcp(McpArgs {
+                command: McpCommand::Disable { name },
+            })) => assert_eq!(name, "grok_com_slack"),
+            other => panic!("expected mcp disable, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn enable_disable_require_name() {
+        let err = PagerArgs::try_parse_from(["grok", "mcp", "enable"])
+            .expect_err("enable without name must fail");
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+
+        let err = PagerArgs::try_parse_from(["grok", "mcp", "disable"])
+            .expect_err("disable without name must fail");
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
     }
 
     #[test]

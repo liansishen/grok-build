@@ -16,7 +16,10 @@ use crate::scrollback::blocks::SessionEvent;
 // ---------------------------------------------------------------------------
 
 /// `/logout` -- ask the shell to clear auth, then return to the login screen.
-pub(super) fn dispatch_logout(_app: &mut AppView) -> Vec<Effect> {
+pub(super) fn dispatch_logout(app: &mut AppView) -> Vec<Effect> {
+    app.invalidate_billing_account();
+    app.usage_visible = false;
+    app.sync_billing_surface_to_agents();
     vec![Effect::Logout]
 }
 
@@ -95,6 +98,7 @@ pub(super) fn dispatch_switch_account(app: &mut AppView) -> Vec<Effect> {
     };
 
     abort_prior_auth(app);
+    app.invalidate_billing_account();
 
     let request_seq = app.next_auth_request_seq;
     app.next_auth_request_seq += 1;
