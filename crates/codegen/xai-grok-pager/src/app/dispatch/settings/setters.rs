@@ -582,7 +582,7 @@ pub(in crate::app::dispatch) fn set_show_session_usage_bar(
     }];
     // Kick an immediate bar refresh for the active agent when enabling.
     if new {
-        if let crate::app::ActiveView::Agent(id) = app.active_view {
+        if let crate::app::app_view::ActiveView::Agent(id) = app.active_view {
             if let Some(agent) = app.agents.get(&id) {
                 if let Some(session_id) = agent.session.session_id.clone() {
                     effects.push(Effect::FetchSessionUsage {
