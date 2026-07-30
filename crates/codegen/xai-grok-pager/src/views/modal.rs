@@ -405,6 +405,11 @@ pub(crate) fn default_palette_entries(
             command: PaletteCommand::Home,
         },
         PaletteEntry {
+            label: xai_grok_i18n::t("modal.delete_this_session").into(),
+            shortcut: "/delete".into(),
+            command: PaletteCommand::SlashCommand("/delete".into()),
+        },
+        PaletteEntry {
             label: xai_grok_i18n::t("modal.resume_session").into(),
             shortcut: "/resume".into(),
             command: PaletteCommand::SlashCommand("/resume".into()),
