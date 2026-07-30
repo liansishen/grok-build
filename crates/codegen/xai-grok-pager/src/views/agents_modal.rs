@@ -817,9 +817,10 @@ pub fn toggle_agent(name: &str, enabled: bool) -> Result<(), String> {
 pub fn format_agent_detail(entry: &AgentListEntry) -> Vec<String> {
     let def = &entry.definition;
     let mut lines = Vec::new();
+    let model = def.model.to_string();
     lines.push(t_fmt(
         "agents.detail.model",
-        &[("model", &def.model)],
+        &[("model", model.as_str())],
     ));
     let mode_label = match def.prompt_mode {
         xai_grok_agent::config::PromptMode::Extend => t("agents.prompt_mode.extend"),

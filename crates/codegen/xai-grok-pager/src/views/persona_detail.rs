@@ -323,10 +323,12 @@ impl PersonaDetailState {
             let error = e.to_string();
             t_fmt("persona.detail.error.read_file", &[("error", &error)])
         })?;
-        let mut doc: toml_edit::DocumentMut = content.parse().map_err(|e| {
-            let error = e.to_string();
-            t_fmt("persona.detail.error.parse_toml", &[("error", &error)])
-        })?;
+        let mut doc: toml_edit::DocumentMut = content
+            .parse::<toml_edit::DocumentMut>()
+            .map_err(|e| {
+                let error = e.to_string();
+                t_fmt("persona.detail.error.parse_toml", &[("error", &error)])
+            })?;
 
         // Update simple string fields.
         let fields: &[(&str, &str)] = &[

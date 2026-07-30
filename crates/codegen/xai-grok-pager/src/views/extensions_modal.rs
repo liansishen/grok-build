@@ -3462,12 +3462,14 @@ pub fn render_extensions_modal(
                             entry_badge_text.push(badge_text);
                             entry_badge_color.push(badge_col);
                             if state.mcps_tools_expanded.contains(&si) {
-                                for t in &server.tools {
+                                for tool in &server.tools {
                                     entry_labels.push(
-                                        t.display_name.clone().unwrap_or_else(|| t.name.clone()),
+                                        tool.display_name
+                                            .clone()
+                                            .unwrap_or_else(|| tool.name.clone()),
                                     );
                                     entry_right_labels.push(String::new());
-                                    let desc = t.description.as_deref().unwrap_or("");
+                                    let desc = tool.description.as_deref().unwrap_or("");
                                     if desc.is_empty() {
                                         entry_desc_lines.push(vec![]);
                                     } else {
@@ -3476,11 +3478,11 @@ pub fn render_extensions_modal(
                                     entry_summary_lines.push(vec![]);
                                     entry_fields.push(vec![]);
                                     entry_is_header.push(false);
-                                    entry_dimmed.push(!t.enabled);
+                                    entry_dimmed.push(!tool.enabled);
                                     entry_indent.push(2);
                                     entry_data_indices.push(Some(si));
                                     entry_group_keys.push(None);
-                                    let tool_badge = if !t.enabled {
+                                    let tool_badge = if !tool.enabled {
                                         (
                                             t("extensions.badge.disabled").to_string(),
                                             Some(theme.accent_error),
