@@ -488,6 +488,8 @@ pub enum Action {
     /// process-wide cache mirror and persists to `[ui].show_thinking_blocks`
     /// via `Effect::PersistSetting`.
     SetShowThinkingBlocks(bool),
+    /// Toggle live session token/cost label left of the model name.
+    SetShowSessionUsageBar(bool),
     /// Set whether runs of consecutive non-destructive tool calls and
     /// subagent rows are grouped into one row. SHELL-owned: updates the
     /// process-wide cache mirror and persists to `[ui].group_tool_verbs`
@@ -2099,9 +2101,13 @@ pub enum Effect {
         request: Option<BillingRequestId>,
     },
     /// Fetch per-session token/cost via `x.ai/session/usage` (auth-agnostic).
+    /// When `for_status_bar` is true, only update the live prompt usage label;
+    /// when false, also push the `/usage` system block (and still refresh the
+    /// bar when the live-usage setting is on).
     FetchSessionUsage {
         agent_id: AgentId,
         session_id: acp::SessionId,
+        for_status_bar: bool,
     },
     /// Re-fetch remote settings to check subscription gate.
     RefreshGate,
@@ -2645,12 +2651,14 @@ pub enum TaskResult {
         agent_id: AgentId,
         session_id: acp::SessionId,
         usage: Box<xai_grok_shell::extensions::notification::PromptUsage>,
+        for_status_bar: bool,
     },
     /// `/usage` session ledger fetch failed. Drop if `session_id` no longer matches.
     SessionUsageFailed {
         agent_id: AgentId,
         session_id: acp::SessionId,
         error: String,
+        for_status_bar: bool,
     },
     /// Feedback submitted successfully (fire-and-forget).
     FeedbackComplete {

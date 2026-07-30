@@ -1602,6 +1602,17 @@ pub(super) fn handle_prompt_response(
             silent: true,
             request: None,
         });
+        if app.current_ui.show_session_usage_bar.unwrap_or(false) {
+            if let Some(agent) = app.agents.get(&agent_id) {
+                if let Some(session_id) = agent.session.session_id.clone() {
+                    effects.push(Effect::FetchSessionUsage {
+                        agent_id,
+                        session_id,
+                        for_status_bar: true,
+                    });
+                }
+            }
+        }
         note_peek_page_flip(app, agent_id, page_flip_entry);
         return effects;
     }

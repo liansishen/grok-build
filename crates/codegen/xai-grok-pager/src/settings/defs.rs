@@ -974,6 +974,32 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+        // SHELL-owned: `[ui].show_session_usage_bar`. Default OFF.
+        SettingMeta {
+            key: "show_session_usage_bar",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shell,
+            label: "Live session usage on prompt",
+            description: "Show this session's total tokens (and estimated cost when \
+                          model prices are configured) to the left of the model name \
+                          on the prompt line. Cost uses server stamps when present, \
+                          otherwise local [model.*] price fields.",
+            keywords: &[
+                "usage",
+                "tokens",
+                "cost",
+                "price",
+                "session",
+                "billing",
+                "status",
+                "bar",
+            ],
+            kind: SettingKind::Bool {
+                default: ui_default.show_session_usage_bar.unwrap_or(false),
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
         // SHELL-owned: `[ui].prompt_suggestions` + process-wide cache. Default ON.
         // The `GROK_PROMPT_SUGGESTIONS` env var overrides at runtime.
         SettingMeta {

@@ -11,7 +11,8 @@ use super::setters::{
     set_page_flip_on_send_inner, set_prompt_suggestions_inner, set_remember_tool_approvals_inner,
     set_render_mermaid_inner, set_respect_manual_folds_inner, set_screen_mode_inner,
     set_scroll_lines_inner, set_scroll_mode_inner, set_scroll_speed_inner,
-    set_show_thinking_blocks_inner, set_show_tips_inner, set_simple_mode_inner, set_theme_inner,
+    set_show_session_usage_bar_inner, set_show_thinking_blocks_inner, set_show_tips_inner,
+    set_simple_mode_inner, set_theme_inner,
     set_timeline_inner, set_timestamps, set_timestamps_inner, set_ui_language_inner,
     set_usage_refresh_interval_minutes_inner, set_vim_mode_inner, set_voice_capture_mode_inner,
     set_voice_keybind_enabled_inner, set_voice_stt_language_inner,
@@ -824,6 +825,9 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("invert_scroll", SettingValue::Bool(b)) => Some(Action::SetInvertScroll(*b)),
         ("scroll_lines", SettingValue::Int(v)) => Some(Action::SetScrollLines(*v)),
         ("show_thinking_blocks", SettingValue::Bool(b)) => Some(Action::SetShowThinkingBlocks(*b)),
+        ("show_session_usage_bar", SettingValue::Bool(b)) => {
+            Some(Action::SetShowSessionUsageBar(*b))
+        }
         ("group_tool_verbs", SettingValue::Bool(b)) => Some(Action::SetGroupToolVerbs(*b)),
         ("collapsed_edit_blocks", SettingValue::Bool(b)) => {
             Some(Action::SetCollapsedEditBlocks(*b))
@@ -1170,6 +1174,9 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
             }
         }
         ("show_thinking_blocks", SettingValue::Bool(b)) => set_show_thinking_blocks_inner(app, *b),
+        ("show_session_usage_bar", SettingValue::Bool(b)) => {
+            set_show_session_usage_bar_inner(app, *b)
+        }
         ("group_tool_verbs", SettingValue::Bool(b)) => set_group_tool_verbs_inner(app, *b),
         ("collapsed_edit_blocks", SettingValue::Bool(b)) => {
             set_collapsed_edit_blocks_inner(app, *b)

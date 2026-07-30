@@ -3882,6 +3882,7 @@ fn default_models(endpoints: &EndpointsConfig) -> IndexMap<String, ModelEntryCon
                 show_model_fingerprint: m.show_model_fingerprint,
                 stream_tool_calls: None,
                 laziness_detector: LazinessDetectorPerModelConfig::default(),
+                pricing: xai_grok_sampling_types::ModelPricing::default(),
             };
             (key, config)
         })
@@ -4005,6 +4006,13 @@ pub struct ModelEntryConfig {
     /// the all-disabled state via `#[serde(default)]`.
     #[serde(default, skip_serializing_if = "is_default_laziness_detector")]
     pub laziness_detector: LazinessDetectorPerModelConfig,
+    /// Local price sheet (USD / 1M tokens) for estimating cost when the API
+    /// omits `cost_in_usd_ticks` (e.g. Cli Proxy API).
+    #[serde(default, skip_serializing_if = "model_pricing_is_empty")]
+    pub pricing: xai_grok_sampling_types::ModelPricing,
+}
+fn model_pricing_is_empty(p: &xai_grok_sampling_types::ModelPricing) -> bool {
+    p.is_empty()
 }
 /// True when `cfg` equals the all-disabled default. Derives `PartialEq`
 /// on `f32`, which is fine for the current shape because both `f32`
@@ -4072,8 +4080,40 @@ pub struct ConfigModelOverride {
     pub compaction_at_tokens: Option<CompactionAtTokens>,
     pub show_model_fingerprint: Option<bool>,
     pub stream_tool_calls: Option<bool>,
+    /// USD / 1M tokens price sheet for local cost estimates.
+    #[serde(default, skip_serializing_if = "model_pricing_is_empty")]
+    pub pricing: xai_grok_sampling_types::ModelPricing,
+    /// Flat aliases so users can write rates on the model table without a
+    /// nested `[model.x.pricing]` table.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_price_per_mtok: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_input_price_per_mtok: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_price_per_mtok: Option<f64>,
+    /// `auto` | `server` | `local` (see [`xai_grok_sampling_types::CostSource`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_source: Option<String>,
 }
 impl ConfigModelOverride {
+    /// Merge flat price fields into `pricing`.
+    pub(crate) fn resolved_pricing(&self) -> xai_grok_sampling_types::ModelPricing {
+        let mut p = self.pricing.clone();
+        if self.input_price_per_mtok.is_some() {
+            p.input_price_per_mtok = self.input_price_per_mtok;
+        }
+        if self.cached_input_price_per_mtok.is_some() {
+            p.cached_input_price_per_mtok = self.cached_input_price_per_mtok;
+        }
+        if self.output_price_per_mtok.is_some() {
+            p.output_price_per_mtok = self.output_price_per_mtok;
+        }
+        if let Some(ref src) = self.cost_source {
+            p.cost_source = xai_grok_sampling_types::CostSource::parse(Some(src));
+        }
+        p
+    }
+
     pub(crate) fn apply(
         &self,
         key: &str,
@@ -4165,6 +4205,10 @@ impl ConfigModelOverride {
         }
         if self.stream_tool_calls.is_some() {
             entry.info.stream_tool_calls = self.stream_tool_calls;
+        }
+        let pricing = self.resolved_pricing();
+        if !pricing.is_empty() {
+            entry.info.pricing = pricing;
         }
         if self.api_key.is_some() {
             entry.api_key.clone_from(&self.api_key);
@@ -4259,6 +4303,9 @@ pub struct ModelInfo {
     /// injecting nudges. See [`LazinessDetectorPerModelConfig`].
     #[serde(default)]
     pub laziness_detector: LazinessDetectorPerModelConfig,
+    /// Local price sheet for estimating session cost when the API omits it.
+    #[serde(default, skip_serializing_if = "model_pricing_is_empty")]
+    pub pricing: xai_grok_sampling_types::ModelPricing,
 }
 impl ModelInfo {
     /// Minimal fallback descriptor for an unknown model slug.
@@ -4297,6 +4344,7 @@ impl ModelInfo {
             show_model_fingerprint: false,
             stream_tool_calls: None,
             laziness_detector: LazinessDetectorPerModelConfig::default(),
+            pricing: xai_grok_sampling_types::ModelPricing::default(),
         }
     }
     /// Extract shared model metadata from a flat config entry.
@@ -4334,6 +4382,7 @@ impl ModelInfo {
             show_model_fingerprint: entry.show_model_fingerprint,
             stream_tool_calls: entry.stream_tool_calls,
             laziness_detector: entry.laziness_detector.clone(),
+            pricing: entry.pricing.clone(),
         }
     }
     /// Derive the legacy effort gate/default from `reasoning_efforts` so the
@@ -5076,6 +5125,7 @@ pub fn resolve_aux_model_sampling_config(
                 show_model_fingerprint: false,
                 stream_tool_calls: None,
                 laziness_detector: LazinessDetectorPerModelConfig::default(),
+                pricing: xai_grok_sampling_types::ModelPricing::default(),
             },
             api_key: Some(bearer),
             env_key: None,
@@ -5310,6 +5360,7 @@ fn resolve_hidden_default_web_search_sampling_config(
             show_model_fingerprint: false,
             stream_tool_calls: None,
             laziness_detector: LazinessDetectorPerModelConfig::default(),
+            pricing: xai_grok_sampling_types::ModelPricing::default(),
         },
         api_key: None,
         env_key: None,
@@ -6527,6 +6578,7 @@ reasoning_effort = "low"
                 show_model_fingerprint: false,
                 stream_tool_calls: None,
                 laziness_detector: LazinessDetectorPerModelConfig::default(),
+                pricing: xai_grok_sampling_types::ModelPricing::default(),
             },
             api_key: api_key.map(|s| s.to_string()),
             env_key: env_key.map(EnvKeys::single),
@@ -7552,6 +7604,7 @@ reasoning_effort = "low"
             show_model_fingerprint: false,
             stream_tool_calls: None,
             laziness_detector: LazinessDetectorPerModelConfig::default(),
+            pricing: xai_grok_sampling_types::ModelPricing::default(),
         };
         let info = ModelInfo::from_config(&entry);
         assert!(info.use_concise);
@@ -7711,6 +7764,7 @@ reasoning_effort = "low"
             show_model_fingerprint: false,
             stream_tool_calls: None,
             laziness_detector: LazinessDetectorPerModelConfig::default(),
+            pricing: xai_grok_sampling_types::ModelPricing::default(),
         };
         let info = ModelInfo::from_config(&entry);
         assert_eq!(info.agent_type, "codex");
@@ -8162,6 +8216,7 @@ reasoning_effort = "low"
             show_model_fingerprint: false,
             stream_tool_calls: None,
             laziness_detector: LazinessDetectorPerModelConfig::default(),
+            pricing: xai_grok_sampling_types::ModelPricing::default(),
         };
         let info = ModelInfo::from_config(&entry);
         assert_eq!(info.inference_idle_timeout_secs, Some(120));
@@ -11980,6 +12035,7 @@ default = "grok-4.5"
                 show_model_fingerprint: false,
                 stream_tool_calls: None,
                 laziness_detector: LazinessDetectorPerModelConfig::default(),
+                pricing: xai_grok_sampling_types::ModelPricing::default(),
                 auto_compact_threshold_percent: None,
                 system_prompt_label: None,
             },

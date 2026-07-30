@@ -230,6 +230,7 @@ pub(super) fn dispatch_show_usage(app: &mut AppView) -> Vec<Effect> {
         Some(session_id) => vec![Effect::FetchSessionUsage {
             agent_id: id,
             session_id,
+            for_status_bar: false,
         }],
         None => {
             if let Some(agent) = app.agents.get_mut(&id) {
