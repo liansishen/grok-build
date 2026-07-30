@@ -211,6 +211,11 @@ pub async fn set_show_thinking_blocks(value: bool) -> Result<()> {
     update_config(|cfg| cfg.ui.show_thinking_blocks = Some(value)).await
 }
 
+/// Persist `[ui].show_session_usage_bar` via `update_config`.
+pub async fn set_show_session_usage_bar(value: bool) -> Result<()> {
+    update_config(|cfg| cfg.ui.show_session_usage_bar = Some(value)).await
+}
+
 /// Persist `[ui].prompt_suggestions` via `update_config`.
 pub async fn set_prompt_suggestions(value: bool) -> Result<()> {
     update_config(|cfg| cfg.ui.prompt_suggestions = Some(value)).await

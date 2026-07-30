@@ -1044,22 +1044,50 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             agent_id,
             session_id,
             usage,
-        } => commit_session_usage_block(
-            app,
-            agent_id,
-            &session_id,
-            crate::app::status_blocks::session_usage_block_text(&usage),
-        ),
+            for_status_bar,
+        } => {
+            // Always refresh live bar snapshot when the setting is on (or the
+            // fetch was for the bar). Tokens show even without cost.
+            let show_bar = app
+                .current_ui
+                .show_session_usage_bar
+                .unwrap_or(false)
+                || for_status_bar;
+            if show_bar {
+                if let Some(agent) = app.agents.get_mut(&agent_id) {
+                    if agent.session.session_id.as_ref() == Some(&session_id) {
+                        agent.session_usage_snapshot = Some((*usage).clone());
+                    }
+                }
+            }
+            if for_status_bar {
+                vec![]
+            } else {
+                commit_session_usage_block(
+                    app,
+                    agent_id,
+                    &session_id,
+                    crate::app::status_blocks::session_usage_block_text(&usage),
+                )
+            }
+        }
         TaskResult::SessionUsageFailed {
             agent_id,
             session_id,
             error,
-        } => commit_session_usage_block(
-            app,
-            agent_id,
-            &session_id,
-            format!("Couldn't load session usage: {error}"),
-        ),
+            for_status_bar,
+        } => {
+            if for_status_bar {
+                vec![]
+            } else {
+                commit_session_usage_block(
+                    app,
+                    agent_id,
+                    &session_id,
+                    format!("Couldn't load session usage: {error}"),
+                )
+            }
+        }
         TaskResult::FeedbackComplete { .. } => vec![],
         TaskResult::FeedbackFailed { agent_id, error } => {
             if let Some(agent) = app.agents.get_mut(&agent_id) {

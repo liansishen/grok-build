@@ -549,6 +549,7 @@ fn complete_session_usage(
 ) -> Vec<Effect> {
     dispatch(
         Action::TaskComplete(TaskResult::SessionUsageComplete {
+            for_status_bar: false,
             agent_id: AgentId(0),
             session_id: session_id.to_string().into(),
             usage: Box::new(usage),
@@ -563,6 +564,7 @@ fn fail_session_usage(app: &mut AppView, session_id: &str, error: &str) -> Vec<E
             agent_id: AgentId(0),
             session_id: session_id.to_string().into(),
             error: error.into(),
+            for_status_bar: false,
         }),
         app,
     )

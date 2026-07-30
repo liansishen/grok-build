@@ -726,6 +726,16 @@ mod tests {
             compaction_at_tokens: Some(CompactionAtTokens::Fixed(100_000)),
             show_model_fingerprint: Some(true),
             stream_tool_calls: Some(false),
+            pricing: xai_grok_sampling_types::ModelPricing {
+                input_price_per_mtok: Some(5.0),
+                cached_input_price_per_mtok: Some(0.5),
+                output_price_per_mtok: Some(30.0),
+                cost_source: xai_grok_sampling_types::CostSource::Auto,
+            },
+            input_price_per_mtok: None,
+            cached_input_price_per_mtok: None,
+            output_price_per_mtok: None,
+            cost_source: None,
         }
     }
 

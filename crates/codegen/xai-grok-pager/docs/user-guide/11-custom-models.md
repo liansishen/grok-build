@@ -89,7 +89,32 @@ context_window = 128000                   # Total context window in tokens
 extra_headers = { "x-api-key" = "sk-..." } # Extra request headers, sent verbatim (optional)
 query_params = { api-version = "2026-07-22" } # Query params appended to every request URL (optional)
 env_http_headers = { "X-Tenant" = "TENANT_TOKEN" }    # Headers from env vars, resolved at client build (optional)
+
+# Optional local price sheet (USD per 1M tokens). Used to estimate session
+# cost in /usage and the live prompt usage bar when the API does not return
+# cost_in_usd_ticks (e.g. Cli Proxy API / BYOK gateways).
+input_price_per_mtok = 5.0
+cached_input_price_per_mtok = 0.5
+output_price_per_mtok = 30.0
+# cost_source = "auto"   # auto | server | local (default auto)
 ```
+
+### Local cost estimates
+
+When a provider omits wire cost, Grok can estimate per-call cost from the
+rates above and fold them into the session usage ledger:
+
+| `cost_source` | Behavior |
+|---------------|----------|
+| `auto` (default) | Use server ticks when present; otherwise estimate |
+| `server` | Only server-reported cost (legacy) |
+| `local` | Always estimate from the price sheet |
+
+Rates are **USD per 1 million tokens**. Uncached input uses
+`input_price_per_mtok`; cache hits use `cached_input_price_per_mtok` (or input
+rate when unset); completion/output uses `output_price_per_mtok`. Enable
+**Live session usage on prompt** in Settings to show totals left of the model
+name (`tokens` always; `$cost` only when a complete estimate exists).
 
 ### Credential Resolution
 

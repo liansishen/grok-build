@@ -246,6 +246,40 @@ fn format_cost(m: &xai_grok_shell::extensions::notification::PromptUsageModel) -
     }
 }
 
+/// Compact prompt-line label: `12.3k tok` or `12.3k tok · $0.0123`.
+///
+/// Returns `None` when there is nothing useful to show (no model calls yet).
+/// Cost is omitted when the ledger has no complete cost stamp (matches
+/// `[ui].show_session_usage_bar`: tokens always, price only when known).
+pub(crate) fn session_usage_bar_label(
+    usage: &xai_grok_shell::extensions::notification::PromptUsage,
+) -> Option<String> {
+    let t = &usage.totals;
+    if t.model_calls == 0 && usage.model_usage.is_empty() && t.total_tokens == 0 {
+        return None;
+    }
+    let tokens = format_compact_tokens(t.total_tokens);
+    match t.cost_usd_ticks {
+        Some(ticks) if !t.cost_is_partial && !usage.usage_is_incomplete => {
+            use xai_grok_shell::extensions::notification::ticks_to_usd;
+            Some(format!("{tokens} · ${:.4}", ticks_to_usd(ticks)))
+        }
+        _ => Some(tokens),
+    }
+}
+
+fn format_compact_tokens(n: u64) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M tok", n as f64 / 1_000_000.0)
+    } else if n >= 10_000 {
+        format!("{:.1}k tok", n as f64 / 1_000.0)
+    } else if n >= 1_000 {
+        format!("{:.2}k tok", n as f64 / 1_000.0)
+    } else {
+        format!("{n} tok")
+    }
+}
+
 /// First non-empty, trimmed line of `text` (empty string if none). Collapses a
 /// multi-line prompt/command to a single display line.
 fn first_nonempty_line(text: &str) -> &str {
@@ -312,6 +346,29 @@ mod tests {
             ..Default::default()
         };
         assert!(session_usage_block_text(&incomplete).contains("incomplete"));
+    }
+
+    #[test]
+    fn session_usage_bar_label_tokens_only_without_cost() {
+        let usage = PromptUsage {
+            totals: model_row(12_500, 500, None),
+            ..Default::default()
+        };
+        assert_eq!(
+            session_usage_bar_label(&usage).as_deref(),
+            Some("12.50k tok")
+        );
+    }
+
+    #[test]
+    fn session_usage_bar_label_includes_cost_when_present() {
+        let usage = PromptUsage {
+            totals: model_row(1_000, 100, Some(12_345_000_000)),
+            ..Default::default()
+        };
+        let label = session_usage_bar_label(&usage).unwrap();
+        assert!(label.contains("tok"));
+        assert!(label.contains("$1.2345"), "got {label}");
     }
 
     #[test]

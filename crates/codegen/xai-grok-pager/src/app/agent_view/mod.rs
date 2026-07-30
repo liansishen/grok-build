@@ -885,6 +885,10 @@ pub struct AgentView {
     pub credit_balance: Option<crate::views::credit_bar::CreditBalance>,
     /// Auto top-up rule paired with `credit_balance` for the prompt warning.
     pub auto_topup: Option<crate::views::credit_bar::AutoTopupInfo>,
+    /// Latest session token/cost snapshot for the live prompt usage bar
+    /// (`[ui].show_session_usage_bar`). Updated by silent or /usage fetches.
+    pub session_usage_snapshot:
+        Option<xai_grok_shell::extensions::notification::PromptUsage>,
     /// Current goal orchestration state. Set by `GoalUpdated` session
     /// notifications, cleared when a new session starts.
     pub goal_state: Option<super::agent::GoalDisplayState>,

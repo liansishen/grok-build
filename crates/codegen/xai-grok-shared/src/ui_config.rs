@@ -140,6 +140,12 @@ pub struct UiConfig {
     /// `None` = on (client default). Written by the pager's settings modal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub show_thinking_blocks: Option<bool>,
+    /// Live session token (+ estimated cost) status left of the model name
+    /// on the prompt info line. `None`/`false` = off (default). When on,
+    /// tokens always show; cost shows only when the ledger has a complete
+    /// cost (server stamp or local price sheet).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_session_usage_bar: Option<bool>,
     /// Fold runs of consecutive non-destructive tool calls (reads, searches,
     /// lists) into one transcript row. `None` = on (client default). Written
     /// by the pager's settings modal.
@@ -304,6 +310,7 @@ impl Default for UiConfig {
             keep_text_selection: None,
             selection_highlight_duration_ms: None,
             show_thinking_blocks: None,
+            show_session_usage_bar: None,
             group_tool_verbs: None,
             collapsed_edit_blocks: None,
             prompt_suggestions: None,

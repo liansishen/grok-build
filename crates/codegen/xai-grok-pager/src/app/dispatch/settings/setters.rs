@@ -545,6 +545,58 @@ pub(in crate::app::dispatch) fn set_show_thinking_blocks(
     }]
 }
 
+pub(super) fn set_show_session_usage_bar_inner(app: &mut AppView, new: bool) {
+    app.current_ui.show_session_usage_bar = Some(new);
+    if !new {
+        for agent in app.agents.values_mut() {
+            agent.session_usage_snapshot = None;
+        }
+    }
+}
+
+/// Toggle live session tokens/cost left of the model name on the prompt line.
+pub(in crate::app::dispatch) fn set_show_session_usage_bar(
+    app: &mut AppView,
+    new: bool,
+) -> Vec<Effect> {
+    let prev = app.current_ui.show_session_usage_bar.unwrap_or(false);
+    if prev == new {
+        return vec![];
+    }
+    set_show_session_usage_bar_inner(app, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "show_session_usage_bar",
+        value = new,
+        "setting changed",
+    );
+    app.show_toast(&format!(
+        "Live session usage {}",
+        if new { "on" } else { "off" }
+    ));
+    let mut effects = vec![Effect::PersistSetting {
+        key: "show_session_usage_bar",
+        value: crate::settings::SettingValue::Bool(new),
+        rollback_value: crate::settings::SettingValue::Bool(prev),
+    }];
+    // Kick an immediate bar refresh for the active agent when enabling.
+    if new {
+        if let crate::app::app_view::ActiveView::Agent(id) = app.active_view {
+            if let Some(agent) = app.agents.get(&id) {
+                if let Some(session_id) = agent.session.session_id.clone() {
+                    effects.push(Effect::FetchSessionUsage {
+                        agent_id: id,
+                        session_id,
+                        for_status_bar: true,
+                    });
+                }
+            }
+        }
+    }
+    effects
+}
+
 pub(super) fn set_group_tool_verbs_inner(app: &mut AppView, new: bool) {
     crate::appearance::cache::set_group_tool_verbs(new);
     // Expansion ids describe the OLD grouping shape; drop them so stale ids

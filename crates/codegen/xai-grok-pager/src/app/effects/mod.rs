@@ -3394,7 +3394,11 @@ pub(crate) fn execute(
                     }
                 });
         }
-        Effect::FetchSessionUsage { agent_id, session_id } => {
+        Effect::FetchSessionUsage {
+            agent_id,
+            session_id,
+            for_status_bar,
+        } => {
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -3404,6 +3408,7 @@ pub(crate) fn execute(
                                 agent_id,
                                 session_id,
                                 usage: Box::new(usage),
+                                for_status_bar,
                             }
                         }
                         Err(error) => {
@@ -3411,6 +3416,7 @@ pub(crate) fn execute(
                                 agent_id,
                                 session_id,
                                 error,
+                                for_status_bar,
                             }
                         }
                     }

@@ -1069,6 +1069,14 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "show_session_usage_bar" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("show_session_usage_bar", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_show_session_usage_bar(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "group_tool_verbs" => {
             let SettingValue::Bool(b) = value else {
                 return Err(kind_mismatch("group_tool_verbs", "Bool", &value));

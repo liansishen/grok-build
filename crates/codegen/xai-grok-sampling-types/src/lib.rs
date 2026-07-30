@@ -10,6 +10,7 @@ pub mod conversation;
 pub mod doom_loop;
 pub mod error;
 pub mod messages;
+pub mod pricing;
 pub mod serde_helpers;
 pub mod tool_overrides;
 pub mod types;
@@ -23,6 +24,7 @@ pub use self::error::{
     EmptyReason, EmptyResponseContext, ResponseModelMetadata, Result, SamplingError,
     is_context_length_error, status_user_message, user_facing_api_error_message,
 };
+pub use self::pricing::{CostSource, ModelPricing, USD_TICKS_PER_USD as PRICING_USD_TICKS_PER_USD};
 pub use self::tool_overrides::{
     ClearableField, SearchDateBound, SearchDateBoundError, ToolOverrides, ToolOverridesUpdate,
     WebSearchOptions, XSearchOptions,

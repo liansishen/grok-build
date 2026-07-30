@@ -2312,11 +2312,22 @@ impl AgentView {
         let usage_warning = usage_warning_text.as_deref();
         let usage_warning_critical = warning.is_some_and(|(_, critical)| critical);
         // Always-visible compact usage (weekly/monthly % + reset) left of model.
-        let usage_status_owned = self
+        let credit_status = self
             .credit_balance
             .as_ref()
             .filter(|_| usage_visible && !self.chat_kind)
             .map(|bal| bal.prompt_status_line());
+        // Live session tokens/cost (left of model; cost only when available).
+        let session_status = self
+            .session_usage_snapshot
+            .as_ref()
+            .and_then(crate::app::status_blocks::session_usage_bar_label);
+        let usage_status_owned = match (session_status, credit_status) {
+            (Some(s), Some(c)) => Some(format!("{s} · {c}")),
+            (Some(s), None) => Some(s),
+            (None, Some(c)) => Some(c),
+            (None, None) => None,
+        };
         let usage_status = usage_status_owned.as_deref();
         let model_label = match self.session.models.reasoning_effort {
             Some(eff) => format!("{model_id} ({eff})"),

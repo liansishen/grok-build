@@ -1331,6 +1331,31 @@ impl SessionActor {
         }
         key
     }
+    /// Prefer server-reported cost; when missing (or `cost_source = local`),
+    /// estimate from the model's configured price sheet.
+    fn resolve_cost_usd_ticks(
+        &self,
+        model_id: Option<&str>,
+        usage: &xai_grok_sampling_types::TokenUsage,
+        server_ticks: Option<i64>,
+    ) -> Option<i64> {
+        let server = xai_grok_sampling_types::reported_cost_ticks(server_ticks);
+        let models = self.models_manager.models();
+        let pricing = model_id
+            .and_then(|id| models.get(id))
+            .or_else(|| {
+                // Fall back to matching by routing slug.
+                models.values().find(|m| {
+                    model_id.is_some_and(|id| m.info.model == id || m.info.id.as_deref() == Some(id))
+                })
+            })
+            .map(|m| &m.info.pricing);
+        match pricing {
+            Some(p) if p.can_estimate() => p.resolve_cost_ticks(usage, server),
+            _ => server,
+        }
+    }
+
     /// Propagate the model-reported token usage from a turn response into
     /// chat state, the per-prompt usage ledger, and per-turn signals.
     ///
@@ -1353,11 +1378,13 @@ impl SessionActor {
             self.chat_state_handle
                 .record_token_usage(u64::from(u.total_tokens));
             self.chat_state_handle.record_last_turn_usage(u.clone());
+            let model_id = response.assistant().and_then(|a| a.model_id.clone());
+            let cost_usd_ticks = self.resolve_cost_usd_ticks(model_id.as_deref(), u, response.cost_usd_ticks);
             self.chat_state_handle.record_model_call_usage(
-                response.assistant().and_then(|a| a.model_id.clone()),
+                model_id,
                 u.clone(),
                 api_duration_ms,
-                response.cost_usd_ticks,
+                cost_usd_ticks,
             );
             self.signals_handle()
                 .record_token_usage(u.completion_tokens, u.reasoning_tokens);
