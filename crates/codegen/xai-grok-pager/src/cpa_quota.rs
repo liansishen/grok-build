@@ -43,7 +43,7 @@ impl CpaQuotaSnapshot {
         }
         Some(
             top.iter()
-                .map(format_account_short)
+                .map(|a| format_account_short(a))
                 .collect::<Vec<_>>()
                 .join(" · "),
         )
@@ -136,14 +136,15 @@ pub fn management_for_model(model_id: &str) -> Option<CpaManagementConfig> {
     None
 }
 
+/// Per-request ceiling for management API calls.
+const CPA_HTTP_TIMEOUT: Duration = Duration::from_secs(20);
+
 /// Fetch weekly quotas for the configured providers (skips xai).
 pub async fn fetch_weekly_quotas(
     settings: &CpaManagementConfig,
 ) -> Result<Vec<CpaAccountQuota>, String> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .build()
-        .map_err(|e| e.to_string())?;
+    // Reuse the process-wide TLS client; request timeouts are set per call.
+    let client = xai_grok_shell::http::shared_client();
 
     let auth_files = list_auth_files(&client, settings).await?;
     let mut out = Vec::new();
@@ -235,6 +236,7 @@ async fn list_auth_files(
     );
     let resp = client
         .get(&url)
+        .timeout(CPA_HTTP_TIMEOUT)
         .header("Authorization", format!("Bearer {}", settings.key))
         .send()
         .await
@@ -276,6 +278,7 @@ async fn fetch_wham_usage(
     });
     let resp = client
         .post(&url)
+        .timeout(CPA_HTTP_TIMEOUT)
         .header("Authorization", format!("Bearer {}", settings.key))
         .json(&payload)
         .send()
