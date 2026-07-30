@@ -184,54 +184,67 @@ pub(crate) fn session_usage_block_text(
 ) -> String {
     let t = &usage.totals;
     if t.model_calls == 0 && usage.model_usage.is_empty() {
-        return if usage.usage_is_incomplete {
-            "Session usage: none recorded, but tracking is incomplete and may under-count."
-                .to_string()
+        return xai_grok_i18n::t(if usage.usage_is_incomplete {
+            "usage.session.empty_incomplete"
         } else {
-            "Session usage: no model calls yet in this session.".to_string()
-        };
+            "usage.session.empty"
+        })
+        .to_string();
     }
 
-    let mut rows = Vec::new();
-    rows.push(format!(
-        "  Input tokens:   {} ({} cached)",
-        group_thousands(t.input_tokens),
-        group_thousands(t.cached_read_tokens),
-    ));
-    rows.push(format!(
-        "  Output tokens:  {} ({} reasoning)",
-        group_thousands(t.output_tokens),
-        group_thousands(t.reasoning_tokens),
-    ));
-    rows.push(format!(
-        "  Total tokens:   {}",
-        group_thousands(t.total_tokens)
-    ));
-    rows.push(format!(
-        "  Model calls:    {} · API time: {}",
-        group_thousands(t.model_calls),
-        format_duration(std::time::Duration::from_millis(t.api_duration_ms)),
-    ));
-    rows.push(format!("  Cost:           {}", format_cost(t)));
+    let input = group_thousands(t.input_tokens);
+    let cached = group_thousands(t.cached_read_tokens);
+    let output = group_thousands(t.output_tokens);
+    let reasoning = group_thousands(t.reasoning_tokens);
+    let total = group_thousands(t.total_tokens);
+    let calls = group_thousands(t.model_calls);
+    let duration = format_duration(std::time::Duration::from_millis(t.api_duration_ms));
+    let cost = format_cost(t);
+
+    let mut rows = vec![
+        xai_grok_i18n::t_fmt(
+            "usage.session.input_tokens",
+            &[("tokens", input.as_str()), ("cached", cached.as_str())],
+        ),
+        xai_grok_i18n::t_fmt(
+            "usage.session.output_tokens",
+            &[
+                ("tokens", output.as_str()),
+                ("reasoning", reasoning.as_str()),
+            ],
+        ),
+        xai_grok_i18n::t_fmt("usage.session.total_tokens", &[("tokens", total.as_str())]),
+        xai_grok_i18n::t_fmt(
+            "usage.session.api_and_calls",
+            &[("calls", calls.as_str()), ("duration", duration.as_str())],
+        ),
+        xai_grok_i18n::t_fmt("usage.session.cost", &[("cost", cost.as_str())]),
+    ];
 
     if usage.model_usage.len() > 1 {
-        rows.push("  By model:".to_string());
+        rows.push(xai_grok_i18n::t("usage.session.by_model").to_string());
         for (model, m) in &usage.model_usage {
-            rows.push(format!(
-                "    {model} — {} in / {} out · {}",
-                group_thousands(m.input_tokens),
-                group_thousands(m.output_tokens),
-                format_cost(m),
+            let input = group_thousands(m.input_tokens);
+            let output = group_thousands(m.output_tokens);
+            let cost = format_cost(m);
+            rows.push(xai_grok_i18n::t_fmt(
+                "usage.session.model_row",
+                &[
+                    ("model", model.as_str()),
+                    ("input", input.as_str()),
+                    ("output", output.as_str()),
+                    ("cost", cost.as_str()),
+                ],
             ));
         }
     }
 
     if usage.usage_is_incomplete {
-        rows.push("  Note: usage is incomplete and may under-count.".to_string());
+        rows.push(xai_grok_i18n::t("usage.session.incomplete_note").to_string());
     }
 
     join_header_rows(
-        "Session usage (since start or last resume):".to_string(),
+        xai_grok_i18n::t("usage.session.header").to_string(),
         rows,
     )
 }
@@ -241,8 +254,10 @@ fn format_cost(m: &xai_grok_shell::extensions::notification::PromptUsageModel) -
     use xai_grok_shell::extensions::notification::ticks_to_usd;
     match m.cost_usd_ticks {
         Some(ticks) => format!("${:.4}", ticks_to_usd(ticks)),
-        None if m.cost_is_partial => "not available (not reported for some calls)".to_string(),
-        None => "not available (not reported)".to_string(),
+        None if m.cost_is_partial => {
+            xai_grok_i18n::t("usage.session.cost_partial").to_string()
+        }
+        None => xai_grok_i18n::t("usage.session.cost_unavailable").to_string(),
     }
 }
 

@@ -1062,10 +1062,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 let text = snapshot
                     .as_ref()
                     .map(|s| s.usage_block_text())
-                    .unwrap_or_else(|| {
-                        "CPA weekly quota: not configured or unavailable for this model."
-                            .to_string()
-                    });
+                    .unwrap_or_else(|| xai_grok_i18n::t("usage.cpa.unavailable").to_string());
                 agent
                     .scrollback
                     .push_block(crate::scrollback::block::RenderBlock::system(text));
@@ -1116,7 +1113,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     app,
                     agent_id,
                     &session_id,
-                    format!("Couldn't load session usage: {error}"),
+                    xai_grok_i18n::t_fmt(
+                        "usage.session.load_failed",
+                        &[("error", error.as_str())],
+                    ),
                 )
             }
         }

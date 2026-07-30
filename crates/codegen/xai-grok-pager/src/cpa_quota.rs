@@ -35,7 +35,7 @@ pub struct CpaQuotaSnapshot {
 
 impl CpaQuotaSnapshot {
     /// Prompt-line fragment: up to 3 accounts, least remaining first.
-    /// Format: `25%(08/05 05:12) · 24%(08/05 04:10)`
+    /// Percentages are remaining quota, e.g. `25%(08/05 05:12)`.
     pub fn prompt_status_line(&self) -> Option<String> {
         let top = top_accounts(&self.accounts, 3);
         if top.is_empty() {
@@ -53,9 +53,9 @@ impl CpaQuotaSnapshot {
     pub fn usage_block_text(&self) -> String {
         let top = top_accounts(&self.accounts, 3);
         if top.is_empty() {
-            return "CPA weekly quota: no account data.".to_string();
+            return xai_grok_i18n::t("usage.cpa.no_accounts").to_string();
         }
-        let mut lines = vec!["CPA weekly quota:".to_string()];
+        let mut lines = vec![xai_grok_i18n::t("usage.cpa.header").to_string()];
         for a in &top {
             let reset = format_reset_shanghai(a.reset_at);
             let plan = a
@@ -63,15 +63,22 @@ impl CpaQuotaSnapshot {
                 .as_deref()
                 .map(|p| format!(" ({p})"))
                 .unwrap_or_default();
-            lines.push(format!(
-                "  {}{}: {:.0}% used · reset {}",
-                a.email, plan, a.used_percent, reset
+            let account = format!("{}{}", a.email, plan);
+            let remaining = format!("{:.0}", remaining_percent(a.used_percent));
+            lines.push(xai_grok_i18n::t_fmt(
+                "usage.cpa.account",
+                &[
+                    ("account", account.as_str()),
+                    ("remaining", remaining.as_str()),
+                    ("time", reset.as_str()),
+                ],
             ));
         }
         if self.accounts.len() > top.len() {
-            lines.push(format!(
-                "  ({} more account(s) omitted)",
-                self.accounts.len() - top.len()
+            let count = (self.accounts.len() - top.len()).to_string();
+            lines.push(xai_grok_i18n::t_fmt(
+                "usage.cpa.more_omitted",
+                &[("count", count.as_str())],
             ));
         }
         lines.join("\n")
@@ -91,10 +98,17 @@ fn top_accounts(accounts: &[CpaAccountQuota], n: usize) -> Vec<&CpaAccountQuota>
     refs.into_iter().take(n).collect()
 }
 
+fn remaining_percent(used_percent: f64) -> f64 {
+    if !used_percent.is_finite() {
+        return 0.0;
+    }
+    (100.0 - used_percent).clamp(0.0, 100.0)
+}
+
 fn format_account_short(a: &CpaAccountQuota) -> String {
     format!(
         "{:.0}%({})",
-        a.used_percent,
+        remaining_percent(a.used_percent),
         format_reset_shanghai(a.reset_at)
     )
 }
@@ -382,7 +396,7 @@ mod tests {
             accounts: vec![acc("a@x.com", 24.0, reset)],
         };
         let line = snap.prompt_status_line().unwrap();
-        assert_eq!(line, "24%(08/05 12:00)");
+        assert_eq!(line, "76%(08/05 12:00)");
     }
 
     #[test]
@@ -392,8 +406,16 @@ mod tests {
             accounts: vec![acc("a@x.com", 24.0, 1_785_903_012)],
         };
         let text = snap.usage_block_text();
-        assert!(text.contains("CPA weekly quota"));
         assert!(text.contains("a@x.com"));
-        assert!(text.contains("24%"));
+        assert!(text.contains("76%"));
+        assert!(!text.contains("24% used"));
+    }
+
+    #[test]
+    fn remaining_percent_is_clamped() {
+        assert_eq!(remaining_percent(24.0), 76.0);
+        assert_eq!(remaining_percent(-5.0), 100.0);
+        assert_eq!(remaining_percent(125.0), 0.0);
+        assert_eq!(remaining_percent(f64::NAN), 0.0);
     }
 }

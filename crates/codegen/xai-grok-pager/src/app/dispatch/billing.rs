@@ -359,7 +359,7 @@ pub(super) fn push_cached_usage_summary(app: &mut AppView, agent_id: AgentId) {
         Some(balance) => {
             crate::views::credit_bar::format_usage_summary(balance, auto_topup.as_ref())
         }
-        None => "No billing data available.".to_string(),
+        None => xai_grok_i18n::t("usage.billing_unavailable").to_string(),
     };
     agent.scrollback.push_block(RenderBlock::System(
         crate::scrollback::blocks::SystemMessageBlock::new(message),

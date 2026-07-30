@@ -235,7 +235,7 @@ pub(super) fn dispatch_show_usage(app: &mut AppView) -> Vec<Effect> {
         None => {
             if let Some(agent) = app.agents.get_mut(&id) {
                 agent.scrollback.push_block(RenderBlock::system(
-                    "Session usage is unavailable until the session starts.".to_string(),
+                    xai_grok_i18n::t("usage.session.unavailable_before_start").to_string(),
                 ));
             }
             let mut effects = append_cpa_quota(app, id, true);
@@ -303,8 +303,9 @@ pub(super) fn append_consumer_billing_surface(app: &mut AppView, agent_id: Agent
     if let Some(url) = app.usage_billing_redirect_url.clone() {
         if let Some(agent) = app.agents.get_mut(&agent_id) {
             agent.scrollback.push_block(RenderBlock::System(
-                crate::scrollback::blocks::SystemMessageBlock::new(format!(
-                    "Please check your usage on {url}"
+                crate::scrollback::blocks::SystemMessageBlock::new(xai_grok_i18n::t_fmt(
+                    "usage.check_online",
+                    &[("url", url.as_str())],
                 )),
             ));
         }
