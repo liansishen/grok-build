@@ -165,6 +165,8 @@ pub async fn fetch_weekly_quotas(
         }
         match fetch_wham_usage(&client, settings, &file.auth_index).await {
             Ok(Some(q)) => {
+                // Resolve plan before moving `email`/`name` out of `file`.
+                let plan_type = q.plan_type.or_else(|| file.resolved_plan());
                 let email = file
                     .email
                     .filter(|e| !e.is_empty())
@@ -174,7 +176,7 @@ pub async fn fetch_weekly_quotas(
                     email,
                     used_percent: q.used_percent,
                     reset_at: q.reset_at,
-                    plan_type: q.plan_type.or_else(|| file.resolved_plan()),
+                    plan_type,
                 });
             }
             Ok(None) => {}
