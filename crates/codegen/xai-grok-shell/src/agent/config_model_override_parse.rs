@@ -736,6 +736,10 @@ mod tests {
             cached_input_price_per_mtok: None,
             output_price_per_mtok: None,
             cost_source: None,
+            management_url: None,
+            management_key: None,
+            management_env_key: None,
+            management_providers: Vec::new(),
         }
     }
 

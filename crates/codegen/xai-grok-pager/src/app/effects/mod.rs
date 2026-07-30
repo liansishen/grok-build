@@ -4273,6 +4273,36 @@ pub(crate) fn execute(
                     }
                 });
         }
+        Effect::FetchCpaQuota {
+            agent_id,
+            model_id,
+            for_usage_block,
+        } => {
+            tasks.spawn(async move {
+                let snapshot = match crate::cpa_quota::management_for_model(&model_id) {
+                    Some(settings) => match crate::cpa_quota::fetch_weekly_quotas(&settings).await {
+                        Ok(accounts) if !accounts.is_empty() => {
+                            Some(crate::cpa_quota::CpaQuotaSnapshot {
+                                accounts,
+                                model_id: model_id.clone(),
+                            })
+                        }
+                        Ok(_) => None,
+                        Err(e) => {
+                            tracing::debug!(error = %e, model_id = %model_id, "cpa quota fetch failed");
+                            None
+                        }
+                    },
+                    None => None,
+                };
+                TaskResult::CpaQuotaFetched {
+                    agent_id,
+                    model_id,
+                    snapshot,
+                    for_usage_block,
+                }
+            });
+        }
         Effect::FetchAppBilling { request } => {
             if !session_flags.billing_surface_visible {
                 return (false, meta);

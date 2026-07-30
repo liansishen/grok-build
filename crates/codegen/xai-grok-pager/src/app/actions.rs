@@ -2109,6 +2109,13 @@ pub enum Effect {
         session_id: acp::SessionId,
         for_status_bar: bool,
     },
+    /// Fetch CPA Management weekly quotas for the current model's pool.
+    /// When `for_usage_block` is true, also push a scrollback summary.
+    FetchCpaQuota {
+        agent_id: AgentId,
+        model_id: String,
+        for_usage_block: bool,
+    },
     /// Re-fetch remote settings to check subscription gate.
     RefreshGate,
     /// Spawn a debounce sleep task for shell suggestions. `agent_id` rides
@@ -2842,6 +2849,13 @@ pub enum TaskResult {
     /// App-level billing transport or payload parsing failed. The last-known-good
     /// cache is retained and periodic refresh remains armed for a later retry.
     AppBillingFetchFailed { request: BillingRequestId },
+    /// CPA weekly quota fetch finished (or empty when management is unset / failed).
+    CpaQuotaFetched {
+        agent_id: AgentId,
+        model_id: String,
+        snapshot: Option<crate::cpa_quota::CpaQuotaSnapshot>,
+        for_usage_block: bool,
+    },
     GateRefreshed {
         settings: Option<xai_grok_shell::util::config::RemoteSettings>,
     },

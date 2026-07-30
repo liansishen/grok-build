@@ -119,6 +119,7 @@ impl AgentView {
             app_chat_mode: false,
             credit_balance: None,
             session_usage_snapshot: None,
+            cpa_quota: None,
             auto_topup: None,
             goal_state: None,
             workflow_blocks: std::collections::HashMap::new(),

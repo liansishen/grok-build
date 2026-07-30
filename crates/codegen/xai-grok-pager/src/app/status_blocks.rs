@@ -246,11 +246,12 @@ fn format_cost(m: &xai_grok_shell::extensions::notification::PromptUsageModel) -
     }
 }
 
-/// Compact prompt-line label: `12.3k tok` or `12.3k tok · $0.0123`.
+/// Compact prompt-line label: `12.3k tok`, `12.3k tok(95.0%)`, or with cost.
 ///
 /// Returns `None` when there is nothing useful to show (no model calls yet).
 /// Cost is omitted when the ledger has no complete cost stamp (matches
 /// `[ui].show_session_usage_bar`: tokens always, price only when known).
+/// Cache rate is `cached_read_tokens / input_tokens` (one decimal place).
 pub(crate) fn session_usage_bar_label(
     usage: &xai_grok_shell::extensions::notification::PromptUsage,
 ) -> Option<String> {
@@ -259,6 +260,10 @@ pub(crate) fn session_usage_bar_label(
         return None;
     }
     let tokens = format_compact_tokens(t.total_tokens);
+    let tokens = match cache_hit_rate_percent(t.cached_read_tokens, t.input_tokens) {
+        Some(pct) => format!("{tokens}({pct:.1}%)"),
+        None => tokens,
+    };
     match t.cost_usd_ticks {
         Some(ticks) if !t.cost_is_partial && !usage.usage_is_incomplete => {
             use xai_grok_shell::extensions::notification::ticks_to_usd;
@@ -266,6 +271,14 @@ pub(crate) fn session_usage_bar_label(
         }
         _ => Some(tokens),
     }
+}
+
+/// Input-cache hit rate as a percentage, or `None` when there is no input.
+pub(crate) fn cache_hit_rate_percent(cached_read_tokens: u64, input_tokens: u64) -> Option<f64> {
+    if input_tokens == 0 {
+        return None;
+    }
+    Some((cached_read_tokens as f64) * 100.0 / (input_tokens as f64))
 }
 
 fn format_compact_tokens(n: u64) -> String {
@@ -354,9 +367,25 @@ mod tests {
             totals: model_row(12_500, 500, None),
             ..Default::default()
         };
+        // 12_500 + 500 = 13_000 → 13.0k
         assert_eq!(
             session_usage_bar_label(&usage).as_deref(),
-            Some("12.50k tok")
+            Some("13.0k tok")
+        );
+    }
+
+    #[test]
+    fn session_usage_bar_label_includes_cache_rate_one_decimal() {
+        let mut totals = model_row(1_000_000, 100_000, None);
+        totals.cached_read_tokens = 950_000;
+        let usage = PromptUsage {
+            totals,
+            ..Default::default()
+        };
+        let label = session_usage_bar_label(&usage).unwrap();
+        assert!(
+            label.starts_with("1.1M tok(95.0%)"),
+            "expected cache rate on total tokens, got {label}"
         );
     }
 

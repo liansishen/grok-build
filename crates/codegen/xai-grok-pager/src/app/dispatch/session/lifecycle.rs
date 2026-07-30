@@ -1265,6 +1265,7 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
                 if unchanged {
                     vec![]
                 } else {
+                    agent.cpa_quota = None;
                     vec![Effect::PersistPreferredModel {
                         model_id: model_id.clone(),
                         reasoning_effort: resolved_effort,
@@ -1289,6 +1290,10 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
         let drain = maybe_drain_queue(agent);
         effects.extend(drain.effects);
         note_peek_page_flip(app, agent_id, drain.page_flip_entry);
+        // Refresh CPA weekly quotas for the newly selected model (if configured).
+        effects.extend(crate::app::dispatch::status::append_cpa_quota(
+            app, agent_id, false,
+        ));
         effects
     } else {
         vec![]

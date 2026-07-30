@@ -1048,6 +1048,30 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             }
             vec![]
         }
+        TaskResult::CpaQuotaFetched {
+            agent_id,
+            model_id: _,
+            snapshot,
+            for_usage_block,
+        } => {
+            let Some(agent) = app.agents.get_mut(&agent_id) else {
+                return vec![];
+            };
+            agent.cpa_quota = snapshot.clone();
+            if for_usage_block {
+                let text = snapshot
+                    .as_ref()
+                    .map(|s| s.usage_block_text())
+                    .unwrap_or_else(|| {
+                        "CPA weekly quota: not configured or unavailable for this model."
+                            .to_string()
+                    });
+                agent
+                    .scrollback
+                    .push_block(crate::scrollback::block::RenderBlock::system(text));
+            }
+            vec![]
+        }
         TaskResult::SessionUsageComplete {
             agent_id,
             session_id,

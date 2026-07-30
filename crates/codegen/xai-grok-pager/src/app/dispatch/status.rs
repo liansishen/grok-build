@@ -214,7 +214,7 @@ pub(super) fn dispatch_show_context_info(app: &mut AppView) -> Vec<Effect> {
     }]
 }
 
-/// `/usage` — session token/cost, then consumer credits when visible.
+/// `/usage` — session token/cost, then CPA weekly quotas and/or consumer credits.
 /// Credits are chained after the session block so layout stays ordered.
 pub(super) fn dispatch_show_usage(app: &mut AppView) -> Vec<Effect> {
     let ActiveView::Agent(id) = app.active_view else {
@@ -238,12 +238,43 @@ pub(super) fn dispatch_show_usage(app: &mut AppView) -> Vec<Effect> {
                     "Session usage is unavailable until the session starts.".to_string(),
                 ));
             }
-            append_consumer_billing_surface(app, id)
+            let mut effects = append_cpa_quota(app, id, true);
+            effects.extend(append_consumer_billing_surface(app, id));
+            effects
         }
     }
 }
 
-/// Commit a session-usage block if still on `session_id`, then consumer credits.
+/// Schedule a CPA weekly-quota fetch for the current model.
+/// Silent refresh only runs when management is configured; `/usage` always
+/// schedules so the user sees an explicit unavailable message when unset.
+pub(crate) fn append_cpa_quota(
+    app: &mut AppView,
+    agent_id: AgentId,
+    for_usage_block: bool,
+) -> Vec<Effect> {
+    let Some(agent) = app.agents.get(&agent_id) else {
+        return vec![];
+    };
+    let Some(model_id) = agent
+        .session
+        .models
+        .current_model_id_str()
+        .map(|s| s.to_string())
+    else {
+        return vec![];
+    };
+    if !for_usage_block && crate::cpa_quota::management_for_model(&model_id).is_none() {
+        return vec![];
+    }
+    vec![Effect::FetchCpaQuota {
+        agent_id,
+        model_id,
+        for_usage_block,
+    }]
+}
+
+/// Commit a session-usage block if still on `session_id`, then CPA + consumer credits.
 pub(super) fn commit_session_usage_block(
     app: &mut AppView,
     agent_id: AgentId,
@@ -257,7 +288,9 @@ pub(super) fn commit_session_usage_block(
         return vec![];
     }
     agent.scrollback.push_block(RenderBlock::system(text));
-    append_consumer_billing_surface(app, agent_id)
+    let mut effects = append_cpa_quota(app, agent_id, true);
+    effects.extend(append_consumer_billing_surface(app, agent_id));
+    effects
 }
 
 /// Consumer credit follow-up for `/usage` (redirect or non-silent billing fetch).

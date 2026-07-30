@@ -2310,18 +2310,30 @@ impl AgentView {
         let usage_warning_text: Option<String> = warning.as_ref().map(|(t, _)| t.clone());
         let usage_warning = usage_warning_text.as_deref();
         let usage_warning_critical = warning.is_some_and(|(_, critical)| critical);
-        // Always-visible compact usage (weekly/monthly % + reset) left of model.
-        let credit_status = self
-            .credit_balance
+        // CPA weekly quotas (per-model management) take precedence over xAI
+        // coding-credit status when present — xAI limits are meaningless on
+        // CPA-routed models.
+        let cpa_status = self
+            .cpa_quota
             .as_ref()
-            .filter(|_| self.billing_surface_visible && !self.chat_kind)
-            .map(|bal| bal.prompt_status_line());
+            .filter(|_| !self.chat_kind)
+            .and_then(|s| s.prompt_status_line());
+        // Always-visible compact usage (weekly/monthly % + reset) left of model.
+        let credit_status = if cpa_status.is_some() {
+            None
+        } else {
+            self.credit_balance
+                .as_ref()
+                .filter(|_| self.billing_surface_visible && !self.chat_kind)
+                .map(|bal| bal.prompt_status_line())
+        };
         // Live session tokens/cost (left of model; cost only when available).
         let session_status = self
             .session_usage_snapshot
             .as_ref()
             .and_then(crate::app::status_blocks::session_usage_bar_label);
-        let usage_status_owned = match (session_status, credit_status) {
+        let quota_status = cpa_status.or(credit_status);
+        let usage_status_owned = match (session_status, quota_status) {
             (Some(s), Some(c)) => Some(format!("{s} · {c}")),
             (Some(s), None) => Some(s),
             (None, Some(c)) => Some(c),

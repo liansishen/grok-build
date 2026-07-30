@@ -2314,14 +2314,28 @@ pub(crate) async fn run(
 
             _ = billing_poll => {
                 billing_poll_at = None;
+                let mut effs = Vec::new();
                 if app.usage_visible && app.billing_poll_wanted {
                     // Consumer billing is account-scoped. Fetch even while the
                     // welcome/dashboard is active; the result fans out to all
                     // existing Build agents.
-                    let effs = vec![Effect::FetchAppBilling { request: None }];
+                    effs.push(Effect::FetchAppBilling { request: None });
+                }
+                // Silent CPA weekly refresh for the active agent when configured.
+                if let crate::app::app_view::ActiveView::Agent(id) = app.active_view {
+                    effs.extend(crate::app::dispatch::status::append_cpa_quota(
+                        &mut app, id, false,
+                    ));
+                }
+                if !effs.is_empty() {
                     if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
                         break;
                     }
+                }
+                // Keep the timer armed while either surface may want refresh.
+                if (app.usage_visible && app.billing_poll_wanted)
+                    || matches!(app.active_view, crate::app::app_view::ActiveView::Agent(_))
+                {
                     billing_poll_at = Some(Instant::now() + billing_poll_interval);
                 }
             }
@@ -2818,7 +2832,7 @@ pub(crate) async fn run(
     Ok(make_run_result(&app))
 }
 
-/// Reconcile the account billing timer with live visibility and cadence state.
+/// Reconcile the account billing / CPA quota timer with live cadence state.
 fn reconcile_billing_poll_deadline(
     app: &AppView,
     poll_at: &mut Option<Instant>,
@@ -2826,7 +2840,11 @@ fn reconcile_billing_poll_deadline(
     now: Instant,
 ) {
     let wanted_interval = billing_poll_interval(app);
-    if !app.usage_visible || !app.billing_poll_wanted {
+    let want_billing = app.usage_visible && app.billing_poll_wanted;
+    // Keep the timer while an agent is active so CPA weekly quotas can refresh
+    // even when consumer xAI billing is hidden (team / API-key).
+    let want_cpa = matches!(app.active_view, crate::app::app_view::ActiveView::Agent(_));
+    if !want_billing && !want_cpa {
         *poll_at = None;
     } else if poll_at.is_none() || *current_interval != wanted_interval {
         *current_interval = wanted_interval;

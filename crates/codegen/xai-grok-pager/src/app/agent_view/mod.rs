@@ -889,6 +889,8 @@ pub struct AgentView {
     /// (`[ui].show_session_usage_bar`). Updated by silent or /usage fetches.
     pub session_usage_snapshot:
         Option<xai_grok_shell::extensions::notification::PromptUsage>,
+    /// CPA weekly quota for the current model's management pool (if configured).
+    pub cpa_quota: Option<crate::cpa_quota::CpaQuotaSnapshot>,
     /// Current goal orchestration state. Set by `GoalUpdated` session
     /// notifications, cleared when a new session starts.
     pub goal_state: Option<super::agent::GoalDisplayState>,

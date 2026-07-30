@@ -4094,6 +4094,20 @@ pub struct ConfigModelOverride {
     /// `auto` | `server` | `local` (see [`xai_grok_sampling_types::CostSource`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_source: Option<String>,
+    /// CLIProxyAPI (CPA) Management API base URL for weekly quota display.
+    /// Example: `http://127.0.0.1:8317` (paths under `/v0/management` are appended).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub management_url: Option<String>,
+    /// Management API secret key (prefer `management_env_key` for secrets).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub management_key: Option<String>,
+    /// Env var(s) holding the management key (same shape as `env_key`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub management_env_key: Option<EnvKeys>,
+    /// Auth-file providers to include when listing quotas (default: `["codex"]`).
+    /// `xai` is always excluded even if listed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub management_providers: Vec<String>,
 }
 impl ConfigModelOverride {
     /// Merge flat price fields into `pricing`.
@@ -4222,6 +4236,9 @@ impl ConfigModelOverride {
         if self.api_base_url.is_some() {
             entry.api_base_url.clone_from(&self.api_base_url);
         }
+        if let Some(mgmt) = self.resolved_cpa_management() {
+            entry.cpa_management = Some(mgmt);
+        }
         if self.supported_in_api.is_none()
             && (self.api_key.is_some() || self.env_key.is_some() || self.auth_provider.is_some())
         {
@@ -4229,6 +4246,46 @@ impl ConfigModelOverride {
         }
         entry
     }
+
+    /// Build CPA management settings when `management_url` is set and a key resolves.
+    pub fn resolved_cpa_management(&self) -> Option<CpaManagementConfig> {
+        let url = self.management_url.as_deref()?.trim();
+        if url.is_empty() {
+            return None;
+        }
+        let key = first_own_credential(
+            self.management_key.as_deref(),
+            self.management_env_key.as_ref(),
+        )?;
+        let providers = if self.management_providers.is_empty() {
+            vec!["codex".to_string()]
+        } else {
+            self.management_providers
+                .iter()
+                .map(|p| p.trim().to_ascii_lowercase())
+                .filter(|p| !p.is_empty() && p != "xai")
+                .collect()
+        };
+        if providers.is_empty() {
+            return None;
+        }
+        Some(CpaManagementConfig {
+            url: url.trim_end_matches('/').to_string(),
+            key,
+            providers,
+        })
+    }
+}
+
+/// Per-model CLIProxyAPI Management settings for weekly quota display.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CpaManagementConfig {
+    /// Management base URL (no trailing slash), e.g. `http://127.0.0.1:8317`.
+    pub url: String,
+    /// Management secret key.
+    pub key: String,
+    /// Providers to include (never includes `xai`).
+    pub providers: Vec<String>,
 }
 /// Shared model metadata — the common fields across all model sources.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -4430,6 +4487,9 @@ pub struct ModelEntry {
     pub auth_provider: Option<crate::auth::AuthProviderRef>,
     /// When set, `base_url` is used for session auth, `api_base_url` for API-key auth.
     pub api_base_url: Option<String>,
+    /// CPA Management settings for weekly quota (from `[model.<id>]`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpa_management: Option<CpaManagementConfig>,
 }
 impl ModelEntry {
     /// Minimal fallback entry for an unknown model slug.
@@ -4442,6 +4502,7 @@ impl ModelEntry {
             env_key: None,
             auth_provider: None,
             api_base_url: None,
+            cpa_management: None,
         }
     }
     pub fn info(&self) -> &ModelInfo {
@@ -4454,6 +4515,7 @@ impl ModelEntry {
             env_key: entry.env_key.clone(),
             auth_provider: None,
             api_base_url: entry.api_base_url.clone(),
+            cpa_management: None,
         }
     }
     /// Non-empty `api_key`, else first non-empty resolved `env_key`.
@@ -5131,6 +5193,7 @@ pub fn resolve_aux_model_sampling_config(
             env_key: None,
             auth_provider: None,
             api_base_url: None,
+            cpa_management: None,
         };
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
         let sampler = sampling_config_for_model(
@@ -5366,6 +5429,7 @@ fn resolve_hidden_default_web_search_sampling_config(
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
     sampling_config_for_model(
@@ -6584,6 +6648,7 @@ reasoning_effort = "low"
             env_key: env_key.map(EnvKeys::single),
             auth_provider: None,
             api_base_url: api_base_url.map(|s| s.to_string()),
+            cpa_management: None,
         }
     }
     /// The effective-model RE-support lookup must use the model ACTUALLY used:
@@ -12043,6 +12108,7 @@ default = "grok-4.5"
             env_key: None,
             auth_provider: None,
             api_base_url: None,
+            cpa_management: None,
         }
     }
     #[test]

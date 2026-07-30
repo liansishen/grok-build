@@ -365,6 +365,7 @@ fn model_show_model_fingerprint_reads_catalog_flag() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     flagged.info.show_model_fingerprint = true;
     mgr.insert_test_entry("fp-model", flagged);
@@ -377,6 +378,7 @@ fn model_show_model_fingerprint_reads_catalog_flag() {
             env_key: None,
             auth_provider: None,
             api_base_url: None,
+            cpa_management: None,
         },
     );
 
@@ -386,6 +388,7 @@ fn model_show_model_fingerprint_reads_catalog_flag() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     custom.info.show_model_fingerprint = true;
     mgr.insert_test_entry("enterprise-key", custom);
@@ -565,6 +568,7 @@ fn rebuild_updates_models_and_available() {
             env_key: None,
             auth_provider: None,
             api_base_url: None,
+            cpa_management: None,
         },
     );
 
@@ -619,6 +623,7 @@ fn default_reasoning_effort_only_stamps_supporting_model() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     reasoning_entry.info.supports_reasoning_effort = true;
     prefetched.insert("reasoning-model".to_string(), reasoning_entry);
@@ -641,6 +646,7 @@ fn default_reasoning_effort_only_stamps_supporting_model() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     prefetched.insert("plain-model".to_string(), plain_entry);
 
@@ -668,6 +674,7 @@ fn reasoning_effort_override_skips_models_that_do_not_offer_level() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     no_none.info.supports_reasoning_effort = true;
     no_none.info.reasoning_efforts = vec![ReasoningEffortOption {
@@ -686,6 +693,7 @@ fn reasoning_effort_override_skips_models_that_do_not_offer_level() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     with_none.info.supports_reasoning_effort = true;
     with_none.info.reasoning_efforts = vec![ReasoningEffortOption {
@@ -787,6 +795,7 @@ fn cli_reasoning_effort_override_only_stamps_supporting_models() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     reasoning_entry.info.supports_reasoning_effort = true;
     prefetched.insert("reasoning-model".to_string(), reasoning_entry);
@@ -797,6 +806,7 @@ fn cli_reasoning_effort_override_only_stamps_supporting_models() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     prefetched.insert("plain-model".to_string(), plain_entry);
 
@@ -840,6 +850,7 @@ fn make_model_entry(model_id: &str) -> ModelEntry {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     }
 }
 
@@ -1581,6 +1592,7 @@ async fn fetch_and_apply_degrades_offline_when_remote_fetch_disabled() {
             env_key: None,
             auth_provider: None,
             api_base_url: None,
+            cpa_management: None,
         },
     );
 
@@ -1609,6 +1621,7 @@ fn default_model_skips_oauth_only_for_api_key_users() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     oauth_only.info.supported_in_api = false;
     catalog.insert("oauth-only".to_string(), oauth_only);
@@ -1619,6 +1632,7 @@ fn default_model_skips_oauth_only_for_api_key_users() {
         env_key: None,
         auth_provider: None,
         api_base_url: None,
+        cpa_management: None,
     };
     catalog.insert("public-model".to_string(), public);
 

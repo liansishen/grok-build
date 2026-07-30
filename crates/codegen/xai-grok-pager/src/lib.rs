@@ -7,6 +7,7 @@ pub mod actions;
 pub mod app;
 pub mod client_identity;
 pub mod completions_cmd;
+pub mod cpa_quota;
 mod config_toml_edit;
 pub mod diagnostics;
 pub mod diff;

@@ -598,25 +598,32 @@ fn show_usage_without_session_still_surfaces_credits() {
 
 #[test]
 fn team_auth_disables_agent_billing_surface() {
-    for meta in [
-        xai_grok_shell::auth::AuthMeta {
-            team_id: Some("team-uuid".into()),
-            ..Default::default()
-        },
-        xai_grok_shell::auth::AuthMeta {
-            principal_type: Some("Team".into()),
-            ..Default::default()
-        },
-    ] {
-        let mut app = test_app_with_agent();
-        app.agents
-            .get_mut(&AgentId(0))
-            .unwrap()
-            .billing_surface_visible = true;
-        let _ = app.apply_auth_meta(&meta);
-        assert!(!app.usage_visible);
-        assert!(!app.agents.get(&AgentId(0)).unwrap().billing_surface_visible);
-    }
+    let meta = xai_grok_shell::auth::AuthMeta {
+        team_id: Some("team-uuid".into()),
+        principal_type: Some("Team".into()),
+        ..Default::default()
+    };
+    let mut app = test_app_with_agent();
+    app.agents
+        .get_mut(&AgentId(0))
+        .unwrap()
+        .billing_surface_visible = true;
+    let _ = app.apply_auth_meta(&meta);
+    assert!(!app.usage_visible);
+    assert!(!app.agents.get(&AgentId(0)).unwrap().billing_surface_visible);
+}
+
+#[test]
+fn personal_user_with_workspace_team_id_keeps_billing_surface() {
+    let meta = xai_grok_shell::auth::AuthMeta {
+        team_id: Some("workspace-uuid".into()),
+        principal_type: Some("User".into()),
+        ..Default::default()
+    };
+    let mut app = test_app_with_agent();
+    let _ = app.apply_auth_meta(&meta);
+    assert!(app.usage_visible);
+    assert!(app.agents.get(&AgentId(0)).unwrap().billing_surface_visible);
 }
 
 #[serial_test::serial(GROK_TEST_OPEN_URL_FILE)]

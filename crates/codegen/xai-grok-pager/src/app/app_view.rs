@@ -1375,11 +1375,17 @@ impl AppView {
             self.auto_topup = None;
             self.sync_billing_cache_to_agents();
         }
-        self.is_team_principal = meta.team_id.is_some()
-            || meta
-                .principal_type
-                .as_deref()
-                .is_some_and(|kind| kind.eq_ignore_ascii_case("team"));
+        // Align with shell `GrokAuth::is_team_principal`: both Team principal
+        // and a non-empty team_id. Personal OAuth users often carry a workspace
+        // team_id with principal_type "User" — that must not hide billing.
+        self.is_team_principal = meta
+            .principal_type
+            .as_deref()
+            .is_some_and(|kind| kind.eq_ignore_ascii_case("team"))
+            && meta
+                .team_id
+                .as_ref()
+                .is_some_and(|id| !id.trim().is_empty());
         self.team_id = meta.team_id.clone();
         self.team_name = meta.team_name.clone();
         self.is_zdr = meta.is_zdr;
@@ -7166,26 +7172,40 @@ pub(crate) mod tests {
     }
     #[test]
     fn apply_auth_meta_disables_billing_surface_for_team_users() {
-        for meta in [
-            xai_grok_shell::auth::AuthMeta {
-                team_id: Some("team-uuid".into()),
-                ..Default::default()
-            },
-            xai_grok_shell::auth::AuthMeta {
-                principal_type: Some("Team".into()),
-                ..Default::default()
-            },
-        ] {
-            let mut app = test_app();
-            assert!(app.usage_visible);
-            let _ = app.apply_auth_meta(&meta);
-            assert!(!app.usage_visible);
-            assert!(
-                !app.welcome_prompt
-                    .slash_controller
-                    .billing_surface_visible()
-            );
-        }
+        // True team principal requires Team type AND team_id (shell alignment).
+        let meta = xai_grok_shell::auth::AuthMeta {
+            team_id: Some("team-uuid".into()),
+            principal_type: Some("Team".into()),
+            team_name: Some("Acme".into()),
+            ..Default::default()
+        };
+        let mut app = test_app();
+        assert!(app.usage_visible);
+        let _ = app.apply_auth_meta(&meta);
+        assert!(!app.usage_visible);
+        assert!(
+            !app.welcome_prompt
+                .slash_controller
+                .billing_surface_visible()
+        );
+    }
+
+    #[test]
+    fn apply_auth_meta_personal_user_with_workspace_team_id_keeps_billing() {
+        // Personal OAuth often has a workspace team_id with principal_type User.
+        let meta = xai_grok_shell::auth::AuthMeta {
+            team_id: Some("workspace-uuid".into()),
+            principal_type: Some("User".into()),
+            email: Some("user@example.com".into()),
+            ..Default::default()
+        };
+        let mut app = test_app();
+        let _ = app.apply_auth_meta(&meta);
+        assert!(
+            app.usage_visible,
+            "workspace team_id alone must not hide consumer billing"
+        );
+        assert!(!app.is_team_principal);
     }
     #[test]
     fn apply_auth_meta_enables_billing_surface_for_personal_users() {
