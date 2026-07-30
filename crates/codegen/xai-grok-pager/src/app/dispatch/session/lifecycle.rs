@@ -102,7 +102,8 @@ pub(crate) fn apply_deferred_switch_outcome(
     outcome: DeferredSwitchOutcome,
 ) -> Option<(acp::ModelId, Option<ReasoningEffort>)> {
     if let Some(err) = outcome.effort_error {
-        let msg = format!("--effort/--reasoning-effort: {}", err.message());
+        let detail = crate::slash::commands::effort_levels::effort_error_message(&err);
+        let msg = xai_grok_i18n::t_fmt("session.effort_error", &[("error", &detail)]);
         tracing::warn!("{msg}");
         agent.show_toast(&msg);
         agent.scrollback.push_block(RenderBlock::system(msg));
@@ -164,26 +165,26 @@ pub(in crate::app::dispatch) fn open_new_session_question(app: &mut AppView) -> 
         return vec![];
     };
     if agent.question_view.is_some() {
-        app.show_toast("Finish answering the current question first");
+        app.show_toast(xai_grok_i18n::t("toast.finish_current_question"));
         return vec![];
     }
     let mut options = vec![
         QuestionOption {
-            label: "Yes".into(),
-            description: "New session in a new isolated git worktree".into(),
+            label: xai_grok_i18n::t("permission.option.yes").into(),
+            description: xai_grok_i18n::t("worktree.new_session.yes_description").into(),
             preview: None,
             id: None,
         },
         QuestionOption {
-            label: "No".into(),
-            description: "New session in the current cwd".into(),
+            label: xai_grok_i18n::t("worktree.fork.no").into(),
+            description: xai_grok_i18n::t("worktree.new_session.no_description").into(),
             preview: None,
             id: None,
         },
     ];
     options.extend(worktree_persist_options());
     let question = Question {
-        question: "Start the new session in an isolated git worktree?".into(),
+        question: xai_grok_i18n::t("worktree.new_session.question").into(),
         id: None,
         options,
         multi_select: Some(false),
@@ -223,22 +224,31 @@ pub(in crate::app::dispatch) fn open_agent_type_mismatch_question(
         return vec![];
     };
     if agent.question_view.is_some() {
-        app.show_toast("Finish answering the current question first");
+        app.show_toast(xai_grok_i18n::t("toast.finish_current_question"));
         return vec![];
     }
     let question = Question {
-        question: format!("Switching to {model_name} requires starting a new session. Continue?"),
+        question: xai_grok_i18n::t_fmt(
+            "session.agent_type_mismatch.question",
+            &[("model", model_name)],
+        ),
         id: None,
         options: vec![
             QuestionOption {
-                label: "Yes".into(),
-                description: format!("Start a new session with {model_name}"),
+                label: xai_grok_i18n::t("permission.option.yes").into(),
+                description: xai_grok_i18n::t_fmt(
+                    "session.agent_type_mismatch.yes_description",
+                    &[("model", model_name)],
+                ),
                 preview: None,
                 id: None,
             },
             QuestionOption {
-                label: "No".into(),
-                description: "Continue the current session".into(),
+                label: xai_grok_i18n::t("worktree.fork.no").into(),
+                description: xai_grok_i18n::t(
+                    "session.agent_type_mismatch.no_description",
+                )
+                .into(),
                 preview: None,
                 id: None,
             },
@@ -699,9 +709,7 @@ pub(in crate::app::dispatch) fn dispatch_new_worktree_session(
         return vec![];
     }
     if !app.cwd_has_git_ancestor {
-        let msg: String = "Not inside a git repository. Navigate to a git repo \
-                      or run 'git init' first."
-            .into();
+        let msg = xai_grok_i18n::t("toast.worktree_not_git_repository").to_string();
         if !app.startup_warnings.iter().any(|w| w.message == msg) {
             app.startup_warnings.push(crate::startup::StartupWarning {
                 severity: crate::startup::WarningSeverity::Warning,
@@ -839,7 +847,7 @@ pub(in crate::app::dispatch) fn dispatch_new_session_with_id(
 /// Tear down a placeholder agent that must not proceed under sticky `--chat`
 /// (local Build refuse). Never leave a half-loaded slot with a bound session id.
 pub(in crate::app::dispatch) fn refuse_chat_mode_build_agent(app: &mut AppView, agent_id: AgentId) {
-    app.show_toast(crate::app::session_startup::CHAT_MODE_LOCAL_BUILD_REFUSAL);
+    app.show_toast(xai_grok_i18n::t("session.chat_mode_local_build_refusal"));
     let fallback = app.agents.keys().copied().find(|id| *id != agent_id);
     remove_agent_and_cleanup(app, agent_id);
     if let Some(target) = fallback {
@@ -852,7 +860,7 @@ pub(in crate::app::dispatch) fn refuse_chat_mode_build_agent(app: &mut AppView, 
         app.session_picker_state.selected = 0;
         app.session_picker_content_results = None;
         app.session_picker_content_loading = false;
-        let msg = crate::app::session_startup::CHAT_MODE_LOCAL_BUILD_REFUSAL.to_string();
+        let msg = xai_grok_i18n::t("session.chat_mode_local_build_refusal").to_string();
         if !app.startup_warnings.iter().any(|w| w.message == msg) {
             app.startup_warnings.push(crate::startup::StartupWarning {
                 severity: crate::startup::WarningSeverity::Warning,
@@ -914,14 +922,14 @@ pub(in crate::app::dispatch) fn handle_session_created(
             && agent_count > 1
             && let Some(cmd) = switch_hint
         {
-            agent.scrollback.push_block(RenderBlock::system(format!(
-                "Session {} \u{2014} use {cmd} to switch between sessions",
-                session_id_clone.0,
+            agent.scrollback.push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                "session.created_switch_hint",
+                &[("session_id", session_id_clone.0.as_ref()), ("command", cmd)],
             )));
         } else if agent_count > 1 {
-            agent.scrollback.push_block(RenderBlock::system(format!(
-                "Session: {}",
-                session_id_clone.0,
+            agent.scrollback.push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                "session.created",
+                &[("session_id", session_id_clone.0.as_ref())],
             )));
         }
         agent.bind_session_id(session_id);
@@ -1030,9 +1038,10 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
             agent.session.models = app.models.clone();
         }
         agent.prompt.file_search.retarget(&session_cwd);
-        agent.scrollback.push_block(RenderBlock::system(format!(
-            "Worktree ready: {}",
-            worktree_path.display()
+        let worktree_path = worktree_path.display().to_string();
+        agent.scrollback.push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+            "worktree.ready",
+            &[("path", &worktree_path)],
         )));
         let deferred = apply_deferred_model_switch(agent, app.cli_effort_token.as_deref());
         let deferred_mode = agent.deferred_session_mode.take();
@@ -1131,7 +1140,7 @@ pub(in crate::app::dispatch) fn handle_session_failed(
     error: String,
 ) -> Vec<Effect> {
     tracing::error!(agent = ?agent_id, error = %error, "Session creation failed");
-    let msg = format!("Session creation failed: {error}");
+    let msg = xai_grok_i18n::t_fmt("session.create_failed", &[("error", &error)]);
     let is_orphan = app
         .agents
         .get(&agent_id)
@@ -1202,7 +1211,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_failed(
             app.session_picker_content_results = None;
             app.session_picker_content_loading = false;
         }
-        let msg = format!("Cannot create worktree: {error}");
+        let msg = xai_grok_i18n::t_fmt("worktree.create_failed", &[("error", &error)]);
         if !app.startup_warnings.iter().any(|w| w.message == msg) {
             app.startup_warnings.push(crate::startup::StartupWarning {
                 severity: crate::startup::WarningSeverity::Warning,
@@ -1256,9 +1265,16 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
                     prev_model.as_ref() == Some(&model_id) && prev_effort == resolved_effort;
                 if !unchanged {
                     let msg = if let Some(eff) = resolved_effort {
-                        format!("Switched to {display_name} ({eff} effort)")
+                        let effort = eff.to_string();
+                        xai_grok_i18n::t_fmt(
+                            "session.model_switched_with_effort",
+                            &[("model", &display_name), ("effort", &effort)],
+                        )
                     } else {
-                        format!("Switched to {display_name}")
+                        xai_grok_i18n::t_fmt(
+                            "session.model_switched_plain",
+                            &[("model", &display_name)],
+                        )
                     };
                     agent.scrollback.push_block(RenderBlock::system(msg));
                 }
@@ -1281,9 +1297,9 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
                 return open_agent_type_mismatch_question(app, model_id, effort, &display_name);
             }
             Err(SwitchModelError::Other(msg)) => {
-                agent
-                    .scrollback
-                    .push_block(RenderBlock::system(format!("Couldn't switch model: {msg}")));
+                agent.scrollback.push_block(RenderBlock::system(
+                    xai_grok_i18n::t_fmt("session.model_switch_failed", &[("error", &msg)]),
+                ));
                 vec![]
             }
         };

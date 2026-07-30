@@ -745,7 +745,7 @@ pub(super) fn render_rows(
                         width: area.width,
                         height: desc_height.min(8), // cap at 8 lines per row to keep scroll sane
                     };
-                    let lock_reason = lock.map(CodingDataSharingLock::reason);
+                    let lock_reason = lock.map(coding_data_sharing_lock_reason);
                     render_expanded_description(buf, desc_rect, meta, lock_reason, theme);
                     // Re-measure how many lines the wrapped description
                     // actually consumed, so y_cursor advances precisely.
@@ -865,7 +865,7 @@ fn compute_filtered_row_heights(state: &SettingsModalState, area_width: u16) -> 
                     // 2040 (`desc_rect.height = ... .min(8)`).
                     h = h.saturating_add(wrapped_description_height(
                         meta,
-                        lock.map(CodingDataSharingLock::reason),
+                        lock.map(coding_data_sharing_lock_reason),
                         area_width,
                         8,
                     ));
@@ -1236,7 +1236,11 @@ pub(super) fn render_picking_enum(
         let overflow_y = y_cursor;
         if overflow_y < choices_y + max_choices_h as u16 && overflow_y < area.y + area.height {
             let overflow_style = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
-            let raw = format!("\u{2026} {more_count} more");
+            let count = more_count.to_string();
+            let raw = format!(
+                "\u{2026} {}",
+                xai_grok_i18n::t_fmt("dashboard.more_count", &[("count", &count)])
+            );
             let overflow_text: std::borrow::Cow<'_, str> = if raw.width() <= area.width as usize {
                 std::borrow::Cow::Owned(raw)
             } else {
@@ -2255,10 +2259,21 @@ pub(super) const ROW_RIGHT_PAD_W: u16 = 1;
 const ROW_CHEVRON_W: u16 = 2;
 /// Chevron column width — reserved for all rows for alignment.
 pub(super) const ROW_CHEVRON_COL_W: u16 = ROW_CHEVRON_W;
-/// Appended to the value column of a locked row (see `SettingsModalState::row_lock`).
-pub(super) const ROW_ADMIN_MANAGED_SUFFIX: &str = " \u{00B7} Admin Managed";
 /// Value column for ZDR-locked rows — replaces the opt-in/out value entirely.
 pub(super) const ROW_ZDR_VALUE: &str = "ZDR";
+
+fn coding_data_sharing_lock_reason(lock: CodingDataSharingLock) -> &'static str {
+    match lock {
+        CodingDataSharingLock::Zdr => xai_grok_i18n::t_or(
+            "settings.coding_data_sharing.lock_reason_zdr",
+            "Your team has Zero Data Retention.",
+        ),
+        CodingDataSharingLock::TeamManaged => xai_grok_i18n::t_or(
+            "settings.coding_data_sharing.lock_reason_team_managed",
+            "Managed by your team admin.",
+        ),
+    }
+}
 
 /// Value-column text, shared by layout, scroll math, and paint.
 /// Bool / empty-dynamic-enum strings use i18n so zh-CN stays localized.
@@ -2283,7 +2298,10 @@ pub(super) fn value_display(
         SettingValue::Int(i) => i.to_string(),
     };
     if lock == Some(CodingDataSharingLock::TeamManaged) {
-        display.push_str(ROW_ADMIN_MANAGED_SUFFIX);
+        display.push_str(xai_grok_i18n::t_or(
+            "settings.coding_data_sharing.admin_managed_suffix",
+            " · Admin Managed",
+        ));
     }
     display
 }

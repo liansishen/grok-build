@@ -134,23 +134,23 @@ pub(super) fn open_doctor_fix_question(
     };
     if agent.question_view.is_some() {
         agent.scrollback.push_block(RenderBlock::system(
-            "Close the current question before applying this fix.",
+            xai_grok_i18n::t("fix_confirm.close_current_question"),
         ));
         return;
     }
     let preview = crate::diagnostics::format_fix_preview(&plan);
     let question = Question {
-        question: "Apply this fix?".to_owned(),
+        question: xai_grok_i18n::t("fix_confirm.apply_this_fix").to_owned(),
         options: vec![
             QuestionOption {
-                label: "Apply".to_owned(),
-                description: "Make the changes shown above.".to_owned(),
+                label: xai_grok_i18n::t("fix_confirm.apply").to_owned(),
+                description: xai_grok_i18n::t("fix_confirm.apply_description").to_owned(),
                 preview: Some(preview),
                 id: None,
             },
             QuestionOption {
-                label: "Cancel".to_owned(),
-                description: "Do not change the configuration.".to_owned(),
+                label: xai_grok_i18n::t("fix_confirm.cancel").to_owned(),
+                description: xai_grok_i18n::t("fix_confirm.cancel_description").to_owned(),
                 preview: None,
                 id: None,
             },
@@ -612,9 +612,15 @@ pub(super) fn dispatch_send_prompt_inner(
                         // fullscreen pane / dashboard (/find, /dashboard, …)
                         // have nothing to act on in scrollback-native mode.
                         // Surface a friendly system block instead of running them.
-                        CommandResult::Message(format!(
-                            "/{} is not available in minimal mode",
-                            invocation.token
+                        CommandResult::Message(xai_grok_i18n::t_fmt(
+                            "slash.screen_mode.only_available",
+                            &[
+                                ("command", invocation.token),
+                                (
+                                    "mode",
+                                    xai_grok_i18n::t("slash.screen_mode.display_fullscreen"),
+                                ),
+                            ],
                         ))
                     } else {
                         agent
@@ -1357,10 +1363,11 @@ pub(super) fn handle_prompt_response(
         let notification = match (&result, was_cancelling) {
             (Ok(_), false) if !agent.bash_turn => {
                 let body = match elapsed {
-                    Some(d) => {
-                        format!("Turn complete in {}.", crate::util::format_duration(d))
-                    }
-                    None => String::from("Turn complete."),
+                    Some(d) => xai_grok_i18n::t_fmt(
+                        "notification.turn_complete_in",
+                        &[("duration", &crate::util::format_duration(d))],
+                    ),
+                    None => NotificationEventKind::TurnComplete.display_t().to_string(),
                 };
                 Some((NotificationEventKind::TurnComplete, body))
             }
@@ -1372,7 +1379,10 @@ pub(super) fn handle_prompt_response(
                     && !reauth_prompted
                     && !context_overflow =>
             {
-                Some((NotificationEventKind::AgentError, format!("Error: {err}")))
+                Some((
+                    NotificationEventKind::AgentError,
+                    xai_grok_i18n::t_fmt("notification.agent_error_detail", &[("error", err)]),
+                ))
             }
             _ => None,
         };

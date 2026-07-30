@@ -16,6 +16,7 @@ use xai_grok_shell::claude_import::{ImportPlan, ImportableItem, PathKind, find_p
 use xai_grok_workspace::permission::types::RuleAction;
 
 use crate::theme::Theme;
+
 use crate::views::modal_window::{
     FoldInfo, ModalSizing, ModalWindowConfig, ModalWindowOutcome, ModalWindowState, Shortcut,
     handle_modal_key, handle_modal_mouse, render_modal_window,
@@ -121,11 +122,11 @@ impl ItemKind {
 
     fn label(&self) -> &'static str {
         match self {
-            Self::Permission => "Permissions",
-            Self::EnvVar => "Env vars",
-            Self::McpServer => "MCP servers",
-            Self::Hook => "Hooks",
-            Self::PathEntry => "Paths",
+            Self::Permission => xai_grok_i18n::t("import.permissions"),
+            Self::EnvVar => xai_grok_i18n::t("import.env_vars"),
+            Self::McpServer => xai_grok_i18n::t("import.mcp_servers"),
+            Self::Hook => xai_grok_i18n::t("extensions.tab.hooks"),
+            Self::PathEntry => xai_grok_i18n::t("import.paths"),
         }
     }
 
@@ -422,7 +423,7 @@ impl ImportClaudeModalState {
             Row::Blank => None,
         });
         let config = ModalWindowConfig {
-            title: "",
+            title: xai_grok_i18n::t("import.claude_title"),
             tabs: None,
             shortcuts: &[],
             sizing: Default::default(),
@@ -594,30 +595,33 @@ pub fn render_import_claude_modal(
     theme: &Theme,
     compact: bool,
 ) {
-    let confirm_label = format!("Enter import {}", state.selected_count());
+    let confirm_label = xai_grok_i18n::t_fmt(
+        "import.enter_import_count",
+        &[("count", &state.selected_count().to_string())],
+    );
     let shortcuts = [
         Shortcut {
-            label: "\u{2191}\u{2193} navigate",
+            label: xai_grok_i18n::t("import.footer.navigate"),
             clickable: false,
             id: SHORTCUT_ID_HINT,
         },
         Shortcut {
-            label: "space toggle",
+            label: xai_grok_i18n::t("import.footer.toggle"),
             clickable: false,
             id: SHORTCUT_ID_HINT,
         },
         Shortcut {
-            label: "\u{2190}\u{2192} fold",
+            label: xai_grok_i18n::t("import.footer.fold"),
             clickable: false,
             id: SHORTCUT_ID_HINT,
         },
         Shortcut {
-            label: "a all",
+            label: xai_grok_i18n::t("import.footer.all"),
             clickable: true,
             id: SHORTCUT_ID_SELECT_ALL,
         },
         Shortcut {
-            label: "n none",
+            label: xai_grok_i18n::t("import.footer.none"),
             clickable: true,
             id: SHORTCUT_ID_SELECT_NONE,
         },
@@ -627,13 +631,13 @@ pub fn render_import_claude_modal(
             id: SHORTCUT_ID_CONFIRM,
         },
         Shortcut {
-            label: "Esc cancel",
+            label: xai_grok_i18n::t("import.esc_cancel"),
             clickable: true,
             id: SHORTCUT_ID_CANCEL,
         },
     ];
     let config = ModalWindowConfig {
-        title: "Import Claude settings",
+        title: xai_grok_i18n::t("import.claude_title"),
         tabs: None,
         shortcuts: &shortcuts,
         sizing: ModalSizing::default().with_compact(compact),
@@ -714,7 +718,10 @@ fn build_rows(
     if !plan.global_items.is_empty() {
         let scope_start = flat_index;
         let scope_key = format!("scope:{:?}", Scope::Global);
-        let label = "Global  ~/.grok/config.toml".to_string();
+        let label = xai_grok_i18n::t_fmt(
+            "import.scope_global",
+            &[("path", "~/.grok/config.toml")],
+        );
         // Placeholder header; flat_indices filled after children are pushed.
         let scope_header_pos = rows.len();
         rows.push(Row::ScopeHeader {
@@ -742,7 +749,10 @@ fn build_rows(
         let scope_start = flat_index;
         let scope_key = format!("scope:{:?}", Scope::Project);
         let project_config = find_project_root(cwd).join(".grok").join("config.toml");
-        let label = format!("Project  {}", project_config.display());
+        let label = xai_grok_i18n::t_fmt(
+            "import.scope_project",
+            &[("path", &project_config.display().to_string())],
+        );
         let scope_header_pos = rows.len();
         rows.push(Row::ScopeHeader {
             label,
@@ -1015,9 +1025,9 @@ fn format_item_label(item: &ImportableItem) -> String {
     match item {
         ImportableItem::Permission(rule) => {
             let action = match rule.action {
-                RuleAction::Allow => "allow",
-                RuleAction::Deny => "deny",
-                RuleAction::Ask => "ask",
+                RuleAction::Allow => xai_grok_i18n::t("import.permission.allow"),
+                RuleAction::Deny => xai_grok_i18n::t("import.permission.deny"),
+                RuleAction::Ask => xai_grok_i18n::t("import.permission.ask"),
             };
             let pattern = rule.pattern.as_deref().unwrap_or("*");
             let tool = format!("{:?}", rule.tool);
@@ -1034,17 +1044,33 @@ fn format_item_label(item: &ImportableItem) -> String {
             timeout,
         } => {
             let m = matcher.as_deref().unwrap_or("*");
-            let t = timeout
-                .map(|t| format!(" timeout={}s", t))
+            let timeout = timeout
+                .map(|seconds| {
+                    xai_grok_i18n::t_fmt(
+                        "import.hook_timeout",
+                        &[("seconds", &seconds.to_string())],
+                    )
+                })
                 .unwrap_or_default();
-            format!("{event}  matcher={m} → {command}{t}")
+            xai_grok_i18n::t_fmt(
+                "import.hook_label",
+                &[
+                    ("event", event),
+                    ("matcher", m),
+                    ("command", command),
+                    ("timeout", &timeout),
+                ],
+            )
         }
         ImportableItem::PathEntry { kind, path } => {
             let kind_str = match kind {
-                PathKind::Skill => "skill dir",
-                PathKind::Rule => "rule dir",
+                PathKind::Skill => xai_grok_i18n::t("import.path.skill_dir"),
+                PathKind::Rule => xai_grok_i18n::t("import.path.rule_dir"),
             };
-            format!("{kind_str}: {path}")
+            xai_grok_i18n::t_fmt(
+                "import.path_label",
+                &[("kind", kind_str), ("path", path)],
+            )
         }
     }
 }

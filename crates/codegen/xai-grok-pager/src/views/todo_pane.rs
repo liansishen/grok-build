@@ -184,9 +184,12 @@ fn empty_placeholder_message(todos_empty: bool, counts: TodoCounts) -> String {
         return xai_grok_i18n::t("pane.no_todos").into();
     }
     match (counts.completed, counts.cancelled) {
-        (_, 0) => "All done.".into(),
-        (0, c) => format!("{c} cancelled."),
-        (d, c) => format!("{d} done. {c} cancelled."),
+        (_, 0) => xai_grok_i18n::t("todo.all_done").into(),
+        (0, c) => xai_grok_i18n::t_fmt("todo.cancelled", &[("count", &c.to_string())]),
+        (d, c) => xai_grok_i18n::t_fmt(
+            "todo.done_cancelled",
+            &[("done", &d.to_string()), ("cancelled", &c.to_string())],
+        ),
     }
 }
 

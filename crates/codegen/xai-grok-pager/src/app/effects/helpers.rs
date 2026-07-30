@@ -458,8 +458,14 @@ impl ConversationsPartial {
     /// Actionable picker notice for a degraded conversations lane.
     pub(crate) fn picker_notice(self) -> &'static str {
         match self {
-            Self::NoOauth => "Couldn't load your chats \u{2014} log in with /login",
-            Self::Timeout | Self::Error => "Couldn't load conversations \u{2014} retry",
+            Self::NoOauth => xai_grok_i18n::t_or(
+                "session_picker.partial.no_oauth",
+                "Couldn't load your chats \u{2014} log in with /login",
+            ),
+            Self::Timeout | Self::Error => xai_grok_i18n::t_or(
+                "session_picker.partial.retry",
+                "Couldn't load conversations \u{2014} retry",
+            ),
         }
     }
 }
@@ -637,7 +643,11 @@ pub(super) fn parse_session_picker_entries(
         .filter_map(|mut e| {
             if e.summary.is_empty() {
                 if e.source == "conversation" {
-                    e.summary = "Untitled".to_string();
+                    e.summary = xai_grok_i18n::t_or(
+                        "session_picker.untitled",
+                        "Untitled",
+                    )
+                    .to_string();
                 } else {
                     return None;
                 }

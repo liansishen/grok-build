@@ -5,7 +5,7 @@
 //! `/docs <title>` opens a single guide by title (case-insensitive).
 
 use crate::app::actions::Action;
-use crate::docs::{REFERENCE_DOCS, USER_GUIDE, default_howto_entries};
+use crate::docs::{default_howto_entries, find_localized_doc};
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 
 /// Online Build docs landing page (hardcoded like other TUI deep-links; docs.x.ai can redirect if the path moves).
@@ -87,9 +87,9 @@ impl SlashCommand for DocsCommand {
             return CommandResult::Action(Action::OpenUrl(BUILD_DOCS_URL.into()));
         }
         match find_localized_doc(trimmed) {
-            Some((doc, title)) => CommandResult::Action(Action::ShowReleaseNotes {
-                title,
-                content: doc.content.into(),
+            Some(localized) => CommandResult::Action(Action::ShowReleaseNotes {
+                title: localized.title,
+                content: localized.content.into(),
             }),
             None => CommandResult::Error(
                 xai_grok_i18n::t_or(
@@ -100,21 +100,6 @@ impl SlashCommand for DocsCommand {
             ),
         }
     }
-}
-
-fn find_localized_doc(title: &str) -> Option<(&'static crate::docs::Doc, String)> {
-    USER_GUIDE
-        .iter()
-        .chain(REFERENCE_DOCS.iter())
-        .zip(default_howto_entries())
-        .find_map(|(doc, localized)| {
-            if doc.title.eq_ignore_ascii_case(title) || localized.title.eq_ignore_ascii_case(title)
-            {
-                Some((doc, localized.title))
-            } else {
-                None
-            }
-        })
 }
 
 fn is_howto_list_arg(arg: &str) -> bool {
@@ -203,15 +188,60 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn title_opens_guide() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
         let models = ModelState::default();
         let mut ctx = make_ctx(&models);
-        match DocsCommand.run(&mut ctx, "Getting Started") {
+        match DocsCommand.run(&mut ctx, "Agent Dashboard") {
             CommandResult::Action(Action::ShowReleaseNotes { title, content }) => {
-                assert_eq!(title, "Getting Started");
-                assert!(!content.is_empty());
+                assert_eq!(title, "Agent Dashboard");
+                assert!(content.starts_with("# Agent Dashboard"));
             }
             other => panic!("expected ShowReleaseNotes, got {other:?}"),
+        }
+    }
+
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn translated_guides_open_with_zh_cn_content() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        let models = ModelState::default();
+        let mut ctx = make_ctx(&models);
+
+        for (requested, expected_content) in [
+            (
+                "Agent Dashboard",
+                include_str!("../../../docs/user-guide/zh-CN/23-dashboard.md"),
+            ),
+            (
+                "Monitoring Usage (External OpenTelemetry)",
+                include_str!("../../../docs/user-guide/zh-CN/24-monitoring-usage.md"),
+            ),
+        ] {
+            match DocsCommand.run(&mut ctx, requested) {
+                CommandResult::Action(Action::ShowReleaseNotes { title, content }) => {
+                    assert_eq!(title, requested);
+                    assert_eq!(content, expected_content);
+                }
+                other => panic!("expected ShowReleaseNotes for {requested:?}, got {other:?}"),
+            }
         }
     }
 

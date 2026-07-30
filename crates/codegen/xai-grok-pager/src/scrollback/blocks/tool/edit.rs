@@ -765,6 +765,18 @@ pub struct EditToolCallBlock {
     pub highlight: EditHighlightPhase,
 }
 
+fn edit_count_suffix(edit_count: usize) -> String {
+    let count = edit_count.to_string();
+    xai_grok_i18n::t_fmt(
+        if edit_count == 1 {
+            "tool.edit.one_edit"
+        } else {
+            "tool.edit.many_edits"
+        },
+        &[("count", &count)],
+    )
+}
+
 fn workflow_script_name(path: &str) -> Option<String> {
     let p = Path::new(path);
     if p.extension().is_none_or(|e| e != "rhai") {
@@ -979,7 +991,7 @@ impl EditToolCallBlock {
                 }
             } else if collapsed && self.edit_count > 1 {
                 vec![Span::styled(
-                    format!(" ({} edits)", self.edit_count),
+                    edit_count_suffix(self.edit_count),
                     detail_style,
                 )]
             } else {
@@ -997,7 +1009,7 @@ impl EditToolCallBlock {
                 surface,
                 cwd,
                 width,
-                prefix.len() + suffix_width,
+                unicode_width::UnicodeWidthStr::width(prefix) + suffix_width,
             ),
         };
 
@@ -1581,7 +1593,11 @@ mod tests {
             Some(80),
         );
         let text: String = header.spans.iter().map(|s| s.content.as_ref()).collect();
-        assert_eq!(text, "Edit main.rs (3 edits)");
+        let expected = format!(
+            "Edit main.rs{}",
+            xai_grok_i18n::t_fmt("tool.edit.many_edits", &[("count", "3")])
+        );
+        assert_eq!(text, expected);
     }
 
     #[test]

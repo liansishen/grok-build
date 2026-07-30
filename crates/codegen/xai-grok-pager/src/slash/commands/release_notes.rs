@@ -27,7 +27,7 @@ impl SlashCommand for ReleaseNotesCommand {
         let changelog = xai_grok_shell::util::changelog::ChangelogManager::new().fetch();
         match changelog.markdown {
             Some(content) => CommandResult::Action(Action::ShowReleaseNotes {
-                title: "Release Notes".to_string(),
+                title: xai_grok_i18n::t_or("release_notes.title", "Release Notes").to_string(),
                 content: content.trim().to_string(),
             }),
             None => {

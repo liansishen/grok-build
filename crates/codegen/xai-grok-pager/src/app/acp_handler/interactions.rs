@@ -77,21 +77,28 @@ pub(crate) fn handle_ask_user_question(
         // after answering the model's question.
         if let Some(ref kind) = old_qv.local_kind {
             use crate::views::question_view::LocalQuestionKind;
-            let cmd = match kind {
+            let subject = match kind {
                 LocalQuestionKind::Fork { .. } => "/fork",
                 LocalQuestionKind::NewSession => "/new",
-                LocalQuestionKind::CreditLimitUpsell { .. } => "credit-limit upsell",
-                LocalQuestionKind::FreeUsageUpsell { .. } => "SuperGrok upsell",
-                LocalQuestionKind::AgentTypeMismatch { .. } => "model switch",
-                LocalQuestionKind::ProjectSelect { .. } => "project select",
+                LocalQuestionKind::CreditLimitUpsell { .. } => {
+                    xai_grok_i18n::t("question.local.subject.credit_limit")
+                }
+                LocalQuestionKind::FreeUsageUpsell { .. } => {
+                    xai_grok_i18n::t("question.local.subject.supergrok")
+                }
+                LocalQuestionKind::AgentTypeMismatch { .. } => {
+                    xai_grok_i18n::t("question.local.subject.model_switch")
+                }
+                LocalQuestionKind::ProjectSelect { .. } => {
+                    xai_grok_i18n::t("question.local.subject.project_select")
+                }
                 LocalQuestionKind::DoctorFix { .. } => "/doctor fix",
                 LocalQuestionKind::DeleteCurrentSession => "/delete",
             };
-            let message = if matches!(kind, LocalQuestionKind::DoctorFix { .. }) {
-                "/doctor fix was cancelled because another question opened.".to_owned()
-            } else {
-                format!("{cmd} cancelled because another question opened.")
-            };
+            let message = xai_grok_i18n::t_fmt(
+                "question.local.cancelled_replaced",
+                &[("subject", subject)],
+            );
             agent.scrollback.push_block(RenderBlock::system(message));
         }
     }

@@ -909,7 +909,7 @@ pub(crate) fn execute(
                     else {
                         return TaskResult::SessionRestoreFailed {
                             agent_id,
-                            error: "Failed to load configuration.".into(),
+                            error: xai_grok_i18n::t("restore.config_failed").into(),
                         };
                     };
                     let _ = auth_manager.auth().await;
@@ -921,54 +921,71 @@ pub(crate) fn execute(
                             Box::new(move |event| {
                                 let msg = match (event.phase, event.step) {
                                     (RestorePhase::Download, PhaseStep::Start) => {
-                                        Some("Downloading session archives...".to_string())
+                                        Some(xai_grok_i18n::t("restore.downloading").to_string())
                                     }
                                     (RestorePhase::Download, PhaseStep::End) => {
-                                        Some(
-                                            format!(
-                                "Downloads finished ({}).",
-                                format_restore_elapsed(event.elapsed),
-                            ),
-                                        )
+                                        Some(xai_grok_i18n::t_fmt(
+                                            "restore.downloads_finished",
+                                            &[(
+                                                "elapsed",
+                                                &format_restore_elapsed(event.elapsed),
+                                            )],
+                                        ))
                                     }
                                     (RestorePhase::Codebase, PhaseStep::Start) => {
-                                        Some("Restoring code...".to_string())
+                                        Some(xai_grok_i18n::t("restore.restoring_code").to_string())
                                     }
-                                    (RestorePhase::Codebase, PhaseStep::End) => {
-                                        event
-                                            .detail
-                                            .as_ref()
-                                            .map(|detail| format!("Code restored ({detail})."))
-                                    }
-                                    (RestorePhase::Memory, PhaseStep::Start) => {
-                                        Some("Restoring memory...".to_string())
-                                    }
-                                    (RestorePhase::SessionState, PhaseStep::Start) => {
-                                        Some("Restoring session state...".to_string())
-                                    }
-                                    (RestorePhase::SessionState, PhaseStep::End) => {
-                                        event
-                                            .detail
-                                            .as_ref()
-                                            .map(|detail| format!("Session state restored ({detail})."))
-                                    }
+                                    (RestorePhase::Codebase, PhaseStep::End) => event
+                                        .detail
+                                        .as_ref()
+                                        .map(|detail| {
+                                            xai_grok_i18n::t_fmt(
+                                                "restore.code_restored",
+                                                &[("detail", detail)],
+                                            )
+                                        }),
+                                    (RestorePhase::Memory, PhaseStep::Start) => Some(
+                                        xai_grok_i18n::t("restore.restoring_memory").to_string(),
+                                    ),
+                                    (RestorePhase::SessionState, PhaseStep::Start) => Some(
+                                        xai_grok_i18n::t("restore.restoring_session_state")
+                                            .to_string(),
+                                    ),
+                                    (RestorePhase::SessionState, PhaseStep::End) => event
+                                        .detail
+                                        .as_ref()
+                                        .map(|detail| {
+                                            xai_grok_i18n::t_fmt(
+                                                "restore.session_state_restored",
+                                                &[("detail", detail)],
+                                            )
+                                        }),
                                     (RestorePhase::Finalize, _) => {
                                         let elapsed_secs = event.elapsed.as_secs();
                                         let status = if event.incomplete {
-                                            "Restore incomplete"
+                                            xai_grok_i18n::t("restore.incomplete")
                                         } else {
-                                            "Restore complete"
+                                            xai_grok_i18n::t("restore.complete")
                                         };
                                         if elapsed_secs >= 60 {
-                                            Some(
-                                                format!(
-                                        "{status} ({}m{:02}s).",
-                                        elapsed_secs / 60,
-                                        elapsed_secs % 60
-                                    ),
-                                            )
+                                            let mins = (elapsed_secs / 60).to_string();
+                                            let secs = format!("{:02}", elapsed_secs % 60);
+                                            Some(xai_grok_i18n::t_fmt(
+                                                "restore.finalize_long",
+                                                &[
+                                                    ("status", status),
+                                                    ("mins", &mins),
+                                                    ("secs", &secs),
+                                                ],
+                                            ))
                                         } else {
-                                            Some(format!("{status} ({elapsed_secs}s)."))
+                                            Some(xai_grok_i18n::t_fmt(
+                                                "restore.finalize_short",
+                                                &[
+                                                    ("status", status),
+                                                    ("secs", &elapsed_secs.to_string()),
+                                                ],
+                                            ))
                                         }
                                     }
                                     _ => None,
@@ -1868,7 +1885,12 @@ pub(crate) fn execute(
                             }
                         })
                         .await
-                        .map_err(|error| format!("Could not prepare the fix: {error}"))
+                        .map_err(|error| {
+                            xai_grok_i18n::t_fmt(
+                                "restore.prepare_fix_failed",
+                                &[("error", &error.to_string())],
+                            )
+                        })
                         .and_then(|result| result);
                     TaskResult::DoctorFixPlanned {
                         target,
@@ -1883,7 +1905,12 @@ pub(crate) fn execute(
                             *plan,
                         ))
                         .await
-                        .map_err(|error| format!("Could not apply the fix: {error}"))
+                        .map_err(|error| {
+                            xai_grok_i18n::t_fmt(
+                                "restore.apply_fix_failed",
+                                &[("error", &error.to_string())],
+                            )
+                        })
                         .and_then(|result| result.map_err(|error| error.to_string()));
                     TaskResult::DoctorFixApplied {
                         target,
@@ -4548,6 +4575,18 @@ async fn lookup_session_title(session_id: &acp::SessionId) -> Option<String> {
         .find(|s| s.info.id == *session_id)
         .and_then(|s| s.display_title_opt())
 }
+fn t_fmt_or(key: &str, fallback: &'static str, args: &[(&str, &str)]) -> String {
+    let mut text = xai_grok_i18n::t_or(key, fallback).to_string();
+    // Replace longer placeholders first so translated templates cannot let a
+    // short name (for example `model`) consume a longer one (`model_hash_line`).
+    let mut ordered = args.to_vec();
+    ordered.sort_by_key(|(name, _)| std::cmp::Reverse(name.len()));
+    for (name, value) in ordered {
+        text = text.replace(&format!("{{{name}}}"), value);
+    }
+    text
+}
+
 /// Format session info into a human-readable string.
 ///
 /// Mirrors the TUI's `render_session_info` for pager display.
@@ -4560,7 +4599,11 @@ fn format_session_info(
 ) -> String {
     let session_id = &info.session_id;
     let cwd = &info.cwd;
-    let model = info.data.model.as_deref().unwrap_or("unknown");
+    let model = info
+        .data
+        .model
+        .as_deref()
+        .unwrap_or_else(|| xai_grok_i18n::t_or("session_info.unknown_model", "unknown"));
     let model_display = xai_grok_shell::session::model_display_name(
         info.data.model_display_name.as_deref(),
         model,
@@ -4568,13 +4611,15 @@ fn format_session_info(
         show_resolved_model,
     );
     let ctx = &info.data.context;
-    let used = ctx.used;
-    let total = ctx.total;
-    let pct = ctx.usage_pct;
-    let title_line = match title {
-        Some(t) => format!("  Title: {t}\n"),
-        None => String::new(),
-    };
+    let title_line = title
+        .map(|title| {
+            t_fmt_or(
+                "session_info.title",
+                "  Title: {title}\n",
+                &[("title", title)],
+            )
+        })
+        .unwrap_or_default();
     let model_hash_line = if xai_grok_shell::session::should_show_model_fingerprint(
         info.data.show_model_fingerprint,
         model,
@@ -4582,7 +4627,13 @@ fn format_session_info(
         info.data
             .model_fingerprint
             .as_deref()
-            .map(|fp| format!("\n  Model Hash: {fp}"))
+            .map(|fingerprint| {
+                t_fmt_or(
+                    "session_info.model_hash",
+                    "\n  Model Hash: {fingerprint}",
+                    &[("fingerprint", fingerprint)],
+                )
+            })
             .unwrap_or_default()
     } else {
         String::new()
@@ -4591,25 +4642,63 @@ fn format_session_info(
         .data
         .api_backend
         .as_deref()
-        .map(|b| format!("\n  API Backend: {b}"))
+        .map(|backend| {
+            t_fmt_or(
+                "session_info.api_backend",
+                "\n  API Backend: {backend}",
+                &[("backend", backend)],
+            )
+        })
         .unwrap_or_default();
     let sandbox_line = xai_grok_sandbox::profile_name()
-        .map(|profile| format!("\n  Sandbox: {profile}"))
+        .map(|profile| {
+            t_fmt_or(
+                "session_info.sandbox",
+                "\n  Sandbox: {profile}",
+                &[("profile", profile)],
+            )
+        })
         .unwrap_or_default();
-    let turn_line = format!("\n  Turn: {}", info.data.turn_index);
+    let turn_line = t_fmt_or(
+        "session_info.turn",
+        "\n  Turn: {turn}",
+        &[("turn", &info.data.turn_index.to_string())],
+    );
     let conversation_line = info
         .data
         .conversation_id
         .as_deref()
         .filter(|id| !id.is_empty())
-        .map(|id| format!("\n  Conversation ID: {id}"))
+        .map(|id| {
+            t_fmt_or(
+                "session_info.conversation_id",
+                "\n  Conversation ID: {id}",
+                &[("id", id)],
+            )
+        })
         .unwrap_or_default();
-    let version_display = xai_grok_version::display_version(
-        xai_grok_update::channel_label(),
-    );
+    let version_display =
+        xai_grok_version::display_version(xai_grok_update::channel_label());
     let auth_lines = format_auth_lines(is_api_key_auth, api_key_env_set);
-    format!(
-        "{title_line}  Shell version: {version_display}\n{auth_lines}  Session ID: {session_id}{conversation_line}\n  Working directory: {cwd}\n  Model: {model_display}{model_hash_line}{backend_line}{sandbox_line}{turn_line}\n  Context: {used} / {total} tokens ({pct}%)"
+    t_fmt_or(
+        "session_info.summary",
+        "{title_line}  Shell version: {version}\n{auth_lines}  Session ID: {session_id}{conversation_line}\n  Working directory: {cwd}\n  Model: {model}{model_hash_line}{backend_line}{sandbox_line}{turn_line}\n  Context: {used} / {total} tokens ({pct}%)",
+        &[
+            ("title_line", &title_line),
+            ("version", &version_display),
+            ("auth_lines", &auth_lines),
+            ("session_id", session_id),
+            ("conversation_line", &conversation_line),
+            ("cwd", cwd),
+            ("model", &model_display),
+            ("model_hash_line", &model_hash_line),
+            ("backend_line", &backend_line),
+            ("sandbox_line", &sandbox_line),
+            ("turn_line", &turn_line),
+            ("used", &ctx.used.to_string()),
+            ("total", &ctx.total.to_string()),
+            ("pct", &ctx.usage_pct.to_string()),
+        ],
     )
 }
 /// Auth section for `/session-info` — login method + where to manage account/credits.
@@ -4619,17 +4708,27 @@ fn format_session_info(
 fn format_auth_lines(is_api_key_auth: bool, api_key_env_set: bool) -> String {
     if is_api_key_auth {
         let method = if api_key_env_set {
-            "  Auth method: API key (XAI_API_KEY)\n"
+            xai_grok_i18n::t_or(
+                "session_info.auth.api_key_env",
+                "  Auth method: API key (XAI_API_KEY)\n",
+            )
         } else {
-            "  Auth method: API key\n"
+            xai_grok_i18n::t_or(
+                "session_info.auth.api_key",
+                "  Auth method: API key\n",
+            )
         };
-        return format!(
-            "{method}  Manage account and credits: console.x.ai\n  Run `grok login` to use your SuperGrok subscription instead.\n"
+        return t_fmt_or(
+            "session_info.auth.api_key_details",
+            "{method}  Manage account and credits: console.x.ai\n  Run `grok login` to use your SuperGrok subscription instead.\n",
+            &[("method", method)],
         );
     }
-    String::from(
+    xai_grok_i18n::t_or(
+        "session_info.auth.oauth",
         "  Auth method: OAuth\n  Manage account and credits: https://grok.com/?_s=billing\n",
     )
+    .to_string()
 }
 /// Build the single text content block for a plain `Effect::SendPrompt`.
 ///

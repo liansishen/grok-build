@@ -143,11 +143,11 @@ impl AgentCommand {
     /// Human-readable label for the status line (e.g., "Compacting").
     pub fn display_name(&self) -> &'static str {
         match self {
-            Self::Compact => "Compacting",
-            Self::CreateWorktree => "Creating worktree",
-            Self::RestoreWorktree => "Restoring session in worktree",
-            Self::RestoreCode => "Restoring code",
-            Self::ForkSession => "Forking session",
+            Self::Compact => xai_grok_i18n::t("agent.command.compacting"),
+            Self::CreateWorktree => xai_grok_i18n::t("agent.command.creating_worktree"),
+            Self::RestoreWorktree => xai_grok_i18n::t("agent.command.restoring_worktree"),
+            Self::RestoreCode => xai_grok_i18n::t("agent.command.restoring_code"),
+            Self::ForkSession => xai_grok_i18n::t("agent.command.forking_session"),
         }
     }
     /// The raw command text (e.g., "/compact").
@@ -355,11 +355,11 @@ impl GoalDisplayStatus {
     /// through their own labels (e.g. `"Budget"`, `"Done"`) elsewhere.
     pub fn pause_label(&self) -> &'static str {
         match self {
-            Self::UserPaused => "Paused",
-            Self::BackOffPaused => "Paused (back-off)",
-            Self::NoProgressPaused => "Paused (no progress)",
-            Self::InfraPaused => "Paused (error)",
-            Self::Blocked => "Paused (verification blocked)",
+            Self::UserPaused => xai_grok_i18n::t("goal.status.user_paused"),
+            Self::BackOffPaused => xai_grok_i18n::t("goal.status.back_off_paused"),
+            Self::NoProgressPaused => xai_grok_i18n::t("goal.status.no_progress_paused"),
+            Self::InfraPaused => xai_grok_i18n::t("goal.status.infra_paused"),
+            Self::Blocked => xai_grok_i18n::t("goal.status.verification_blocked"),
             Self::Active
             | Self::Failed
             | Self::Interrupted

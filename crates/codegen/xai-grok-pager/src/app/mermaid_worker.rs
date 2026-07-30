@@ -1111,7 +1111,7 @@ impl AgentView {
             .as_ref()
             .is_some_and(|rt| rt.has_pending(&key, action))
         {
-            self.show_toast("Rendering diagram\u{2026}");
+            self.show_toast(xai_grok_i18n::t("toast.rendering_diagram"));
             return;
         }
 
@@ -1149,7 +1149,7 @@ impl AgentView {
             if let Some(rt) = self.mermaid.as_mut() {
                 rt.pending.push(PendingMermaidAction { key, action });
             }
-            self.show_toast("Rendering diagram\u{2026}");
+            self.show_toast(xai_grok_i18n::t("toast.rendering_diagram"));
         } else {
             tracing::warn!(
                 target: MERMAID_TRACING_TARGET,

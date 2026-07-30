@@ -110,6 +110,7 @@ pub enum NotificationEventKind {
 }
 
 impl NotificationEventKind {
+    /// Stable event name used by hooks and telemetry. Do not localize.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::TurnComplete => "Turn complete",
@@ -117,6 +118,29 @@ impl NotificationEventKind {
             Self::SessionReady => "Session ready",
             Self::TaskComplete => "Task complete",
             Self::AgentError => "Agent error",
+        }
+    }
+
+    /// Human-facing notification text for the active UI locale.
+    pub fn display_t(&self) -> &'static str {
+        match self {
+            Self::TurnComplete => xai_grok_i18n::t_or(
+                "notification.event.turn_complete",
+                "Turn complete",
+            ),
+            Self::ApprovalRequired => xai_grok_i18n::t_or(
+                "notification.event.approval_required",
+                "Approval required",
+            ),
+            Self::SessionReady => {
+                xai_grok_i18n::t_or("notification.event.session_ready", "Session ready")
+            }
+            Self::TaskComplete => {
+                xai_grok_i18n::t_or("notification.event.task_complete", "Task complete")
+            }
+            Self::AgentError => {
+                xai_grok_i18n::t_or("notification.event.agent_error", "Agent error")
+            }
         }
     }
 }

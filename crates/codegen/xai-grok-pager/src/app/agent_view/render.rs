@@ -128,7 +128,10 @@ impl AgentView {
                     ]
                 }
             }
-            PlanApprovalFocus::Preview => vec![HintItem::new(key!('y'), "copy plan")],
+            PlanApprovalFocus::Preview => vec![HintItem::new(
+                key!('y'),
+                xai_grok_i18n::t("hint.copy_plan"),
+            )],
         }
     }
     /// Returns the *exact* hints the bottom shortcuts bar would render right now.
@@ -161,8 +164,8 @@ impl AgentView {
                 match perm.focus {
                     PermissionFocus::FollowupInput => {
                         vec![
-                            HintItem::new(key!(Enter), "send"),
-                            HintItem::new(key!(Esc), "back"),
+                            HintItem::new(key!(Enter), xai_grok_i18n::t("hint.send")),
+                            HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
                         ]
                     }
                     PermissionFocus::Options => {
@@ -171,15 +174,19 @@ impl AgentView {
                         let n = perm.options.len().min(9) as u8;
                         let last_ch = char::from(b'0' + n.max(1));
                         let last_key = KeyShortcut::new(KeyCode::Char(last_ch), KeyModifiers::NONE);
-                        let mut hints = vec![HintItem::paired(key!('1'), last_key, "select")];
+                        let mut hints = vec![HintItem::paired(
+                            key!('1'),
+                            last_key,
+                            xai_grok_i18n::t("hint.select"),
+                        )];
                         if perm.has_adjustable_scope() {
                             hints.push(HintItem::paired(key!(Left), key!(Right), "scope"));
                         }
                         if !perm.description.is_empty() {
                             let label = if perm.args_expanded {
-                                "collapse"
+                                xai_grok_i18n::t("dashboard.hint.collapse")
                             } else {
-                                "expand"
+                                xai_grok_i18n::t("hint.expand")
                             };
                             hints.push(HintItem::new(key!('f', CONTROL), label));
                         }
@@ -187,7 +194,10 @@ impl AgentView {
                             key!('o', CONTROL),
                             xai_grok_i18n::t("mode.flag.always_approve"),
                         ));
-                        hints.push(HintItem::new(key!('c', CONTROL), "cancel"));
+                        hints.push(HintItem::new(
+                            key!('c', CONTROL),
+                            xai_grok_i18n::t("hint.cancel"),
+                        ));
                         hints
                     }
                 }
@@ -226,32 +236,39 @@ impl AgentView {
                 QuestionFocus::InputMode => {
                     if self.prompt.file_search_visible() {
                         vec![
-                            HintItem::paired(key!(Up), key!(Down), "nav"),
-                            HintItem::new(key!(Tab), "accept"),
-                            HintItem::new(key!(Right), "drill"),
-                            HintItem::new(key!(Esc), "dismiss"),
+                            HintItem::paired(
+                                key!(Up),
+                                key!(Down),
+                                xai_grok_i18n::t("hint.nav"),
+                            ),
+                            HintItem::new(
+                                key!(Tab),
+                                xai_grok_i18n::t("hint.accept_suggestion"),
+                            ),
+                            HintItem::new(key!(Right), xai_grok_i18n::t("hint.open")),
+                            HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close")),
                         ]
                     } else {
                         vec![
-                            HintItem::new(key!(Enter), "submit"),
-                            HintItem::new(key!(Esc), "back"),
+                            HintItem::new(key!(Enter), xai_grok_i18n::t("auth.submit")),
+                            HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
                         ]
                     }
                 }
                 QuestionFocus::Navigation => {
                     vec![
-                        HintItem::new(key!(Esc), "unselect"),
-                        HintItem::new(key!(Tab), "scrollback"),
-                        HintItem::new(key!('X'), "dismiss"),
+                        HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
+                        HintItem::new(key!(Tab), xai_grok_i18n::t("hint.scrollback")),
+                        HintItem::new(key!('X'), xai_grok_i18n::t("hint.close")),
                     ]
                 }
             }
         } else if self.cancel_turn_view.is_some() {
             vec![
-                HintItem::paired(key!('1'), key!('4'), "select"),
-                HintItem::new(key!(Enter), "confirm"),
-                HintItem::new(key!(Esc), "keep running"),
-                HintItem::new(key!(Tab), "scrollback"),
+                HintItem::paired(key!('1'), key!('4'), xai_grok_i18n::t("hint.select")),
+                HintItem::new(key!(Enter), xai_grok_i18n::t("hint.confirm")),
+                HintItem::new(key!(Esc), xai_grok_i18n::t("modal.continue_to_run")),
+                HintItem::new(key!(Tab), xai_grok_i18n::t("hint.scrollback")),
             ]
         } else {
             self.normal_pane_hints(registry, esc_owned_before_agent)
@@ -1411,7 +1428,7 @@ impl AgentView {
         let git_text = branch.map(|b| {
             let icon = crate::git_info::branch_icon();
             if b.is_empty() {
-                format!("{icon} detached")
+                format!("{icon} {}", xai_grok_i18n::t("git.detached"))
             } else {
                 format!("{icon} {b}")
             }
@@ -1431,8 +1448,10 @@ impl AgentView {
             || lazy_git.as_ref().is_some_and(|i| i.is_worktree);
         if show_worktree_label {
             let label_style = Style::default().fg(theme.accent_user).bg(theme.bg_base);
-            path_offset += "worktree ".width() as u16;
-            parts.push(Span::styled("worktree ", label_style));
+            let worktree_label = xai_grok_i18n::t("actions.DashboardToggleWorktree.label");
+            let worktree_text = format!("{worktree_label} ");
+            path_offset += worktree_text.width() as u16;
+            parts.push(Span::styled(worktree_text, label_style));
         }
         if let Some(profile) = xai_grok_sandbox::profile_name() {
             let sandbox_text = format!("sandbox:{profile} ");
@@ -1452,10 +1471,11 @@ impl AgentView {
             .clone()
             .or_else(|| lazy_git.as_ref().and_then(|i| i.main_repo.clone()));
         if let Some(main_repo) = main_repo_display {
-            parts.push(Span::styled(
-                format!(" (worktree of {main_repo})"),
-                cwd_style,
-            ));
+            let worktree_suffix = xai_grok_i18n::t_fmt(
+                "git.worktree_of",
+                &[("main_repo", main_repo.as_str())],
+            );
+            parts.push(Span::styled(format!(" {worktree_suffix}"), cwd_style));
         }
         let cwd_line = Line::from(parts);
         let max_cwd_width = areas
@@ -1577,8 +1597,12 @@ impl AgentView {
                 let query = search.query();
                 let counter = match search.current_index() {
                     Some(i) => Some(format!("{}/{}", i + 1, search.match_count())),
-                    None if search.has_error() => Some("bad pattern".to_string()),
-                    None if !query.is_empty() => Some("no matches".to_string()),
+                    None if search.has_error() => Some(
+                        xai_grok_i18n::t_or("tool.search.bad_pattern", "bad pattern").to_string(),
+                    ),
+                    None if !query.is_empty() => {
+                        Some(xai_grok_i18n::t("tool.search.no_matches").to_string())
+                    }
                     None => None,
                 };
                 let counter_width = counter
@@ -2355,7 +2379,12 @@ impl AgentView {
             },
             PromptMode::EditingQueued { id, .. } => {
                 let pos = self.session.queue_position(*id).map(|i| i + 1).unwrap_or(1);
-                editing_label = format!("editing queued #{pos}");
+                let pos = pos.to_string();
+                editing_label = xai_grok_i18n::t_or(
+                    "prompt.editing_queued_position",
+                    "editing queued #{pos}",
+                )
+                .replace("{pos}", &pos);
                 PromptInfo {
                     model_name: &editing_label,
                     flags: mode_flags,
@@ -2691,25 +2720,34 @@ impl AgentView {
                         left_spans.push(Span::styled(counter, hint_style));
                     }
                     left_spans.push(Span::styled("\u{2191}/\u{2193}", hint_key));
-                    left_spans.push(Span::styled(" navigate", hint_style));
+                    left_spans.push(Span::styled(
+                        format!(" {}", xai_grok_i18n::t("welcome.picker.navigate")),
+                        hint_style,
+                    ));
                     if qv.questions.len() > 1 {
                         left_spans.push(Span::styled(" \u{b7} ", hint_style));
                         left_spans.push(Span::styled("\u{2190}/\u{2192}", hint_key));
-                        left_spans.push(Span::styled(" question", hint_style));
+                        left_spans.push(Span::styled(
+                            format!(" {}", xai_grok_i18n::t("dashboard.pending_question")),
+                            hint_style,
+                        ));
                     }
                     left_spans.push(Span::styled(" \u{b7} ", hint_style));
                     left_spans.push(Span::styled("y", hint_key));
-                    left_spans.push(Span::styled(" copy", hint_style));
+                    left_spans.push(Span::styled(
+                        format!(" {}", xai_grok_i18n::t("hint.copy")),
+                        hint_style,
+                    ));
                     let left_line = Line::from(left_spans);
                     let avail_w = footer_w.saturating_sub(3);
                     buf.set_line_safe(content_x, footer_y, &left_line, avail_w);
                     let is_last = qv.active_tab >= qv.questions.len().saturating_sub(1);
                     let enter_label = if qv.is_on_freeform_row() {
-                        "edit"
+                        xai_grok_i18n::t("hint.edit")
                     } else if is_last {
-                        "submit"
+                        xai_grok_i18n::t("auth.submit")
                     } else {
-                        "select"
+                        xai_grok_i18n::t("hint.select")
                     };
                     let btn_key = "Enter";
                     let btn_bg = theme.bg_base;
@@ -3211,8 +3249,8 @@ impl AgentView {
                 match perm.focus {
                     PermissionFocus::FollowupInput => {
                         vec![
-                            HintItem::new(key!(Enter), "send"),
-                            HintItem::new(key!(Esc), "back"),
+                            HintItem::new(key!(Enter), xai_grok_i18n::t("hint.send")),
+                            HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
                         ]
                     }
                     PermissionFocus::Options => {
@@ -3221,15 +3259,19 @@ impl AgentView {
                         let n = perm.options.len().min(9) as u8;
                         let last_ch = char::from(b'0' + n.max(1));
                         let last_key = KeyShortcut::new(KeyCode::Char(last_ch), KeyModifiers::NONE);
-                        let mut hints = vec![HintItem::paired(key!('1'), last_key, "select")];
+                        let mut hints = vec![HintItem::paired(
+                            key!('1'),
+                            last_key,
+                            xai_grok_i18n::t("hint.select"),
+                        )];
                         if perm.has_adjustable_scope() {
                             hints.push(HintItem::paired(key!(Left), key!(Right), "scope"));
                         }
                         if !perm.description.is_empty() {
                             let label = if perm.args_expanded {
-                                "collapse"
+                                xai_grok_i18n::t("dashboard.hint.collapse")
                             } else {
-                                "expand"
+                                xai_grok_i18n::t("hint.expand")
                             };
                             hints.push(HintItem::new(key!('f', CONTROL), label));
                         }
@@ -3237,7 +3279,10 @@ impl AgentView {
                             key!('o', CONTROL),
                             xai_grok_i18n::t("mode.flag.always_approve"),
                         ));
-                        hints.push(HintItem::new(key!('c', CONTROL), "cancel"));
+                        hints.push(HintItem::new(
+                            key!('c', CONTROL),
+                            xai_grok_i18n::t("hint.cancel"),
+                        ));
                         hints
                     }
                 }
@@ -3289,23 +3334,30 @@ impl AgentView {
                 QuestionFocus::InputMode => {
                     if self.prompt.file_search_visible() {
                         vec![
-                            HintItem::paired(key!(Up), key!(Down), "nav"),
-                            HintItem::new(key!(Tab), "accept"),
-                            HintItem::new(key!(Right), "drill"),
-                            HintItem::new(key!(Esc), "dismiss"),
+                            HintItem::paired(
+                                key!(Up),
+                                key!(Down),
+                                xai_grok_i18n::t("hint.nav"),
+                            ),
+                            HintItem::new(
+                                key!(Tab),
+                                xai_grok_i18n::t("hint.accept_suggestion"),
+                            ),
+                            HintItem::new(key!(Right), xai_grok_i18n::t("hint.open")),
+                            HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close")),
                         ]
                     } else {
                         vec![
-                            HintItem::new(key!(Enter), "submit"),
-                            HintItem::new(key!(Esc), "back"),
+                            HintItem::new(key!(Enter), xai_grok_i18n::t("auth.submit")),
+                            HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
                         ]
                     }
                 }
                 QuestionFocus::Navigation => {
                     vec![
-                        HintItem::new(key!(Esc), "unselect"),
-                        HintItem::new(key!(Tab), "scrollback"),
-                        HintItem::new(key!('X'), "dismiss"),
+                        HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
+                        HintItem::new(key!(Tab), xai_grok_i18n::t("hint.scrollback")),
+                        HintItem::new(key!('X'), xai_grok_i18n::t("hint.close")),
                     ]
                 }
             };
@@ -3313,10 +3365,10 @@ impl AgentView {
         } else if self.cancel_turn_view.is_some() {
             use crate::views::shortcuts_bar::HintItem;
             let hints = vec![
-                HintItem::paired(key!('1'), key!('4'), "select"),
-                HintItem::new(key!(Enter), "confirm"),
-                HintItem::new(key!(Esc), "keep running"),
-                HintItem::new(key!(Tab), "scrollback"),
+                HintItem::paired(key!('1'), key!('4'), xai_grok_i18n::t("hint.select")),
+                HintItem::new(key!(Enter), xai_grok_i18n::t("hint.confirm")),
+                HintItem::new(key!(Esc), xai_grok_i18n::t("modal.continue_to_run")),
+                HintItem::new(key!(Tab), xai_grok_i18n::t("hint.scrollback")),
             ];
             ShortcutsBar::new(&hints)
                 .with_pending(pending_hint)
@@ -3332,20 +3384,26 @@ impl AgentView {
                             .find(ActionId::DashboardOverlayStop)
                             .map(|def| def.default_key)
                             .unwrap_or(key!('x', CONTROL)),
-                        "stop",
+                        xai_grok_i18n::t("actions.DashboardOverlayStop.label"),
                     ),
                 );
                 hints.insert(
                     0,
                     HintItem {
                         keys: vec![key!('[', CONTROL), key!(']', CONTROL)],
-                        label: "agents".into(),
+                        label: xai_grok_i18n::t("subagent_catalog.agents").into(),
                         custom_display: Some("Ctrl+[/]"),
                         description: None,
                         pinned: false,
                     },
                 );
-                hints.insert(0, HintItem::new(key!('\\', CONTROL), "dashboard"));
+                hints.insert(
+                    0,
+                    HintItem::new(
+                        key!('\\', CONTROL),
+                        xai_grok_i18n::t("actions.OpenDashboard.label"),
+                    ),
+                );
             }
             let help_hint = registry.find(ActionId::ShortcutsHelp).map(|def| {
                 let mut hint = def.hint();
@@ -3819,8 +3877,8 @@ impl AgentView {
                 prompt_post_flush = Some(clear.into());
             }
             let hints = vec![
-                HintItem::new(key!(Esc), "quit"),
-                HintItem::new(key!(' '), "fire"),
+                HintItem::new(key!(Esc), xai_grok_i18n::t("hint.quit")),
+                HintItem::new(key!(' '), xai_grok_i18n::t_or("hint.fire", "fire")),
             ];
             ShortcutsBar::new(&hints).render(layout.shortcuts, buf);
             self.pane_areas = layout.pane_areas();
@@ -4053,17 +4111,17 @@ impl AgentView {
             );
             if modal_state.input.is_some() {
                 let hints = vec![
-                    HintItem::new(key!(Enter), "submit"),
-                    HintItem::new(key!(Esc), "cancel"),
+                    HintItem::new(key!(Enter), xai_grok_i18n::t("auth.submit")),
+                    HintItem::new(key!(Esc), xai_grok_i18n::t("hint.cancel")),
                 ];
                 ShortcutsBar::new(&hints).render(layout.shortcuts, buf);
             } else if modal_state.pending_action.is_some() {
-                let hints = vec![HintItem::new(key!(Esc), "dismiss")];
+                let hints = vec![HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close"))];
                 ShortcutsBar::new(&hints).render(layout.shortcuts, buf);
             } else if modal_state.picker_state.search_active {
                 let hints = vec![
-                    HintItem::new(key!(Esc), "clear search"),
-                    HintItem::new(key!(Enter), "keep filter"),
+                    HintItem::new(key!(Esc), xai_grok_i18n::t("hint.clear")),
+                    HintItem::new(key!(Enter), xai_grok_i18n::t("hint.filter")),
                 ];
                 ShortcutsBar::new(&hints).render(layout.shortcuts, buf);
             }
@@ -4164,11 +4222,13 @@ impl AgentView {
                                     dur_s as u32 % 60,
                                 )
                             } else {
-                                "[Play]".to_string()
+                                xai_grok_i18n::t("media.play").to_string()
                             };
-                            let open_label = "[Open]";
+                            let open_label = xai_grok_i18n::t("media.open");
                             let gap = 3u16;
-                            let total = play_label.len() as u16 + gap + open_label.len() as u16;
+                            let play_width = UnicodeWidthStr::width(play_label.as_str()) as u16;
+                            let open_width = UnicodeWidthStr::width(open_label) as u16;
+                            let total = play_width + gap + open_width;
                             let start_x = rect.x + rect.width.saturating_sub(total) / 2;
                             buf.set_string_safe(
                                 start_x,
@@ -4181,13 +4241,13 @@ impl AgentView {
                                     Rect {
                                         x: start_x,
                                         y: button_y,
-                                        width: play_label.len() as u16,
+                                        width: play_width,
                                         height: 1,
                                     },
                                     path.clone(),
                                 ));
                             }
-                            let open_x = start_x + play_label.len() as u16 + gap;
+                            let open_x = start_x + play_width + gap;
                             buf.set_string_safe(
                                 open_x,
                                 button_y,
@@ -4198,7 +4258,7 @@ impl AgentView {
                                 Rect {
                                     x: open_x,
                                     y: button_y,
-                                    width: open_label.len() as u16,
+                                    width: open_width,
                                     height: 1,
                                 },
                                 path.clone(),
@@ -4209,10 +4269,12 @@ impl AgentView {
                             .media_areas
                             .push((rect, path.clone()));
                         if button_visible {
-                            let open_label = "[Open]";
-                            let copy_label = "[Copy]";
+                            let open_label = xai_grok_i18n::t("media.open");
+                            let copy_label = xai_grok_i18n::t("media.copy");
                             let gap = 3u16;
-                            let total = open_label.len() as u16 + gap + copy_label.len() as u16;
+                            let open_width = UnicodeWidthStr::width(open_label) as u16;
+                            let copy_width = UnicodeWidthStr::width(copy_label) as u16;
+                            let total = open_width + gap + copy_width;
                             let start_x = rect.x + rect.width.saturating_sub(total) / 2;
                             buf.set_string_safe(
                                 start_x,
@@ -4224,12 +4286,12 @@ impl AgentView {
                                 Rect {
                                     x: start_x,
                                     y: button_y,
-                                    width: open_label.len() as u16,
+                                    width: open_width,
                                     height: 1,
                                 },
                                 path.clone(),
                             ));
-                            let copy_x = start_x + open_label.len() as u16 + gap;
+                            let copy_x = start_x + open_width + gap;
                             buf.set_string_safe(
                                 copy_x,
                                 button_y,
@@ -4240,7 +4302,7 @@ impl AgentView {
                                 Rect {
                                     x: copy_x,
                                     y: button_y,
-                                    width: copy_label.len() as u16,
+                                    width: copy_width,
                                     height: 1,
                                 },
                                 path.clone(),

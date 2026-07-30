@@ -24,9 +24,7 @@ use crate::terminal::overlay;
 mod content;
 mod geometry;
 
-use content::{
-    build_meta_line, format_bytes, format_mime, paint_path_line, truncate_path_for_overlay,
-};
+use content::{build_meta_line, format_bytes, format_mime, truncate_path_for_overlay};
 #[cfg(test)]
 use geometry::ImagePlacement;
 use geometry::{
@@ -97,9 +95,18 @@ fn render_image_overlay_inner(
     let inner = block.inner(overlay_rect);
     block.render(overlay_rect, buf);
 
-    let title_text = format!(" Image #{} ", image.display_number);
+    let title_text = format!(
+        " {} ",
+        xai_grok_i18n::t_fmt(
+            "prompt.image_chip",
+            &[("number", &image.display_number.to_string())],
+        )
+    );
     let meta = build_meta_line(image, plan.display_path);
-    let full_title = if meta.len() + title_text.len() + 6 < overlay_rect.width as usize {
+    let combined_width = unicode_width::UnicodeWidthStr::width(title_text.as_str())
+        + unicode_width::UnicodeWidthStr::width(meta.as_str())
+        + 6;
+    let full_title = if combined_width < overlay_rect.width as usize {
         format!("{}\u{2500} {} ", title_text, meta)
     } else {
         title_text.clone()
@@ -108,7 +115,7 @@ fn render_image_overlay_inner(
         .fg(text_fg)
         .bg(bg)
         .add_modifier(ratatui::style::Modifier::BOLD);
-    let title_width = full_title.len() as u16;
+    let title_width = unicode_width::UnicodeWidthStr::width(full_title.as_str()) as u16;
     let title_x = overlay_rect.x + (overlay_rect.width.saturating_sub(title_width)) / 2;
     buf.set_span(
         title_x,
@@ -129,7 +136,19 @@ fn render_image_overlay_inner(
     let path_footer = plan.display_path.filter(|_| inner.height >= 2);
     let image_inner = if let Some(path) = path_footer {
         let footer_y = inner.y + inner.height - 1;
-        paint_path_line(buf, inner.x, footer_y, inner.width, path, text_fg, bg);
+        let path_label = xai_grok_i18n::t_fmt(
+            "img.path",
+            &[("path", &path.display().to_string())],
+        );
+        let clipped_path =
+            crate::render::line_utils::truncate_str(&path_label, inner.width as usize);
+        use crate::render::SafeBuf;
+        buf.set_span_safe(
+            inner.x,
+            footer_y,
+            &Span::styled(clipped_path, Style::default().fg(text_fg).bg(bg)),
+            inner.width,
+        );
         Rect {
             x: inner.x,
             y: inner.y,
@@ -142,30 +161,39 @@ fn render_image_overlay_inner(
 
     if !plan.show_pixels {
         let mut lines = Vec::new();
-        lines.push(Line::from(format!(
-            "Format: {}",
-            format_mime(&image.mime_type)
+        lines.push(Line::from(xai_grok_i18n::t_fmt(
+            "img.format",
+            &[("format", &format_mime(&image.mime_type))],
         )));
         if let Some((w, h)) = image.preview_dimensions() {
-            lines.push(Line::from(format!("Dimensions: {} x {}", w, h)));
+            lines.push(Line::from(xai_grok_i18n::t_fmt(
+                "img.dimensions",
+                &[("width", &w.to_string()), ("height", &h.to_string())],
+            )));
         }
         let status = if image.preview.is_failed() {
-            Some("Preview unavailable")
+            Some(xai_grok_i18n::t("img.preview_unavailable").to_owned())
         } else if image.preview.is_pending() && protocol.supports_images() {
-            Some("Preview pending")
+            Some(xai_grok_i18n::t("img.preview_pending").to_owned())
         } else {
             None
         };
-        lines.push(Line::from(status.map(str::to_owned).unwrap_or_else(|| {
-            format!("Size: {}", format_bytes(image.byte_len))
+        lines.push(Line::from(status.unwrap_or_else(|| {
+            xai_grok_i18n::t_fmt("img.size", &[("size", &format_bytes(image.byte_len))])
         })));
         // Short boxes need the path in the body because no footer fits.
         if path_footer.is_none()
             && let Some(path) = plan.display_path
         {
-            lines.push(Line::from(format!(
-                "Path: {}",
-                truncate_path_for_overlay(&path.display().to_string(), inner.width as usize)
+            lines.push(Line::from(xai_grok_i18n::t_fmt(
+                "img.path",
+                &[(
+                    "path",
+                    &truncate_path_for_overlay(
+                        &path.display().to_string(),
+                        inner.width as usize,
+                    ),
+                )],
             )));
         }
 
@@ -188,8 +216,8 @@ fn render_image_overlay_inner(
 
     if image_inner.width > 0 && image_inner.height > 0 {
         use crate::render::SafeBuf;
-        let loading = "Loading...";
-        let lw = loading.len() as u16;
+        let loading = xai_grok_i18n::t("img.loading");
+        let lw = unicode_width::UnicodeWidthStr::width(loading) as u16;
         let lx = image_inner.x + image_inner.width.saturating_sub(lw) / 2;
         let ly = image_inner.y + image_inner.height / 2;
         buf.set_span_safe(

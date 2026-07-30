@@ -19,7 +19,10 @@ impl SlashCommand for TutorialCommand {
     }
 
     fn description(&self) -> &str {
-        "Quick tips to get the most out of Grok Build"
+        xai_grok_i18n::t_or(
+            "tutorial.description",
+            "Quick tips to get the most out of Grok Build",
+        )
     }
 
     fn usage(&self) -> &str {

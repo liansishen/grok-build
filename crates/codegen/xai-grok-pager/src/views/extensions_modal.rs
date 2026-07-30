@@ -10,6 +10,8 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use unicode_width::UnicodeWidthStr;
 
+use xai_grok_i18n::{t, t_fmt};
+
 use crate::input::line_editor::{LineEditOutcome, LineEditor};
 use crate::theme::Theme;
 use crate::views::modal_window::{
@@ -183,9 +185,9 @@ type GroupedPlugins<'a> = std::collections::BTreeMap<
 /// Header count suffix: `1 plugin`, `2 plugins`.
 fn plugin_count_label(n: usize) -> String {
     if n == 1 {
-        "1 plugin".to_string()
+        t("extensions.plugin_count_one").to_string()
     } else {
-        format!("{n} plugins")
+        t_fmt("extensions.plugin_count_many", &[("n", &n.to_string())])
     }
 }
 
@@ -199,15 +201,23 @@ pub fn plugin_group(plugin: &xai_hooks_plugins_types::PluginInfo) -> PluginGroup
     use xai_hooks_plugins_types::{PluginOrigin, PluginScope};
 
     match &plugin.origin {
-        Some(PluginOrigin::ProjectGrok) => PluginGroup::new(0, "origin:project", "Project"),
-        Some(PluginOrigin::ProjectClaude) => {
-            PluginGroup::new(1, "origin:project-claude", "Project (Claude)")
+        Some(PluginOrigin::ProjectGrok) => {
+            PluginGroup::new(0, "origin:project", t("extensions.group.project"))
         }
-        Some(PluginOrigin::UserGrok) => PluginGroup::new(2, "origin:user", "User"),
+        Some(PluginOrigin::ProjectClaude) => PluginGroup::new(
+            1,
+            "origin:project-claude",
+            t("extensions.group.project_claude"),
+        ),
+        Some(PluginOrigin::UserGrok) => {
+            PluginGroup::new(2, "origin:user", t("extensions.group.user"))
+        }
         Some(PluginOrigin::UserClaude)
-        | Some(PluginOrigin::ClaudeInstalled { marketplace: None }) => {
-            PluginGroup::new(3, "origin:user-claude", "User (Claude)")
-        }
+        | Some(PluginOrigin::ClaudeInstalled { marketplace: None }) => PluginGroup::new(
+            3,
+            "origin:user-claude",
+            t("extensions.group.user_claude"),
+        ),
         Some(PluginOrigin::ClaudeMarketplace { marketplace })
         | Some(PluginOrigin::ClaudeInstalled {
             marketplace: Some(marketplace),
@@ -226,24 +236,40 @@ pub fn plugin_group(plugin: &xai_hooks_plugins_types::PluginInfo) -> PluginGroup
         },
         Some(PluginOrigin::MarketplaceInstall {
             source_name: None, ..
-        }) => PluginGroup::new(6, "origin:direct", "Direct installs"),
-        Some(PluginOrigin::CliOverride) => PluginGroup::new(7, "origin:cli", "CLI override"),
-        Some(PluginOrigin::ConfigPath) => PluginGroup::new(8, "origin:config", "Custom paths"),
+        }) => PluginGroup::new(
+            6,
+            "origin:direct",
+            t("extensions.group.direct_installs"),
+        ),
+        Some(PluginOrigin::CliOverride) => {
+            PluginGroup::new(7, "origin:cli", t("extensions.group.cli_override"))
+        }
+        Some(PluginOrigin::ConfigPath) => {
+            PluginGroup::new(8, "origin:config", t("extensions.group.custom_paths"))
+        }
         Some(PluginOrigin::Unknown) | None => match plugin.scope {
-            PluginScope::Project => PluginGroup::new(0, "origin:project", "Project"),
+            PluginScope::Project => {
+                PluginGroup::new(0, "origin:project", t("extensions.group.project"))
+            }
             PluginScope::User => match plugin.marketplace_source.as_deref() {
-                Some(source) if source.starts_with("git: ") => {
-                    PluginGroup::new(6, "origin:direct", "Direct installs")
-                }
+                Some(source) if source.starts_with("git: ") => PluginGroup::new(
+                    6,
+                    "origin:direct",
+                    t("extensions.group.direct_installs"),
+                ),
                 Some(source) => PluginGroup {
                     rank: 5,
                     key: format!("grok-mp:{source}"),
                     label: source.to_string(),
                 },
-                None => PluginGroup::new(2, "origin:user", "User"),
+                None => PluginGroup::new(2, "origin:user", t("extensions.group.user")),
             },
-            PluginScope::Cli => PluginGroup::new(7, "origin:cli", "CLI override"),
-            PluginScope::Config => PluginGroup::new(8, "origin:config", "Custom paths"),
+            PluginScope::Cli => {
+                PluginGroup::new(7, "origin:cli", t("extensions.group.cli_override"))
+            }
+            PluginScope::Config => {
+                PluginGroup::new(8, "origin:config", t("extensions.group.custom_paths"))
+            }
         },
     }
 }
@@ -513,11 +539,11 @@ impl ExtensionsTab {
     /// Display label for the tab bar.
     pub fn label(self) -> &'static str {
         match self {
-            Self::Hooks => "Hooks",
-            Self::Plugins => "Plugins",
-            Self::Marketplace => "Marketplace",
-            Self::Skills => "Skills",
-            Self::McpServers => "MCP Servers",
+            Self::Hooks => t("extensions.tab.hooks"),
+            Self::Plugins => t("extensions.tab.plugins"),
+            Self::Marketplace => t("extensions.tab.marketplace"),
+            Self::Skills => t("extensions.tab.skills"),
+            Self::McpServers => t("extensions.tab.mcp_servers"),
         }
     }
 
@@ -570,9 +596,9 @@ pub enum StatusFilter {
 impl StatusFilter {
     pub fn label(self) -> &'static str {
         match self {
-            Self::All => "All",
-            Self::Enabled => "Enabled",
-            Self::Disabled => "Disabled",
+            Self::All => t("extensions.filter.all"),
+            Self::Enabled => t("extensions.filter.enabled"),
+            Self::Disabled => t("extensions.filter.disabled"),
         }
     }
 
@@ -816,7 +842,11 @@ impl ModalInput {
                     .map(|(_, f)| f.label())
                     .collect();
                 if !empty_required.is_empty() {
-                    self.error = Some(format!("Required: {}", empty_required.join(", ")));
+                    let fields = empty_required.join(", ");
+                    self.error = Some(t_fmt(
+                        "extensions.form.required",
+                        &[("fields", fields.as_str())],
+                    ));
                     return ModalInputOutcome::Changed;
                 }
                 ModalInputOutcome::Submit {
@@ -1001,7 +1031,7 @@ impl McpSetupFormState {
             }
             KeyCode::Enter => {
                 if self.selected_value().is_none() {
-                    self.error = Some("Select an option".to_string());
+                    self.error = Some(t("extensions.select_option").to_string());
                     McpSetupOutcome::Changed
                 } else {
                     McpSetupOutcome::Submit
@@ -1081,7 +1111,9 @@ pub const MCP_SERVERS_ACTION_KEYS: &[(char, &str)] = &[
 ];
 
 /// Footer label for the MCP tab Ctrl+O shortcut (not in [`MCP_SERVERS_ACTION_KEYS`]).
-pub const MCP_SERVERS_OPEN_CONNECTORS_FOOTER: &str = "ctrl-o open";
+pub fn mcp_servers_open_connectors_footer() -> &'static str {
+    t("extensions.footer.ctrl_o_open")
+}
 
 /// Map an action key character to its display string for shortcut hints.
 ///
@@ -1090,7 +1122,7 @@ pub const MCP_SERVERS_OPEN_CONNECTORS_FOOTER: &str = "ctrl-o open";
 /// Returns `""` for unmapped characters.
 pub fn action_key_display(ch: char) -> &'static str {
     match ch {
-        ' ' => "space",
+        ' ' => t("extensions.key.space"),
         'a' => "a",
         'd' => "d",
         'e' => "e",
@@ -1137,6 +1169,24 @@ pub fn extensions_action_keys(tab: ExtensionsTab) -> Vec<(char, &'static str)> {
     }
 }
 
+/// Localized user-facing label for a stable telemetry/action identity.
+fn action_key_desc(desc: &'static str) -> &'static str {
+    match desc {
+        "reload" => t("extensions.action.reload"),
+        "add" => t("extensions.action.add"),
+        "remove" => t("extensions.action.remove"),
+        "update" => t("extensions.action.update"),
+        "install" => t("extensions.action.install"),
+        "uninstall" => t("extensions.action.uninstall"),
+        "refresh" => t("extensions.action.refresh"),
+        "add source" => t("extensions.action.add_source"),
+        "remove source" => t("extensions.action.remove_source"),
+        "filter" => t("extensions.action.filter"),
+        "auth" => t("extensions.action.auth"),
+        _ => desc,
+    }
+}
+
 /// Footer verb for an action key. Uses the state's published
 /// `entry_data_indices` / `entry_group_keys` (input handling, unit tests).
 pub fn action_key_footer_desc(
@@ -1167,20 +1217,20 @@ fn action_key_footer_desc_for_mapping(
 ) -> &'static str {
     if ch == ' ' && desc == "toggle" {
         match selected_item_enabled_at(state, entry_data_indices, entry_group_keys, selected) {
-            Some(true) => "disable",
-            Some(false) => "enable",
-            None => "enable/disable",
+            Some(true) => t("extensions.action.disable"),
+            Some(false) => t("extensions.action.enable"),
+            None => t("extensions.action.enable_disable"),
         }
     } else {
-        desc
+        action_key_desc(desc)
     }
 }
 
 pub fn action_key_cheatsheet_desc(ch: char, desc: &'static str) -> &'static str {
     if ch == ' ' && desc == "toggle" {
-        "enable/disable"
+        t("extensions.action.enable_disable")
     } else {
-        desc
+        action_key_desc(desc)
     }
 }
 
@@ -1283,16 +1333,32 @@ pub fn tab_all_hints(tab: ExtensionsTab) -> Vec<crate::views::shortcuts_bar::Hin
         let display_key = KeyShortcut::new(KeyCode::Char(ch), KeyModifiers::NONE);
         let mut item = HintItem::new(display_key, action_key_cheatsheet_desc(ch, label));
         if ch == ' ' {
-            item.custom_display = Some("Space");
+            item.custom_display = Some(t("extensions.key.space"));
         }
         hints.push(item);
     }
     // Common navigation.
-    hints.push(HintItem::paired(crate::key!('j'), crate::key!('k'), "nav"));
-    hints.push(HintItem::new(crate::key!(Tab), "switch tab"));
-    hints.push(HintItem::new(crate::key!('/'), "search"));
-    hints.push(HintItem::new(crate::key!(Enter), "expand"));
-    hints.push(HintItem::new(crate::key!(Esc), "close"));
+    hints.push(HintItem::paired(
+        crate::key!('j'),
+        crate::key!('k'),
+        t("extensions.hint.nav"),
+    ));
+    hints.push(HintItem::new(
+        crate::key!(Tab),
+        t("extensions.hint.switch_tab"),
+    ));
+    hints.push(HintItem::new(
+        crate::key!('/'),
+        t("extensions.hint.search"),
+    ));
+    hints.push(HintItem::new(
+        crate::key!(Enter),
+        t("extensions.hint.expand"),
+    ));
+    hints.push(HintItem::new(
+        crate::key!(Esc),
+        t("extensions.hint.close"),
+    ));
     hints
 }
 
@@ -1316,9 +1382,9 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
         (ExtensionsTab::Plugins, 'a') => Some(ButtonAction::StartInput {
             command_prefix: "plugins_install".into(),
             fields: vec![FieldSpec {
-                label: "Source".into(),
+                label: t("extensions.form.source").into(),
                 required: true,
-                placeholder: Some("owner/repo, URL, or local path".into()),
+                placeholder: Some(t("extensions.form.source_placeholder").into()),
             }],
         }),
         // Toggle enable/disable on the selected plugin.
@@ -1329,7 +1395,7 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
         (ExtensionsTab::Hooks, 'a') => Some(ButtonAction::StartInput {
             command_prefix: "hooks_add".into(),
             fields: vec![FieldSpec {
-                label: "Path".into(),
+                label: t("extensions.form.path").into(),
                 required: true,
                 placeholder: None,
             }],
@@ -1349,9 +1415,9 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
         (ExtensionsTab::Marketplace, 'a') => Some(ButtonAction::StartInput {
             command_prefix: "marketplace_add_source".into(),
             fields: vec![FieldSpec {
-                label: "Source".into(),
+                label: t("extensions.form.source").into(),
                 required: true,
-                placeholder: Some("owner/repo, git URL, or local path".into()),
+                placeholder: Some(t("extensions.form.marketplace_source_placeholder").into()),
             }],
         }),
         (ExtensionsTab::Marketplace, 'x') => Some(ButtonAction::RemoveSelectedMarketplaceSource),
@@ -1365,14 +1431,14 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
             // `build_action_from_input` reads matching indices.
             fields: vec![
                 FieldSpec {
-                    label: "URL / Command".into(),
+                    label: t("extensions.form.url_command").into(),
                     required: true,
-                    placeholder: Some("https://... or command [args...]".into()),
+                    placeholder: Some(t("extensions.form.url_command_placeholder").into()),
                 },
                 FieldSpec {
-                    label: "Name".into(),
+                    label: t("extensions.form.name").into(),
                     required: false,
-                    placeholder: Some("Auto generated by URL".into()),
+                    placeholder: Some(t("extensions.form.name_placeholder").into()),
                 },
             ],
         }),
@@ -2124,7 +2190,7 @@ pub(crate) fn build_mcp_servers_picker_rows(
     collapsed_sections: &std::collections::HashSet<String>,
     tools_expanded: &std::collections::HashSet<usize>,
 ) -> McpServersPickerRows {
-    use crate::views::mcps_modal::{McpSectionId, section_for, section_key, section_label};
+    use crate::views::mcps_modal::{McpSectionId, section_for, section_key};
 
     let searching = !query.is_empty();
     let mut sections: std::collections::BTreeMap<
@@ -2151,7 +2217,7 @@ pub(crate) fn build_mcp_servers_picker_rows(
         let section_collapsed =
             mcp_section_children_hidden(collapsed_sections, &sec_key, searching);
         out.labels
-            .push(section_label(section_id, section_servers.len()));
+            .push(mcp_section_label(section_id, section_servers.len()));
         out.data_indices.push(None);
         out.group_keys.push(Some(sec_key));
         if section_collapsed {
@@ -2231,6 +2297,86 @@ pub(crate) fn mcp_section_children_hidden(
     !searching && collapsed_sections.contains(section_key)
 }
 
+fn mcp_section_label(
+    section: &crate::views::mcps_modal::McpSectionId,
+    count: usize,
+) -> String {
+    use crate::views::mcps_modal::McpSectionId;
+
+    let count = count.to_string();
+    match section {
+        McpSectionId::Managed => t_fmt(
+            "extensions.mcp.section.managed",
+            &[("count", count.as_str())],
+        ),
+        McpSectionId::Plugin(name) => t_fmt(
+            "extensions.mcp.section.plugin",
+            &[("name", name.as_str()), ("count", count.as_str())],
+        ),
+        McpSectionId::Local => t_fmt(
+            "extensions.mcp.section.local",
+            &[("count", count.as_str())],
+        ),
+    }
+}
+
+fn mcp_section_description_lines(
+    section: &crate::views::mcps_modal::McpSectionId,
+    team_id: Option<&str>,
+) -> Vec<String> {
+    use crate::views::mcps_modal::McpSectionId;
+
+    match section {
+        McpSectionId::Managed => {
+            let url = crate::views::mcps_modal::managed_connectors_url_display(team_id);
+            vec![
+                t("extensions.mcp.manage_connectors").to_string(),
+                format!("[{url}]"),
+            ]
+        }
+        McpSectionId::Plugin(_) | McpSectionId::Local => vec![],
+    }
+}
+
+fn mcp_status_label(status: crate::views::mcps_modal::McpServerDisplayStatus) -> &'static str {
+    use crate::views::mcps_modal::McpServerDisplayStatus;
+
+    match status {
+        McpServerDisplayStatus::Ready => t("extensions.mcp.status.ready"),
+        McpServerDisplayStatus::NeedsAuth => t("extensions.mcp.status.needs_auth"),
+        McpServerDisplayStatus::SetupRequired => t("extensions.mcp.status.setup_required"),
+        McpServerDisplayStatus::Unavailable => t("extensions.mcp.status.unavailable"),
+        McpServerDisplayStatus::Initializing => t("extensions.mcp.status.initializing"),
+    }
+}
+
+fn mcp_source_label(server: &crate::views::mcps_modal::McpServerInfo) -> String {
+    use crate::views::mcps_modal::McpWireSource;
+
+    if let Some(ref plugin_name) = server.plugin_name {
+        t_fmt(
+            "extensions.source.plugin",
+            &[("name", plugin_name.as_str())],
+        )
+    } else if server.wire_source == McpWireSource::Managed {
+        t("extensions.mcp.source.managed").to_string()
+    } else if server.source.eq_ignore_ascii_case("local") {
+        t("extensions.mcp.source.local").to_string()
+    } else if server.source.eq_ignore_ascii_case("managed") {
+        t("extensions.mcp.source.managed").to_string()
+    } else if let Some(name) = server
+        .source
+        .split_once(':')
+        .filter(|(kind, _)| kind.eq_ignore_ascii_case("plugin"))
+        .map(|(_, name)| name.trim())
+        .filter(|name| !name.is_empty())
+    {
+        t_fmt("extensions.source.plugin", &[("name", name)])
+    } else {
+        server.source.clone()
+    }
+}
+
 /// Derive a display label and whether the source is a custom (removable) path.
 ///
 /// Returns `(label, is_custom)` where `is_custom` means the source was added
@@ -2266,39 +2412,41 @@ pub fn derive_source_label(source_dir: &str) -> (String, bool) {
             .map(|w| w[2].clone())
     };
     if let Some(name) = plugin_name("plugins").or_else(|| plugin_name("installed-plugins")) {
-        return (format!("Plugin: {name}"), false);
+        return (
+            t_fmt("extensions.source.plugin", &[("name", name.as_str())]),
+            false,
+        );
     }
     // Global hooks under $GROK_HOME/hooks
     let global_hooks = grok.join("hooks");
     let global_str = global_hooks.display().to_string();
     if source_dir == global_str || source_dir.starts_with(&format!("{global_str}/")) {
-        return ("Global hooks".into(), false);
+        return (t("extensions.source.global_hooks").into(), false);
     }
     // Settings under .claude/
     if source_dir.contains("/.claude/") {
-        return ("Claude settings".into(), false);
+        return (t("extensions.source.claude_settings").into(), false);
     }
     // Project hooks
     if source_dir.ends_with("/.grok/hooks") || source_dir.contains("/.grok/hooks/") {
-        return ("Project hooks".into(), false);
+        return (t("extensions.source.project_hooks").into(), false);
     }
     // Custom directory — removable
-    let display = {
-        if let Ok(rest) = source_path.strip_prefix(&grok) {
-            let prefix = crate::util::display_grok_home_prefix();
-            let rest_str = rest.to_string_lossy();
-            let rest_trimmed = rest_str.strip_prefix('/').unwrap_or(&rest_str);
-            format!("Custom: {prefix}/{rest_trimmed}")
-        } else if let Some(home) = dirs::home_dir() {
-            let home_str = home.display().to_string();
-            source_dir
-                .strip_prefix(&home_str)
-                .map(|rest| format!("Custom: ~{rest}"))
-                .unwrap_or_else(|| format!("Custom: {source_dir}"))
-        } else {
-            format!("Custom: {source_dir}")
-        }
+    let path = if let Ok(rest) = source_path.strip_prefix(&grok) {
+        let prefix = crate::util::display_grok_home_prefix();
+        let rest_str = rest.to_string_lossy();
+        let rest_trimmed = rest_str.strip_prefix('/').unwrap_or(&rest_str);
+        format!("{prefix}/{rest_trimmed}")
+    } else if let Some(home) = dirs::home_dir() {
+        let home_str = home.display().to_string();
+        source_dir
+            .strip_prefix(&home_str)
+            .map(|rest| format!("~{rest}"))
+            .unwrap_or_else(|| source_dir.to_string())
+    } else {
+        source_dir.to_string()
     };
+    let display = t_fmt("extensions.source.custom", &[("path", path.as_str())]);
     (display, true)
 }
 
@@ -2348,16 +2496,60 @@ fn filter_and_sort_skills(
     SkillsEntryData { matches }
 }
 
+fn skill_scope_label(
+    scope: xai_grok_tools::implementations::skills::types::SkillScope,
+) -> &'static str {
+    use xai_grok_tools::implementations::skills::types::SkillScope;
+
+    match scope {
+        SkillScope::Local => t("extensions.skill_source.local"),
+        SkillScope::Repo => t("extensions.skill_source.repo"),
+        SkillScope::User => t("extensions.skill_source.user"),
+        SkillScope::Server => t("extensions.skill_source.server"),
+        SkillScope::Bundled => t("extensions.skill_source.bundled"),
+        SkillScope::Plugin => t("extensions.skill_source.plugin"),
+    }
+}
+
+fn workflow_source_label(source: &str) -> String {
+    if source.eq_ignore_ascii_case("builtin") {
+        t("extensions.workflow_source.builtin").to_string()
+    } else if source.eq_ignore_ascii_case("project") {
+        t("extensions.workflow_source.project").to_string()
+    } else if source.eq_ignore_ascii_case("user") {
+        t("extensions.workflow_source.user").to_string()
+    } else if source.eq_ignore_ascii_case("managed") {
+        t("extensions.workflow_source.managed").to_string()
+    } else {
+        source.to_string()
+    }
+}
+
 fn skill_source_str(skill: &SkillInfo) -> String {
     if let Some(ref cs) = skill.config_source {
         match cs {
+            xai_grok_tools::types::config_source::ConfigSource::Builtin => {
+                t("extensions.skill_source.builtin").into()
+            }
+            xai_grok_tools::types::config_source::ConfigSource::Bundled { .. } => {
+                t("extensions.skill_source.bundled").into()
+            }
+            xai_grok_tools::types::config_source::ConfigSource::Server { .. } => {
+                t("extensions.skill_source.server").into()
+            }
+            xai_grok_tools::types::config_source::ConfigSource::Cli { .. } => {
+                t("extensions.skill_source.cli").into()
+            }
+            xai_grok_tools::types::config_source::ConfigSource::Managed { .. } => {
+                t("extensions.skill_source.managed").into()
+            }
             xai_grok_tools::types::config_source::ConfigSource::User { path } => {
                 if crate::util::is_under_user_grok_home(path) {
                     crate::util::display_user_grok_path("skills")
                 } else if path.display().to_string().contains("/.claude/") {
                     "~/.claude/skills".into()
                 } else {
-                    "user".into()
+                    t("extensions.skill_source.user").into()
                 }
             }
             xai_grok_tools::types::config_source::ConfigSource::Project { path } => {
@@ -2367,16 +2559,20 @@ fn skill_source_str(skill: &SkillInfo) -> String {
                 } else if s.contains("/.claude/") {
                     ".claude/skills".into()
                 } else {
-                    "project".into()
+                    t("extensions.skill_source.project").into()
                 }
             }
             xai_grok_tools::types::config_source::ConfigSource::Plugin { plugin_name, .. } => {
-                format!("plugin: {}", plugin_name)
+                t_fmt("extensions.source.plugin", &[("name", plugin_name.as_str())])
             }
-            _ => format!("{:?}", skill.scope).to_lowercase(),
+            xai_grok_tools::types::config_source::ConfigSource::ConfigToml { .. }
+            | xai_grok_tools::types::config_source::ConfigSource::ClaudeJson { .. }
+            | xai_grok_tools::types::config_source::ConfigSource::McpJson { .. } => {
+                t("extensions.skill_source.config").into()
+            }
         }
     } else {
-        format!("{:?}", skill.scope).to_lowercase()
+        skill_scope_label(skill.scope).into()
     }
 }
 
@@ -2385,24 +2581,47 @@ fn build_plugin_fields(plugin: &xai_hooks_plugins_types::PluginInfo) -> Vec<Stri
     use xai_hooks_plugins_types::McpStatus;
     let mut components = Vec::new();
     if !plugin.skill_names.is_empty() {
-        components.push(format!("skills: {}", plugin.skill_names.join(", ")));
+        let names = plugin.skill_names.join(", ");
+        components.push(t_fmt(
+            "extensions.components.skills_named",
+            &[("names", names.as_str())],
+        ));
     } else if plugin.skill_count > 0 {
-        components.push(format!("{} skills", plugin.skill_count));
+        components.push(t_fmt(
+            "extensions.components.skills_count",
+            &[("count", &plugin.skill_count.to_string())],
+        ));
     }
     if !plugin.agent_names.is_empty() {
-        components.push(format!("agents: {}", plugin.agent_names.join(", ")));
+        let names = plugin.agent_names.join(", ");
+        components.push(t_fmt(
+            "extensions.components.agents_named",
+            &[("names", names.as_str())],
+        ));
     } else if plugin.agent_count > 0 {
-        components.push(format!("{} agents", plugin.agent_count));
+        components.push(t_fmt(
+            "extensions.components.agents_count",
+            &[("count", &plugin.agent_count.to_string())],
+        ));
     }
     if plugin.hook_count > 0 {
-        components.push(format!("{} hooks", plugin.hook_count));
+        components.push(t_fmt(
+            "extensions.components.hooks_count",
+            &[("count", &plugin.hook_count.to_string())],
+        ));
     }
     match plugin.mcp_status {
         McpStatus::Active | McpStatus::ActiveInline => {
-            components.push(format!("{} MCP servers", plugin.mcp_server_count));
+            components.push(t_fmt(
+                "extensions.components.mcp_servers_count",
+                &[("count", &plugin.mcp_server_count.to_string())],
+            ));
         }
         McpStatus::Blocked => {
-            components.push(format!("{} MCP: blocked", plugin.mcp_server_count));
+            components.push(t_fmt(
+                "extensions.components.mcp_blocked_count",
+                &[("count", &plugin.mcp_server_count.to_string())],
+            ));
         }
         McpStatus::None => {}
     }
@@ -2412,8 +2631,9 @@ fn build_plugin_fields(plugin: &xai_hooks_plugins_types::PluginInfo) -> Vec<Stri
 /// Names shown per component category before "+N more".
 const COMPONENT_ITEMS_CAP: usize = 8;
 
-/// Copy for a catalog entry verified to provide nothing detectable.
-const NO_DETECTABLE_COMPONENTS: &str = "no detectable components";
+fn no_detectable_components() -> &'static str {
+    t("extensions.no_detectable_components")
+}
 
 fn component_categories(
     components: &xai_hooks_plugins_types::PluginComponents,
@@ -2421,12 +2641,12 @@ fn component_categories(
     use xai_hooks_plugins_types::ComponentCategory;
     components.categories().map(|(category, items)| {
         let label = match category {
-            ComponentCategory::Skills => "skills",
-            ComponentCategory::Commands => "commands",
-            ComponentCategory::Agents => "agents",
-            ComponentCategory::McpServers => "mcp servers",
-            ComponentCategory::Hooks => "hooks",
-            ComponentCategory::LspServers => "lsp servers",
+            ComponentCategory::Skills => t("extensions.field.skills"),
+            ComponentCategory::Commands => t("extensions.field.commands"),
+            ComponentCategory::Agents => t("extensions.field.agents"),
+            ComponentCategory::McpServers => t("extensions.field.mcp_servers"),
+            ComponentCategory::Hooks => t("extensions.field.hooks"),
+            ComponentCategory::LspServers => t("extensions.field.lsp_servers"),
         };
         (label, items)
     })
@@ -2449,7 +2669,10 @@ pub(crate) fn render_components_fields(
             .collect();
         let mut value = names.join(", ");
         if items.len() > COMPONENT_ITEMS_CAP {
-            value.push_str(&format!(" +{} more", items.len() - COMPONENT_ITEMS_CAP));
+            value.push_str(&t_fmt(
+                "extensions.components.more",
+                &[("count", &(items.len() - COMPONENT_ITEMS_CAP).to_string())],
+            ));
         }
         fields.push((label.to_string(), value));
     }
@@ -2460,10 +2683,75 @@ pub(crate) fn render_components_fields(
 pub(crate) fn marketplace_components_summary(
     plugin: &xai_hooks_plugins_types::MarketplacePluginEntry,
 ) -> Option<String> {
-    plugin
-        .components
-        .as_ref()
-        .and_then(|components| components.summary_line())
+    let components = plugin.components.as_ref()?;
+    let parts: Vec<String> = component_categories(components)
+        .into_iter()
+        .filter(|(_, items)| !items.is_empty())
+        .map(|(label, items)| {
+            t_fmt(
+                "extensions.components.summary_item",
+                &[("count", &items.len().to_string()), ("label", label)],
+            )
+        })
+        .collect();
+    (!parts.is_empty()).then(|| parts.join(" \u{b7} "))
+}
+
+fn marketplace_install_status_label(status: &str) -> String {
+    match status {
+        "installed" => t("extensions.status.installed").to_string(),
+        "update_available" => t("extensions.status.update_available").to_string(),
+        "not_installed" => t("extensions.status.not_installed").to_string(),
+        _ => status.to_string(),
+    }
+}
+
+fn pending_action_label(raw: &str) -> String {
+    match raw {
+        "Reloading..." => t("extensions.processing.reloading").to_string(),
+        "Processing..." => t("extensions.processing").to_string(),
+        "Updating..." => t("extensions.processing.updating").to_string(),
+        "authenticating..." => t("extensions.processing.authenticating").to_string(),
+        "enabling..." => t("extensions.processing.enabling").to_string(),
+        "disabling..." => t("extensions.processing.disabling").to_string(),
+        "adding..." => t("extensions.processing.adding").to_string(),
+        "Adding source..." => t("ext_confirm.adding_source").to_string(),
+        "Uninstalling..." => t("extensions.processing.uninstalling").to_string(),
+        "toggling..." => t("extensions.processing.toggling").to_string(),
+        "removing..." => t("extensions.processing.removing").to_string(),
+        "Installing..." => t("extensions.processing.installing").to_string(),
+        _ => {
+            let suffix = if raw.ends_with("...") { "..." } else { "…" };
+            raw.strip_prefix("Authenticating ")
+                .and_then(|name| name.strip_suffix(suffix))
+                .map(|name| {
+                    t_fmt(
+                        "extensions.processing.authenticating_server",
+                        &[("name", name)],
+                    )
+                })
+                .unwrap_or_else(|| raw.to_string())
+        }
+    }
+}
+
+fn pending_badge_label(raw: &str) -> String {
+    pending_action_label(raw)
+        .trim_end_matches(|c| c == '.' || c == '\u{2026}')
+        .to_string()
+}
+
+fn extensions_empty_label(tab: ExtensionsTab, searching: bool) -> &'static str {
+    if searching {
+        return t("extensions.empty.no_matches");
+    }
+    match tab {
+        ExtensionsTab::Hooks => t("extensions.empty.hooks"),
+        ExtensionsTab::Plugins => t("extensions.empty.plugins"),
+        ExtensionsTab::Marketplace => t("extensions.empty.marketplace"),
+        ExtensionsTab::Skills => t("extensions.empty.skills"),
+        ExtensionsTab::McpServers => t("extensions.empty.mcp_servers"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2589,16 +2877,22 @@ pub fn render_extensions_modal(
                         }
                         entry_summary_lines.push(vec![]);
                         // Fields for expanded view.
-                        let mut fields = vec![("path".to_string(), skill.path.clone())];
+                        let mut fields = vec![(
+                            t("extensions.field.path").to_string(),
+                            skill.path.clone(),
+                        )];
                         if let Some(ref a) = skill.author
                             && !a.is_empty()
                         {
-                            fields.push(("author".to_string(), a.clone()));
+                            fields.push((t("extensions.field.author").to_string(), a.clone()));
                         }
                         if let Some(ref tools) = skill.allowed_tools
                             && !tools.is_empty()
                         {
-                            fields.push(("tools".to_string(), tools.join(", ")));
+                            fields.push((
+                                t("extensions.field.tools").to_string(),
+                                tools.join(", "),
+                            ));
                         }
                         entry_fields.push(fields);
                         entry_is_header.push(false);
@@ -2607,7 +2901,7 @@ pub fn render_extensions_modal(
                         entry_data_indices.push(Some(si));
                         entry_group_keys.push(None);
                         if !skill.enabled {
-                            entry_badge_text.push("[disabled]".into());
+                            entry_badge_text.push(t("extensions.badge.disabled").into());
                             entry_badge_color.push(Some(theme.accent_error));
                         } else {
                             entry_badge_text.push(String::new());
@@ -2615,7 +2909,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.skills_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -2641,7 +2935,7 @@ pub fn render_extensions_modal(
                             })
                             .collect();
                         if !visible.is_empty() {
-                            entry_labels.push("Workflows".to_string());
+                            entry_labels.push(t("extensions.workflows_header").to_string());
                             entry_right_labels.push(String::new());
                             entry_desc_lines.push(vec![]);
                             entry_summary_lines.push(vec![]);
@@ -2655,7 +2949,10 @@ pub fn render_extensions_modal(
                             entry_badge_color.push(None);
                             for wf in visible {
                                 entry_labels.push(wf.name.clone());
-                                entry_right_labels.push(format!("({})", wf.source));
+                                entry_right_labels.push(format!(
+                                    "({})",
+                                    workflow_source_label(&wf.source)
+                                ));
                                 if wf.description.is_empty() {
                                     entry_desc_lines.push(vec![]);
                                 } else {
@@ -2664,10 +2961,13 @@ pub fn render_extensions_modal(
                                 entry_summary_lines.push(vec![]);
                                 let mut fields = Vec::new();
                                 if let Some(ref p) = wf.path {
-                                    fields.push(("path".to_string(), p.clone()));
+                                    fields.push((t("extensions.field.path").to_string(), p.clone()));
                                 }
                                 if let Some(ref w) = wf.when_to_use {
-                                    fields.push(("when to use".to_string(), w.clone()));
+                                    fields.push((
+                                        t("extensions.field.when_to_use").to_string(),
+                                        w.clone(),
+                                    ));
                                 }
                                 entry_fields.push(fields);
                                 entry_is_header.push(false);
@@ -2681,7 +2981,10 @@ pub fn render_extensions_modal(
                         }
                     }
                     TabDataState::Error(ref msg) => {
-                        entry_labels.push(format!("workflows: {}", msg));
+                        entry_labels.push(t_fmt(
+                            "extensions.workflows_error",
+                            &[("msg", msg)],
+                        ));
                         entry_right_labels.push(String::new());
                         entry_desc_lines.push(vec![]);
                         entry_summary_lines.push(vec![]);
@@ -2760,9 +3063,15 @@ pub fn render_extensions_modal(
                             if let Some(ref desc) = plugin.description
                                 && !desc.is_empty()
                             {
-                                fields.push(("description".to_string(), desc.clone()));
+                                fields.push((
+                                    t("extensions.field.description").to_string(),
+                                    desc.clone(),
+                                ));
                             }
-                            fields.push(("path".to_string(), plugin.root.clone()));
+                            fields.push((
+                                t("extensions.field.path").to_string(),
+                                plugin.root.clone(),
+                            ));
                             entry_fields.push(fields);
                             entry_is_header.push(false);
                             entry_dimmed.push(!plugin.enabled);
@@ -2770,7 +3079,7 @@ pub fn render_extensions_modal(
                             entry_data_indices.push(Some(pi));
                             entry_group_keys.push(None);
                             entry_badge_text.push(if !plugin.enabled {
-                                "[disabled]".into()
+                                t("extensions.badge.disabled").into()
                             } else {
                                 String::new()
                             });
@@ -2782,7 +3091,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.plugins_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -2822,7 +3131,10 @@ pub fn render_extensions_modal(
                         let searching = !state.picker_state.query().is_empty();
                         let collapsed =
                             !searching && state.hooks_collapsed_groups.contains(source_dir);
-                        entry_labels.push(format!("{} ({} hooks)", label, hooks.len()));
+                        entry_labels.push(t_fmt(
+                            "extensions.hooks_count",
+                            &[("label", label.as_str()), ("n", &hooks.len().to_string())],
+                        ));
                         entry_right_labels.push(String::new());
                         entry_desc_lines.push(vec![]);
                         entry_summary_lines.push(vec![]);
@@ -2848,7 +3160,7 @@ pub fn render_extensions_modal(
                             let cmd = hook
                                 .command
                                 .as_deref()
-                                .unwrap_or(hook.url.as_deref().unwrap_or("(no command)"));
+                                .unwrap_or(hook.url.as_deref().unwrap_or(t("extensions.no_command")));
                             entry_right_labels.push(String::new());
                             entry_desc_lines.push(vec![format!("\u{2192} {}", cmd)]);
                             entry_summary_lines.push(vec![]);
@@ -2859,7 +3171,7 @@ pub fn render_extensions_modal(
                             entry_data_indices.push(Some(hi));
                             entry_group_keys.push(None);
                             entry_badge_text.push(if hook.disabled {
-                                "[disabled]".into()
+                                t("extensions.badge.disabled").into()
                             } else {
                                 String::new()
                             });
@@ -2871,7 +3183,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.hooks_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -2902,7 +3214,10 @@ pub fn render_extensions_modal(
                         entry_desc_lines.push(vec![]);
                         entry_summary_lines.push(vec![]);
                         if let Some(ref err) = source.error {
-                            entry_fields.push(vec![("error".to_string(), err.clone())]);
+                            entry_fields.push(vec![(
+                                t("extensions.field.error").to_string(),
+                                err.clone(),
+                            )]);
                         } else {
                             entry_fields.push(vec![]);
                         }
@@ -2912,7 +3227,7 @@ pub fn render_extensions_modal(
                         entry_data_indices.push(None);
                         entry_group_keys.push(Some(si.to_string()));
                         if source.error.is_some() {
-                            entry_badge_text.push("[error]".into());
+                            entry_badge_text.push(t("extensions.badge.error").into());
                             entry_badge_color.push(Some(theme.accent_error));
                         } else {
                             entry_badge_text.push(String::new());
@@ -2926,16 +3241,22 @@ pub fn render_extensions_modal(
                                 continue;
                             }
                             let status_label = match plugin.install_status.as_str() {
-                                "installed" => "[installed]",
-                                "update_available" => "[update available]",
+                                "installed" => t("extensions.badge.installed"),
+                                "update_available" => t("extensions.badge.update_available"),
                                 _ => "",
                             };
                             entry_labels.push(plugin.name.clone());
                             let right = match (plugin.version.as_deref(), plugin.author.as_deref())
                             {
-                                (Some(v), Some(a)) => format!("v{v} by {a}"),
-                                (Some(v), None) => format!("v{v}"),
-                                (None, Some(a)) => format!("by {a}"),
+                                (Some(version), Some(author)) => t_fmt(
+                                    "extensions.marketplace.version_by_author",
+                                    &[("version", version), ("author", author)],
+                                ),
+                                (Some(version), None) => format!("v{version}"),
+                                (None, Some(author)) => t_fmt(
+                                    "extensions.marketplace.by_author",
+                                    &[("author", author)],
+                                ),
                                 (None, None) => String::new(),
                             };
                             entry_right_labels.push(right);
@@ -2952,16 +3273,28 @@ pub fn render_extensions_modal(
                             // Fields for expanded view.
                             let mut fields = Vec::new();
                             if let Some(ref version) = plugin.version {
-                                fields.push(("version".to_string(), version.clone()));
+                                fields.push((
+                                    t("extensions.field.version").to_string(),
+                                    version.clone(),
+                                ));
                             }
                             if let Some(ref author) = plugin.author {
-                                fields.push(("author".to_string(), author.clone()));
+                                fields.push((
+                                    t("extensions.field.author").to_string(),
+                                    author.clone(),
+                                ));
                             }
                             if let Some(ref category) = plugin.category {
-                                fields.push(("category".to_string(), category.clone()));
+                                fields.push((
+                                    t("extensions.field.category").to_string(),
+                                    category.clone(),
+                                ));
                             }
                             if !plugin.tags.is_empty() {
-                                fields.push(("tags".to_string(), plugin.tags.join(", ")));
+                                fields.push((
+                                    t("extensions.field.tags").to_string(),
+                                    plugin.tags.join(", "),
+                                ));
                             }
                             match &plugin.components {
                                 Some(components) if !components.is_empty() => {
@@ -2969,23 +3302,29 @@ pub fn render_extensions_modal(
                                 }
                                 Some(_) => {
                                     fields.push((
-                                        "provides".to_string(),
-                                        NO_DETECTABLE_COMPONENTS.to_string(),
+                                        t("extensions.field.provides").to_string(),
+                                        no_detectable_components().to_string(),
                                     ));
                                 }
                                 None => {
                                     if plugin.remote_url.is_some() {
                                         fields.push((
-                                            "provides".to_string(),
-                                            "contents shown after install".to_string(),
+                                            t("extensions.field.provides").to_string(),
+                                            t("extensions.contents_after_install").to_string(),
                                         ));
                                     }
                                 }
                             }
                             if plugin.install_status != "not_installed" {
-                                fields.push(("status".to_string(), plugin.install_status.clone()));
+                                fields.push((
+                                    t("extensions.field.status").to_string(),
+                                    marketplace_install_status_label(&plugin.install_status),
+                                ));
                                 if let Some(ref iv) = plugin.installed_version {
-                                    fields.push(("installed".to_string(), iv.clone()));
+                                    fields.push((
+                                        t("extensions.field.installed").to_string(),
+                                        iv.clone(),
+                                    ));
                                 }
                             }
                             entry_fields.push(fields);
@@ -3003,7 +3342,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.marketplace_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -3019,10 +3358,7 @@ pub fn render_extensions_modal(
             }
             ExtensionsTab::McpServers => {
                 if let TabDataState::Loaded(ref servers) = state.mcps_data {
-                    use crate::views::mcps_modal::{
-                        McpSectionId, section_description_lines, section_for, section_key,
-                        section_label,
-                    };
+                    use crate::views::mcps_modal::{McpSectionId, section_for, section_key};
 
                     init_mcps_section_collapse_on_first_load(
                         &mut state.mcps_collapsed_sections,
@@ -3056,9 +3392,9 @@ pub fn render_extensions_modal(
                             &sec_key,
                             searching,
                         );
-                        entry_labels.push(section_label(section_id, section_servers.len()));
+                        entry_labels.push(mcp_section_label(section_id, section_servers.len()));
                         entry_right_labels.push(String::new());
-                        entry_desc_lines.push(section_description_lines(
+                        entry_desc_lines.push(mcp_section_description_lines(
                             section_id,
                             state.session_team_id.as_deref(),
                         ));
@@ -3081,23 +3417,26 @@ pub fn render_extensions_modal(
                                     .clone()
                                     .unwrap_or_else(|| server.name.clone()),
                             );
-                            entry_right_labels.push(format!("({})", server.source));
+                            entry_right_labels.push(format!("({})", mcp_source_label(server)));
                             // Summary line: tools count + enabled count.
                             if server.tools.is_empty() {
-                                entry_desc_lines.push(vec![
-                                    "no tools (server may not be connected)".to_string(),
-                                ]);
+                                entry_desc_lines.push(vec![t("extensions.no_tools").to_string()]);
                             } else {
+                                let tool_count = server.tools.len().to_string();
                                 let enabled_count =
                                     server.tools.iter().filter(|t| t.enabled).count();
                                 if enabled_count == server.tools.len() {
-                                    entry_desc_lines
-                                        .push(vec![format!("{} tools", server.tools.len())]);
+                                    entry_desc_lines.push(vec![t_fmt(
+                                        "extensions.mcp.tools_count",
+                                        &[("count", tool_count.as_str())],
+                                    )]);
                                 } else {
-                                    entry_desc_lines.push(vec![format!(
-                                        "{} tools ({} enabled)",
-                                        server.tools.len(),
-                                        enabled_count
+                                    entry_desc_lines.push(vec![t_fmt(
+                                        "extensions.mcp.tools_enabled_count",
+                                        &[
+                                            ("count", tool_count.as_str()),
+                                            ("enabled", &enabled_count.to_string()),
+                                        ],
                                     )]);
                                 }
                             }
@@ -3110,10 +3449,13 @@ pub fn render_extensions_modal(
                             entry_data_indices.push(Some(si));
                             entry_group_keys.push(Some(tools_group_key));
                             let (badge_text, badge_col) = if !server.enabled {
-                                ("[disabled]".to_string(), Some(theme.accent_error))
+                                (
+                                    t("extensions.badge.disabled").to_string(),
+                                    Some(theme.accent_error),
+                                )
                             } else {
                                 (
-                                    format!("[{}]", server.status.label()),
+                                    format!("[{}]", mcp_status_label(server.status)),
                                     Some(server.status.theme_color(&theme)),
                                 )
                             };
@@ -3139,7 +3481,10 @@ pub fn render_extensions_modal(
                                     entry_data_indices.push(Some(si));
                                     entry_group_keys.push(None);
                                     let tool_badge = if !t.enabled {
-                                        ("[disabled]".to_string(), Some(theme.accent_error))
+                                        (
+                                            t("extensions.badge.disabled").to_string(),
+                                            Some(theme.accent_error),
+                                        )
                                     } else {
                                         (String::new(), None)
                                     };
@@ -3150,7 +3495,7 @@ pub fn render_extensions_modal(
                         }
                     }
                 } else if let TabDataState::Error(ref msg) = state.mcps_data {
-                    entry_labels.push(format!("Error: {}", msg));
+                    entry_labels.push(t_fmt("extensions.error", &[("msg", msg)]));
                     entry_right_labels.push(String::new());
                     entry_desc_lines.push(vec![]);
                     entry_summary_lines.push(vec![]);
@@ -3172,7 +3517,7 @@ pub fn render_extensions_modal(
         && let Some(ref pending_text) = state.pending_action
     {
         if let Some(badge) = entry_badge_text.get_mut(pending_idx) {
-            *badge = format!("[{}]", pending_text.trim_end_matches("..."));
+            *badge = format!("[{}]", pending_badge_label(pending_text));
         }
         if let Some(color) = entry_badge_color.get_mut(pending_idx) {
             *color = Some(theme.warning);
@@ -3290,17 +3635,17 @@ pub fn render_extensions_modal(
         // Input-mode is handled below; it owns its own footer.
     } else if state.mcp_setup.is_some() {
         shortcuts.push(Shortcut {
-            label: "Enter save and authenticate",
+            label: t("extensions.footer.enter_save_auth"),
             clickable: false,
             id: 0,
         });
         shortcuts.push(Shortcut {
-            label: "↑/↓ select",
+            label: t("extensions.footer.arrow_select"),
             clickable: false,
             id: 0,
         });
         shortcuts.push(Shortcut {
-            label: "Esc cancel",
+            label: t("extensions.footer.esc_cancel"),
             clickable: false,
             id: 0,
         });
@@ -3309,21 +3654,21 @@ pub fn render_extensions_modal(
         // handles. Tab is either path completion (single-field) or
         // field navigation (multi-field).
         shortcuts.push(Shortcut {
-            label: "Enter submit",
+            label: t("extensions.footer.enter_submit"),
             clickable: false,
             id: 0,
         });
         shortcuts.push(Shortcut {
             label: if input.is_multi_field() {
-                "Tab/Shift+Tab field"
+                t("extensions.footer.tab_field")
             } else {
-                "Tab complete"
+                t("extensions.footer.tab_complete")
             },
             clickable: false,
             id: 0,
         });
         shortcuts.push(Shortcut {
-            label: "Esc cancel",
+            label: t("extensions.footer.esc_cancel"),
             clickable: false,
             id: 0,
         });
@@ -3335,7 +3680,7 @@ pub fn render_extensions_modal(
         // cycles forward; `Shift+Tab` is still listed in the
         // cheatsheet (`?` shortcut help).
         shortcuts.push(Shortcut {
-            label: "Tab tabs",
+            label: t("extensions.footer.tab_tabs"),
             clickable: true,
             id: 98,
         });
@@ -3348,7 +3693,7 @@ pub fn render_extensions_modal(
         }
         if state.active_tab == ExtensionsTab::McpServers {
             shortcuts.push(Shortcut {
-                label: MCP_SERVERS_OPEN_CONNECTORS_FOOTER,
+                label: mcp_servers_open_connectors_footer(),
                 clickable: false,
                 id: 0,
             });
@@ -3358,7 +3703,7 @@ pub fn render_extensions_modal(
         // from the footer to save space — the cheatsheet still lists it.
         // ID 99 = close action, handled in the mouse handler.
         shortcuts.push(Shortcut {
-            label: "Esc close",
+            label: t("extensions.footer.esc_close"),
             clickable: true,
             id: 99,
         });
@@ -3422,15 +3767,17 @@ pub fn render_extensions_modal(
     if !in_input_mode {
         // Search bar at top of content area.
         let search_active_render = state.picker_state.search_active;
-        picker::render_picker_search_bar(
+        picker::render_search_bar_with_label(
             buf,
             content_area.x,
             content_area.y,
             search_width,
             &theme,
-            &state.picker_state,
+            t("extensions.search.label"),
+            state.picker_state.query(),
             search_active_render,
             true, // show_search_hint
+            state.picker_state.query_cursor(),
             Some(theme.bg_base),
         );
     }
@@ -3488,7 +3835,7 @@ pub fn render_extensions_modal(
     // `underline_last_desc` and the recorded click band both assume the URL is the
     // LAST Managed description line; trip a test if that ever stops holding.
     debug_assert!(
-        crate::views::mcps_modal::section_description_lines(
+        mcp_section_description_lines(
             &crate::views::mcps_modal::McpSectionId::Managed,
             state.session_team_id.as_deref(),
         )
@@ -3557,6 +3904,34 @@ pub fn render_extensions_modal(
         // No picker render in input mode: clear any stale recorded link band.
         state.picker_state.link_band = None;
         (Vec::new(), Vec::new())
+    } else if loading {
+        state.picker_state.link_band = None;
+        if entries_area.width > 0 && entries_area.height > 0 {
+            let frames = crate::glyphs::dot_spinner_frames();
+            let frame = frames[(tick / SPINNER_DIVISOR) as usize % frames.len()];
+            let message = format!("{frame} {}", t("extensions.loading"));
+            let message_style = Style::default().fg(theme.gray).bg(theme.bg_base);
+            let x = entries_area.x
+                + entries_area
+                    .width
+                    .saturating_sub(message.width() as u16)
+                    / 2;
+            let y = entries_area.y + entries_area.height / 2;
+            buf.set_string(x, y, message, message_style);
+        }
+        (Vec::new(), Vec::new())
+    } else if picker_entries.is_empty() {
+        let msg_style = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
+        buf.set_string(
+            entries_area.x,
+            entries_area.y,
+            extensions_empty_label(
+                state.active_tab,
+                !state.picker_state.query().is_empty(),
+            ),
+            msg_style,
+        );
+        (Vec::new(), Vec::new())
     } else {
         let content_hit = picker::render_picker_content_with_scrollbar_x(
             buf,
@@ -3567,7 +3942,7 @@ pub fn render_extensions_modal(
             &non_selectable,
             &non_selectable_clickable,
             Some(theme.bg_base),
-            loading,
+            false,
             0,
             inner_x + inner_width - 1,
         );
@@ -3615,7 +3990,11 @@ pub fn render_extensions_modal(
         && state.pending_entry_index.is_none()
         && let Some(popup_rect) = state.window.popup_area
     {
-        let label = state.pending_action.as_deref().unwrap_or("Processing...");
+        let label = state
+            .pending_action
+            .as_deref()
+            .map(pending_action_label)
+            .unwrap_or_else(|| t("extensions.processing").to_string());
         let frames = crate::glyphs::braille_spinner_frames();
         let frame_idx = (tick / SPINNER_DIVISOR) as usize % frames.len();
         let display = format!("{} {label}", frames[frame_idx]);
@@ -3703,8 +4082,20 @@ pub fn render_extensions_modal(
     // footer shortcut style.
     if let Some(kind) = modal_msg_kind {
         let segments: &[(&str, &str)] = match kind {
-            ModalMsgKind::Error => &[("any key", " back")],
-            ModalMsgKind::Confirm => &[("y", " confirm"), ("any other key", " cancel")],
+            ModalMsgKind::Error => &[(
+                t("extensions.footer.any_key"),
+                t("extensions.footer.back"),
+            )],
+            ModalMsgKind::Confirm => &[
+                (
+                    t("extensions.footer.y_confirm_key"),
+                    t("extensions.footer.confirm"),
+                ),
+                (
+                    t("extensions.footer.any_other_key"),
+                    t("extensions.footer.cancel"),
+                ),
+            ],
         };
         render_footer_hint_segments(buf, footer_area, segments, &theme);
     } else if let Some(ref n) = state.result_notice
@@ -3769,7 +4160,7 @@ fn render_mcp_setup_form(buf: &mut Buffer, area: Rect, setup: &McpSetupFormState
             .bg(theme.bg_base)
             .add_modifier(Modifier::BOLD),
     );
-    let hint = "Save and authenticate";
+    let hint = t("extensions.save_and_authenticate");
     buf.set_string(
         x,
         top.saturating_add(1),
@@ -7090,8 +7481,12 @@ mod tests {
             "precondition: link hit band recorded for connectors URL"
         );
 
+        let confirm_msg = xai_grok_i18n::t_fmt(
+            "ext_confirm.remove_mcp_server",
+            &[("name", "local-grafana")],
+        );
         state.modal_message = Some(ModalMessage::Confirmation {
-            message: "Remove MCP server \"local-grafana\"?".into(),
+            message: confirm_msg.clone(),
             action: ConfirmationAction::DeleteMcpServer {
                 server_name: "local-grafana".into(),
             },
@@ -7103,7 +7498,7 @@ mod tests {
         render_extensions_modal(&mut confirm_buf, area, &mut state, None, false, 0);
 
         assert_eq!(
-            buffer_count(&confirm_buf, "Remove MCP server \"local-grafana\"?"),
+            buffer_count(&confirm_buf, &confirm_msg),
             1,
             "confirmation message must be painted"
         );

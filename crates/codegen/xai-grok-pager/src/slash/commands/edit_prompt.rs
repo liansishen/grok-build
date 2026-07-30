@@ -12,7 +12,7 @@ impl SlashCommand for EditPromptCommand {
     }
 
     fn description(&self) -> &str {
-        "Open an external editor for an empty prompt; use the command palette to preserve a draft"
+        xai_grok_i18n::t("slash.edit_prompt.description")
     }
 
     fn usage(&self) -> &str {
@@ -29,12 +29,15 @@ impl SlashCommand for EditPromptCommand {
 
     fn run(&self, ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
         if !ctx.screen_mode.is_minimal() {
-            return CommandResult::Error(
-                "/edit-prompt is only available in minimal mode".to_owned(),
-            );
+            return CommandResult::Error(xai_grok_i18n::t_fmt(
+                "slash.screen_mode.only_available",
+                &[("command", "edit-prompt"), ("mode", "minimal")],
+            ));
         }
         if ctx.session_id.is_none() {
-            return CommandResult::Error("No active session".to_owned());
+            return CommandResult::Error(
+                xai_grok_i18n::t("slash.edit_prompt.no_active_session").to_owned(),
+            );
         }
         CommandResult::Action(Action::EditPromptExternal)
     }

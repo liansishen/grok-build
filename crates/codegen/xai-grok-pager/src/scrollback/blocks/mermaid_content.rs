@@ -28,17 +28,6 @@ pub const MERMAID_INFO: &str = "mermaid";
 /// affordance row.
 const MERMAID_LABEL: &str = "\u{25c7} mermaid";
 
-/// Status hint shown in the affordance row while an on-click diagram render is
-/// in flight.
-const MERMAID_RENDERING: &str = "rendering diagram\u{2026}";
-
-/// Affordance-row button label: open the rendered PNG in the OS default app.
-const AFFORDANCE_OPEN: &str = "[Open Image]";
-/// Affordance-row button label: copy the rendered PNG's filesystem path.
-const AFFORDANCE_COPY_PATH: &str = "[Copy Image Path]";
-/// Affordance-row button label: copy the diagram's Mermaid source.
-const AFFORDANCE_COPY_SOURCE: &str = "[Copy Source]";
-
 /// Display-column gap between adjacent affordance-row buttons (and before the
 /// trailing status hint).
 const AFFORDANCE_GAP: u16 = 3;
@@ -315,10 +304,10 @@ pub(crate) enum AffordanceKind {
 /// One button in a diagram's affordance row, with its start column so the
 /// painted label and the click hit-rect can't drift. Every button is always
 /// clickable — `[Open]`/`[Copy path]` render lazily on click.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AffordanceButton {
     /// Display label, e.g. `[Open]`.
-    pub label: &'static str,
+    pub label: String,
     /// The click action this button triggers.
     pub kind: AffordanceKind,
     /// Start column, in display cells from the affordance row's left edge.
@@ -338,21 +327,23 @@ pub(crate) struct AffordanceRow {
     pub buttons: [AffordanceButton; 3],
     /// `(start_col, text)` of the trailing `rendering…` hint, present only while
     /// an on-click render for this diagram is in flight.
-    pub status: Option<(u16, &'static str)>,
+    pub status: Option<(u16, String)>,
 }
 
 /// The affordance row's three buttons laid out left-to-right starting at
 /// `start_col` (which leaves room for the leading `◇ mermaid` label).
 fn affordance_buttons(start_col: u16) -> [AffordanceButton; 3] {
     let specs = [
-        (AFFORDANCE_OPEN, AffordanceKind::Open),
-        (AFFORDANCE_COPY_PATH, AffordanceKind::CopyPath),
-        (AFFORDANCE_COPY_SOURCE, AffordanceKind::CopySource),
+        ("media.open_image", AffordanceKind::Open),
+        ("media.copy_image_path", AffordanceKind::CopyPath),
+        ("media.copy_source", AffordanceKind::CopySource),
     ];
     let mut col = start_col;
-    specs.map(|(label, kind)| {
+    specs.map(|(key, kind)| {
+        let label = xai_grok_i18n::t(key).to_string();
+        let width = UnicodeWidthStr::width(label.as_str()) as u16;
         let button = AffordanceButton { label, kind, col };
-        col += UnicodeWidthStr::width(label) as u16 + AFFORDANCE_GAP;
+        col += width + AFFORDANCE_GAP;
         button
     })
 }
@@ -366,8 +357,12 @@ pub(crate) fn affordance_row(rendering: bool) -> AffordanceRow {
     let buttons = affordance_buttons(buttons_start);
     let status = rendering.then(|| {
         let last = &buttons[buttons.len() - 1];
-        let after = last.col + UnicodeWidthStr::width(last.label) as u16 + AFFORDANCE_GAP;
-        (after, MERMAID_RENDERING)
+        let after =
+            last.col + UnicodeWidthStr::width(last.label.as_str()) as u16 + AFFORDANCE_GAP;
+        (
+            after,
+            xai_grok_i18n::t("media.rendering_diagram").to_string(),
+        )
     });
     AffordanceRow {
         label: (0, MERMAID_LABEL),
@@ -741,48 +736,63 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn affordance_buttons_start_after_the_label_with_a_fixed_gap() {
         // Buttons are laid out from `start_col` (which leaves room for the
         // leading `◇ mermaid` label) with a fixed inter-button gap; every button
         // is clickable (no per-button enable flag).
         let start = UnicodeWidthStr::width(MERMAID_LABEL) as u16 + AFFORDANCE_GAP;
         let buttons = affordance_buttons(start);
-        assert_eq!(
-            buttons.map(|b| (b.label, b.kind)),
-            [
-                ("[Open Image]", AffordanceKind::Open),
-                ("[Copy Image Path]", AffordanceKind::CopyPath),
-                ("[Copy Source]", AffordanceKind::CopySource),
-            ],
-        );
+        let expected = [
+            (xai_grok_i18n::t("media.open_image"), AffordanceKind::Open),
+            (
+                xai_grok_i18n::t("media.copy_image_path"),
+                AffordanceKind::CopyPath,
+            ),
+            (
+                xai_grok_i18n::t("media.copy_source"),
+                AffordanceKind::CopySource,
+            ),
+        ];
+        for (button, &(label, kind)) in buttons.iter().zip(expected.iter()) {
+            assert_eq!(button.label, label);
+            assert_eq!(button.kind, kind);
+        }
         assert_eq!(buttons[0].col, start);
         for win in buttons.windows(2) {
-            let prev_end = win[0].col + UnicodeWidthStr::width(win[0].label) as u16;
+            let prev_end =
+                win[0].col + UnicodeWidthStr::width(win[0].label.as_str()) as u16;
             assert_eq!(win[1].col, prev_end + AFFORDANCE_GAP, "fixed gap: {win:?}");
         }
     }
 
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn affordance_row_has_label_and_shows_status_only_while_rendering() {
-        // Display widths: `◇ mermaid` (9) + gap (3) → buttons start at col 12;
-        // [Open Image] (12), [Copy Image Path] (17), [Copy Source] (13) with
-        // gap-3 between.
         let start = UnicodeWidthStr::width(MERMAID_LABEL) as u16 + AFFORDANCE_GAP;
         let idle = affordance_row(false);
         assert_eq!(idle.label, (0, MERMAID_LABEL));
-        assert_eq!(idle.buttons.map(|b| b.col), [start, start + 15, start + 35]);
-        assert_eq!(
-            idle.buttons.map(|b| b.label),
-            ["[Open Image]", "[Copy Image Path]", "[Copy Source]"],
-        );
+        assert_eq!(idle.buttons[0].col, start);
+        for win in idle.buttons.windows(2) {
+            let prev_end =
+                win[0].col + UnicodeWidthStr::width(win[0].label.as_str()) as u16;
+            assert_eq!(win[1].col, prev_end + AFFORDANCE_GAP);
+        }
         assert_eq!(idle.status, None, "no status unless a render is in flight");
 
-        // While rendering, the `rendering…` hint sits after the last button + gap;
+        // While rendering, the localized status sits after the last button + gap;
         // the label and button columns are unchanged.
         let busy = affordance_row(true);
-        let last = busy.buttons[2];
-        let after = last.col + UnicodeWidthStr::width(last.label) as u16 + AFFORDANCE_GAP;
-        assert_eq!(busy.status, Some((after, MERMAID_RENDERING)));
+        let last = &busy.buttons[2];
+        let after =
+            last.col + UnicodeWidthStr::width(last.label.as_str()) as u16 + AFFORDANCE_GAP;
+        assert_eq!(
+            busy.status,
+            Some((
+                after,
+                xai_grok_i18n::t("media.rendering_diagram").to_string(),
+            ))
+        );
         assert_eq!(busy.label, idle.label);
         assert_eq!(busy.buttons, idle.buttons);
     }

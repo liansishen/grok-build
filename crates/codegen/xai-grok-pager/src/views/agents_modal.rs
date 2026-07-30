@@ -20,8 +20,19 @@ use xai_grok_agent::config::{AgentDefinition, AgentScope, BuiltinAgentName};
 use xai_grok_shell::agent::config::AgentSelectionConfig;
 use xai_grok_tools::implementations::skills::discovery::extract_first_paragraph;
 use xai_grok_tools::registry::types::ToolServerConfig;
+use xai_grok_i18n::{t, t_fmt, t_or};
 use xai_grok_tools::types::template_renderer::TemplateRenderer;
 use xai_grok_tools::types::tool::ToolKind;
+
+fn agent_scope_label(scope: AgentScope) -> &'static str {
+    match scope {
+        AgentScope::BuiltIn => t("agents.scope.built_in"),
+        AgentScope::Project => t("agents.scope.project"),
+        AgentScope::User => t("agents.scope.user"),
+        AgentScope::Bundled => t("agents.scope.bundled"),
+    }
+}
+
 /// Which tab is active in the agents modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentsTab {
@@ -34,8 +45,8 @@ impl AgentsTab {
     /// Display label for the tab bar.
     pub fn label(self) -> &'static str {
         match self {
-            Self::Agents => "Agents",
-            Self::Personas => "Personas",
+            Self::Agents => t("subagent_catalog.agents"),
+            Self::Personas => t("subagent_catalog.personas"),
         }
     }
     /// Next tab (wraps around).
@@ -135,8 +146,8 @@ pub enum ConfigFileScope {
 impl ConfigFileScope {
     pub fn label(self) -> &'static str {
         match self {
-            Self::User => "user",
-            Self::Project => "project",
+            Self::User => t("agents.scope.user_lower"),
+            Self::Project => t("agents.scope.project_lower"),
         }
     }
     pub fn toggle(self) -> Self {
@@ -482,7 +493,8 @@ pub fn merge_persona_lists(bundle: &BundleState, cwd: &Path) -> Vec<PersonaDetai
             if path.exists() {
                 persona.source_path = Some(path.display().to_string());
                 if persona.scope_label.is_none() {
-                    persona.scope_label = Some("bundled".to_string());
+                    persona.scope_label =
+                        Some(t("agents.scope.bundled_lower").to_string());
                 }
             }
         }
@@ -596,7 +608,7 @@ pub fn sanitize_config_name(name: &str) -> Result<String, String> {
         })
         .collect();
     if !sanitized.chars().any(|c| c.is_alphanumeric()) {
-        return Err("Name must contain at least one alphanumeric character".to_string());
+        return Err(t("agents.error.name_alphanumeric").to_string());
     }
     Ok(sanitized)
 }
@@ -624,11 +636,17 @@ pub fn create_persona_template(
     let sanitized = sanitize_config_name(name)?;
     let personas_dir = personas_dir_for_scope(scope, cwd);
     if let Err(e) = std::fs::create_dir_all(&personas_dir) {
-        return Err(format!("Failed to create personas directory: {e}"));
+        return Err(t_fmt(
+            "agents.error.create_personas_directory",
+            &[("error", &e.to_string())],
+        ));
     }
     let path = personas_dir.join(format!("{sanitized}.toml"));
     if path.exists() {
-        return Err(format!("Persona '{}' already exists", sanitized));
+        return Err(t_fmt(
+            "agents.error.persona_exists",
+            &[("name", &sanitized)],
+        ));
     }
     let desc_opt = (!description.trim().is_empty()).then(|| description.trim());
     let instr_opt = (!instructions.trim().is_empty()).then(|| instructions.trim());
@@ -636,9 +654,18 @@ pub fn create_persona_template(
         description: desc_opt,
         instructions: instr_opt,
     };
-    let content =
-        toml::to_string_pretty(&template).map_err(|e| format!("Failed to format persona: {e}"))?;
-    std::fs::write(&path, content).map_err(|e| format!("Failed to write persona file: {e}"))?;
+    let content = toml::to_string_pretty(&template).map_err(|e| {
+        t_fmt(
+            "agents.error.format_persona",
+            &[("error", &e.to_string())],
+        )
+    })?;
+    std::fs::write(&path, content).map_err(|e| {
+        t_fmt(
+            "agents.error.write_persona",
+            &[("error", &e.to_string())],
+        )
+    })?;
     Ok(path)
 }
 /// True when `path` is a deletable local persona file (user or project `.grok/personas`).
@@ -685,11 +712,16 @@ pub fn delete_persona_file(path: &Path) -> Result<(), String> {
             c.components()
                 .any(|comp| matches!(comp, std::path::Component::Normal(s) if s == "bundled"))
         }) {
-            return Err("Cannot delete bundled personas".to_string());
+            return Err(t("agents.error.cannot_delete_bundled").to_string());
         }
-        return Err("Persona file is not in a known personas directory".to_string());
+        return Err(t("agents.error.unknown_persona_directory").to_string());
     }
-    std::fs::remove_file(path).map_err(|e| format!("Failed to delete persona file: {e}"))?;
+    std::fs::remove_file(path).map_err(|e| {
+        t_fmt(
+            "agents.error.delete_persona_file",
+            &[("error", &e.to_string())],
+        )
+    })?;
     Ok(())
 }
 /// Load `[agent]` from effective config (merged shell + pager config layers).
@@ -730,7 +762,7 @@ pub fn set_default_agent(name: Option<&str>) -> Result<(), String> {
         let _ = std::fs::create_dir_all(parent);
     }
     let Some(mut doc) = crate::config_toml_edit::read_config_document_for_edit(&config_path) else {
-        return Err("Could not read or parse config.toml".to_string());
+        return Err(t("agents.error.read_config").to_string());
     };
     if let Some(agent_name) = name {
         if !doc.contains_key("agent") {
@@ -738,13 +770,17 @@ pub fn set_default_agent(name: Option<&str>) -> Result<(), String> {
         }
         let agent_table = doc["agent"]
             .as_table_mut()
-            .ok_or("[agent] is not a table")?;
+            .ok_or_else(|| t("agents.error.agent_not_table").to_string())?;
         agent_table["name"] = toml_edit::value(agent_name);
     } else if let Some(agent_table) = doc.get_mut("agent").and_then(|v| v.as_table_mut()) {
         agent_table.remove("name");
     }
-    std::fs::write(&config_path, doc.to_string())
-        .map_err(|e| format!("Failed to write config.toml: {e}"))?;
+    std::fs::write(&config_path, doc.to_string()).map_err(|e| {
+        t_fmt(
+            "agents.error.write_config",
+            &[("error", &e.to_string())],
+        )
+    })?;
     Ok(())
 }
 /// Toggle an agent's enabled state via `[subagents.toggle]` in config.toml.
@@ -754,40 +790,53 @@ pub fn toggle_agent(name: &str, enabled: bool) -> Result<(), String> {
         let _ = std::fs::create_dir_all(parent);
     }
     let Some(mut doc) = crate::config_toml_edit::read_config_document_for_edit(&config_path) else {
-        return Err("Could not read or parse config.toml".to_string());
+        return Err(t("agents.error.read_config").to_string());
     };
     if !doc.contains_key("subagents") {
         doc["subagents"] = toml_edit::Item::Table(toml_edit::Table::new());
     }
     let subagents = doc["subagents"]
         .as_table_mut()
-        .ok_or("subagents is not a table")?;
+        .ok_or_else(|| t("agents.error.subagents_not_table").to_string())?;
     if !subagents.contains_key("toggle") {
         subagents["toggle"] = toml_edit::Item::Table(toml_edit::Table::new());
     }
     let toggle_table = subagents["toggle"]
         .as_table_mut()
-        .ok_or("subagents.toggle is not a table")?;
+        .ok_or_else(|| t("agents.error.subagents_toggle_not_table").to_string())?;
     toggle_table[name] = toml_edit::value(enabled);
-    std::fs::write(&config_path, doc.to_string())
-        .map_err(|e| format!("Failed to write config.toml: {e}"))?;
+    std::fs::write(&config_path, doc.to_string()).map_err(|e| {
+        t_fmt(
+            "agents.error.write_config",
+            &[("error", &e.to_string())],
+        )
+    })?;
     Ok(())
 }
 /// Format detail lines for an expanded agent entry.
 pub fn format_agent_detail(entry: &AgentListEntry) -> Vec<String> {
     let def = &entry.definition;
     let mut lines = Vec::new();
-    lines.push(format!("  Model: {}", def.model));
+    lines.push(t_fmt(
+        "agents.detail.model",
+        &[("model", &def.model)],
+    ));
     let mode_label = match def.prompt_mode {
-        xai_grok_agent::config::PromptMode::Extend => "extend",
-        xai_grok_agent::config::PromptMode::Full => "full",
+        xai_grok_agent::config::PromptMode::Extend => t("agents.prompt_mode.extend"),
+        xai_grok_agent::config::PromptMode::Full => t("agents.prompt_mode.full"),
     };
-    lines.push(format!("  Prompt mode: {mode_label}"));
+    lines.push(t_fmt(
+        "agents.detail.prompt_mode",
+        &[("mode", mode_label)],
+    ));
     let tools = &def.tool_config.tools;
     if tools.is_empty() {
-        lines.push("  Tools: (none)".to_string());
+        lines.push(t("agents.detail.tools_none").to_string());
     } else {
-        lines.push(format!("  Tools ({}): ", tools.len()));
+        lines.push(t_fmt(
+            "agents.detail.tools_count",
+            &[("count", &tools.len().to_string())],
+        ));
         for tool in tools {
             let name = tool.name_override.as_deref().unwrap_or_else(|| {
                 tool.id
@@ -798,26 +847,42 @@ pub fn format_agent_detail(entry: &AgentListEntry) -> Vec<String> {
         }
     }
     if !def.skills.is_empty() {
-        lines.push(format!("  Skills: {}", def.skills.join(", ")));
+        lines.push(t_fmt(
+            "agents.detail.skills",
+            &[("skills", &def.skills.join(", "))],
+        ));
     }
     if let Some(ref path) = entry.source_path {
-        lines.push(format!("  Source: {}", path.display()));
+        lines.push(t_fmt(
+            "agents.detail.source",
+            &[("path", &path.display().to_string())],
+        ));
     }
-    lines.push(format!("  Scope: {}", entry.scope.label()));
+    lines.push(t_fmt(
+        "agents.detail.scope",
+        &[("scope", agent_scope_label(entry.scope))],
+    ));
     if let Some(ref body) = def.prompt_body {
         let rendered = render_prompt_body(body, &def.tool_config);
         let char_count = rendered.chars().count();
         let truncated: String = rendered.chars().take(120).collect::<String>();
         if char_count > 120 {
-            lines.push(format!("  Prompt extension: {truncated}..."));
-            lines.push("  (Enter to view full)".to_string());
+            let ellipsis = t_or("agents.detail.truncation_ellipsis", "...");
+            lines.push(t_fmt(
+                "agents.detail.prompt_extension_truncated",
+                &[("prompt", &truncated), ("ellipsis", ellipsis)],
+            ));
+            lines.push(t("agents.detail.enter_view_full").to_string());
         } else {
-            lines.push(format!("  Prompt extension: {truncated}"));
+            lines.push(t_fmt(
+                "agents.detail.prompt_extension",
+                &[("prompt", &truncated)],
+            ));
         }
     } else if entry.source_path.is_some() {
-        lines.push("  Prompt extension: (in file — Enter to view)".to_string());
+        lines.push(t("agents.detail.prompt_extension_in_file").to_string());
     } else {
-        lines.push("  Prompt extension: (none)".to_string());
+        lines.push(t("agents.detail.prompt_extension_none").to_string());
     }
     lines
 }
@@ -861,9 +926,9 @@ fn synthesize_agent_markdown(entry: &AgentListEntry) -> String {
     if let Some(ref body) = entry.definition.prompt_body {
         render_prompt_body(body, &entry.definition.tool_config)
     } else {
-        format!(
-            "*{} uses the base system prompt with no additional instructions.*\n",
-            entry.name,
+        t_fmt(
+            "agents.base_prompt_only",
+            &[("name", &entry.name)],
         )
     }
 }
@@ -991,10 +1056,10 @@ fn modal_sizing(compact: bool) -> ModalSizing {
 }
 fn scope_badge(scope: AgentScope, theme: &Theme) -> (String, Style) {
     let label = match scope {
-        AgentScope::BuiltIn => " built-in ",
-        AgentScope::Project => " project ",
-        AgentScope::User => " user ",
-        AgentScope::Bundled => " bundled ",
+        AgentScope::BuiltIn => t("agents.scope.badge.built_in"),
+        AgentScope::Project => t("agents.scope.badge.project"),
+        AgentScope::User => t("agents.scope.badge.user"),
+        AgentScope::Bundled => t("agents.scope.badge.bundled"),
     };
     let fg = match scope {
         AgentScope::BuiltIn => theme.accent_assistant,
@@ -1023,7 +1088,7 @@ pub fn render_agents_modal(
         AgentsTab::Personas => build_personas_tab_shortcuts(state),
     };
     let config = ModalWindowConfig {
-        title: "Agents",
+        title: t("subagent_catalog.agents"),
         tabs: Some(&tab_labels),
         shortcuts: &shortcuts,
         sizing: modal_sizing(compact),
@@ -1049,47 +1114,47 @@ pub fn render_agents_modal(
 fn build_agents_tab_shortcuts<'a>(state: &AgentsModalState) -> Vec<Shortcut<'a>> {
     let mut shortcuts = vec![
         Shortcut {
-            label: "j/k nav",
+            label: t("agents.footer.nav_jk"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "e/\u{2192} expand",
+            label: t("agents.footer.expand"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "E/\u{2190} collapse",
+            label: t("agents.footer.collapse"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Enter view",
+            label: t("agents.footer.enter_view"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "/ search",
+            label: t("settings.modal.footer.slash_search"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "t toggle",
+            label: t("agents.footer.toggle"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "s default",
+            label: t("agents.footer.default"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Tab switch tab",
+            label: t("agents.footer.switch_tab"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Esc close",
+            label: t("extensions.footer.esc_close"),
             clickable: false,
             id: 0,
         },
@@ -1102,17 +1167,17 @@ fn build_personas_tab_shortcuts<'a>(state: &AgentsModalState) -> Vec<Shortcut<'a
     if state.persona_input.is_some() {
         vec![
             Shortcut {
-                label: "Tab switch field",
+                label: t("agents.footer.switch_field"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Enter create",
+                label: t("agents.footer.enter_create"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc cancel",
+                label: t("extensions.footer.esc_cancel"),
                 clickable: false,
                 id: 0,
             },
@@ -1120,12 +1185,12 @@ fn build_personas_tab_shortcuts<'a>(state: &AgentsModalState) -> Vec<Shortcut<'a
     } else if state.persona_confirm.is_some() {
         vec![
             Shortcut {
-                label: "y confirm",
+                label: t("agents.footer.y_confirm"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "n/Esc cancel",
+                label: t("agents.footer.n_esc_cancel"),
                 clickable: false,
                 id: 0,
             },
@@ -1133,47 +1198,47 @@ fn build_personas_tab_shortcuts<'a>(state: &AgentsModalState) -> Vec<Shortcut<'a
     } else {
         let mut shortcuts = vec![
             Shortcut {
-                label: "j/k nav",
+                label: t("agents.footer.nav_jk"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "e/\u{2192} expand",
+                label: t("agents.footer.expand"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "E/\u{2190} collapse",
+                label: t("agents.footer.collapse"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Enter view",
+                label: t("agents.footer.enter_view"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "/ search",
+                label: t("settings.modal.footer.slash_search"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "n new",
+                label: t("agents.footer.new"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "d delete",
+                label: t("agents.footer.delete"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Tab switch tab",
+                label: t("agents.footer.switch_tab"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc close",
+                label: t("extensions.footer.esc_close"),
                 clickable: false,
                 id: 0,
             },
@@ -1264,9 +1329,9 @@ fn render_agents_tab(
     let filtered = state.filtered_indices();
     if filtered.is_empty() {
         let msg = if state.search_query().is_empty() {
-            "No agents found"
+            t("agents.no_found")
         } else {
-            "No matching agents"
+            t("agents.no_matching")
         };
         buf.set_string(content_area.x, y, msg, Style::default().fg(theme.gray_dim));
         return;
@@ -1332,12 +1397,10 @@ fn render_agents_tab(
         }
         match &rows[ri] {
             FlatRow::ScopeHeader(scope) => {
-                let label = match scope {
-                    AgentScope::BuiltIn => "\u{2500}\u{2500} Built-in \u{2500}\u{2500}",
-                    AgentScope::Project => "\u{2500}\u{2500} Project \u{2500}\u{2500}",
-                    AgentScope::User => "\u{2500}\u{2500} User \u{2500}\u{2500}",
-                    AgentScope::Bundled => "\u{2500}\u{2500} Bundled \u{2500}\u{2500}",
-                };
+                let label = format!(
+                    "\u{2500}\u{2500} {} \u{2500}\u{2500}",
+                    agent_scope_label(*scope)
+                );
                 let style = Style::default()
                     .fg(theme.gray_dim)
                     .add_modifier(Modifier::BOLD);
@@ -1408,7 +1471,7 @@ fn render_agents_tab(
                     .as_deref()
                     .is_some_and(|a| a == entry.name);
                 if is_active {
-                    let active_label = " active";
+                    let active_label = t("agents.badge.active");
                     let active_remaining =
                         (content_area.x + content_area.width).saturating_sub(x) as usize;
                     if active_remaining >= active_label.width() {
@@ -1424,7 +1487,7 @@ fn render_agents_tab(
                 }
                 let is_default = entry.name == state.default_agent;
                 if is_default {
-                    let default_label = " default";
+                    let default_label = t("agents.badge.default");
                     let default_remaining =
                         (content_area.x + content_area.width).saturating_sub(x) as usize;
                     if default_remaining >= default_label.width() {
@@ -1439,7 +1502,7 @@ fn render_agents_tab(
                     }
                 }
                 if !entry.enabled {
-                    let off_label = " [off]";
+                    let off_label = t("agents.badge.off");
                     let off_remaining =
                         (content_area.x + content_area.width).saturating_sub(x) as usize;
                     if off_remaining >= off_label.len() {
@@ -1515,11 +1578,11 @@ fn render_personas_tab(
     if let Some(ref msg) = state.message {
         y = render_modal_message_line(buf, content_area.x, y, w, msg, theme);
     }
-    let blurb = "Personas shape subagent behavior via the persona parameter on spawn_subagent.";
+    let blurb = t("agents.personas.blurb");
     let blurb_style = Style::default().fg(theme.gray_dim);
     buf.set_string(content_area.x, y, blurb, blurb_style);
     y += 1;
-    let blurb2 = "Used by skills (e.g. /implement) and by the model when spawning subagents.";
+    let blurb2 = t("agents.personas.blurb_usage");
     buf.set_string(content_area.x, y, blurb2, blurb_style);
     y += 2;
     if state.search_active || !state.search_query().is_empty() {
@@ -1540,9 +1603,9 @@ fn render_personas_tab(
     let filtered = state.filtered_persona_indices();
     if filtered.is_empty() {
         let msg = if state.personas.is_empty() {
-            "No personas available"
+            t("agents.personas.none_available")
         } else {
-            "No matching personas"
+            t("agents.personas.no_matching")
         };
         buf.set_string(content_area.x, y, msg, Style::default().fg(theme.gray_dim));
         return;
@@ -1567,16 +1630,16 @@ fn render_personas_tab(
             if persona.has_inputs || persona.has_outputs {
                 let mut tags = Vec::new();
                 if persona.has_inputs {
-                    tags.push("accepts structured inputs");
+                    tags.push(t("agents.personas.accepts_structured_inputs"));
                 }
                 if persona.has_outputs {
-                    tags.push("produces structured outputs");
+                    tags.push(t("agents.personas.produces_structured_outputs"));
                 }
                 rows.push(PersonaFlatRow::Tags(idx, tags.join(" \u{00b7} ")));
             }
             rows.push(PersonaFlatRow::Hint(
                 idx,
-                "Enter to view full definition".to_string(),
+                t("agents.personas.enter_view_full_definition").to_string(),
             ));
         }
     }
@@ -1827,7 +1890,7 @@ fn render_persona_create_form(
 ) {
     let mut y = content_area.y;
     let w = content_area.width as usize;
-    let title = "Create New Persona";
+    let title = t("agents.create_persona");
     let title_style = Style::default()
         .fg(theme.text_primary)
         .add_modifier(Modifier::BOLD);
@@ -1847,7 +1910,7 @@ fn render_persona_create_form(
         content_area,
         y,
         w,
-        "Name: ",
+        t("agents.form.name"),
         input.name_editor(),
         input.active_field == CreateField::Name,
         theme,
@@ -1857,7 +1920,7 @@ fn render_persona_create_form(
         content_area,
         y,
         w,
-        "Description: ",
+        t("agents.form.description"),
         input.description_editor(),
         input.active_field == CreateField::Description,
         theme,
@@ -1867,12 +1930,12 @@ fn render_persona_create_form(
         content_area,
         y,
         w,
-        "Instructions: ",
+        t("agents.form.instructions"),
         input.instructions_editor(),
         input.active_field == CreateField::Instructions,
         theme,
     );
-    let scope_label = "Scope: ";
+    let scope_label = t("agents.form.scope");
     let scope_active = input.active_field == CreateField::Scope;
     let label_style = if scope_active {
         Style::default().fg(theme.accent_user)
@@ -1882,13 +1945,13 @@ fn render_persona_create_form(
     buf.set_string(content_area.x, y, scope_label, label_style);
     let scope_text = format!("[{}]", input.scope.label());
     buf.set_string(
-        content_area.x + scope_label.len() as u16,
+        content_area.x + scope_label.width() as u16,
         y,
         &scope_text,
         Style::default().fg(theme.text_primary),
     );
     y += 2;
-    let hint = "Tab/↑↓: field | Space/←→ on scope: user/project | Enter: create | Esc: cancel";
+    let hint = t("agents.form.hint");
     buf.set_string(content_area.x, y, hint, Style::default().fg(theme.gray_dim));
 }
 /// Render the confirm-delete persona dialog.
@@ -1900,13 +1963,13 @@ fn render_persona_confirm_dialog(
 ) {
     let PersonaConfirmAction::Delete { name, path } = confirm;
     let mut y = content_area.y;
-    let title = "Delete Persona";
+    let title = t("agents.delete_persona");
     let title_style = Style::default()
         .fg(theme.accent_error)
         .add_modifier(Modifier::BOLD);
     buf.set_string(content_area.x, y, title, title_style);
     y += 2;
-    let msg = format!("Delete persona '{name}'?");
+    let msg = t_fmt("agents.delete_persona_confirm", &[("name", name)]);
     buf.set_string(
         content_area.x,
         y,
@@ -1922,7 +1985,7 @@ fn render_persona_confirm_dialog(
         Style::default().fg(theme.gray),
     );
     y += 2;
-    let hint = "y: confirm | n/Esc: cancel";
+    let hint = t("agents.delete_hint");
     buf.set_string(content_area.x, y, hint, Style::default().fg(theme.gray_dim));
 }
 enum FlatRow {
@@ -2004,7 +2067,7 @@ pub fn handle_agents_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agents
     }
     let tab_labels: Vec<&str> = AgentsTab::ALL.iter().map(|t| t.label()).collect();
     let config = ModalWindowConfig {
-        title: "Agents",
+        title: t("subagent_catalog.agents"),
         tabs: Some(&tab_labels),
         shortcuts: &[],
         sizing: modal_sizing(false),
@@ -2121,7 +2184,10 @@ fn handle_agents_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agents
         KeyCode::Enter | KeyCode::Char('o') => {
             if let Some(entry) = state.agents.get(state.selected) {
                 if let Some(ref path) = entry.source_path {
-                    let title = format!("{} \u{2014} prompt extension", entry.name);
+                    let title = t_fmt(
+                        "agents.prompt_extension_title",
+                        &[("name", &entry.name)],
+                    );
                     return AgentsModalOutcome::ViewAgent {
                         title,
                         source_path: Some(path.clone()),
@@ -2129,7 +2195,10 @@ fn handle_agents_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agents
                     };
                 }
                 if entry.definition.prompt_body.is_some() {
-                    let title = format!("{} \u{2014} prompt extension", entry.name);
+                    let title = t_fmt(
+                        "agents.prompt_extension_title",
+                        &[("name", &entry.name)],
+                    );
                     return AgentsModalOutcome::ViewAgent {
                         title,
                         source_path: None,
@@ -2159,14 +2228,14 @@ fn handle_agents_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agents
                     Ok(()) => {
                         refresh_default_agent(state);
                         state.message = Some(if is_already_default {
-                            AgentsModalMessage::info(format!(
-                                "Cleared \u{2014} new sessions use '{}'",
-                                state.default_agent
+                            AgentsModalMessage::info(t_fmt(
+                                "agents.default_cleared",
+                                &[("name", &state.default_agent)],
                             ))
                         } else {
-                            AgentsModalMessage::info(format!(
-                                "New sessions will start with '{}'",
-                                state.default_agent
+                            AgentsModalMessage::info(t_fmt(
+                                "agents.default_set",
+                                &[("name", &state.default_agent)],
                             ))
                         });
                     }
@@ -2245,7 +2314,7 @@ fn handle_personas_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agen
                 let scope_label = persona
                     .scope_label
                     .clone()
-                    .unwrap_or_else(|| "bundled".to_string());
+                    .unwrap_or_else(|| t("agents.scope.bundled_lower").to_string());
                 return AgentsModalOutcome::OpenPersonaDetail {
                     name: persona.name.clone(),
                     source_path,
@@ -2262,8 +2331,9 @@ fn handle_personas_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agen
         KeyCode::Char('d') => {
             if let Some(persona) = state.personas.get(state.persona_selected) {
                 if !persona_is_deletable(persona) {
-                    state.message =
-                        Some(AgentsModalMessage::error("Cannot delete bundled personas"));
+                    state.message = Some(AgentsModalMessage::error(t(
+                        "agents.error.cannot_delete_bundled",
+                    )));
                     return AgentsModalOutcome::Changed;
                 }
                 if let Some(ref path_str) = persona.source_path {
@@ -2272,7 +2342,9 @@ fn handle_personas_tab_key(state: &mut AgentsModalState, key: &KeyEvent) -> Agen
                         path: PathBuf::from(path_str),
                     });
                 } else {
-                    state.message = Some(AgentsModalMessage::error("Persona has no source file"));
+                    state.message = Some(AgentsModalMessage::error(t(
+                        "agents.error.no_source_file",
+                    )));
                 }
             }
             AgentsModalOutcome::Changed
@@ -2363,7 +2435,7 @@ fn handle_persona_create_form_key(
         let instructions = input.instructions().trim().to_string();
         let scope = input.scope;
         if name.is_empty() {
-            state.message = Some(AgentsModalMessage::error("Name is required"));
+            state.message = Some(AgentsModalMessage::error(t("agents.error.name_required")));
             return AgentsModalOutcome::Changed;
         }
         match create_persona_template(&name, &description, &instructions, scope, &cwd) {
@@ -2371,8 +2443,9 @@ fn handle_persona_create_form_key(
                 let label = path.file_stem().and_then(|s| s.to_str()).unwrap_or(&name);
                 state.persona_input = None;
                 state.refresh_personas();
-                state.message = Some(AgentsModalMessage::success(format!(
-                    "Created persona '{label}'"
+                state.message = Some(AgentsModalMessage::success(t_fmt(
+                    "agents.persona_created",
+                    &[("name", label)],
                 )));
             }
             Err(e) => {
@@ -2397,8 +2470,9 @@ fn handle_persona_confirm_key(state: &mut AgentsModalState, key: &KeyEvent) -> A
             match delete_persona_file(&path) {
                 Ok(()) => {
                     state.refresh_personas();
-                    state.message = Some(AgentsModalMessage::success(format!(
-                        "Deleted persona '{name}'"
+                    state.message = Some(AgentsModalMessage::success(t_fmt(
+                        "agents.persona_deleted",
+                        &[("name", &name)],
                     )));
                 }
                 Err(e) => {

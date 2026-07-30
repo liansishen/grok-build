@@ -585,10 +585,14 @@ impl ExecuteToolCallBlock {
                                 .with_joiner(joiner.clone()),
                         );
                     }
-                    let hidden = total - threshold;
+                    let hidden = (total - threshold).to_string();
+                    let hidden_lines = xai_grok_i18n::t_fmt(
+                        "tool.execute.hidden_lines",
+                        &[("hidden", &hidden)],
+                    );
                     lines.push(
                         BlockLine::separator(Line::from(Span::styled(
-                            format!("\u{2026} +{hidden} lines"),
+                            hidden_lines,
                             theme.muted(),
                         )))
                         .with_panel_background(theme.bg_dark),

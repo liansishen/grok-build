@@ -26,10 +26,9 @@ fn title_key(s: &str) -> String {
 /// title miss stays visible even when remote restore produces the final error.
 /// Debug formatting: the arg is arbitrary user text.
 pub(crate) fn title_miss_hint(arg: &str) -> String {
-    format!(
-        "no session id or title matched {arg:?} for this directory; \
-         try `grok sessions search {arg:?}`"
-    )
+    // Debug-escape arbitrary user text so control characters stay visible.
+    let arg = format!("{arg:?}");
+    xai_grok_i18n::t_fmt("session.title_miss_hint", &[("arg", &arg)])
 }
 
 /// Select the local session a resume arg names by title.
@@ -75,10 +74,13 @@ pub(crate) fn select_by_title<'a>(
                 .map(|s| format!("  {}  {:?}", s.info.id, s.display_title()))
                 .collect::<Vec<_>>()
                 .join("\n");
+            let title = format!("{:?}", arg.trim());
             anyhow::bail!(
-                "Multiple sessions match title {:?}:\n{listing}\n\
-                 Resume by session id instead: grok --resume <session-id>",
-                arg.trim()
+                "{}",
+                xai_grok_i18n::t_fmt(
+                    "session.title_ambiguous",
+                    &[("title", &title), ("listing", &listing)],
+                )
             );
         }
     }
@@ -137,7 +139,15 @@ pub(crate) fn presandbox_resume_target(
     }
     let summaries = xai_grok_shell::session::persistence::local_summaries_for_cwd_sync(cwd)
         .map_err(|e| {
-            anyhow::anyhow!("failed to list local sessions while resolving --resume {arg:?}: {e}")
+            let arg = format!("{arg:?}");
+            let error = e.to_string();
+            anyhow::anyhow!(
+                "{}",
+                xai_grok_i18n::t_fmt(
+                    "session.title_list_failed",
+                    &[("arg", &arg), ("error", &error)],
+                )
+            )
         })?;
     Ok(select_by_title(arg, &summaries)?
         .map(|s| PinnedResumeTarget::Title {
@@ -157,10 +167,12 @@ pub(crate) fn worktree_resume_failure_message(
     local_miss_target: Option<&str>,
     detail: &str,
 ) -> String {
-    let msg = format!("couldn't resume worktree session: {detail}");
     match local_miss_target {
-        Some(target) => format!("{msg}; {}", title_miss_hint(target)),
-        None => msg,
+        Some(target) => xai_grok_i18n::t_fmt(
+            "session.worktree_resume_failed_with_hint",
+            &[("detail", detail), ("hint", &title_miss_hint(target))],
+        ),
+        None => xai_grok_i18n::t_fmt("session.worktree_resume_failed", &[("detail", detail)]),
     }
 }
 

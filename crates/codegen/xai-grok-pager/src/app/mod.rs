@@ -636,7 +636,7 @@ pub async fn run(
         warn_leader_disabled_by_sandbox(profile);
     }
     if session_startup::chat_mode_conflicts_with_leader(args.chat(), use_leader) {
-        anyhow::bail!("{}", session_startup::CHAT_MODE_LEADER_CONFLICT);
+        anyhow::bail!("{}", session_startup::chat_mode_leader_conflict());
     }
     if args.trust {
         match std::env::current_dir() {
@@ -669,7 +669,7 @@ pub async fn run(
         if session_startup::chat_mode_refuses_local_build_load(true, false, session_id, &cwd) {
             anyhow::bail!(
                 "{} (session id: {session_id})",
-                session_startup::CHAT_MODE_LOCAL_BUILD_REFUSAL
+                session_startup::chat_mode_local_build_refusal()
             );
         }
     }

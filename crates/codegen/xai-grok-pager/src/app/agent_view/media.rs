@@ -208,7 +208,11 @@ impl AgentView {
             // Register the diagram's source once — moved, not cloned (the
             // placement is owned and used only here) — when at least one button
             // fits; every fitting button below indexes into it for click routing.
-            let source_idx = if row.buttons.iter().any(|b| fits(b.col, b.label)) {
+            let source_idx = if row
+                .buttons
+                .iter()
+                .any(|b| fits(b.col, b.label.as_str()))
+            {
                 let idx = self.inline_media_hits.mermaid_sources.len();
                 self.inline_media_hits.mermaid_sources.push(source);
                 Some(idx)
@@ -216,11 +220,11 @@ impl AgentView {
                 None
             };
             for btn in row.buttons {
-                if !fits(btn.col, btn.label) {
+                if !fits(btn.col, btn.label.as_str()) {
                     continue;
                 }
                 let bx = rect.x.saturating_add(btn.col);
-                let width = UnicodeWidthStr::width(btn.label) as u16;
+                let width = UnicodeWidthStr::width(btn.label.as_str()) as u16;
                 let hit = Rect {
                     x: bx,
                     y: rect.y,
@@ -237,7 +241,7 @@ impl AgentView {
                 } else {
                     Style::default().fg(theme.gray)
                 };
-                buf.set_string_safe(bx, rect.y, btn.label, style);
+                buf.set_string_safe(bx, rect.y, &btn.label, style);
                 if let Some(idx) = source_idx {
                     self.inline_media_hits
                         .mermaid_buttons
@@ -247,12 +251,12 @@ impl AgentView {
 
             // Trailing dim `rendering…` hint after the buttons (not clickable).
             if let Some((col, status)) = row.status
-                && fits(col, status)
+                && fits(col, status.as_str())
             {
                 buf.set_string_safe(
                     rect.x.saturating_add(col),
                     rect.y,
-                    status,
+                    &status,
                     Style::default().fg(theme.gray_dim),
                 );
             }

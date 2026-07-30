@@ -1,8 +1,8 @@
 //! In-app how-to documentation data (embedded markdown).
 //!
-//! Single source of truth: two static arrays (`USER_GUIDE`, `REFERENCE_DOCS`)
-//! hold every doc. All lookups are zero-allocation; `DocEntry` exists only for
-//! backward compatibility with the TUI doc picker.
+//! The canonical English docs live in two static arrays (`USER_GUIDE`,
+//! `REFERENCE_DOCS`). `DocEntry` adds active-locale metadata and selected
+//! translated content for the TUI doc picker.
 
 /// A compile-time document entry. All fields are `&'static str`.
 #[derive(Debug)]
@@ -28,8 +28,26 @@ impl From<&Doc> for DocEntry {
         Self {
             title: title.into(),
             description: description.into(),
-            content: d.content,
+            content: doc_content_for_locale(d, xai_grok_i18n::current_locale()),
         }
+    }
+}
+
+/// Content for the requested UI locale.
+///
+/// Keep `Doc::content` English so model-facing lookups and extracted files
+/// retain their existing behavior; only explicitly translated TUI guides are
+/// switched here.
+fn doc_content_for_locale(d: &Doc, locale: xai_grok_i18n::Locale) -> &'static str {
+    if !matches!(locale, xai_grok_i18n::Locale::ZhCn) {
+        return d.content;
+    }
+    match d.filename {
+        "23-dashboard.md" => include_str!("../docs/user-guide/zh-CN/23-dashboard.md"),
+        "24-monitoring-usage.md" => {
+            include_str!("../docs/user-guide/zh-CN/24-monitoring-usage.md")
+        }
+        _ => d.content,
     }
 }
 
@@ -37,7 +55,9 @@ fn localized_doc_meta(d: &Doc) -> (&'static str, &'static str) {
     let key = match d.filename {
         "hooks-and-plugins.md" => "docs.reference.hooks_plugins",
         "custom-hooks.md" => "docs.reference.custom_hooks",
-        // User-guide files use a stable two-digit numeric prefix.
+        "23-dashboard.md" => "docs.23",
+        "24-monitoring-usage.md" => "docs.24",
+        // Other user-guide files use a stable two-digit numeric prefix.
         filename => {
             let num = filename.get(..2).unwrap_or("");
             xai_grok_i18n::intern_key(&format!("docs.{num}"))
@@ -235,12 +255,31 @@ pub fn list_howto_titles() -> Vec<String> {
 }
 
 /// Returns all docs as owned `DocEntry` values for the TUI doc picker.
+///
+/// Titles and descriptions follow the active UI catalog. Full translated
+/// markdown is currently embedded for guides 23 and 24; other entries retain
+/// their canonical English content.
 pub fn default_howto_entries() -> Vec<DocEntry> {
     USER_GUIDE
         .iter()
         .chain(REFERENCE_DOCS.iter())
         .map(DocEntry::from)
         .collect()
+}
+
+/// Find a doc by its English or localized title and return localized TUI data.
+pub(crate) fn find_localized_doc(title: &str) -> Option<DocEntry> {
+    USER_GUIDE
+        .iter()
+        .chain(REFERENCE_DOCS.iter())
+        .find_map(|doc| {
+            let localized = DocEntry::from(doc);
+            if doc.title.eq_ignore_ascii_case(title) || localized.title.eq_ignore_ascii_case(title) {
+                Some(localized)
+            } else {
+                None
+            }
+        })
 }
 
 /// Extract user-guide docs to `<grok_home>/docs/user-guide/`.
@@ -323,7 +362,83 @@ mod tests {
         let entries = default_howto_entries();
         assert_eq!(entries.len(), USER_GUIDE.len() + REFERENCE_DOCS.len());
         for (i, doc) in USER_GUIDE.iter().enumerate() {
-            assert_eq!(entries[i].title, doc.title, "Entry {} title mismatch", i);
+            let (title, _) = localized_doc_meta(doc);
+            assert_eq!(entries[i].title, title, "Entry {} title mismatch", i);
+            assert_eq!(
+                entries[i].content,
+                doc_content_for_locale(doc, xai_grok_i18n::current_locale()),
+                "Entry {} content mismatch",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn localized_content_only_replaces_translated_guides() {
+        let dashboard = find_doc("Agent Dashboard").expect("dashboard guide");
+        let monitoring = find_doc("Monitoring Usage (External OpenTelemetry)")
+            .expect("monitoring guide");
+        let getting_started = find_doc("Getting Started").expect("getting-started guide");
+
+        assert_eq!(
+            doc_content_for_locale(dashboard, xai_grok_i18n::Locale::En),
+            dashboard.content
+        );
+        assert_eq!(
+            doc_content_for_locale(monitoring, xai_grok_i18n::Locale::En),
+            monitoring.content
+        );
+        assert!(dashboard.content.starts_with("# Agent Dashboard"));
+        assert!(monitoring.content.starts_with("# Monitoring Usage"));
+        assert_eq!(get_howto_doc("Agent Dashboard"), Some(dashboard.content));
+        assert_eq!(
+            get_howto_doc("Monitoring Usage (External OpenTelemetry)"),
+            Some(monitoring.content)
+        );
+
+        assert_eq!(
+            doc_content_for_locale(dashboard, xai_grok_i18n::Locale::ZhCn),
+            include_str!("../docs/user-guide/zh-CN/23-dashboard.md")
+        );
+        assert_eq!(
+            doc_content_for_locale(monitoring, xai_grok_i18n::Locale::ZhCn),
+            include_str!("../docs/user-guide/zh-CN/24-monitoring-usage.md")
+        );
+        assert_eq!(
+            doc_content_for_locale(getting_started, xai_grok_i18n::Locale::ZhCn),
+            getting_started.content
+        );
+    }
+
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn default_howto_entries_localizes_translated_guide_content() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        let entries = default_howto_entries();
+
+        for (english_title, expected_content) in [
+            (
+                "Agent Dashboard",
+                include_str!("../docs/user-guide/zh-CN/23-dashboard.md"),
+            ),
+            (
+                "Monitoring Usage (External OpenTelemetry)",
+                include_str!("../docs/user-guide/zh-CN/24-monitoring-usage.md"),
+            ),
+        ] {
+            let index = USER_GUIDE
+                .iter()
+                .position(|doc| doc.title == english_title)
+                .expect("translated guide");
+            assert_eq!(entries[index].content, expected_content);
         }
     }
 

@@ -108,7 +108,7 @@ pub struct WelcomeRenderResult {
     pub refresh_rect: Option<Rect>,
     /// Hit-test rect for the gate URL link (click to open in browser).
     pub gate_url_rect: Option<Rect>,
-    /// Whether a xai_grok_i18n::t("welcome.changelog") menu action was rendered (above Quit), so the
+    /// Whether a "Changelog" menu action was rendered (above Quit), so the
     /// input handler can map the extra menu row to the release-notes action
     /// once markdown is available.
     pub changelog_action_present: bool,
@@ -455,7 +455,7 @@ pub(super) fn render_version_badge(
                 Style::default().fg(theme.gray),
             ));
             spans.push(Span::styled(
-                " Beta",
+                format!(" {}", xai_grok_i18n::t("welcome.beta")),
                 Style::default()
                     .fg(theme.text_primary)
                     .add_modifier(Modifier::BOLD),
@@ -463,7 +463,7 @@ pub(super) fn render_version_badge(
         }
         VersionBadgeMode::HeroFooter => {
             let channel_display = if channel.is_empty() {
-                "Beta"
+                xai_grok_i18n::t("welcome.beta")
             } else {
                 channel.trim()
             };
@@ -474,7 +474,7 @@ pub(super) fn render_version_badge(
         }
         VersionBadgeMode::HeroInline => {
             spans.push(Span::styled(
-                "Grok Build Beta  ",
+                format!("Grok Build {}  ", xai_grok_i18n::t("welcome.beta")),
                 Style::default()
                     .fg(theme.text_primary)
                     .add_modifier(Modifier::BOLD),
@@ -1823,7 +1823,7 @@ fn render_welcome_done(
         }
         items.push((key_w, xai_grok_i18n::t("welcome.new_worktree")));
         items.push((key_s, xai_grok_i18n::t("welcome.resume_session")));
-        // xai_grok_i18n::t("welcome.changelog") above Quit; no shortcut — opened by click (row or block).
+        // Changelog above Quit; no shortcut — opened by click (row or block).
         if show_changelog_action {
             items.push(("", xai_grok_i18n::t("welcome.changelog")));
         }
@@ -2468,7 +2468,11 @@ pub(crate) fn render_session_picker(
             summary_lines: &[],
             dimmed: false,
             indent: 1,
-            badge: if has_snippet { "match" } else { "" },
+            badge: if has_snippet {
+                xai_grok_i18n::t("session_picker.badge.match")
+            } else {
+                ""
+            },
             badge_color: Some(theme.accent_user),
             collapsible: true,
             underline_last_desc: false,

@@ -2,6 +2,7 @@ use std::io::{IsTerminal as _, Write};
 use std::path::Path;
 
 use anyhow::Result;
+use xai_grok_i18n::{t, t_fmt, t_or};
 
 use crate::diagnostics::{DiagnosticReport, FixActivation, FixPlan, ShellKind};
 
@@ -50,7 +51,7 @@ pub fn run(args: DoctorArgs) -> Result<()> {
 pub fn run_with_writer(args: DoctorArgs, writer: &mut impl Write) -> Result<()> {
     match args.command {
         None => run_report(args.json, writer),
-        Some(_) => anyhow::bail!("Doctor fixes require interactive input and output."),
+        Some(_) => anyhow::bail!("{}", t("interactive_required")),
     }
 }
 
@@ -145,16 +146,14 @@ fn apply_fix_plan(
 
     if !args.yes {
         if !stdin_is_terminal {
-            anyhow::bail!(
-                "Cannot apply this fix without confirmation. Run it in an interactive terminal or add `--yes`."
-            );
+            anyhow::bail!("{}", t("cannot_apply_without_confirmation"));
         }
-        write!(writer, "\nApply this fix? [y/N] ")?;
+        write!(writer, "\n{} ", t("apply_fix_prompt"))?;
         writer.flush()?;
         let mut answer = String::new();
         input.read_line(&mut answer)?;
         if !matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
-            writeln!(writer, "Fix cancelled.")?;
+            writeln!(writer, "{}", t("fix_cancelled"))?;
             return Ok(());
         }
     }
@@ -173,14 +172,21 @@ fn apply_fix_plan(
             .any(|finding| finding.id == outcome.id())
         {
             anyhow::bail!(
-                "The change was applied, but Doctor still reports `{}`.",
-                outcome.id()
+                "{}",
+                t_fmt(
+                    "change_applied_but_still_reports",
+                    &[("id", &outcome.id().to_string())],
+                )
             );
         }
     } else if !crate::diagnostics::verify_persistent_fix(&outcome) {
         anyhow::bail!(
-            "The change was applied, but Doctor could not verify `{}` in persistent configuration.",
-            outcome.id()
+            "{}",
+            t_or(
+                "doctor_cmd.change_applied_but_persistent_unverified",
+                "The change was applied, but Doctor could not verify `{id}` in persistent configuration.",
+            )
+            .replace("{id}", &outcome.id().to_string())
         );
     }
 

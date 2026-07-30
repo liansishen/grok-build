@@ -645,8 +645,14 @@ pub(crate) fn build_session_entry_data(
 
             let mut field_data: Vec<(String, String)> = Vec::new();
             if is_expanded {
-                field_data.push(("ID".into(), entry.id.clone()));
-                field_data.push(("CWD".into(), entry.cwd.clone()));
+                field_data.push((
+                    xai_grok_i18n::t("session_picker.field.id").into(),
+                    entry.id.clone(),
+                ));
+                field_data.push((
+                    xai_grok_i18n::t("session_picker.field.cwd").into(),
+                    entry.cwd.clone(),
+                ));
                 if let Some(ref model) = entry.model_id {
                     field_data.push((
                         xai_grok_i18n::t("session_picker.field.model").into(),
@@ -829,8 +835,14 @@ pub(crate) fn build_content_entry_data(
 
             let mut field_data = Vec::new();
             if is_expanded {
-                field_data.push(("ID".into(), h.session_id.clone()));
-                field_data.push(("CWD".into(), h.cwd.clone()));
+                field_data.push((
+                    xai_grok_i18n::t("session_picker.field.id").into(),
+                    h.session_id.clone(),
+                ));
+                field_data.push((
+                    xai_grok_i18n::t("session_picker.field.cwd").into(),
+                    h.cwd.clone(),
+                ));
             }
 
             let snippet_preview = h.snippet.as_deref().and_then(|s| {
@@ -897,8 +909,13 @@ pub(crate) fn hidden_external_hint(
         .filter(|entry| crate::app::is_foreign_picker_source(&entry.source))
         .count();
     (hidden > 0).then(|| {
-        let plural = if hidden == 1 { "" } else { "s" };
-        format!("{hidden} external session{plural} hidden \u{b7} f to show")
+        let count = hidden.to_string();
+        let key = if hidden == 1 {
+            "session_picker.external_hidden_one"
+        } else {
+            "session_picker.external_hidden_many"
+        };
+        xai_grok_i18n::t_fmt(key, &[("count", &count)])
     })
 }
 

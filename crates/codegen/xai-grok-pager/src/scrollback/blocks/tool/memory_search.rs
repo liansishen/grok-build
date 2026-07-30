@@ -2,6 +2,7 @@
 
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
+use unicode_width::UnicodeWidthStr;
 
 use super::TOOL_HEADER_RANGE;
 use crate::render::line_utils::truncate_str;
@@ -88,19 +89,28 @@ impl MemorySearchToolCallBlock {
         let prefix = xai_grok_i18n::t("tool.prefix.memory_search");
         let count = self.results.len();
         let suffix = if count > 0 {
-            let s = if count == 1 { "" } else { "s" };
-            format!(" ({count} result{s})")
+            let count_text = count.to_string();
+            xai_grok_i18n::t_fmt(
+                if count == 1 {
+                    "tool.search_tool.one_result"
+                } else {
+                    "tool.search_tool.many_results"
+                },
+                &[("count", &count_text)],
+            )
         } else {
             String::new()
         };
 
         match max_width {
             Some(w) => {
-                let suffix_fits = prefix.len() + suffix.len() < w;
-                let effective_suffix = if suffix_fits { &suffix } else { "" };
+                let prefix_width = UnicodeWidthStr::width(prefix);
+                let suffix_width = UnicodeWidthStr::width(suffix.as_str());
+                let suffix_fits = prefix_width + suffix_width < w;
+                let effective_suffix = if suffix_fits { suffix.as_str() } else { "" };
                 let query_budget = w
-                    .saturating_sub(prefix.len())
-                    .saturating_sub(effective_suffix.len());
+                    .saturating_sub(prefix_width)
+                    .saturating_sub(UnicodeWidthStr::width(effective_suffix));
                 let display_query = truncate_str(&self.query, query_budget);
 
                 let mut spans = vec![
@@ -130,6 +140,15 @@ impl MemorySearchToolCallBlock {
             content: line,
             ..Default::default()
         }
+    }
+}
+
+fn memory_source_label(source: &str) -> &str {
+    match source {
+        "global" => xai_grok_i18n::t("memory.section.global"),
+        "workspace" => xai_grok_i18n::t("memory.section.workspace"),
+        "session" | "sessions" => xai_grok_i18n::t("memory.section.sessions"),
+        _ => source,
     }
 }
 
@@ -184,7 +203,7 @@ impl BlockContent for MemorySearchToolCallBlock {
                 if self.results.is_empty() && self.error.is_none() {
                     lines.push(BlockLine::separator(Line::from("")));
                     lines.push(BlockLine::separator(Line::from(Span::styled(
-                        "  (no results)",
+                        xai_grok_i18n::t("tool.search.no_results"),
                         theme.muted(),
                     ))));
                 }
@@ -192,15 +211,20 @@ impl BlockContent for MemorySearchToolCallBlock {
                 for (i, r) in self.results.iter().enumerate() {
                     lines.push(Line::from("").into());
 
-                    // "  1. path/file.md:10-25  (score: 0.72, global)"
+                    // Localized display metadata; parsed protocol values stay canonical.
                     let idx_span = Span::styled(format!("  {}. ", i + 1), theme.muted());
                     let path_display = shorten_path(&r.path);
                     let path_span = Span::styled(
                         format!("{path_display}:{}-{}", r.start_line, r.end_line),
                         theme.primary().add_modifier(Modifier::BOLD),
                     );
+                    let score = format!("{:.2}", r.score);
+                    let source = memory_source_label(&r.source);
                     let meta_span = Span::styled(
-                        format!("  (score: {:.2}, {})", r.score, r.source),
+                        xai_grok_i18n::t_fmt(
+                            "tool.memory_search.score_source",
+                            &[("score", &score), ("source", source)],
+                        ),
                         theme.dim(),
                     );
                     lines.push(BlockLine::styled(Line::from(vec![

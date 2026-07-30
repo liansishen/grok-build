@@ -18,6 +18,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::widgets::StatefulWidget;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::layout::WrapMode;
 use super::state::ListPaneState;
@@ -136,20 +137,25 @@ impl<T: ListItem> StatefulWidget for ListPane<'_, T> {
         // Render corner overlay indicators.
         render_corner_indicators(content_area, buf, state, &self.style);
 
-        // Render "Copied!" toast (bottom-right corner, briefly after y-copy).
+        // Render the copy toast (bottom-right corner, briefly after y-copy).
         // Rendered AFTER indicators so we can skip the bottom-right indicator
         // to avoid overlapping.
-        if state.copy_toast_active() && content_area.height > 0 && content_area.width > 8 {
-            let toast_text = " Copied!";
-            let x = content_area.right().saturating_sub(toast_text.len() as u16);
-            let y = content_area.bottom().saturating_sub(1);
-            // Write each char, keeping bg (selection highlight) but
-            // overriding fg + modifiers so content styles don't leak.
-            for (i, ch) in toast_text.chars().enumerate() {
-                let cell = &mut buf[(x + i as u16, y)];
-                cell.set_char(ch);
-                cell.fg = self.style.toast_fg;
-                cell.modifier = ratatui::style::Modifier::BOLD;
+        if state.copy_toast_active() && content_area.height > 0 {
+            let toast_text = format!(" {}", xai_grok_i18n::t("clipboard.copied"));
+            let toast_width = UnicodeWidthStr::width(toast_text.as_str()) as u16;
+            if toast_width <= content_area.width {
+                let x = content_area.right().saturating_sub(toast_width);
+                let y = content_area.bottom().saturating_sub(1);
+                // Write each char, keeping bg (selection highlight) but
+                // overriding fg + modifiers so content styles don't leak.
+                let mut col = 0u16;
+                for ch in toast_text.chars() {
+                    let cell = &mut buf[(x + col, y)];
+                    cell.set_char(ch);
+                    cell.fg = self.style.toast_fg;
+                    cell.modifier = ratatui::style::Modifier::BOLD;
+                    col = col.saturating_add(UnicodeWidthChar::width(ch).unwrap_or(0) as u16);
+                }
             }
         }
 

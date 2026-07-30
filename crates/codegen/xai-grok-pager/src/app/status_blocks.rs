@@ -8,6 +8,8 @@ use crate::app::agent::BgTaskStatus;
 use crate::app::agent_view::AgentView;
 use crate::app::subagent::format_subagent_label;
 use crate::util::{format_duration, group_thousands};
+use unicode_width::UnicodeWidthStr;
+use xai_grok_i18n::{t, t_fmt};
 
 /// `/queue` body — a read-only list of the queued prompts.
 ///
@@ -32,13 +34,14 @@ pub(crate) fn queue_block_text(agent: &AgentView) -> String {
     }
 
     if rows.is_empty() {
-        xai_grok_i18n::t("status.queue_empty").to_string()
+        t("status.queue_empty").to_string()
     } else {
-        let header = format!(
-            "Queued prompt{} ({}):",
-            if rows.len() == 1 { "" } else { "s" },
-            rows.len()
-        );
+        let count = rows.len().to_string();
+        let header = if rows.len() == 1 {
+            t_fmt("tasks.queued_header_singular", &[("count", &count)])
+        } else {
+            t_fmt("tasks.queued_header_plural", &[("count", &count)])
+        };
         join_header_rows(header, rows)
     }
 }
@@ -59,8 +62,8 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
         let active = run.active_agent_count();
         let agents = match active {
             0 => String::new(),
-            1 => " · 1 agent".to_string(),
-            n => format!(" · {n} agents"),
+            1 => t("tasks.agents_one").to_string(),
+            n => t_fmt("tasks.agents_many", &[("n", &n.to_string())]),
         };
         let phase = run
             .current_phase
@@ -69,14 +72,26 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
             .filter(|phase| !phase.is_empty())
             .map(|phase| format!(" · {phase}"))
             .unwrap_or_default();
+        let workflow_label = t_fmt("tasks.workflow", &[("name", run.name.as_str())]);
+        let status = if run.is_active() {
+            t("tasks.workflow.running").to_string()
+        } else {
+            let status_key = match run.status.as_str() {
+                "budget_limited" => Some("tasks.workflow.status_budget_limited"),
+                "cancelled" | "canceled" => Some("tasks.workflow.status_cancelled"),
+                "complete" | "completed" | "done" => Some("tasks.workflow.status_complete"),
+                "failed" => Some("tasks.workflow.status_failed"),
+                "interrupted" => Some("tasks.workflow.status_interrupted"),
+                _ => None,
+            };
+            status_key
+                .map(t)
+                .map(str::to_string)
+                .unwrap_or_else(|| run.status.replace('_', " "))
+        };
         rows.push(format!(
-            "  {:<9}Workflow · {}{phase}{agents}  ({})",
-            if run.is_active() {
-                "running".to_string()
-            } else {
-                run.status.replace('_', " ")
-            },
-            run.name,
+            "  {}{workflow_label}{phase}{agents}  ({})",
+            pad_right(status.as_str(), 9),
             format_duration(std::time::Duration::from_millis(run.live_elapsed_ms()))
         ));
     }
@@ -96,11 +111,16 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
     for info in subs {
         let (type_label, desc) = format_subagent_label(info);
         let status = if info.pending_kill {
-            "stopping"
+            t("tasks.status_stopping")
         } else if info.is_running() {
-            "running"
+            t("tasks.workflow.running")
         } else {
-            info.status.as_deref().unwrap_or("done")
+            match info.status.as_deref() {
+                Some("done" | "complete" | "completed") | None => t("tasks.status_done"),
+                Some("failed") => t("tasks.status_failed"),
+                Some("stopping") => t("tasks.status_stopping"),
+                Some(status) => status,
+            }
         };
         let label = if desc.is_empty() {
             type_label
@@ -108,7 +128,8 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
             format!("{type_label} · {desc}")
         };
         rows.push(format!(
-            "  {status:<9}{label}  ({})",
+            "  {}{label}  ({})",
+            pad_right(status, 9),
             format_duration(info.display_elapsed())
         ));
     }
@@ -125,7 +146,11 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
             .then(a.task_id.cmp(&b.task_id))
     });
     for task in tasks {
-        let kind = if task.is_monitor { "Monitor" } else { "Task" };
+        let kind = if task.is_monitor {
+            t("tasks.kind_monitor")
+        } else {
+            t("tasks.kind_task")
+        };
         let one_line = task
             .description
             .as_deref()
@@ -133,16 +158,17 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| first_nonempty_line(&task.command));
         let status = if task.pending_kill {
-            "stopping"
+            t("tasks.status_stopping")
         } else {
             match task.status {
-                BgTaskStatus::Running => "running",
-                BgTaskStatus::Done => "done",
-                BgTaskStatus::Failed => "failed",
+                BgTaskStatus::Running => t("tasks.workflow.running"),
+                BgTaskStatus::Done => t("tasks.status_done"),
+                BgTaskStatus::Failed => t("tasks.status_failed"),
             }
         };
         rows.push(format!(
-            "  {status:<9}{kind} · {one_line}  ({})",
+            "  {}{kind} · {one_line}  ({})",
+            pad_right(status, 9),
             format_duration(task.elapsed())
         ));
     }
@@ -157,8 +183,8 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
     });
     for info in sched {
         rows.push(format!(
-            "  {:<9}{} · {} · {}",
-            "scheduled",
+            "  {}{} · {} · {}",
+            pad_right(t("tasks.status_scheduled"), 9),
             info.tag,
             info.human_schedule,
             first_nonempty_line(&info.prompt)
@@ -166,13 +192,14 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
     }
 
     if rows.is_empty() {
-        "No background tasks, workflows, or subagents.".to_string()
+        t("tasks.empty").to_string()
     } else {
-        let header = format!(
-            "Task{} ({}):",
-            if rows.len() == 1 { "" } else { "s" },
-            rows.len()
-        );
+        let count = rows.len().to_string();
+        let header = if rows.len() == 1 {
+            t_fmt("tasks.header_singular", &[("count", &count)])
+        } else {
+            t_fmt("tasks.header_plural", &[("count", &count)])
+        };
         join_header_rows(header, rows)
     }
 }
@@ -274,7 +301,11 @@ pub(crate) fn session_usage_bar_label(
     if t.model_calls == 0 && usage.model_usage.is_empty() && t.total_tokens == 0 {
         return None;
     }
-    let tokens = format_compact_tokens(t.total_tokens);
+    let compact_tokens = format_compact_tokens(t.total_tokens);
+    let tokens = t_fmt(
+        "usage.session.compact_tokens",
+        &[("tokens", compact_tokens.as_str())],
+    );
     let tokens = match cache_hit_rate_percent(t.cached_read_tokens, t.input_tokens) {
         Some(pct) => format!("{tokens}({pct:.1}%)"),
         None => tokens,
@@ -298,14 +329,21 @@ pub(crate) fn cache_hit_rate_percent(cached_read_tokens: u64, input_tokens: u64)
 
 fn format_compact_tokens(n: u64) -> String {
     if n >= 1_000_000 {
-        format!("{:.1}M tok", n as f64 / 1_000_000.0)
+        format!("{:.1}M", n as f64 / 1_000_000.0)
     } else if n >= 10_000 {
-        format!("{:.1}k tok", n as f64 / 1_000.0)
+        format!("{:.1}k", n as f64 / 1_000.0)
     } else if n >= 1_000 {
-        format!("{:.2}k tok", n as f64 / 1_000.0)
+        format!("{:.2}k", n as f64 / 1_000.0)
     } else {
-        format!("{n} tok")
+        n.to_string()
     }
+}
+
+fn pad_right(value: &str, width: usize) -> String {
+    format!(
+        "{value}{}",
+        " ".repeat(width.saturating_sub(UnicodeWidthStr::width(value)))
+    )
 }
 
 /// First non-empty, trimmed line of `text` (empty string if none). Collapses a
@@ -323,10 +361,14 @@ fn format_queue_row(pos: usize, text: &str) -> String {
     let first_line = first_nonempty_line(text);
     let extra = text.lines().count().saturating_sub(1);
     if extra > 0 {
-        format!(
-            "  #{pos}  {first_line}  (+{extra} more line{})",
-            if extra == 1 { "" } else { "s" }
-        )
+        let singular = extra == 1;
+        let extra = extra.to_string();
+        let suffix = if singular {
+            t_fmt("tasks.more_lines_singular", &[("extra", &extra)])
+        } else {
+            t_fmt("tasks.more_lines_plural", &[("extra", &extra)])
+        };
+        format!("  #{pos}  {first_line}  {suffix}")
     } else {
         format!("  #{pos}  {first_line}")
     }

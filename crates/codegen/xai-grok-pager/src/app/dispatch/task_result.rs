@@ -230,6 +230,102 @@ pub(crate) fn current_doctor_target(
         _ => None,
     }
 }
+// `diagnostics::format_fix_success` is outside this task's allowed file set.
+// Parse only its stable, client-authored English wrappers; extracted settings,
+// paths, and commands are passed through as opaque values.
+fn localize_fix_success_line(line: &str) -> String {
+    if let Some(path) = line
+        .strip_prefix("Set up SSH wrapping in ")
+        .and_then(|value| value.strip_suffix('.'))
+    {
+        return xai_grok_i18n::t_fmt("ssh_wrap_setup", &[("path", path)]);
+    }
+    if let Some(path) = line
+        .strip_prefix("SSH wrapping is already set up in ")
+        .and_then(|value| value.strip_suffix('.'))
+    {
+        return xai_grok_i18n::t_fmt("ssh_wrap_already_setup", &[("path", path)]);
+    }
+    if let Some(path) = line.strip_prefix("Backup: ") {
+        return xai_grok_i18n::t_fmt("backup_path", &[("path", path)]);
+    }
+    if line == "Start a new shell to use the alias." {
+        return xai_grok_i18n::t("start_new_shell").to_string();
+    }
+    if line == "Run /doctor again to verify the live setting." {
+        return xai_grok_i18n::t_or(
+            "task_result.run_doctor_again",
+            "Run /doctor again to verify the live setting.",
+        )
+        .to_string();
+    }
+    if line == "Applied the Doctor fix." {
+        return xai_grok_i18n::t_or(
+            "task_result.doctor_fix_applied",
+            "Applied the Doctor fix.",
+        )
+        .to_string();
+    }
+    if line == "Detach and reattach to activate the persistent tmux setting." {
+        return xai_grok_i18n::t_or(
+            "task_result.tmux_detach_reattach",
+            "Detach and reattach to activate the persistent tmux setting.",
+        )
+        .to_string();
+    }
+    if let Some(rest) = line.strip_prefix("Added `")
+        && let Some((setting, path)) = rest.strip_suffix('.').and_then(|value| value.split_once("` to "))
+    {
+        return xai_grok_i18n::t_or(
+            "task_result.tmux_setting_added",
+            "Added `{setting}` to {path}.",
+        )
+        .replace("{setting}", setting)
+        .replace("{path}", path);
+    }
+    if let Some(rest) = line.strip_prefix('`')
+        && let Some((setting, path)) = rest
+            .strip_suffix('.')
+            .and_then(|value| value.split_once("` is already configured in "))
+    {
+        return xai_grok_i18n::t_or(
+            "task_result.tmux_setting_already_configured",
+            "`{setting}` is already configured in {path}.",
+        )
+        .replace("{setting}", setting)
+        .replace("{path}", path);
+    }
+    if line.starts_with("Reload tmux with ") && line.ends_with(", or detach and reattach.") {
+        let command = line
+            .trim_start_matches("Reload tmux with ")
+            .trim_end_matches(", or detach and reattach.");
+        return xai_grok_i18n::t_or(
+            "task_result.tmux_reload_command",
+            "Reload tmux with {command}, or detach and reattach.",
+        )
+        .replace("{command}", command);
+    }
+    if let Some(path) = line
+        .strip_prefix("Detach and reattach to activate the persistent tmux setting in ")
+        .and_then(|value| value.strip_suffix('.'))
+    {
+        return xai_grok_i18n::t_or(
+            "task_result.tmux_detach_reattach_path",
+            "Detach and reattach to activate the persistent tmux setting in {path}.",
+        )
+        .replace("{path}", path);
+    }
+    line.to_string()
+}
+
+fn format_doctor_fix_success(outcome: &crate::diagnostics::FixOutcome) -> String {
+    crate::diagnostics::format_fix_success(outcome)
+        .lines()
+        .map(localize_fix_success_line)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 pub(crate) fn deliver_doctor_message(app: &mut AppView, preferred: AgentId, message: String) {
     let destination = app
         .agents
@@ -680,8 +776,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 deliver_doctor_message(
                     app,
                     target.agent_id,
-                    "This fix was cancelled because the session changed. Run `/doctor fix` again."
-                        .to_owned(),
+                    xai_grok_i18n::t("router.fix_cancelled_session_changed").to_owned(),
                 );
                 return vec![];
             };
@@ -696,28 +791,53 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     deliver_doctor_message(
                         app,
                         target.agent_id,
-                        format!(
-                            "This fix configures your local computer, not this SSH session.\nOn your local computer, run: {command}"
+                        xai_grok_i18n::t_fmt(
+                            "task_result.fix_local_computer",
+                            &[("command", command.as_str())],
                         ),
                     );
                 }
-                Err(error) => deliver_doctor_message(
-                    app,
-                    target.agent_id,
-                    if error.starts_with("Could not prepare the fix:") {
-                        error
-                    } else {
-                        format!("Could not prepare the fix: {error}")
-                    },
-                ),
+                Err(error) => {
+                    let prefix = xai_grok_i18n::t_fmt(
+                        "restore.prepare_fix_failed",
+                        &[("error", "")],
+                    );
+                    let detail = error
+                        .strip_prefix(prefix.trim_end())
+                        .map(str::trim_start)
+                        .unwrap_or(error.as_str());
+                    deliver_doctor_message(
+                        app,
+                        target.agent_id,
+                        xai_grok_i18n::t_fmt(
+                            "task_result.could_not_prepare_fix",
+                            &[("error", detail)],
+                        ),
+                    )
+                }
             }
             vec![]
         }
         TaskResult::DoctorFixApplied { target, result } => {
             let message = match result {
-                Ok(outcome) => crate::diagnostics::format_fix_success(&outcome),
-                Err(error) if error.starts_with("Could not apply the fix:") => error,
-                Err(error) => format!("Could not apply the fix: {error}"),
+                // The diagnostics helper owns fix-specific data (tmux setting lines,
+                // quoted paths). Translate its client-authored wrappers line by line
+                // while keeping those opaque values unchanged.
+                Ok(outcome) => format_doctor_fix_success(&outcome),
+                Err(error) => {
+                    let prefix = xai_grok_i18n::t_fmt(
+                        "restore.apply_fix_failed",
+                        &[("error", "")],
+                    );
+                    let detail = error
+                        .strip_prefix(prefix.trim_end())
+                        .map(str::trim_start)
+                        .unwrap_or(error.as_str());
+                    xai_grok_i18n::t_fmt(
+                        "task_result.could_not_apply_fix",
+                        &[("error", detail)],
+                    )
+                }
             };
             deliver_doctor_message(app, target.agent_id, message);
             vec![]

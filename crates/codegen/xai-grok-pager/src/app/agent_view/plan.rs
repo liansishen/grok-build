@@ -122,7 +122,7 @@ impl AgentView {
         } else if approval_empty {
             LineViewerState::open_markdown_content(
                 "plan.md",
-                crate::views::plan_approval_view::EMPTY_PLAN_PLACEHOLDER.to_owned(),
+                crate::views::plan_approval_view::empty_plan_placeholder(),
                 None,
             )
         } else if let Some(plan_path) = self.plan_file_path() {
@@ -135,7 +135,7 @@ impl AgentView {
         };
         viewer.kind = crate::views::file_search::line_viewer::LineViewerKind::PlanPreview;
         viewer.title_override = Some(if approval_empty {
-            "plan.md (empty)".to_string()
+            xai_grok_i18n::t_fmt("plan.empty_title", &[("file", "plan.md")])
         } else {
             "plan.md".to_string()
         });

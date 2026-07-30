@@ -2340,19 +2340,29 @@ fn sanitize_user_error_collapses_disk_full() {
 #[test]
 fn worktree_resume_failure_sanitizes_detail_before_hint() {
     let raw = "failed to copy index: No space left on device (os error 28)";
-    let msg = worktree_resume_failure_message(
-        Some("typo title"),
-        &sanitize_user_error(raw),
-    );
+    let detail = sanitize_user_error(raw);
+    let msg = worktree_resume_failure_message(Some("typo title"), &detail);
     assert_eq!(
-            msg,
-            format!(
-                "couldn't resume worktree session: No space left on device; {}",
-                crate::app::session_title_resolve::title_miss_hint("typo title")
-            )
-        );
-    let id_msg = worktree_resume_failure_message(None, &sanitize_user_error(raw));
-    assert_eq!(id_msg, "couldn't resume worktree session: No space left on device");
+        msg,
+        xai_grok_i18n::t_fmt(
+            "session.worktree_resume_failed_with_hint",
+            &[
+                ("detail", detail.as_str()),
+                (
+                    "hint",
+                    &crate::app::session_title_resolve::title_miss_hint("typo title"),
+                ),
+            ],
+        )
+    );
+    let id_msg = worktree_resume_failure_message(None, &detail);
+    assert_eq!(
+        id_msg,
+        xai_grok_i18n::t_fmt(
+            "session.worktree_resume_failed",
+            &[("detail", detail.as_str())],
+        )
+    );
 }
 /// A resume-picker entry converts to a **dormant** dashboard roster row
 /// (the non-leader idle source) preserving title, cwd, model, worktree

@@ -75,7 +75,7 @@ pub(super) fn handle_permission_request(
         app.notification_service.notify(NotificationEvent {
             kind: NotificationEventKind::ApprovalRequired,
             title: "Grok".into(),
-            body: NotificationEventKind::ApprovalRequired.as_str().into(),
+            body: NotificationEventKind::ApprovalRequired.display_t().into(),
             session_id: Some(perm.request.session_id.0.to_string()),
         });
         app.notification_service.mark_permission_notified();
@@ -218,12 +218,14 @@ fn resolve_subagent_label(agent: &AgentView, session_id: &acp::SessionId) -> Opt
     // Tier 1: tracked subagent with full metadata.
     if let Some(info) = agent.subagent_sessions.get(sid) {
         return Some(format!(
-            "Subagent \"{}\" ({}):",
-            info.description, info.subagent_type
+            "{} \"{}\" ({}):",
+            xai_grok_i18n::t("dashboard.response.subagent"),
+            info.description,
+            info.subagent_type
         ));
     }
     // Tier 2: non-root session with no tracked info.
-    Some("Child session (untracked):".to_string())
+    Some(xai_grok_i18n::t("perm.child_session_untracked").to_string())
 }
 
 /// Build title, description lines, and optional raw command for a permission request.
@@ -381,19 +383,32 @@ pub(super) fn mcp_args_lines(req: &acp::RequestPermissionRequest) -> Vec<String>
     if lines.len() > MCP_ARGS_MAX_LINES {
         let hidden = lines.len() - MCP_ARGS_MAX_LINES;
         lines.truncate(MCP_ARGS_MAX_LINES);
-        lines.push(format!("… (+{hidden} more lines)"));
+        let key = if hidden == 1 {
+            "tasks.more_lines_singular"
+        } else {
+            "tasks.more_lines_plural"
+        };
+        lines.push(format!(
+            "… {}",
+            xai_grok_i18n::t_fmt(key, &[("extra", &hidden.to_string())])
+        ));
     }
     lines
 }
 
-/// Check if this is an edit permission by looking at option names.
+/// Check if this is an edit permission using stable protocol identifiers.
 ///
-/// The shell's edit options include "allow all edits" in the AllowAlways
-/// option name. This is reliable even when tool_call.fields.kind is None.
+/// The option display name is localized, so it must never be the primary
+/// discriminator. Keep the legacy English-name check only for older peers that
+/// do not send the stable option id or tool kind.
 fn is_edit_permission(req: &acp::RequestPermissionRequest) -> bool {
-    req.options.iter().any(|o| {
-        o.kind == acp::PermissionOptionKind::AllowAlways && o.name.to_lowercase().contains("edit")
-    })
+    req.tool_call.fields.kind == Some(acp::ToolKind::Edit)
+        || req.options.iter().any(|o| {
+            o.option_id.0.as_ref()
+                == xai_grok_workspace::permission::ALLOW_EDITS_SESSION_OPTION_ID
+                || (o.kind == acp::PermissionOptionKind::AllowAlways
+                    && o.name.to_lowercase().contains("edit"))
+        })
 }
 
 /// Cancel a permission request by sending `Cancelled` on the response channel.

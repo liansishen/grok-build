@@ -46,10 +46,18 @@ pub fn section_key(section: &McpSectionId) -> String {
 
 /// Display label for a section header, e.g. `"Managed by grok.com (3)"`.
 pub fn section_label(section: &McpSectionId, count: usize) -> String {
+    let count = count.to_string();
     match section {
-        McpSectionId::Managed => format!("Managed by grok.com ({count})"),
-        McpSectionId::Plugin(name) => format!("Plugin: {name} ({count})"),
-        McpSectionId::Local => format!("Local ({count})"),
+        McpSectionId::Managed => {
+            xai_grok_i18n::t_fmt("extensions.mcp.section.managed", &[("count", &count)])
+        }
+        McpSectionId::Plugin(name) => xai_grok_i18n::t_fmt(
+            "extensions.mcp.section.plugin",
+            &[("name", name), ("count", &count)],
+        ),
+        McpSectionId::Local => {
+            xai_grok_i18n::t_fmt("extensions.mcp.section.local", &[("count", &count)])
+        }
     }
 }
 
@@ -83,7 +91,7 @@ pub fn section_description_lines(section: &McpSectionId, team_id: Option<&str>) 
         McpSectionId::Managed => {
             let url = managed_connectors_url_display(team_id);
             vec![
-                "Add, remove, or manage connectors. Ctrl+O to open or go to:".into(),
+                xai_grok_i18n::t("extensions.mcp.manage_connectors").into(),
                 format!("[{url}]"),
             ]
         }

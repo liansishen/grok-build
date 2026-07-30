@@ -567,7 +567,7 @@ pub(crate) fn default_palette_entries(
             command: PaletteCommand::HowTo,
         },
         PaletteEntry {
-            label: "Tutorial".into(),
+            label: xai_grok_i18n::t_or("modal.tutorial", "Tutorial").into(),
             shortcut: "/tutorial".into(),
             command: PaletteCommand::SlashCommand("/tutorial".into()),
         },

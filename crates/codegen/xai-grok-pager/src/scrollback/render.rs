@@ -5,6 +5,7 @@ use std::sync::Arc;
 use derive_more::{Deref, DerefMut};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use unicode_width::UnicodeWidthStr;
 
 use super::block::{BlockContent, RenderBlock};
 use super::entry::ScrollbackEntry;
@@ -40,16 +41,16 @@ pub(crate) const GROUP_HEADER_RANGE_ID: u16 = u16::MAX;
 /// inline graphics). Graphics terminals use a shorter overlay `[Open]` instead.
 pub fn media_open_button_label(is_video: bool) -> &'static str {
     if is_video {
-        "[Open Video]"
+        xai_grok_i18n::t("media.open_video")
     } else {
-        "[Open Image]"
+        xai_grok_i18n::t("media.open_image")
     }
 }
 
-/// Centered left column for the `[Open]` text button. Shared by the renderer
-/// and the hit-area computation so the label and click target stay aligned.
-pub fn media_open_button_col(content_width: u16, is_video: bool) -> u16 {
-    let label_w = media_open_button_label(is_video).len() as u16;
+/// Centered left column for the localized open-media text button. Shared by
+/// the renderer and hit-area computation so label and click target stay aligned.
+pub fn media_open_button_col(content_width: u16, label: &str) -> u16 {
+    let label_w = UnicodeWidthStr::width(label) as u16;
     content_width.saturating_sub(label_w) / 2
 }
 
@@ -838,8 +839,9 @@ pub(crate) fn render_scrolled_entries_with_selection_boundaries(
             // Centered `[Open]` button → click-to-open. It is the second-to-last
             // content line (the last line is a blank spacer).
             let open_button_screen_rect = if content_lines >= 2 {
-                let label_w = media_open_button_label(is_video).len() as u16;
-                let col = media_open_button_col(content_width, is_video);
+                let label = media_open_button_label(is_video);
+                let label_w = UnicodeWidthStr::width(label) as u16;
+                let col = media_open_button_col(content_width, label);
                 let button_virtual_y = content_y_start + (content_lines - 2);
                 line_screen_rect(button_virtual_y, label_w).map(|mut rect| {
                     rect.x = rect.x.saturating_add(col);

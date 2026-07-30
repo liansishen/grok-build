@@ -27,6 +27,11 @@ const SPINNER_DIVISOR: u64 = 4;
 /// ~30 Hz dashboard tick this toggles roughly every 0.33 s (≈1.5 Hz blink).
 const NEEDS_INPUT_BLINK_DIVISOR: u64 = 10;
 
+fn age_column_text(age: &str) -> String {
+    let padding = 6usize.saturating_sub(UnicodeWidthStr::width(age));
+    format!("{}{}", " ".repeat(padding), age)
+}
+
 // Row markers use the filled (◆) / hollow (◇) diamonds from `crate::glyphs`
 // (with CP437 fallbacks on legacy consoles). The dashboard uses
 // diamonds instead of circles to differentiate this view's vocabulary from
@@ -2326,10 +2331,11 @@ fn render_row(
         Style::default().bg(bg).fg(icon_color),
     );
 
-    // Age column — reserve up to 8 cells on the right edge (to fit
-    // "just now"). Uses coarse buckets: just now / m / h / d / mo / y.
+    // Age column — reserve a six-cell minimum field on the right edge. The
+    // localized coarse buckets may be wider, so pad from terminal display
+    // width rather than Rust's scalar-counting format width.
     let age = format_time_ago(row.last_change_at.elapsed().unwrap_or_default());
-    let age_str = format!("{age:>6}");
+    let age_str = age_column_text(&age);
     let age_w = UnicodeWidthStr::width(age_str.as_str()) as u16;
     let age_x = rect.x + rect.width.saturating_sub(age_w + 1);
     if age_x > content_start_x {
@@ -4470,6 +4476,17 @@ mod tests {
         assert!(!state_icon(RowState::Completed, 0).is_empty());
         assert!(!state_icon(RowState::Failed, 0).is_empty());
         assert!(!state_icon(RowState::Blocked, 0).is_empty());
+    }
+
+    #[test]
+    fn age_column_padding_uses_unicode_display_width() {
+        let padded = age_column_text("刚刚");
+        assert_eq!(UnicodeWidthStr::width(padded.as_str()), 6);
+        assert_eq!(padded, "  刚刚");
+
+        let wider = age_column_text("十二个月前");
+        assert_eq!(wider, "十二个月前");
+        assert_eq!(UnicodeWidthStr::width(wider.as_str()), 10);
     }
 
     /// Helper: read buffer row-by-row so multi-cell substring checks

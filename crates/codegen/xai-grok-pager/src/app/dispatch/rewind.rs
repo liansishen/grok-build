@@ -614,9 +614,9 @@ pub(super) fn dispatch_rewind_success(
     // it: nothing is resubmitted there, so the revert needs its signal.)
     if inline_resubmit.is_none() || is_files_only {
         let msg = match mode_str {
-            "conversation_only" => "Reverted conversation",
-            "files_only" => "Reverted file changes",
-            _ => "Reverted conversation and file changes",
+            "conversation_only" => xai_grok_i18n::t("rewind.reverted_conversation"),
+            "files_only" => xai_grok_i18n::t("rewind.reverted_files"),
+            _ => xai_grok_i18n::t("rewind.reverted_both"),
         };
         if app.screen_mode.is_minimal() {
             // Minimal has no toast surface and can't erase committed lines, so the confirmation stays in scrollback there.

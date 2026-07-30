@@ -98,12 +98,13 @@
             crate::views::plan_approval_view::PlanApprovalFocus::Preview,
             "empty approval must keep Preview focus once the placeholder opens"
         );
-        assert_eq!(
+        assert!(
             agent
                 .line_viewer
                 .as_ref()
-                .and_then(|v| v.markdown_content_for_test()),
-            Some(crate::views::plan_approval_view::EMPTY_PLAN_PLACEHOLDER)
+                .and_then(|v| v.markdown_content_for_test())
+                .is_some_and(|content| !content.trim().is_empty()),
+            "empty approval placeholder must be non-empty"
         );
     }
 
@@ -194,12 +195,13 @@
         assert!(agent.latest_inline_plan_content.is_none());
         // Empty approval still opens the placeholder decision surface (not a
         // silent "no plan" toast) so the user always sees a way to proceed.
-        assert_eq!(
+        assert!(
             agent
                 .line_viewer
                 .as_ref()
-                .and_then(|v| v.markdown_content_for_test()),
-            Some(crate::views::plan_approval_view::EMPTY_PLAN_PLACEHOLDER)
+                .and_then(|v| v.markdown_content_for_test())
+                .is_some_and(|content| !content.trim().is_empty()),
+            "empty approval placeholder must be non-empty"
         );
     }
 

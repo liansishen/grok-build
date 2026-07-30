@@ -31,9 +31,9 @@ impl SlashCommand for VoiceCommand {
         // configurable (toggle or hold via `voice_capture_mode`), so leave the
         // behavior unspecified.
         if crate::app::kitty_releases_reported() {
-            "Dictation (Ctrl+Space/F8; Esc/Enter to stop)"
+            xai_grok_i18n::t("slash.voice.description_kitty")
         } else {
-            "Toggle dictation (Ctrl+Space/F8; Esc/Enter to stop)"
+            xai_grok_i18n::t("slash.voice.description_toggle")
         }
     }
 

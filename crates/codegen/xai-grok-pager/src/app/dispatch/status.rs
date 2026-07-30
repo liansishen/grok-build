@@ -187,7 +187,11 @@ pub(super) fn scrub_error_for_toast(error: &str) -> String {
             .chars()
             .any(crate::render::line_utils::is_unsafe_display_char)
     {
-        "server error (see logs for details)".to_string()
+        xai_grok_i18n::t_or(
+            "status.server_error_see_logs",
+            "server error (see logs for details)",
+        )
+        .to_string()
     } else {
         error.to_string()
     }
@@ -342,9 +346,12 @@ pub(crate) fn commit_minimal_update_notice(app: &mut AppView, latest_version: &s
     if let ActiveView::Agent(id) = app.active_view
         && let Some(agent) = app.agents.get_mut(&id)
     {
-        agent.scrollback.push_block(RenderBlock::system(format!(
-            "Update available: v{latest_version} — restart to apply."
-        )));
+        agent
+            .scrollback
+            .push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
+                "status.update_available",
+                &[("latest_version", latest_version)],
+            )));
     }
 }
 
@@ -394,10 +401,7 @@ pub(super) fn dispatch_open_gboom(app: &mut AppView) -> Vec<Effect> {
         return vec![];
     };
     if detect_graphics_protocol() == GraphicsProtocol::None {
-        agent.show_toast(
-            "No demons here \u{2014} GBOOM needs a graphics-capable terminal \
-             (kitty, Ghostty, WezTerm, iTerm2)",
-        );
+        agent.show_toast(xai_grok_i18n::t("status.gboom_no_graphics"));
         return vec![];
     }
     // Close other media modals: they share the kitty placement id. Drop the
@@ -420,8 +424,8 @@ pub(super) fn notify_session_ready(
 ) {
     notification_service.notify(NotificationEvent {
         kind: NotificationEventKind::SessionReady,
-        title: "Grok".into(),
-        body: NotificationEventKind::SessionReady.as_str().into(),
+        title: xai_grok_i18n::t("status.notification_title").into(),
+        body: NotificationEventKind::SessionReady.display_t().into(),
         session_id: agent.session.session_id.as_ref().map(|s| s.0.to_string()),
     });
 }
@@ -480,9 +484,11 @@ pub(super) fn handle_coding_data_sharing_failed(
     refresh_open_settings_modals(app);
     // Scrub long/unsafe error strings before toasting.
     let scrubbed = scrub_error_for_toast(&error);
-    app.show_toast(&format!(
-        "\u{2717} Couldn't update coding data sharing: {scrubbed}"
-    ));
+    app.show_toast(&xai_grok_i18n::t_or(
+        "status.coding_data_sharing_update_failed",
+        "\u{2717} Couldn't update coding data sharing: {error}",
+    )
+    .replace("{error}", &scrubbed));
     tracing::warn!(
         target: "settings",
         key = "coding_data_sharing",
@@ -559,7 +565,12 @@ pub(super) fn handle_context_info_complete(
     info: Box<xai_grok_shell::session::SessionInfoResponse>,
 ) -> Vec<Effect> {
     if let Some(agent) = app.agents.get_mut(&agent_id) {
-        let model = info.data.model.as_deref().unwrap_or("unknown").to_string();
+        let model = info
+            .data
+            .model
+            .as_deref()
+            .unwrap_or_else(|| xai_grok_i18n::t_or("status.unknown", "unknown"))
+            .to_string();
         // Take ownership of the snapshot once, hand a clone to the
         // agent's running counters, then move the original into the
         // scrollback block (which keeps it for theme-reactive

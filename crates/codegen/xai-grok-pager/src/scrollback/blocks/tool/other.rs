@@ -224,7 +224,7 @@ impl BlockContent for OtherToolCallBlock {
                 let label = crate::scrollback::render::media_open_button_label(is_video);
                 let col = crate::scrollback::render::media_open_button_col(
                     ctx.content_width() as u16,
-                    is_video,
+                    label,
                 );
                 let open_line = Line::from(vec![
                     Span::raw(" ".repeat(col as usize)),

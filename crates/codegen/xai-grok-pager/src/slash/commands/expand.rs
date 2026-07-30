@@ -36,9 +36,10 @@ impl SlashCommand for ExpandCommand {
         // pane folds/unfolds blocks in place (the `e` / `Ctrl+E` chords) and has
         // no print-once committed history to re-print.
         if !ctx.screen_mode.is_minimal() {
-            return CommandResult::Message(
-                "/expand is only available in minimal mode (--minimal)".to_string(),
-            );
+            return CommandResult::Message(xai_grok_i18n::t_fmt(
+                "slash.screen_mode.only_available",
+                &[("command", "expand"), ("mode", "minimal")],
+            ));
         }
         if ctx.session_id.is_none() {
             return CommandResult::Error(

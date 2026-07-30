@@ -1574,7 +1574,9 @@ mod tests {
             elapsed.as_secs() >= 3600,
             "roster row age should reflect the real timestamp, got {elapsed:?}"
         );
-        assert_eq!(crate::util::format_time_ago(elapsed), "2h");
+        let count = "2";
+        let expected = xai_grok_i18n::t_or("time_ago.hours", "{count}h").replace("{count}", count);
+        assert_eq!(crate::util::format_time_ago(elapsed), expected);
     }
     /// Roster rows sort by their real `last_change_unix_ms`: a session
     /// touched long ago floats below a recently-touched one.

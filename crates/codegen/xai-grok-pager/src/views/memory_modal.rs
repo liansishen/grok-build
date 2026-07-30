@@ -34,6 +34,14 @@ use crate::views::modal_window::{
     self, ModalContentArea, ModalSizing, ModalWindowConfig, ModalWindowState, Shortcut,
 };
 
+fn tr_fmt(key: &str, fallback: &'static str, args: &[(&str, &str)]) -> String {
+    let mut text = xai_grok_i18n::t_or(key, fallback).to_string();
+    for (name, value) in args {
+        text = text.replace(&format!("{{{name}}}"), value);
+    }
+    text
+}
+
 const SPLIT_MIN_WIDTH: u16 = 80;
 const LIST_WIDTH_RATIO: f64 = 0.40;
 const MAX_PREVIEW_BYTES: u64 = 1_048_576;
@@ -266,7 +274,10 @@ impl MemoryModalState {
                 let path = std::path::Path::new(&e.path);
                 match std::fs::metadata(path) {
                     Ok(meta) if meta.len() > MAX_PREVIEW_BYTES => {
-                        Some(MarkdownContent::new("*(File too large to preview)*"))
+                        Some(MarkdownContent::new(xai_grok_i18n::t_or(
+                            "memory.file_too_large",
+                            "*(File too large to preview)*",
+                        )))
                     }
                     Err(_) => None,
                     _ => std::fs::read_to_string(path).ok().map(MarkdownContent::new),
@@ -364,9 +375,15 @@ pub fn build_entries(
             entries.extend(items);
         }
     };
-    push_section("Global", global);
-    push_section("Workspace", workspace);
-    push_section("Sessions", session);
+    push_section(xai_grok_i18n::t_or("memory.section.global", "Global"), global);
+    push_section(
+        xai_grok_i18n::t_or("memory.section.workspace", "Workspace"),
+        workspace,
+    );
+    push_section(
+        xai_grok_i18n::t_or("memory.section.sessions", "Sessions"),
+        session,
+    );
     entries
 }
 
@@ -380,7 +397,7 @@ pub fn render_memory_modal(
     let shortcuts = build_shortcuts(&state.mode, state.memory_enabled, state.fullscreen);
 
     let modal_config = ModalWindowConfig {
-        title: "Memory",
+        title: xai_grok_i18n::t("modal.memory"),
         tabs: None,
         shortcuts: &shortcuts,
         sizing: if state.fullscreen {
@@ -475,9 +492,9 @@ fn render_file_list(buf: &mut Buffer, area: Rect, state: &mut MemoryModalState, 
     let viewport = state.query.viewport(area.width as usize);
     if state.query().is_empty() {
         let placeholder = if filter_focused {
-            "type to filter..."
+            xai_grok_i18n::t_or("memory.filter_active", "type to filter...")
         } else {
-            "/ to filter..."
+            xai_grok_i18n::t_or("memory.filter_idle", "/ to filter...")
         };
         buf.set_span(
             area.x,
@@ -597,7 +614,7 @@ fn render_file_list(buf: &mut Buffer, area: Rect, state: &mut MemoryModalState, 
             if is_selected
                 && matches!(state.mode, MemoryModalMode::ConfirmingDelete { idx } if idx == filt_idx)
             {
-                let hint = " [x to confirm]";
+                let hint = xai_grok_i18n::t_or("memory.confirm_delete_inline", " [x to confirm]");
                 let hint_w = hint.len() as u16;
                 let hint_x = (area.x + content_width).saturating_sub(hint_w + 1);
                 buf.set_span(
@@ -636,7 +653,7 @@ fn render_preview(buf: &mut Buffer, area: Rect, state: &mut MemoryModalState, th
     if state.preview_markdown.is_none() {
         state.preview_total_lines = 0;
         state.preview_scrollbar_area = None;
-        let msg = "No file selected";
+        let msg = xai_grok_i18n::t("memory.no_file");
         let style = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
         let cy = area.y + area.height / 2;
         let cx = area.x + area.width.saturating_sub(msg.width() as u16) / 2;
@@ -1033,28 +1050,28 @@ fn build_shortcuts(
     match mode {
         MemoryModalMode::Browse => {
             let toggle_label = if memory_enabled {
-                "t toggle (on)"
+                xai_grok_i18n::t_or("memory.footer.toggle_on", "t toggle (on)")
             } else {
-                "t toggle (off)"
+                xai_grok_i18n::t_or("memory.footer.toggle_off", "t toggle (off)")
             };
             let mut shortcuts = vec![
                 Shortcut {
-                    label: "\u{2191}/\u{2193} nav",
+                    label: xai_grok_i18n::t_or("memory.footer.nav", "\u{2191}/\u{2193} nav"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "/ search",
+                    label: xai_grok_i18n::t("settings.modal.footer.slash_search"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "y copy path",
+                    label: xai_grok_i18n::t_or("memory.footer.copy_path", "y copy path"),
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "x delete",
+                    label: xai_grok_i18n::t_or("memory.footer.delete", "x delete"),
                     clickable: false,
                     id: 0,
                 },
@@ -1065,15 +1082,15 @@ fn build_shortcuts(
                 },
                 Shortcut {
                     label: if fullscreen {
-                        "^F normal"
+                        xai_grok_i18n::t_or("memory.footer.normal", "^F normal")
                     } else {
-                        "^F fullscreen"
+                        xai_grok_i18n::t_or("memory.footer.fullscreen", "^F fullscreen")
                     },
                     clickable: false,
                     id: 0,
                 },
                 Shortcut {
-                    label: "Esc close",
+                    label: xai_grok_i18n::t("extensions.footer.esc_close"),
                     clickable: false,
                     id: 0,
                 },
@@ -1085,24 +1102,24 @@ fn build_shortcuts(
         }
         MemoryModalMode::FilterFocused => vec![
             Shortcut {
-                label: "type to filter",
+                label: xai_grok_i18n::t("settings.modal.footer.type_to_filter"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "Esc exit filter",
+                label: xai_grok_i18n::t_or("memory.footer.exit_filter", "Esc exit filter"),
                 clickable: false,
                 id: 0,
             },
         ],
         MemoryModalMode::ConfirmingDelete { .. } => vec![
             Shortcut {
-                label: "x confirm delete",
+                label: xai_grok_i18n::t_or("memory.footer.confirm_delete", "x confirm delete"),
                 clickable: false,
                 id: 0,
             },
             Shortcut {
-                label: "any key cancel",
+                label: xai_grok_i18n::t_or("memory.footer.any_key_cancel", "any key cancel"),
                 clickable: false,
                 id: 0,
             },
@@ -1139,25 +1156,37 @@ fn format_size(bytes: u64) -> String {
 
 fn format_modified(epoch_secs: Option<u64>, now_secs: u64) -> String {
     let Some(modified) = epoch_secs else {
-        return "unknown".to_string();
+        return xai_grok_i18n::t_or("memory.time.unknown", "unknown").to_string();
     };
     if now_secs <= modified {
-        return "just now".to_string();
+        return xai_grok_i18n::t("session_picker.time.just_now").to_string();
     }
     let delta = now_secs - modified;
     if delta < 60 {
-        return "just now".to_string();
+        return xai_grok_i18n::t("session_picker.time.just_now").to_string();
     }
     if delta < 3600 {
         let mins = delta / 60;
-        return format!("{mins}m ago");
+        return tr_fmt(
+            "session_picker.time.minutes_ago",
+            "{count}m ago",
+            &[("count", &mins.to_string())],
+        );
     }
     if delta < 86400 {
         let hours = delta / 3600;
-        return format!("{hours}h ago");
+        return tr_fmt(
+            "session_picker.time.hours_ago",
+            "{count}h ago",
+            &[("count", &hours.to_string())],
+        );
     }
     let days = delta / 86400;
-    format!("{days}d ago")
+    tr_fmt(
+        "session_picker.time.days_ago",
+        "{count}d ago",
+        &[("count", &days.to_string())],
+    )
 }
 
 fn load_fullscreen_pref() -> bool {

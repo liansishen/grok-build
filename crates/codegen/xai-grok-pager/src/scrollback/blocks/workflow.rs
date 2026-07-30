@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span, Text};
+use xai_grok_i18n::t_or;
 
 use crate::render::color::blend_color;
 use crate::scrollback::block::BlockContent;
@@ -85,25 +86,37 @@ impl BlockContent for WorkflowBlock {
         };
         let muted = theme.muted();
 
-        let mut spans = vec![Span::styled("Workflow ", bold)];
+        let mut spans = vec![Span::styled(
+            t_or("workflow.block.prefix", "Workflow "),
+            bold,
+        )];
         let verb = match &self.status {
-            WorkflowBlockStatus::Running => format!("{}: ", self.name),
-            WorkflowBlockStatus::Done { elapsed } => {
-                format!("{} done in {}: ", self.name, format_duration(*elapsed))
-            }
-            WorkflowBlockStatus::Failed { elapsed } => {
-                format!("{} failed in {}: ", self.name, format_duration(*elapsed))
-            }
-            WorkflowBlockStatus::Cancelled { elapsed } => {
-                format!(
-                    "{} ◌ cancelled after {}: ",
-                    self.name,
-                    format_duration(*elapsed)
-                )
-            }
-            WorkflowBlockStatus::Paused { elapsed } => {
-                format!("{} paused at {}: ", self.name, format_duration(*elapsed))
-            }
+            WorkflowBlockStatus::Running => t_or("workflow.block.running", "{name}: ")
+                .replace("{name}", &self.name),
+            WorkflowBlockStatus::Done { elapsed } => t_or(
+                "workflow.block.done",
+                "{name} done in {duration}: ",
+            )
+            .replace("{name}", &self.name)
+            .replace("{duration}", &format_duration(*elapsed)),
+            WorkflowBlockStatus::Failed { elapsed } => t_or(
+                "workflow.block.failed",
+                "{name} failed in {duration}: ",
+            )
+            .replace("{name}", &self.name)
+            .replace("{duration}", &format_duration(*elapsed)),
+            WorkflowBlockStatus::Cancelled { elapsed } => t_or(
+                "workflow.block.cancelled",
+                "{name} ◌ cancelled after {duration}: ",
+            )
+            .replace("{name}", &self.name)
+            .replace("{duration}", &format_duration(*elapsed)),
+            WorkflowBlockStatus::Paused { elapsed } => t_or(
+                "workflow.block.paused",
+                "{name} paused at {duration}: ",
+            )
+            .replace("{name}", &self.name)
+            .replace("{duration}", &format_duration(*elapsed)),
         };
         let text_style = if matches!(self.status, WorkflowBlockStatus::Cancelled { .. }) {
             theme.dim()
@@ -119,7 +132,8 @@ impl BlockContent for WorkflowBlock {
         }
         if matches!(self.status, WorkflowBlockStatus::Running) && self.active_agents > 0 {
             spans.push(Span::styled(
-                format!("  ({} agents)", self.active_agents),
+                t_or("workflow.block.agents", "  ({count} agents)")
+                    .replace("{count}", &self.active_agents.to_string()),
                 muted,
             ));
         }

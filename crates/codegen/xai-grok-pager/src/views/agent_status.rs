@@ -20,6 +20,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
+use xai_grok_i18n::{t, t_fmt};
 
 use super::context_bar::SEPARATOR;
 use super::turn_status::SPINNER_DIVISOR;
@@ -175,10 +176,10 @@ fn goal_phase_label(goal: &GoalDisplayState) -> String {
         | GoalDisplayStatus::NoProgressPaused
         | GoalDisplayStatus::InfraPaused
         | GoalDisplayStatus::Blocked => goal.status.pause_label().into(),
-        GoalDisplayStatus::Failed => "Failed".into(),
-        GoalDisplayStatus::Interrupted => "Interrupted".into(),
-        GoalDisplayStatus::BudgetLimited => "Budget".into(),
-        GoalDisplayStatus::Complete => "Done".into(),
+        GoalDisplayStatus::Failed => t("agent_status.failed").into(),
+        GoalDisplayStatus::Interrupted => t("agent_status.interrupted").into(),
+        GoalDisplayStatus::BudgetLimited => t("agent_status.budget").into(),
+        GoalDisplayStatus::Complete => t("agent_status.done").into(),
         GoalDisplayStatus::Active => active_phase_label(goal),
     }
 }
@@ -193,18 +194,18 @@ pub fn active_phase_label(goal: &GoalDisplayState) -> String {
         // Omit the "(n/m)" suffix until the first counter arrives so the
         // chip reads "Verifying" instead of a confusing "Verifying (0/0)".
         return if attempts.is_empty() {
-            "Verifying".into()
+            t("agent_status.verifying").into()
         } else {
-            format!("Verifying ({attempts})")
+            t_fmt("agent_status.verifying_attempts", &[("attempts", &attempts)])
         };
     }
     if goal.planning {
-        return "Planning".into();
+        return t("agent_status.planning").into();
     }
     match goal.phase {
-        GoalDisplayPhase::Idle => "Idle".into(),
-        GoalDisplayPhase::Planning => "Planning".into(),
-        GoalDisplayPhase::Executing => "Executing".into(),
+        GoalDisplayPhase::Idle => t("agent_status.idle").into(),
+        GoalDisplayPhase::Planning => t("agent_status.planning").into(),
+        GoalDisplayPhase::Executing => t("agent_status.executing").into(),
     }
 }
 
@@ -244,9 +245,13 @@ pub fn goal_status_line(
         format_tokens_compact(goal.live_tokens_used(context_used, active_subagent_tokens));
     let tokens_display = match goal.token_budget {
         Some(budget) if budget > 0 => {
-            format!("{}/{} tokens", tokens_str, format_tokens_compact(budget))
+            let budget_str = format_tokens_compact(budget);
+            t_fmt(
+                "agent_status.tokens_of_budget",
+                &[("used", &tokens_str), ("budget", &budget_str)],
+            )
         }
-        _ => format!("{} tokens", tokens_str),
+        _ => t_fmt("agent_status.tokens", &[("count", &tokens_str)]),
     };
 
     let elapsed_str = format_elapsed_compact(goal.live_elapsed_ms());
@@ -273,7 +278,7 @@ pub fn goal_status_line(
 
     let is_active = matches!(goal.status, GoalDisplayStatus::Active);
 
-    let chip_name = "Goal";
+    let chip_name = t("agent_status.goal");
     let goal_text = if is_active {
         let frames = crate::glyphs::dot_spinner_frames();
         let frame = frames[(tick / 4) % frames.len()];
@@ -316,10 +321,15 @@ pub fn mcp_status_line(
     let frames = crate::glyphs::braille_spinner_frames();
     let frame_idx = (tick / SPINNER_DIVISOR) as usize % frames.len();
     let style = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
+    let connected = progress.connected.to_string();
+    let total = progress.total.to_string();
     Some(Line::from(vec![
         Span::styled(format!("{} ", frames[frame_idx]), style),
         Span::styled(
-            format!("MCP ({}/{})", progress.connected, progress.total),
+            t_fmt(
+                "agent_status.mcp_progress",
+                &[("connected", &connected), ("total", &total)],
+            ),
             style,
         ),
     ]))

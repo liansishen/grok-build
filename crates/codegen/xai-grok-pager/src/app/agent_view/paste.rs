@@ -1660,6 +1660,7 @@ pub(super) mod paste_key_tests {
     /// three always-clickable buttons (each registering a hit-rect carrying the
     /// source), with the buttons shifted right past the label.
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn paints_affordance_row_with_label_and_registers_all_buttons() {
         use crate::scrollback::blocks::mermaid_content::{AffordanceKind, affordance_row};
         use crate::scrollback::render::DiagramAffordancePlacement;
@@ -1668,7 +1669,7 @@ pub(super) mod paste_key_tests {
         let theme = Theme::current();
         let source = "flowchart TD\nA-->B\n".to_string();
         let layout = affordance_row(false);
-        let cols = layout.buttons.map(|b| b.col);
+        let cols = std::array::from_fn(|i| layout.buttons[i].col);
         let mut agent = make_agent();
         let rect = Rect::new(0, 0, 80, 1);
         let mut buf = Buffer::empty(rect);
@@ -1691,9 +1692,10 @@ pub(super) mod paste_key_tests {
             theme.gray_dim,
             "the ◇ mermaid label is dim",
         );
-        assert_eq!(span(cols[0], 12), "[Open Image]");
-        assert_eq!(span(cols[1], 17), "[Copy Image Path]");
-        assert_eq!(span(cols[2], 13), "[Copy Source]");
+        for (col, button) in cols.iter().zip(layout.buttons.iter()) {
+            let width = unicode_width::UnicodeWidthStr::width(button.label.as_str()) as u16;
+            assert_eq!(span(*col, width), button.label);
+        }
         let buttons = &agent.inline_media_hits.mermaid_buttons;
         assert_eq!(buttons.len(), 3);
         assert_eq!(
@@ -1715,6 +1717,7 @@ pub(super) mod paste_key_tests {
     /// label so it stays discoverable), with no bold/underline. With the cursor
     /// off the row, all buttons are idle.
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn paints_affordance_row_highlights_only_the_hovered_button() {
         use crate::scrollback::blocks::mermaid_content::affordance_row;
         use crate::scrollback::render::DiagramAffordancePlacement;
@@ -1722,7 +1725,8 @@ pub(super) mod paste_key_tests {
         use ratatui::layout::Rect;
         use ratatui::style::Modifier;
         let theme = Theme::current();
-        let cols = affordance_row(false).buttons.map(|b| b.col);
+        let layout = affordance_row(false);
+        let cols = std::array::from_fn(|i| layout.buttons[i].col);
         let placement = |rect: Rect| DiagramAffordancePlacement {
             screen_rect: rect,
             source: "A-->B\n".to_string(),
@@ -1770,13 +1774,18 @@ pub(super) mod paste_key_tests {
     /// a row wide enough for the label + `[Open]` paints just those and registers
     /// only `[Open]`'s hit-rect; the clipped buttons register none.
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn paints_affordance_row_clips_segments_to_row_width() {
         use crate::scrollback::render::DiagramAffordancePlacement;
         use ratatui::buffer::Buffer;
         use ratatui::layout::Rect;
         let theme = Theme::current();
+        let layout = crate::scrollback::blocks::mermaid_content::affordance_row(false);
+        let first = &layout.buttons[0];
+        let first_end = first.col
+            + unicode_width::UnicodeWidthStr::width(first.label.as_str()) as u16;
         let mut agent = make_agent();
-        let rect = Rect::new(0, 0, 24, 1);
+        let rect = Rect::new(0, 0, first_end, 1);
         let mut buf = Buffer::empty(Rect::new(0, 0, 80, 1));
         agent.paint_diagram_affordances(
             &mut buf,
@@ -1790,17 +1799,17 @@ pub(super) mod paste_key_tests {
             .filter_map(|x| buf.cell((x, 0)).map(|c| c.symbol()))
             .collect();
         assert!(
-            row.contains("[Open Image]"),
-            "[Open Image] fits and is painted: {row:?}"
+            row.contains(first.label.as_str()),
+            "the first localized button fits and is painted: {row:?}"
         );
         assert!(
-            !row.contains("[Copy"),
+            !row.contains(layout.buttons[1].label.as_str()),
             "clipped segments are not painted: {row:?}"
         );
         assert_eq!(
             agent.inline_media_hits.mermaid_buttons.len(),
             1,
-            "only the [Open Image] hit-rect is registered",
+            "only the first localized button hit-rect is registered",
         );
     }
     /// `render_dropdown_chrome` anchors the items band above the prompt by

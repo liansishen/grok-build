@@ -48,7 +48,7 @@ pub fn browser_open_likely_available() -> bool {
 /// User-facing copy when the browser opener cannot run. Includes the full
 /// URL on its own line so it is easy to select/copy in the TUI.
 pub fn browser_unavailable_message(url: &str) -> String {
-    format!("Could not open a browser. Open this URL manually:\n{url}")
+    xai_grok_i18n::t_fmt("link.browser_unavailable", &[("url", url)])
 }
 
 /// Open a URL in the system's default browser/handler.
@@ -157,16 +157,23 @@ fn build_open_path_command(path: &std::path::Path) -> std::process::Command {
 ///   imagine media paths (e.g. `…\C%3A%5CUsers…`).
 /// - **macOS / Linux**: `open` / `xdg-open` open the file in its default app.
 pub fn open_path(path: &std::path::Path) -> bool {
-    // Never launch a real GUI app in tests.
-    #[cfg(test)]
+    // Never launch a real GUI app in this crate's tests or in downstream test
+    // builds that enable the shared test-support feature.
+    #[cfg(any(test, feature = "test-support"))]
     {
         !path.as_os_str().is_empty()
     }
-    #[cfg(all(not(test), target_os = "windows"))]
+    #[cfg(all(
+        not(any(test, feature = "test-support")),
+        target_os = "windows"
+    ))]
     {
         reveal_in_explorer(path)
     }
-    #[cfg(all(not(test), not(target_os = "windows")))]
+    #[cfg(all(
+        not(any(test, feature = "test-support")),
+        not(target_os = "windows")
+    ))]
     {
         match build_open_path_command(path).spawn() {
             Ok(_) => true,

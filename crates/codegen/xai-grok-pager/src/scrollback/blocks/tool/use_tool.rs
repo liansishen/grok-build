@@ -190,12 +190,14 @@ impl BlockContent for UseToolCallBlock {
 
                     for (i, line) in content_lines.iter().enumerate() {
                         if i >= max_inline {
-                            let remaining = content_lines.len() - max_inline;
+                            let remaining = (content_lines.len() - max_inline).to_string();
+                            let more_lines = xai_grok_i18n::t_fmt(
+                                "tool.preview.more_lines",
+                                &[("count", &remaining)],
+                            );
                             lines.push(
                                 BlockLine::from(Line::from(Span::styled(
-                                    format!(
-                                        "{indent}... ({remaining} more lines, press Enter to view)",
-                                    ),
+                                    format!("{indent}{more_lines}"),
                                     theme.dim(),
                                 )))
                                 .with_panel_background(theme.bg_dark),

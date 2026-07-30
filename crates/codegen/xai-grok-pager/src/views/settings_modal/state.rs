@@ -1068,7 +1068,10 @@ pub(super) fn validate_string(
             if matched {
                 None
             } else {
-                Some(format!("Unknown model: \"{buffer}\""))
+                Some(xai_grok_i18n::t_fmt(
+                    "settings.modal.err_unknown_model",
+                    &[("buffer", buffer)],
+                ))
             }
         }
     }

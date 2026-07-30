@@ -2684,7 +2684,7 @@ impl AppView {
                                 self.pending_action = Some(PendingAction::with_ttl(
                                     Action::DashboardOverlayStop,
                                     KeyShortcut::from(*key),
-                                    Some("close this session"),
+                                    Some(xai_grok_i18n::t("dashboard.close_this_session")),
                                     crate::views::dashboard::state::STOP_CONFIRM_WINDOW,
                                 ));
                                 return InputOutcome::Changed;
@@ -3029,8 +3029,11 @@ impl AppView {
                         git_ref: git_ref.clone(),
                     };
                     let shortcut = KeyShortcut::from(*key);
-                    self.pending_action =
-                        Some(PendingAction::new(action, shortcut, "new in worktree"));
+                    self.pending_action = Some(PendingAction::new(
+                        action,
+                        shortcut,
+                        xai_grok_i18n::t("worktree.new_session.pending_label"),
+                    ));
                     return InputOutcome::Changed;
                 }
                 _ => unreachable!(),
@@ -3070,7 +3073,7 @@ impl AppView {
             self.pending_action = Some(PendingAction::new(
                 Action::Quit,
                 KeyShortcut::from(*key),
-                "quit",
+                xai_grok_i18n::t("actions.Quit.label"),
             ));
             return InputOutcome::Changed;
         }
@@ -3412,7 +3415,7 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
         let entry_count = entry_map.len();
         let non_selectable_flags: Vec<bool> = entry_map.iter().map(|e| e.is_none()).collect();
         let config = PickerConfig {
-            title: Some("Resume session"),
+            title: Some(xai_grok_i18n::t("modal.resume_session")),
             show_search_hint: true,
             expandable: true,
             esc_clears_query: true,
@@ -3868,7 +3871,7 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
                     && let Some(md) = ctx.changelog_markdown.as_deref()
                 {
                     return InputOutcome::Action(Action::ShowReleaseNotes {
-                        title: "Release Notes".to_string(),
+                        title: xai_grok_i18n::t("release_notes.title").to_string(),
                         content: md.trim().to_string(),
                     });
                 }
@@ -4083,7 +4086,7 @@ fn dispatch_menu_action(
     if Some(index) == changelog_idx {
         if let Some(md) = changelog_md {
             return InputOutcome::Action(Action::ShowReleaseNotes {
-                title: "Release Notes".to_string(),
+                title: xai_grok_i18n::t("release_notes.title").to_string(),
                 content: md.trim().to_string(),
             });
         }
@@ -4392,7 +4395,7 @@ impl AppView {
                             Vec::new();
                         if self.default_yolo {
                             flags_vec.push(crate::views::prompt_widget::PromptFlag {
-                                text: "always-approve",
+                                text: xai_grok_i18n::t("mode.flag.always_approve"),
                                 color: None,
                                 bold: false,
                             });
@@ -4642,7 +4645,9 @@ impl AppView {
                             let title = agents
                                 .get(&id)
                                 .map(crate::views::session_title::entry_title)
-                                .unwrap_or_else(|| "(session)".to_string());
+                                .unwrap_or_else(|| {
+                                    xai_grok_i18n::t("session.title_generic").to_string()
+                                });
                             let (hover_prev, hover_next, hover_close) = self
                                 .dashboard
                                 .as_ref()
@@ -4783,9 +4788,9 @@ impl AppView {
                             {
                                 dashboard.close_popup();
                                 if dashboard.error_toast.is_none() {
-                                    dashboard.error_toast = Some(format!(
-                                        "{} Session closed",
-                                        crate::glyphs::check_mark()
+                                    dashboard.error_toast = Some(xai_grok_i18n::t_fmt(
+                                        "dashboard.toast.session_closed",
+                                        &[("check", crate::glyphs::check_mark())],
                                     ));
                                 }
                             }
@@ -4824,7 +4829,9 @@ impl AppView {
                                     let title = agents
                                         .get(&agent_id)
                                         .map(crate::views::session_title::entry_title)
-                                        .unwrap_or_else(|| "(session)".to_string());
+                                        .unwrap_or_else(|| {
+                                            xai_grok_i18n::t("session.title_generic").to_string()
+                                        });
                                     let bundle_state = &self.bundle_state;
                                     let (cursor, post_flush, drawn) =
                                         crate::views::dashboard::render_popup_overlay(
@@ -5493,7 +5500,10 @@ impl AppView {
                     | Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                         agent.image_viewer = None;
                         agent.image_load_rx = None;
-                        agent.toast = Some(("Couldn't load image preview".into(), 6));
+                        agent.toast = Some((
+                            xai_grok_i18n::t("toast.couldnt_load_image").into(),
+                            6,
+                        ));
                     }
                     Err(std::sync::mpsc::TryRecvError::Empty) => {}
                 }

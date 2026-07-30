@@ -306,10 +306,15 @@ fn handle_list_input(ev: &Event, st: &mut TutorialState) -> TutorialOutcome {
 
 /// Intro copy shown above the topic list. No time promises — just what it
 /// is and how to leave.
-const INTRO_LINES: [&str; 2] = [
-    "Quick tips to get the most out of Grok Build.",
-    "Pick a topic. Esc when you're done.",
-];
+fn intro_lines() -> [&'static str; 2] {
+    [
+        xai_grok_i18n::t_or(
+            "tutorial.intro.1",
+            "Quick tips to get the most out of Grok Build.",
+        ),
+        xai_grok_i18n::t_or("tutorial.intro.2", "Pick a topic. Esc when you're done."),
+    ]
+}
 
 /// Topic page body: the embedded markdown minus its leading `# ` heading —
 /// the modal window chrome already shows the title, so rendering the H1
@@ -331,12 +336,23 @@ pub fn render_tutorial(buf: &mut Buffer, area: Rect, st: &mut TutorialState, com
                 return;
             };
             let next_hint = match TUTORIAL_TOPICS.get(index + 1) {
-                Some(next) => format!("\u{2192} next: {}", next.title),
-                None => "\u{2192} done".to_owned(),
+                Some(next) => xai_grok_i18n::t_or(
+                    "tutorial.shortcut.next",
+                    "\u{2192} next: {title}",
+                )
+                .replace("{title}", next.title),
+                None => xai_grok_i18n::t_or(
+                    "tutorial.shortcut.done_arrow",
+                    "\u{2192} done",
+                )
+                .to_owned(),
             };
             let mut shortcuts = vec![
                 Shortcut {
-                    label: "\u{2191}/\u{2193} scroll",
+                    label: xai_grok_i18n::t_or(
+                        "tutorial.shortcut.scroll",
+                        "\u{2191}/\u{2193} scroll",
+                    ),
                     clickable: false,
                     id: 0,
                 },
@@ -348,13 +364,16 @@ pub fn render_tutorial(buf: &mut Buffer, area: Rect, st: &mut TutorialState, com
             ];
             if topic.go_deeper.is_some() {
                 shortcuts.push(Shortcut {
-                    label: "d go deeper",
+                    label: xai_grok_i18n::t_or(
+                        "tutorial.shortcut.go_deeper",
+                        "d go deeper",
+                    ),
                     clickable: false,
                     id: 0,
                 });
             }
             shortcuts.push(Shortcut {
-                label: "Esc list",
+                label: xai_grok_i18n::t_or("tutorial.shortcut.list", "Esc list"),
                 clickable: false,
                 id: 0,
             });
@@ -396,7 +415,14 @@ pub fn render_tutorial(buf: &mut Buffer, area: Rect, st: &mut TutorialState, com
 }
 
 fn render_list(buf: &mut Buffer, area: Rect, st: &mut TutorialState, compact: bool, theme: &Theme) {
-    let progress = format!("{}/{} explored", st.viewed.len(), TUTORIAL_TOPICS.len());
+    let viewed = st.viewed.len().to_string();
+    let total = TUTORIAL_TOPICS.len().to_string();
+    let progress = xai_grok_i18n::t_or(
+        "tutorial.progress",
+        "{viewed}/{total} explored",
+    )
+    .replace("{viewed}", &viewed)
+    .replace("{total}", &total);
     let shortcuts = [
         Shortcut {
             label: &progress,
@@ -404,23 +430,26 @@ fn render_list(buf: &mut Buffer, area: Rect, st: &mut TutorialState, compact: bo
             id: 0,
         },
         Shortcut {
-            label: "\u{2191}/\u{2193} navigate",
+            label: xai_grok_i18n::t_or(
+                "tutorial.shortcut.navigate",
+                "\u{2191}/\u{2193} navigate",
+            ),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Enter open",
+            label: xai_grok_i18n::t_or("tutorial.shortcut.open", "Enter open"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Esc done",
+            label: xai_grok_i18n::t_or("tutorial.shortcut.done", "Esc done"),
             clickable: false,
             id: 0,
         },
     ];
     let modal_config = ModalWindowConfig {
-        title: "Welcome to Grok Build",
+        title: xai_grok_i18n::t_or("tutorial.title", "Welcome to Grok Build"),
         tabs: None,
         shortcuts: &shortcuts,
         sizing: ModalSizing {
@@ -442,7 +471,7 @@ fn render_list(buf: &mut Buffer, area: Rect, st: &mut TutorialState, compact: bo
     // Intro copy, then a blank row, then the topic rows.
     let intro_style = Style::default().fg(theme.gray_bright);
     let mut y = mca.content.y;
-    for line in INTRO_LINES {
+    for line in intro_lines() {
         if y >= mca.content.y + mca.content.height {
             break;
         }

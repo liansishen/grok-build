@@ -523,9 +523,9 @@ pub(in crate::app::dispatch) fn dispatch_toggle_vim_mode(app: &mut AppView) -> V
     set_vim_mode_inner(app, enabled);
     refresh_open_settings_modals(app);
     let msg = if enabled {
-        "Vim mode: on"
+        xai_grok_i18n::t("settings_ui.vim_mode_on")
     } else {
-        "Vim mode: off"
+        xai_grok_i18n::t("settings_ui.vim_mode_off")
     };
     tracing::info!(vim_mode = enabled, "Vim mode toggled");
     match app.active_view {
@@ -1253,7 +1253,7 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
                 "rollback path has no arm for this setting key; in-memory cache is now \
                  inconsistent with the on-disk state (which already failed to write)"
             );
-            app.show_toast(ROLLBACK_NO_ARM_TOAST);
+            app.show_toast(xai_grok_i18n::t("settings_ui.rollback_no_arm_toast"));
             return companion_effects;
         }
     }

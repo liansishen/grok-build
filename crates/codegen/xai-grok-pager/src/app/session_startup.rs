@@ -172,19 +172,13 @@ impl std::fmt::Display for StartupFlagError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::SessionIdRequiresFork => {
-                write!(
-                    f,
-                    "Error: --session-id can only be used with --continue or --resume if --fork-session is also specified."
-                )
+                write!(f, "{}", xai_grok_i18n::t("startup.session_id_requires_fork"))
             }
             Self::ForkRequiresResumeOrContinue => {
-                write!(f, "Error: --fork-session requires --resume or --continue.")
+                write!(f, "{}", xai_grok_i18n::t("startup.fork_requires_resume"))
             }
             Self::ForkWithWorktree => {
-                write!(
-                    f,
-                    "Error: --fork-session cannot be combined with --worktree."
-                )
+                write!(f, "{}", xai_grok_i18n::t("startup.fork_with_worktree"))
             }
         }
     }
@@ -265,23 +259,29 @@ impl PagerArgs {
         })
     }
 }
-/// User-facing refusal when process-wide `--chat` would open a local Build disk row.
-pub const CHAT_MODE_LOCAL_BUILD_REFUSAL: &str = "cannot open a local Build session while --chat is active; \
-resume a conversation or start a new chat (/chat)";
-/// User-facing error when `--chat` is combined with leader mode.
-pub const CHAT_MODE_LEADER_CONFLICT: &str = "gateway chat mode (--chat) cannot run with leader mode; \
-pass --no-leader or disable [cli] use_leader in config";
+/// Localized refusal when process-wide `--chat` would open a local Build disk row.
+pub fn chat_mode_local_build_refusal() -> &'static str {
+    xai_grok_i18n::t("session.chat_mode_local_build_refusal")
+}
+/// Localized error when `--chat` is combined with leader mode.
+pub fn chat_mode_leader_conflict() -> &'static str {
+    xai_grok_i18n::t("session.chat_mode_leader_conflict")
+}
 /// Startup guard used by TUI `run` (and unit-tested): sticky `--chat` + leader is invalid.
 #[inline]
 pub fn chat_mode_conflicts_with_leader(chat: bool, use_leader: bool) -> bool {
     chat && use_leader
 }
-/// User-facing error for `--fork-session` + `--chat` (forking is a Build disk
+/// Localized error for `--fork-session` + `--chat` (forking is a Build disk
 /// concept; chat sessions have no local copy to fork).
-pub const CHAT_MODE_FORK_CONFLICT: &str = "--fork-session is not supported with --chat";
-/// User-facing error for `--restore-code` + `--chat` (code restore is a
+pub fn chat_mode_fork_conflict() -> &'static str {
+    xai_grok_i18n::t("session.chat_mode_fork_conflict")
+}
+/// Localized error for `--restore-code` + `--chat` (code restore is a
 /// Build/worktree concept; chat sessions carry no codebase).
-pub const CHAT_MODE_RESTORE_CODE_CONFLICT: &str = "--restore-code is not supported with --chat";
+pub fn chat_mode_restore_code_conflict() -> &'static str {
+    xai_grok_i18n::t("session.chat_mode_restore_code_conflict")
+}
 /// Flag validation: Build-lifecycle flags that cannot combine with `--chat`.
 /// Always `None` when `chat_mode` is false, so call sites need no `cfg`.
 pub fn chat_mode_flag_conflict(
@@ -293,10 +293,10 @@ pub fn chat_mode_flag_conflict(
         return None;
     }
     if fork_session {
-        return Some(CHAT_MODE_FORK_CONFLICT);
+        return Some(chat_mode_fork_conflict());
     }
     if restore_code {
-        return Some(CHAT_MODE_RESTORE_CODE_CONFLICT);
+        return Some(chat_mode_restore_code_conflict());
     }
     None
 }
@@ -432,10 +432,7 @@ pub fn effective_fork_new_cwd(process_cwd: &str, parent_cwd: Option<&Path>) -> S
 async fn most_recent_session_id(cwd: &str) -> anyhow::Result<(String, Option<String>)> {
     let summaries = xai_grok_shell::session::persistence::list_summaries(Some(cwd)).await?;
     let first = summaries.first().ok_or_else(|| {
-        anyhow::anyhow!(
-            "No session found for current directory. \
-             Use 'grok' to start a new session."
-        )
+        anyhow::anyhow!("{}", xai_grok_i18n::t("startup.no_session_for_directory"))
     })?;
     Ok((first.info.id.to_string(), first.display_title_opt()))
 }
@@ -462,10 +459,22 @@ pub(crate) fn pre_acp_auth_manager(
 /// CLI users get a clear error before ACP.
 pub fn ensure_session_id_available(session_id: &str, cwd: &str) -> anyhow::Result<()> {
     if uuid::Uuid::try_parse(session_id).is_err() {
-        anyhow::bail!("Error: --session-id must be a valid UUID (got '{session_id}').");
+        anyhow::bail!(
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.session_id_invalid_uuid",
+                &[("session_id", session_id)],
+            )
+        );
     }
     if xai_grok_shell::session::persistence::session_exists_for_cwd(session_id, cwd) {
-        anyhow::bail!("Error: Session ID {session_id} is already in use.");
+        anyhow::bail!(
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.session_id_already_in_use",
+                &[("session_id", session_id)],
+            )
+        );
     }
     Ok(())
 }
@@ -474,8 +483,12 @@ pub async fn materialize_startup(
     ctx: MaterializeCtx,
     intent: SessionStartupIntent,
 ) -> anyhow::Result<MaterializedStartup> {
-    let cwd = std::env::current_dir()
-        .map_err(|e| anyhow::anyhow!("Failed to get cwd: {e}"))?
+    let cwd = std::env::current_dir().map_err(|e| {
+        anyhow::anyhow!(
+            "{}",
+            xai_grok_i18n::t_fmt("startup.cwd_failed", &[("error", &e.to_string())])
+        )
+    })?
         .to_string_lossy()
         .to_string();
     materialize_startup_for_cwd(ctx, intent, &cwd).await
@@ -487,7 +500,7 @@ pub async fn materialize_startup_for_cwd(
     cwd: &str,
 ) -> anyhow::Result<MaterializedStartup> {
     if ctx.chat_mode && matches!(intent, SessionStartupIntent::ForkFrom { .. }) {
-        anyhow::bail!("{CHAT_MODE_FORK_CONFLICT}");
+        anyhow::bail!("{}", chat_mode_fork_conflict());
     }
     match intent {
         SessionStartupIntent::NewAuto => Ok(MaterializedStartup::NewAuto),
@@ -495,7 +508,13 @@ pub async fn materialize_startup_for_cwd(
             if !ctx.has_worktree {
                 ensure_session_id_available(&session_id, cwd)?;
             } else if uuid::Uuid::try_parse(&session_id).is_err() {
-                anyhow::bail!("Error: --session-id must be a valid UUID (got '{session_id}').");
+                anyhow::bail!(
+                    "{}",
+                    xai_grok_i18n::t_fmt(
+                        "startup.session_id_invalid_uuid",
+                        &[("session_id", session_id.as_str())],
+                    )
+                );
             }
             Ok(MaterializedStartup::NewWithId { session_id })
         }
@@ -504,7 +523,7 @@ pub async fn materialize_startup_for_cwd(
             most_recent_for_cwd: true,
         } => {
             if ctx.chat_mode {
-                anyhow::bail!("chat-mode resume requires a build with the `chat` cargo feature");
+                anyhow::bail!("{}", xai_grok_i18n::t("startup.chat_feature_required"));
             }
             let started = std::time::Instant::now();
             let (id, title) = most_recent_session_id(cwd).await?;
@@ -542,7 +561,13 @@ pub async fn materialize_startup_for_cwd(
         } => {
             if ctx.chat_mode {
                 if !valid_conversation_id_shape(&session_id) {
-                    anyhow::bail!("invalid conversation id {session_id:?}");
+                    anyhow::bail!(
+                        "{}",
+                        xai_grok_i18n::t_fmt(
+                            "startup.invalid_conversation_id",
+                            &[("session_id", session_id.as_str())],
+                        )
+                    );
                 }
                 return Ok(MaterializedStartup::Resume {
                     session_id,
@@ -619,8 +644,11 @@ async fn resolve_existing_session(
             "Session found locally under different CWD"
         );
         eprintln!(
-            "Session {} found locally (originally in {})",
-            session_id, original_cwd
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.session_found_other_cwd",
+                &[("session_id", session_id), ("cwd", original_cwd.as_str())],
+            )
         );
         return Ok(ResolvedExisting {
             id: session_id.to_string(),
@@ -642,8 +670,11 @@ async fn resolve_existing_session(
             "Session not found locally; deferring restore to worktree resume handler"
         );
         eprintln!(
-            "Session {:?} not found locally; it will be restored into the new worktree.",
-            session_id
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.session_restore_into_worktree",
+                &[("session_id", session_id)],
+            )
         );
         return Ok(ResolvedExisting {
             id: session_id.to_string(),
@@ -654,21 +685,30 @@ async fn resolve_existing_session(
     }
     if !ctx.allow_remote_restore {
         if !arg_is_uuid {
+            let hint = super::session_title_resolve::title_miss_hint(session_id);
             anyhow::bail!(
-                "Session does not exist: {}",
-                super::session_title_resolve::title_miss_hint(session_id)
+                "{}",
+                xai_grok_i18n::t_fmt(
+                    "startup.session_does_not_exist_with_hint",
+                    &[("hint", hint.as_str())],
+                )
             );
         }
-        anyhow::bail!("Session does not exist");
+        anyhow::bail!("{}", xai_grok_i18n::t("startup.session_does_not_exist"));
     }
     let restored = restore_session_from_remote(session_id, cwd).await;
     if arg_is_uuid {
         return restored;
     }
     restored.map_err(|e| {
+        let error = format!("{e:#}");
+        let hint = super::session_title_resolve::title_miss_hint(session_id);
         anyhow::anyhow!(
-            "{e:#}; {}",
-            super::session_title_resolve::title_miss_hint(session_id)
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.restore_failed_with_hint",
+                &[("error", error.as_str()), ("hint", hint.as_str())],
+            )
         )
     })
 }
@@ -678,22 +718,40 @@ async fn restore_session_from_remote(
     session_id: &str,
     cwd: &str,
 ) -> anyhow::Result<ResolvedExisting> {
-    let raw_config = xai_grok_shell::config::load_effective_config()
-        .map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
+    let raw_config = xai_grok_shell::config::load_effective_config().map_err(|e| {
+        anyhow::anyhow!(
+            "{}",
+            xai_grok_i18n::t_fmt("startup.config_load_failed", &[("error", &e.to_string())])
+        )
+    })?;
     if let Some((false, source)) =
         xai_grok_shell::util::config::session_registry_local_override_sourced(Some(&raw_config))
     {
         anyhow::bail!(
-            "Session does not exist locally (session registry is disabled by {})",
-            source.label()
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.session_not_exist_registry_disabled",
+                &[("source", source.label())],
+            )
         );
     }
     eprintln!(
-        "Session {:?} not found locally, restoring from remote...",
-        session_id
+        "{}",
+        xai_grok_i18n::t_fmt(
+            "startup.restoring_remote",
+            &[("session_id", session_id)],
+        )
     );
     let agent_config = xai_grok_shell::agent::config::Config::new_from_toml_cfg(&raw_config)
-        .map_err(|e| anyhow::anyhow!("Failed to create agent config: {}", e))?;
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "{}",
+                xai_grok_i18n::t_fmt(
+                    "startup.agent_config_failed",
+                    &[("error", &e.to_string())],
+                )
+            )
+        })?;
     use xai_grok_shell::agent::session_registry_client::SessionRegistryClient;
     use xai_grok_shell::auth::{AuthManager, ensure_authenticated_or_noninteractive};
     use xai_grok_shell::session::restore::restore_session_with_storage;
@@ -705,7 +763,15 @@ async fn restore_session_from_remote(
         None,
     )
     .await
-    .map_err(|e| anyhow::anyhow!("Failed to authenticate for session restore: {}", e))?;
+    .map_err(|e| {
+        anyhow::anyhow!(
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.restore_auth_failed",
+                &[("error", &e.to_string())],
+            )
+        )
+    })?;
     let auth_manager = std::sync::Arc::new(AuthManager::new(
         &grok_home(),
         agent_config.grok_com_config.clone(),
@@ -735,13 +801,27 @@ async fn restore_session_from_remote(
         Some(progress),
     )
     .await
-    .map_err(|e| anyhow::anyhow!("Failed to restore session from remote: {:#}", e))?;
+    .map_err(|e| {
+        anyhow::anyhow!(
+            "{}",
+            xai_grok_i18n::t_fmt(
+                "startup.remote_restore_failed",
+                &[("error", &format!("{e:#}"))],
+            )
+        )
+    })?;
     let effective_id = if result.local_session_id.is_empty() {
         session_id.to_string()
     } else {
         result.local_session_id
     };
-    eprintln!("  Restored as local session {}", effective_id);
+    eprintln!(
+        "{}",
+        xai_grok_i18n::t_fmt(
+            "startup.restored_local",
+            &[("session_id", effective_id.as_str())],
+        )
+    );
     Ok(ResolvedExisting {
         id: effective_id,
         original_cwd: None,
@@ -765,7 +845,13 @@ async fn resolve_session_by_title(
     };
     let id = chosen.info.id.to_string();
     tracing::info!(session_id = %id, "Session resolved by title");
-    eprintln!("Resuming session {} (matched by title)", id);
+    eprintln!(
+        "{}",
+        xai_grok_i18n::t_fmt(
+            "startup.resuming_matched_title",
+            &[("session_id", id.as_str())],
+        )
+    );
     Ok(Some(ResolvedExisting {
         id,
         original_cwd: None,
@@ -993,15 +1079,15 @@ mod tests {
     fn chat_mode_flag_conflict_matrix() {
         assert_eq!(
             chat_mode_flag_conflict(true, true, false),
-            Some(CHAT_MODE_FORK_CONFLICT)
+            Some(xai_grok_i18n::t("session.chat_mode_fork_conflict"))
         );
         assert_eq!(
             chat_mode_flag_conflict(true, false, true),
-            Some(CHAT_MODE_RESTORE_CODE_CONFLICT)
+            Some(xai_grok_i18n::t("session.chat_mode_restore_code_conflict"))
         );
         assert_eq!(
             chat_mode_flag_conflict(true, true, true),
-            Some(CHAT_MODE_FORK_CONFLICT)
+            Some(xai_grok_i18n::t("session.chat_mode_fork_conflict"))
         );
         assert_eq!(chat_mode_flag_conflict(true, false, false), None);
         assert_eq!(chat_mode_flag_conflict(false, true, true), None);
@@ -1129,7 +1215,7 @@ mod tests {
             let err = materialize_startup_for_cwd(chat_ctx(), intent, "/tmp")
                 .await
                 .unwrap_err();
-            assert_eq!(err.to_string(), CHAT_MODE_FORK_CONFLICT);
+            assert_eq!(err.to_string(), chat_mode_fork_conflict());
         }
     }
     /// The chat passthrough does not bypass the cwd-collision refusal that

@@ -13,6 +13,15 @@ use xai_grok_shell::session::unified_list::ListScope;
 
 type SearchHit = xai_grok_shell::extensions::session_search::SearchSessionHit;
 
+fn partial_notice(partial: ConversationsPartial) -> &'static str {
+    match partial {
+        ConversationsPartial::NoOauth => xai_grok_i18n::t("session_picker.partial_chats_login"),
+        ConversationsPartial::Timeout | ConversationsPartial::Error => {
+            xai_grok_i18n::t("session_picker.partial_conversations_retry")
+        }
+    }
+}
+
 struct PickerSurface<'a> {
     entries: &'a mut Option<Vec<SessionPickerEntry>>,
     loading: &'a mut bool,
@@ -206,10 +215,10 @@ pub(in crate::app::dispatch) fn handle_session_list_loaded(
         );
     }
     let empty_notice = partial.map_or_else(
-        || "No sessions found for this directory".to_owned(),
-        |partial| partial.picker_notice().to_owned(),
+        || xai_grok_i18n::t("session_picker.empty_directory").to_owned(),
+        |partial| partial_notice(partial).to_owned(),
     );
-    let partial_notice = partial.map(ConversationsPartial::picker_notice);
+    let partial_notice = partial.map(partial_notice);
     let chat_mode = app.chat_mode;
     let is_browse = query.is_none();
     let mut sessions = Some(sessions);
@@ -276,10 +285,8 @@ pub(in crate::app::dispatch) fn handle_session_list_loaded(
             // Notify once per directory; the browse is scoped to `app.cwd`.
             app.session_picker_relaxed_notified_for = Some(app.cwd.clone());
             let message = match scope {
-                ListScope::Repo => {
-                    "No sessions in this directory. Showing other sessions from this repository."
-                }
-                _ => "No sessions in this directory. Showing sessions from other directories.",
+                ListScope::Repo => xai_grok_i18n::t("session_picker.relaxed_repository"),
+                _ => xai_grok_i18n::t("session_picker.relaxed_directories"),
             };
             app.show_toast(message);
         }
@@ -303,7 +310,8 @@ pub(in crate::app::dispatch) fn handle_session_list_failed(
     }
     app.session_picker_detail_generation += 1;
     tracing::warn!(error = %error, "session list fetch failed");
-    let error_notice = format!("Couldn't load sessions: {error}");
+    let error_notice =
+        xai_grok_i18n::t_fmt("session_picker.load_failed", &[("error", &error)]);
     let is_search = query.is_some();
     let chat_mode = app.chat_mode;
     let mut handled = false;

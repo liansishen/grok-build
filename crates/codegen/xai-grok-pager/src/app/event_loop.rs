@@ -776,9 +776,9 @@ pub(crate) async fn run(
         app.minimal_state.welcome_pending = true;
     }
     if term_state.relaunched_into_minimal && app.screen_mode.is_minimal() {
-        app.screen_mode_switch_hint = Some("Switched to minimal mode · /fullscreen to go back");
+        app.screen_mode_switch_hint = Some(xai_grok_i18n::t("conn.switched_minimal"));
     } else if term_state.relaunched_into_fullscreen && !app.screen_mode.is_minimal() {
-        app.screen_mode_switch_hint = Some("Switched to fullscreen mode · /minimal to go back");
+        app.screen_mode_switch_hint = Some(xai_grok_i18n::t("conn.switched_fullscreen"));
     }
     let remote_permission_mode = remote_settings
         .as_ref()
@@ -2478,8 +2478,9 @@ pub(crate) async fn run(
                             None,
                             Some(serde_json::json!({ "attempt": attempt })),
                         );
-                        app.show_toast(&format!(
-                            "Disconnected. Reconnecting... (attempt {attempt})"
+                        app.show_toast(&xai_grok_i18n::t_fmt(
+                            "conn.reconnecting",
+                            &[("attempt", &attempt.to_string())],
                         ));
                         presenter.request(false);
                     }
@@ -2668,14 +2669,17 @@ pub(crate) async fn run(
                         reconnect_abort_handle = Some(join_handle.abort_handle());
 
                         app.show_toast(if any_reload {
-                            "Reconnected. Reloading session..."
+                            xai_grok_i18n::t("toast.reconnected_reloading_session")
                         } else {
-                            "Reconnected. Re-initializing..."
+                            xai_grok_i18n::t("toast.reconnected_reinitializing")
                         });
                         presenter.request(false);
                     }
                     ConnectionStatus::Failed { ref error } => {
-                        app.show_toast(&format!("Connection failed: {error}"));
+                        app.show_toast(&xai_grok_i18n::t_fmt(
+                            "conn.connection_failed",
+                            &[("error", error)],
+                        ));
                         presenter.request(false);
                     }
                     _ => {}
@@ -2752,11 +2756,11 @@ pub(crate) async fn run(
 
                 if pending.agent_ids.is_empty() {
                     // Nothing was reloaded (no open sessions at reconnect).
-                    app.show_toast("Reconnected.");
+                    app.show_toast(xai_grok_i18n::t("toast.reconnected"));
                 } else if restored {
-                    app.show_toast("Session restored. In-progress tools and terminals were lost.");
+                    app.show_toast(xai_grok_i18n::t("toast.session_restored"));
                 } else {
-                    app.show_toast("Session restore failed. Kept the existing transcript.");
+                    app.show_toast(xai_grok_i18n::t("toast.session_restore_failed"));
                 }
 
                 // Re-trigger the queue drain suppressed during the outage: every

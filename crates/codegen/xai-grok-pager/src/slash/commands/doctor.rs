@@ -7,8 +7,9 @@ use crate::slash::command::{
     AppCtx, ArgItem, CommandExecCtx, CommandResult, DoctorRequest, SlashCommand,
 };
 
-const USAGE: &str =
-    "Usage: /doctor [fix [ssh-wrap|tmux-clipboard|dcs-passthrough|tmux-extended-keys]]";
+fn usage_str() -> String {
+    xai_grok_i18n::t("slash.doctor.usage").to_owned()
+}
 
 pub struct DoctorCommand;
 
@@ -51,7 +52,7 @@ impl SlashCommand for DoctorCommand {
     }
 
     fn description(&self) -> &str {
-        "Check this session and show available fixes"
+        xai_grok_i18n::t("slash.doctor.description")
     }
 
     fn usage(&self) -> &str {
@@ -93,7 +94,7 @@ impl SlashCommand for DoctorCommand {
             display: "fix".into(),
             match_text: "fix".into(),
             insert_text: "fix".into(),
-            description: "Show automatic fixes available here".into(),
+            description: xai_grok_i18n::t("slash.doctor.arg_fix").into(),
         }])
     }
 
@@ -108,9 +109,9 @@ impl SlashCommand for DoctorCommand {
             (Some("fix"), None, None) => CommandResult::Doctor(DoctorRequest::ListFixes),
             (Some("fix"), Some(value), None) => match crate::diagnostics::resolve_fix_id(value) {
                 Ok(id) => CommandResult::Doctor(DoctorRequest::Fix(id)),
-                Err(error) => CommandResult::Error(format!("{error}\n{USAGE}")),
+                Err(error) => CommandResult::Error(format!("{error}\n{}", usage_str())),
             },
-            _ => CommandResult::Error(USAGE.to_owned()),
+            _ => CommandResult::Error(usage_str()),
         }
     }
 }
@@ -176,8 +177,9 @@ mod tests {
 
     #[test]
     fn rejects_unknown_and_extra_arguments() {
+        let usage = xai_grok_i18n::t("slash.doctor.usage");
         for value in ["unknown", "fix unknown", "fix ssh-wrap extra", "report now"] {
-            assert!(matches!(run(value), CommandResult::Error(message) if message.contains(USAGE)));
+            assert!(matches!(run(value), CommandResult::Error(message) if message.contains(usage)));
         }
     }
 

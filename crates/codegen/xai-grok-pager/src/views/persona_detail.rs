@@ -12,6 +12,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use unicode_width::UnicodeWidthStr;
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::input::line_editor::{LineEditOutcome, LineEditor};
 use crate::theme::Theme;
@@ -48,13 +49,13 @@ impl PersonaField {
 
     fn label(self) -> &'static str {
         match self {
-            Self::Name => "Name",
-            Self::Description => "Description",
-            Self::Model => "Model",
-            Self::ReasoningEffort => "Effort",
-            Self::Isolation => "Isolation",
-            Self::Instructions => "Instructions",
-            Self::InstructionsFile => "Instr. file",
+            Self::Name => t("persona.detail.field.name"),
+            Self::Description => t("persona.detail.field.description"),
+            Self::Model => t("persona.detail.field.model"),
+            Self::ReasoningEffort => t("persona.detail.field.effort"),
+            Self::Isolation => t("persona.detail.field.isolation"),
+            Self::Instructions => t("persona.detail.field.instructions"),
+            Self::InstructionsFile => t("persona.detail.field.instructions_file"),
         }
     }
 
@@ -316,13 +317,16 @@ impl PersonaDetailState {
     /// Save current state back to the TOML file using toml_edit to preserve formatting.
     fn save_to_file(&self) -> Result<(), String> {
         let Some(ref path) = self.source_path else {
-            return Err("No source file to save to".to_string());
+            return Err(t("persona.no_source").to_string());
         };
-        let content =
-            std::fs::read_to_string(path).map_err(|e| format!("Failed to read file: {e}"))?;
-        let mut doc: toml_edit::DocumentMut = content
-            .parse()
-            .map_err(|e| format!("Failed to parse TOML: {e}"))?;
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            let error = e.to_string();
+            t_fmt("persona.detail.error.read_file", &[("error", &error)])
+        })?;
+        let mut doc: toml_edit::DocumentMut = content.parse().map_err(|e| {
+            let error = e.to_string();
+            t_fmt("persona.detail.error.parse_toml", &[("error", &error)])
+        })?;
 
         // Update simple string fields.
         let fields: &[(&str, &str)] = &[
@@ -342,7 +346,10 @@ impl PersonaDetailState {
             }
         }
 
-        std::fs::write(path, doc.to_string()).map_err(|e| format!("Failed to write file: {e}"))?;
+        std::fs::write(path, doc.to_string()).map_err(|e| {
+            let error = e.to_string();
+            t_fmt("persona.detail.error.write_file", &[("error", &error)])
+        })?;
         Ok(())
     }
 }
@@ -379,8 +386,16 @@ pub fn render_persona_detail(
     theme: &Theme,
     compact: bool,
 ) {
-    let title = format!("persona: {}", state.name);
-    let shortcuts = build_shortcuts(state);
+    let title = t_fmt("persona.detail.title", &[("name", &state.name)]);
+    let shortcut_labels = build_shortcut_labels(state);
+    let shortcuts = shortcut_labels
+        .iter()
+        .map(|label| Shortcut {
+            label: label.as_str(),
+            clickable: false,
+            id: 0,
+        })
+        .collect::<Vec<_>>();
     let config = ModalWindowConfig {
         title: &title,
         tabs: None,
@@ -472,7 +487,7 @@ pub fn render_persona_detail(
                 } else {
                     Style::default().fg(theme.gray_dim)
                 };
-                buf.set_string(value_x, y, "(empty)", empty_style);
+                buf.set_string(value_x, y, t("persona.detail.empty"), empty_style);
             } else {
                 let lines = word_wrap_lines(value, value_w);
                 let total = lines.len();
@@ -504,12 +519,13 @@ pub fn render_persona_detail(
                     if is_long {
                         y += 1;
                         if y < max_y {
-                            let hint = format!(
-                                "  ... ({} more lines \u{2014} e to expand, j/k to scroll)",
-                                total - max_collapsed
+                            let remaining = (total - max_collapsed).to_string();
+                            let hint = t_fmt(
+                                "persona.detail.hint.expand",
+                                &[("count", &remaining)],
                             );
                             buf.set_string(
-                                content_area.x + 2,
+                                content_area.x + 4,
                                 y,
                                 hint,
                                 Style::default().fg(theme.gray_dim),
@@ -535,19 +551,19 @@ pub fn render_persona_detail(
                     // Hint line.
                     y += 1;
                     if y < max_y {
-                        let pos_hint = if total > viewport_h {
-                            format!(
-                                " [{}\u{2013}{}/ {}]",
-                                scroll + 1,
-                                (scroll + viewport_h).min(total),
-                                total
+                        let hint = if total > viewport_h {
+                            let start = (scroll + 1).to_string();
+                            let end = (scroll + viewport_h).min(total).to_string();
+                            let total = total.to_string();
+                            t_fmt(
+                                "persona.detail.hint.collapse_scroll_with_position",
+                                &[("start", &start), ("end", &end), ("total", &total)],
                             )
                         } else {
-                            String::new()
+                            t("persona.detail.hint.collapse_scroll").to_string()
                         };
-                        let hint = format!("  (e to collapse, j/k to scroll{})", pos_hint);
                         buf.set_string(
-                            content_area.x + 2,
+                            content_area.x + 4,
                             y,
                             hint,
                             Style::default().fg(theme.gray_dim),
@@ -596,14 +612,17 @@ pub fn render_persona_detail(
     }
 
     // I/O sections
-    for (section, items) in [("Inputs", &state.inputs), ("Outputs", &state.outputs)] {
+    for (section_key, items) in [
+        ("persona.detail.section.inputs", &state.inputs),
+        ("persona.detail.section.outputs", &state.outputs),
+    ] {
         if items.is_empty() || y >= max_y {
             continue;
         }
         buf.set_string(
             content_area.x,
             y,
-            section,
+            t(section_key),
             Style::default()
                 .fg(theme.text_primary)
                 .add_modifier(Modifier::BOLD),
@@ -613,10 +632,19 @@ pub fn render_persona_detail(
             if y >= max_y {
                 break;
             }
-            let req = if entry.required { ", required" } else { "" };
-            let header = format!("  \u{2022} {} ({}{})", entry.name, entry.io_type, req);
+            let header = if entry.required {
+                t_fmt(
+                    "persona.detail.io.required",
+                    &[("name", &entry.name), ("type", &entry.io_type)],
+                )
+            } else {
+                t_fmt(
+                    "persona.detail.io.optional",
+                    &[("name", &entry.name), ("type", &entry.io_type)],
+                )
+            };
             buf.set_string(
-                content_area.x,
+                content_area.x + 2,
                 y,
                 &header,
                 Style::default()
@@ -656,7 +684,8 @@ pub fn render_persona_detail(
     if y < max_y
         && let Some(ref path) = state.source_path
     {
-        let src = format!("Source: {}", path.display());
+        let path = path.display().to_string();
+        let src = t_fmt("persona.detail.source", &[("path", &path)]);
         let truncated: String = src.chars().take(w).collect();
         buf.set_string(
             content_area.x,
@@ -680,46 +709,22 @@ fn persona_detail_sizing(compact: bool) -> ModalSizing {
     .with_compact(compact)
 }
 
-fn build_shortcuts(state: &PersonaDetailState) -> Vec<Shortcut<'static>> {
+fn build_shortcut_labels(state: &PersonaDetailState) -> Vec<String> {
     if state.is_editing() {
         vec![
-            Shortcut {
-                label: "Enter save",
-                clickable: false,
-                id: 0,
-            },
-            Shortcut {
-                label: "Esc cancel",
-                clickable: false,
-                id: 0,
-            },
+            t("persona.detail.footer.enter_save").to_string(),
+            t("persona.detail.footer.esc_cancel").to_string(),
         ]
     } else {
-        let mut shortcuts = vec![Shortcut {
-            label: "j/k nav",
-            clickable: false,
-            id: 0,
-        }];
+        let mut labels = vec![t("persona.detail.footer.nav").to_string()];
         if state.editable {
-            shortcuts.push(Shortcut {
-                label: "e edit field",
-                clickable: false,
-                id: 0,
-            });
+            labels.push(t("persona.detail.footer.edit_field").to_string());
         }
         if state.source_path.is_some() && state.editable {
-            shortcuts.push(Shortcut {
-                label: "i $EDITOR",
-                clickable: false,
-                id: 0,
-            });
+            labels.push(t("persona.detail.footer.open_editor").to_string());
         }
-        shortcuts.push(Shortcut {
-            label: "Esc back",
-            clickable: false,
-            id: 0,
-        });
-        shortcuts
+        labels.push(t("persona.detail.footer.esc_back").to_string());
+        labels
     }
 }
 
@@ -797,18 +802,17 @@ fn handle_browse_key(state: &mut PersonaDetailState, key: &KeyEvent) -> PersonaD
         // Other fields: e/Enter opens inline editor.
         KeyCode::Char('e') | KeyCode::Enter => {
             if !state.editable {
-                state.message = Some("Bundled personas are read-only".to_string());
+                state.message = Some(t("persona.detail.read_only").to_string());
                 return PersonaDetailOutcome::Changed;
             }
             let field = state.selected_field;
             if !field.is_editable() {
-                state.message = Some("This field cannot be edited inline".to_string());
+                state.message = Some(t("persona.detail.not_editable_inline").to_string());
                 return PersonaDetailOutcome::Changed;
             }
             let current = state.field_value(field).to_owned();
             if current.contains(['\n', '\r']) {
-                state.message =
-                    Some("Multiline values must be edited in the source file".to_string());
+                state.message = Some(t("persona.detail.multiline_source_only").to_string());
                 return PersonaDetailOutcome::Changed;
             }
             let mut editor = LineEditor::default();
@@ -826,9 +830,9 @@ fn handle_browse_key(state: &mut PersonaDetailState, key: &KeyEvent) -> PersonaD
                 if state.editable {
                     return PersonaDetailOutcome::EditInEditor { path: path.clone() };
                 }
-                state.message = Some("Bundled personas are read-only".to_string());
+                state.message = Some(t("persona.detail.read_only").to_string());
             } else {
-                state.message = Some("No source file".to_string());
+                state.message = Some(t("persona.no_source").to_string());
             }
             PersonaDetailOutcome::Changed
         }
@@ -857,9 +861,9 @@ fn handle_editing_key(state: &mut PersonaDetailState, key: &KeyEvent) -> Persona
             state.set_field_value(field, new_value);
             state.dirty = true;
             if let Err(e) = state.save_to_file() {
-                state.message = Some(format!("Save failed: {e}"));
+                state.message = Some(t_fmt("persona.save_failed", &[("error", &e)]));
             } else {
-                state.message = Some("Saved".to_string());
+                state.message = Some(t("persona.saved").to_string());
             }
         }
         return PersonaDetailOutcome::Changed;

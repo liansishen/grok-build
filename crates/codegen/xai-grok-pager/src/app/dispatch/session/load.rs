@@ -123,7 +123,7 @@ fn dispatch_load_session_ungated(
         &session_id,
         &app.cwd,
     ) {
-        app.show_toast(crate::app::session_startup::CHAT_MODE_LOCAL_BUILD_REFUSAL);
+        app.show_toast(crate::app::session_startup::chat_mode_local_build_refusal());
         return vec![];
     }
     invalidate_picker_fetch_on_dismiss(app);
@@ -801,7 +801,7 @@ pub(in crate::app::dispatch) fn dispatch_load_session_with_restore(
         &session_id,
         &app.cwd,
     ) {
-        app.show_toast(crate::app::session_startup::CHAT_MODE_LOCAL_BUILD_REFUSAL);
+        app.show_toast(crate::app::session_startup::chat_mode_local_build_refusal());
         return vec![];
     }
     if focus_if_session_already_open(app, &session_id, false).is_some() {

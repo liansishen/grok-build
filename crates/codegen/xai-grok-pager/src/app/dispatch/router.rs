@@ -1043,9 +1043,9 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                     .and_then(|u| u.to_file_path().ok())
                     .is_some_and(|path| crate::app::link_opener::open_path(&path));
                 app.show_toast(if opened {
-                    "Opening in default app\u{2026}"
+                    xai_grok_i18n::t("router.opening_in_default_app")
                 } else {
-                    "Could not open file"
+                    xai_grok_i18n::t("router.could_not_open_file")
                 });
             } else {
                 open_url_or_show(app, &url);
@@ -1058,9 +1058,9 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 Some(LinkTarget::File(path)) => {
                     let opened = crate::app::link_opener::open_path(&path);
                     app.show_toast(if opened {
-                        "Opening in default app\u{2026}"
+                        xai_grok_i18n::t("router.opening_in_default_app")
                     } else {
-                        "Could not open file"
+                        xai_grok_i18n::t("router.could_not_open_file")
                     });
                 }
                 Some(LinkTarget::Url(url)) => {
@@ -1177,18 +1177,17 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 super::task_result::deliver_doctor_message(
                     app,
                     target.agent_id,
-                    "This fix was cancelled because the session changed. Run `/doctor fix` again."
-                        .to_owned(),
+                    xai_grok_i18n::t("router.fix_cancelled_session_changed").to_owned(),
                 );
                 return vec![];
             };
             if let Some(agent) = app.agents.get_mut(&target.agent_id) {
+                let id = plan.id().to_string();
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                        "Applying {}…",
-                        plan.id()
-                    )));
+                    .push_block(crate::scrollback::block::RenderBlock::system(
+                        xai_grok_i18n::t_fmt("router.applying_fix", &[("id", &id)]),
+                    ));
             }
             vec![Effect::ApplyDoctorFix { target, plan }]
         }
@@ -1196,7 +1195,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             super::task_result::deliver_doctor_message(
                 app,
                 target.agent_id,
-                "Fix cancelled.".to_owned(),
+                xai_grok_i18n::t("fix_cancelled").to_owned(),
             );
             vec![]
         }

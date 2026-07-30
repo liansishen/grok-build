@@ -60,7 +60,7 @@ pub(crate) fn location_line_at(theme: &Theme, cwd: &Path) -> Line<'static> {
     if let Some(branch) = info.as_ref().and_then(|i| i.branch.as_deref()) {
         let icon = git_info::branch_icon();
         let git_text = if branch.is_empty() {
-            format!("{icon} detached")
+            format!("{icon} {}", xai_grok_i18n::t("git.detached"))
         } else {
             format!("{icon} {branch}")
         };
@@ -106,7 +106,8 @@ fn format_cwd_display(cwd: &Path, info: Option<&git_info::CwdGitInfo>) -> String
 /// Pure formatting for the cwd display — no global state, easy to test.
 fn format_cwd_parts(display: &str, main_repo: Option<&str>) -> String {
     if let Some(main_repo) = main_repo {
-        format!("{display} (worktree of {main_repo})")
+        let suffix = xai_grok_i18n::t_fmt("git.worktree_of", &[("main_repo", main_repo)]);
+        format!("{display} {suffix}")
     } else {
         display.to_string()
     }
@@ -136,10 +137,12 @@ mod tests {
     /// session status bar — regardless of the worktree's human label (the
     /// label is no longer shown here; the `worktree ` badge stands in for it).
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn format_cwd_worktree_shows_main_repo() {
+        let suffix = xai_grok_i18n::t_fmt("git.worktree_of", &[("main_repo", "~/xai")]);
         assert_eq!(
             format_cwd_parts("~/wt/session-1", Some("~/xai")),
-            "~/wt/session-1 (worktree of ~/xai)"
+            format!("~/wt/session-1 {suffix}")
         );
     }
 
@@ -163,6 +166,7 @@ mod tests {
     /// A worktree subdirectory shows the `(worktree of …)` suffix (matching
     /// the session status bar) while still showing the real subdirectory path.
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn format_cwd_display_worktree_subdir_shows_main_repo() {
         let info = git_info::CwdGitInfo {
             branch: Some("kevin/x".into()),
@@ -170,9 +174,10 @@ mod tests {
             main_repo: Some("~/xai".into()),
             worktree_label: Some("location-picker".into()),
         };
+        let suffix = xai_grok_i18n::t_fmt("git.worktree_of", &[("main_repo", "~/xai")]);
         assert_eq!(
             format_cwd_display(Path::new("/work/wt/location-picker/frontend"), Some(&info)),
-            "/work/wt/location-picker/frontend (worktree of ~/xai)",
+            format!("/work/wt/location-picker/frontend {suffix}"),
         );
     }
 

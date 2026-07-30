@@ -55,7 +55,7 @@ fn no_login_method_error(app: &AppView) -> String {
     if app.auth_methods.is_empty() {
         xai_grok_shell::agent::auth_method::PREFERRED_API_KEY_UNAVAILABLE.to_string()
     } else {
-        "No login method available".to_string()
+        xai_grok_i18n::t("auth.no_login_method").to_string()
     }
 }
 
@@ -359,7 +359,11 @@ pub(super) fn handle_auth_complete(
                 // auth detour, so a plain front-enqueue + drain is safe.
                 if let Some(prompt) = agent.reauth_stashed_prompt.take() {
                     agent.scrollback.push_block(RenderBlock::system(
-                        "Re-authenticated. Retrying\u{2026}".to_string(),
+                        xai_grok_i18n::t_or(
+                            "auth.reauthenticated_retrying",
+                            "Re-authenticated. Retrying\u{2026}",
+                        )
+                        .to_string(),
                     ));
                     agent.session.enqueue_in_flight_prompt_front(prompt);
                     let drain = maybe_drain_queue(agent);
@@ -478,18 +482,32 @@ pub(super) fn handle_mcp_auth_trigger_done(
                 } else {
                     modal.modal_message =
                         Some(crate::views::extensions_modal::ModalMessage::Error(
-                            format!("{server_name}: setup schema is not supported in this UI"),
+                            xai_grok_i18n::t_or(
+                                "extensions.mcp.setup_schema_unsupported",
+                                "{server}: setup schema is not supported in this UI",
+                            )
+                            .replace("{server}", &server_name),
                         ));
                 }
                 return vec![];
             }
             Err(e) => {
                 let msg = if e.starts_with("To authenticate") {
-                    format!("{server_name}: {e}")
+                    xai_grok_i18n::t_or(
+                        "extensions.mcp.server_message",
+                        "{server}: {message}",
+                    )
+                    .replace("{server}", &server_name)
+                    .replace("{message}", &e)
                 } else if e.contains(&server_name) {
-                    format!("Auth failed: {e}")
+                    xai_grok_i18n::t_fmt("auth.auth_failed", &[("error", e.as_str())])
                 } else {
-                    format!("{server_name} auth failed: {e}")
+                    xai_grok_i18n::t_or(
+                        "extensions.mcp.server_auth_failed",
+                        "{server} auth failed: {error}",
+                    )
+                    .replace("{server}", &server_name)
+                    .replace("{error}", &e)
                 };
                 modal.modal_message =
                     Some(crate::views::extensions_modal::ModalMessage::Error(msg));
@@ -530,18 +548,33 @@ pub(super) fn handle_mcp_setup_submit_done(
             modal.pending_action = None;
             modal.pending_entry_index = None;
             modal.modal_message = Some(crate::views::extensions_modal::ModalMessage::Error(
-                format!("{server_name} setup failed: {e}"),
+                xai_grok_i18n::t_or(
+                    "extensions.mcp.setup_failed",
+                    "{server} setup failed: {error}",
+                )
+                .replace("{server}", &server_name)
+                .replace("{error}", &e),
             ));
             return vec![];
         }
-        modal.pending_action = Some(format!("Authenticating {server_name}..."));
+        modal.pending_action = Some(
+            xai_grok_i18n::t_or(
+                "extensions.mcp.authenticating",
+                "Authenticating {server}...",
+            )
+            .replace("{server}", &server_name),
+        );
         modal.pending_entry_index = None;
     }
     let Some(session_id) = agent.session.session_id.clone() else {
         if let Some(ref mut modal) = agent.extensions_modal {
             modal.pending_action = None;
             modal.modal_message = Some(crate::views::extensions_modal::ModalMessage::Error(
-                format!("{server_name}: no active session for authentication"),
+                xai_grok_i18n::t_or(
+                    "extensions.mcp.no_active_session",
+                    "{server}: no active session for authentication",
+                )
+                .replace("{server}", &server_name),
             ));
         }
         return vec![];

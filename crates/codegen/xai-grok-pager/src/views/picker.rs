@@ -193,8 +193,11 @@ pub fn compute_scroll_offset(
 // Search bar
 // ---------------------------------------------------------------------------
 
-const SEARCH_BAR_LABEL: &str = " search: ";
 const SEARCH_BAR_TRAILING_GAP: u16 = 1;
+
+fn search_bar_label() -> String {
+    format!(" {}", xai_grok_i18n::t("list_pane.input.search"))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SearchBarLayout {
@@ -214,7 +217,7 @@ impl SearchBarLayout {
 }
 
 pub fn search_bar_layout(width: u16, trailing_width: u16) -> SearchBarLayout {
-    let label_width = (SEARCH_BAR_LABEL.len() as u16).min(width);
+    let label_width = (search_bar_label().width() as u16).min(width);
     let available_input = width - label_width;
     let trailing_reserved = if trailing_width > 0
         && available_input
@@ -239,10 +242,10 @@ pub fn search_bar_layout(width: u16, trailing_width: u16) -> SearchBarLayout {
     }
 }
 
-/// Render a search bar row: ` search: {query}_` or ` / to search` hint.
+/// Render a search bar row with the localized search label or idle hint.
 ///
 /// - `active`: whether the cursor blinks (search mode is engaged).
-/// - `show_hint`: show `/ to search` placeholder when query is empty and not active.
+/// - `show_hint`: show the localized search placeholder when query is empty and not active.
 /// - `query_cursor`: byte offset of the editing cursor within `query`.
 ///   The visual cursor is placed after the display-width of `query[..query_cursor]`.
 /// - `bg`: optional background color for the search text (used in Floating mode).
@@ -259,13 +262,14 @@ pub fn render_search_bar(
     query_cursor: usize,
     bg: Option<ratatui::style::Color>,
 ) {
+    let label = search_bar_label();
     render_search_bar_with_label(
         buf,
         x,
         y,
         width,
         theme,
-        SEARCH_BAR_LABEL,
+        &label,
         query,
         active,
         show_hint,
@@ -287,13 +291,14 @@ pub fn render_search_bar_with_viewport(
     bg: Option<ratatui::style::Color>,
     viewport: xai_ratatui_textarea::SingleLineViewport,
 ) {
+    let label = search_bar_label();
     render_search_bar_with_label_viewport(
         buf,
         x,
         y,
         layout.render_width,
         theme,
-        SEARCH_BAR_LABEL,
+        &label,
         query,
         active,
         show_hint,
@@ -330,13 +335,14 @@ pub(crate) fn render_line_editor_search_bar(
     show_hint: bool,
     bg: Option<ratatui::style::Color>,
 ) {
+    let label = search_bar_label();
     render_line_editor_search_bar_with_label(
         buf,
         x,
         y,
         width,
         theme,
-        SEARCH_BAR_LABEL,
+        &label,
         editor,
         active,
         show_hint,
@@ -384,7 +390,7 @@ fn render_line_editor_search_bar_with_label(
     show_hint: bool,
     bg: Option<ratatui::style::Color>,
 ) {
-    let input_width = width.saturating_sub(label.len() as u16) as usize;
+    let input_width = width.saturating_sub(label.width() as u16) as usize;
     let viewport = editor.viewport(input_width);
     render_search_bar_with_label_viewport(
         buf,
@@ -403,8 +409,8 @@ fn render_line_editor_search_bar_with_label(
 }
 
 /// Like [`render_search_bar`] but with a caller-supplied prompt `label`
-/// (e.g. `" path: "`) instead of the default `" search: "`. The label
-/// width is measured in bytes (ASCII), matching the input-window math.
+/// (e.g. `" path: "`) instead of the localized default search label. The label
+/// width is measured in terminal display columns, matching the input-window math.
 #[allow(clippy::too_many_arguments)]
 pub fn render_search_bar_with_label(
     buf: &mut Buffer,
@@ -462,7 +468,7 @@ fn render_search_bar_with_label_viewport(
     let always_active = !active && !show_hint;
 
     if active || !query.is_empty() || always_active {
-        let label_w = label.len() as u16;
+        let label_w = (label.width() as u16).min(width);
         buf.set_line(
             x,
             y,
@@ -2028,7 +2034,7 @@ fn render_picker_content_inner(
     if loading {
         let spinner_frames = crate::glyphs::dot_spinner_frames();
         let frame = spinner_frames[(loading_tick / 4) as usize % spinner_frames.len()];
-        let msg = format!("{frame} Loading\u{2026}");
+        let msg = format!("{frame} {}", xai_grok_i18n::t("dashboard.loading"));
         let msg_style = Style::default().fg(theme.gray);
         let cx = content_area.x + content_area.width.saturating_sub(msg.width() as u16) / 2;
         let cy = content_area.y + content_area.height / 2;
@@ -2041,7 +2047,8 @@ fn render_picker_content_inner(
         let msg_style = Style::default()
             .fg(theme.gray_dim)
             .bg(picker_base_bg(bg, theme));
-        buf.set_string(content_area.x, content_area.y, "  No matches", msg_style);
+        let msg = format!("  {}", xai_grok_i18n::t("extensions.empty.no_matches"));
+        buf.set_string(content_area.x, content_area.y, msg, msg_style);
         return empty_hit;
     }
 
@@ -3460,7 +3467,8 @@ mod tests {
         let theme = Theme::current();
         for counter in ["no matches", "bad pattern", "12/34"] {
             let counter_width = counter.width() as u16;
-            let width = SEARCH_BAR_LABEL.len() as u16 + counter_width + SEARCH_BAR_TRAILING_GAP;
+            let width =
+                search_bar_label().width() as u16 + counter_width + SEARCH_BAR_TRAILING_GAP;
             let layout = search_bar_layout(width, counter_width);
             assert_eq!(
                 layout.trailing_width(),

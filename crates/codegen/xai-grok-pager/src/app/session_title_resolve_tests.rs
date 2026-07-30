@@ -114,13 +114,22 @@ fn title_miss_hint_escapes_arg_and_suggests_search() {
 #[test]
 fn worktree_failure_message_hint_follows_threaded_provenance() {
     let msg = worktree_resume_failure_message(Some("typo title"), "restore failed");
-    assert!(msg.contains("couldn't resume worktree session: restore failed"));
-    assert!(msg.contains("no session id or title matched"), "{msg}");
+    let expected_with_hint = xai_grok_i18n::t_fmt(
+        "session.worktree_resume_failed_with_hint",
+        &[
+            ("detail", "restore failed"),
+            ("hint", &title_miss_hint("typo title")),
+        ],
+    );
+    assert_eq!(msg, expected_with_hint);
     assert!(msg.contains("grok sessions search"), "{msg}");
     let resolved_msg = worktree_resume_failure_message(None, "restore failed");
     assert_eq!(
         resolved_msg,
-        "couldn't resume worktree session: restore failed"
+        xai_grok_i18n::t_fmt(
+            "session.worktree_resume_failed",
+            &[("detail", "restore failed")],
+        )
     );
 }
 

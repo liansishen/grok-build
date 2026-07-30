@@ -262,7 +262,10 @@ pub(in crate::app::dispatch) fn set_voice_keybind_enabled(
     set_voice_keybind_enabled_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "voice_keybind_enabled", value = new, "setting changed");
-    app.show_toast(&save_success_toast("Voice shortcut", new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t_or("settings.voice_keybind_enabled.label", "Voice shortcut"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "voice_keybind_enabled",
         value: crate::settings::SettingValue::Bool(new),
@@ -366,7 +369,8 @@ pub(in crate::app::dispatch) fn set_ui_language(app: &mut AppView, value: String
         "setting changed"
     );
     let name = if canonical == xai_grok_i18n::LANGUAGE_AUTO {
-        format!("System ({})", locale.display_name())
+        let system = xai_grok_i18n::t("settings.language.choice_auto");
+        format!("{system} ({})", locale.display_name())
     } else {
         locale.display_name().to_string()
     };
@@ -571,9 +575,12 @@ pub(in crate::app::dispatch) fn set_show_session_usage_bar(
         value = new,
         "setting changed",
     );
-    app.show_toast(&format!(
-        "Live session usage {}",
-        if new { "on" } else { "off" }
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t_or(
+            "settings.show_session_usage_bar.label",
+            "Live session usage on prompt",
+        ),
+        new,
     ));
     let mut effects = vec![Effect::PersistSetting {
         key: "show_session_usage_bar",
@@ -1202,7 +1209,10 @@ pub(in crate::app::dispatch) fn set_combine_queued_prompts(
     set_combine_queued_prompts_inner(app, new);
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "combine_queued_prompts", value = new, "setting changed");
-    app.show_toast(&save_success_toast("Combine queued prompts", new));
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("setter.combine_queued_prompts"),
+        new,
+    ));
     vec![Effect::PersistSetting {
         key: "combine_queued_prompts",
         value: crate::settings::SettingValue::Bool(new),
@@ -1314,7 +1324,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_undo(
     set_contextual_hint(
         app,
         "contextual_hints.undo",
-        "Undo hint",
+        xai_grok_i18n::t("setter.undo_hint"),
         prev,
         |h, v| h.undo = v,
         new,
@@ -1329,7 +1339,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_plan_mode(
     set_contextual_hint(
         app,
         "contextual_hints.plan_mode",
-        "Plan mode hint",
+        xai_grok_i18n::t("setter.plan_mode_hint"),
         prev,
         |h, v| h.plan_mode = v,
         new,
@@ -1344,7 +1354,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_image_input(
     set_contextual_hint(
         app,
         "contextual_hints.image_input",
-        "Image input hint",
+        xai_grok_i18n::t("setter.image_input_hint"),
         prev,
         |h, v| h.image_input = v,
         new,
@@ -1359,7 +1369,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_send_now(
     set_contextual_hint(
         app,
         "contextual_hints.send_now",
-        "Send now hint",
+        xai_grok_i18n::t("setter.send_now_hint"),
         prev,
         |h, v| h.send_now = v,
         new,
@@ -1374,7 +1384,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_small_screen(
     set_contextual_hint(
         app,
         "contextual_hints.small_screen",
-        "Small screen hint",
+        xai_grok_i18n::t("setter.small_screen_hint"),
         prev,
         |h, v| h.small_screen = v,
         new,
@@ -1389,7 +1399,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_word_select(
     set_contextual_hint(
         app,
         "contextual_hints.word_select",
-        "Word select hint",
+        xai_grok_i18n::t("setter.word_select_hint"),
         prev,
         |h, v| h.word_select = v,
         new,
@@ -1404,7 +1414,7 @@ pub(in crate::app::dispatch) fn set_contextual_hint_ssh_wrap(
     set_contextual_hint(
         app,
         "contextual_hints.ssh_wrap",
-        "SSH wrap hint",
+        xai_grok_i18n::t("settings.contextual_hints.ssh_wrap.label"),
         prev,
         |h, v| h.ssh_wrap = v,
         new,
@@ -1425,10 +1435,14 @@ pub(in crate::app::dispatch) fn set_contextual_hint_ssh_wrap(
 // (rollback of corrupted config).
 // ---------------------------------------------------------------------------
 
-/// Format a "✓ <Label>: <value>" toast for theme-family settings.
+/// Format a localized theme-family toast.
 /// `value` is the user-friendly display name, not the canonical.
-fn save_theme_toast(label: &str, value: &str) -> String {
-    format!("\u{2713} {label}: {value}")
+fn save_theme_toast(label_or_template: &str, value: &str) -> String {
+    if label_or_template.contains("{value}") {
+        label_or_template.replace("{value}", value)
+    } else {
+        format!("\u{2713} {label_or_template}: {value}")
+    }
 }
 
 /// Apply a (non-auto) theme to the live display.
@@ -1527,7 +1541,7 @@ pub(in crate::app::dispatch) fn set_theme(app: &mut AppView, new: String) -> Vec
         "setting changed",
     );
     app.show_toast(&save_theme_toast(
-        "Theme",
+        xai_grok_i18n::t("setter.theme"),
         crate::theme::display_name_for_canonical(new_canonical),
     ));
     vec![Effect::PersistSetting {
@@ -1631,7 +1645,7 @@ pub(in crate::app::dispatch) fn set_auto_dark_theme(app: &mut AppView, new: Stri
         "setting changed",
     );
     app.show_toast(&save_theme_toast(
-        "Auto dark theme",
+        xai_grok_i18n::t("setter.auto_dark_theme"),
         crate::theme::display_name_for_canonical(new_canonical),
     ));
     vec![Effect::PersistSetting {
@@ -1744,7 +1758,7 @@ pub(in crate::app::dispatch) fn set_auto_light_theme(
         "setting changed",
     );
     app.show_toast(&save_theme_toast(
-        "Auto light theme",
+        xai_grok_i18n::t("setter.auto_light_theme"),
         crate::theme::display_name_for_canonical(new_canonical),
     ));
     vec![Effect::PersistSetting {
@@ -1843,7 +1857,7 @@ pub(in crate::app::dispatch) fn set_default_model_inner(
 /// renders the user-friendly model name (NOT the internal id) so the
 /// toast text matches what the user typed.
 fn save_default_model_toast(value: &str) -> String {
-    format!("\u{2713} Default model: {value}")
+    save_value_toast(xai_grok_i18n::t("settings.default_model.label"), value)
 }
 
 /// Outer dispatcher for `Action::SetDefaultModel`. Switches and persists
@@ -2032,7 +2046,10 @@ pub(super) fn set_fork_secondary_model_inner(app: &mut AppView, value: String) {
 /// `save_default_model_toast` — renders the user-friendly model
 /// name (NOT the internal id).
 fn save_fork_secondary_model_toast(value: &str) -> String {
-    format!("\u{2713} Fork secondary model: {value}")
+    save_value_toast(
+        xai_grok_i18n::t("settings.fork_secondary_model.label"),
+        value,
+    )
 }
 
 /// Outer dispatcher for `Action::SetForkSecondaryModel`.

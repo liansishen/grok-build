@@ -62,7 +62,10 @@ impl AgentView {
                     && let Some(ref mut modal) = self.agents_modal
                 {
                     modal.message = Some(crate::views::agents_modal::AgentsModalMessage::error(
-                        format!("Failed to load persona '{name}'"),
+                        xai_grok_i18n::t_fmt(
+                            "ext_confirm.persona_load_failed",
+                            &[("name", &name)],
+                        ),
                     ));
                 }
                 self.persona_detail = detail;
@@ -778,7 +781,7 @@ impl AgentView {
             }
             McpSetupOutcome::Submit => {
                 let Some(values) = setup.values() else {
-                    setup.error = Some("Select an option".to_string());
+                    setup.error = Some(xai_grok_i18n::t("ext_confirm.select_option").to_string());
                     return InputOutcome::Changed;
                 };
                 let server_name = setup.server_name.clone();
@@ -1416,7 +1419,8 @@ impl AgentView {
                         state.plugins_data = TabDataState::Loading;
                         state.marketplace_data = TabDataState::Loading;
                     } else {
-                        state.pending_action = Some("Processing...".into());
+                        state.pending_action =
+                            Some(xai_grok_i18n::t("extensions.processing").into());
                         state.pending_entry_index = Some(state.picker_state.selected);
                     }
                 }
@@ -1576,13 +1580,19 @@ impl AgentView {
                         if let Some(ref mut s) = self.extensions_modal {
                             s.modal_message =
                                 Some(crate::views::extensions_modal::ModalMessage::Error(
-                                    format!("Cannot remove managed server '{name}'"),
+                                    xai_grok_i18n::t_fmt(
+                                        "ext_confirm.cannot_remove_managed",
+                                        &[("name", &name)],
+                                    ),
                                 ));
                         }
                         InputOutcome::Changed
                     }
                     Some(Ok(server_name)) => self.prompt_extensions_confirm(
-                        format!("Remove MCP server \"{server_name}\"?"),
+                        xai_grok_i18n::t_fmt(
+                            "ext_confirm.remove_mcp_server",
+                            &[("name", &server_name)],
+                        ),
                         crate::views::extensions_modal::ConfirmationAction::DeleteMcpServer {
                             server_name,
                         },
@@ -1606,14 +1616,16 @@ impl AgentView {
                         // No pending_entry_index: the new source doesn't exist
                         // yet, so any index would decorate an unrelated row.
                         xai_hooks_plugins_types::MarketplaceAction::AddSource { .. } => {
-                            state.pending_action = Some("Adding source...".into());
+                            state.pending_action =
+                                Some(xai_grok_i18n::t("ext_confirm.adding_source").into());
                         }
                         xai_hooks_plugins_types::MarketplaceAction::Uninstall { .. } => {
                             state.pending_action = Some("Uninstalling...".into());
                             state.pending_entry_index = Some(state.picker_state.selected);
                         }
                         _ => {
-                            state.pending_action = Some("Processing...".into());
+                            state.pending_action =
+                                Some(xai_grok_i18n::t("extensions.processing").into());
                             state.pending_entry_index = Some(state.picker_state.selected);
                         }
                     }
@@ -1630,7 +1642,10 @@ impl AgentView {
                         let path = hook.source_dir.clone();
                         let (label, _) = crate::views::extensions_modal::derive_source_label(&path);
                         return self.prompt_extensions_confirm(
-                            format!("Remove hook source \"{label}\"?"),
+                            xai_grok_i18n::t_fmt(
+                                "ext_confirm.remove_hook_source",
+                                &[("label", &label)],
+                            ),
                             crate::views::extensions_modal::ConfirmationAction::Hooks(
                                 xai_hooks_plugins_types::HooksAction::Remove { path },
                             ),
@@ -1727,7 +1742,10 @@ impl AgentView {
                     let plugin_id = plugin.id.clone();
                     let name = plugin.name.clone();
                     return self.prompt_extensions_confirm(
-                        format!("Uninstall plugin \"{name}\"?"),
+                        xai_grok_i18n::t_fmt(
+                            "ext_confirm.uninstall_plugin",
+                            &[("name", &name)],
+                        ),
                         crate::views::extensions_modal::ConfirmationAction::Plugins(
                             xai_hooks_plugins_types::PluginsAction::Uninstall {
                                 plugin_id,
@@ -1931,7 +1949,10 @@ impl AgentView {
                         let source = &response.sources[si];
                         let plugin = &source.plugins[pi];
                         return self.prompt_extensions_confirm(
-                            format!("Uninstall marketplace plugin \"{}\"?", plugin.name),
+                            xai_grok_i18n::t_fmt(
+                                "ext_confirm.uninstall_marketplace_plugin",
+                                &[("name", &plugin.name)],
+                            ),
                             crate::views::extensions_modal::ConfirmationAction::Marketplace(
                                 xai_hooks_plugins_types::MarketplaceAction::Uninstall {
                                     source_url_or_path: source.source_url_or_path.clone(),
@@ -1952,9 +1973,9 @@ impl AgentView {
                             .and_then(|(si, _)| response.sources.get(si));
                         if let Some(source) = source {
                             return self.prompt_extensions_confirm(
-                                format!(
-                                    "Remove source \"{}\" and uninstall all its plugins?",
-                                    source.source_name
+                                xai_grok_i18n::t_fmt(
+                                    "ext_confirm.remove_source",
+                                    &[("name", &source.source_name)],
                                 ),
                                 crate::views::extensions_modal::ConfirmationAction::Marketplace(
                                     xai_hooks_plugins_types::MarketplaceAction::RemoveSource {
@@ -3104,7 +3125,10 @@ mod extensions_modal_confirmation_tests {
             PromptCase {
                 modal: mcp,
                 button: ButtonAction::RemoveSelectedMcpServer,
-                message_sub: "Remove MCP server \"alpha\"?".into(),
+                message_sub: xai_grok_i18n::t_fmt(
+                    "ext_confirm.remove_mcp_server",
+                    &[("name", "alpha")],
+                ),
                 expected: ConfirmationAction::DeleteMcpServer {
                     server_name: "alpha".into(),
                 },

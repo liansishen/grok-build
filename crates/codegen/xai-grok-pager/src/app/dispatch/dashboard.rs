@@ -327,7 +327,7 @@ pub(super) fn dispatch_dashboard_attach(
         DashboardRowId::TopLevel(agent_id) => {
             if !app.agents.contains_key(&agent_id) {
                 if let Some(d) = app.dashboard.as_mut() {
-                    d.set_error_toast("Session no longer exists");
+                    d.set_error_toast(xai_grok_i18n::t("dash.session_gone"));
                 }
                 return vec![];
             }
@@ -364,7 +364,7 @@ pub(super) fn dispatch_dashboard_attach(
                 .is_some_and(|a| a.subagent_sessions.contains_key(&child_session_id));
             if !alive {
                 if let Some(d) = app.dashboard.as_mut() {
-                    d.set_error_toast("Subagent no longer running");
+                    d.set_error_toast(xai_grok_i18n::t("dash.subagent_not_running"));
                 }
                 return vec![];
             }
@@ -551,7 +551,10 @@ pub(super) fn dispatch_dashboard_overlay_stop(app: &mut AppView) -> Vec<Effect> 
         // agent disappears externally (`app_view.rs`, AgentDashboard arm).
         // Don't clobber a refusal toast planted by the close path above.
         if d.error_toast.is_none() {
-            d.error_toast = Some(format!("{} Session closed", crate::glyphs::check_mark()));
+            d.error_toast = Some(xai_grok_i18n::t_fmt(
+                "dashboard.toast.session_closed",
+                &[("check", crate::glyphs::check_mark())],
+            ));
         }
     }
     effects
@@ -571,7 +574,7 @@ pub(super) fn dispatch_dashboard_toggle_worktree(app: &mut AppView) -> Vec<Effec
             d.dispatch_worktree = !d.dispatch_worktree;
         } else {
             d.dispatch_worktree = false;
-            d.set_error_toast("Not a git repository — worktrees need one");
+            d.set_error_toast(xai_grok_i18n::t("dash.not_git_repo_worktree"));
         }
     }
     vec![]
@@ -594,7 +597,7 @@ pub(super) fn dispatch_dashboard_toggle_auto_approve(app: &mut AppView) -> Vec<E
     };
     let Some(selected) = d.selected.as_ref() else {
         if let Some(d) = app.dashboard.as_mut() {
-            d.set_error_toast("Select a session first");
+            d.set_error_toast(xai_grok_i18n::t("dash.select_session_first"));
         }
         return vec![];
     };
@@ -605,7 +608,7 @@ pub(super) fn dispatch_dashboard_toggle_auto_approve(app: &mut AppView) -> Vec<E
     };
     if !app.agents.contains_key(&agent_id) {
         if let Some(d) = app.dashboard.as_mut() {
-            d.set_error_toast("Session no longer exists");
+            d.set_error_toast(xai_grok_i18n::t("dash.session_gone"));
         }
         return vec![];
     }
@@ -821,8 +824,9 @@ pub(super) fn dispatch_dashboard_open_location_picker(app: &mut AppView) -> Vec<
     candidates.push(LocationCandidate {
         label: location_picker_label(&cwd),
         detail: format!(
-            "{}  (current)",
-            crate::project_picker::sources::display_path(&cwd)
+            "{}  {}",
+            crate::project_picker::sources::display_path(&cwd),
+            xai_grok_i18n::t("project_picker.current_suffix")
         ),
         worktree: worktree_label(&cwd),
         path: cwd.clone(),
@@ -876,11 +880,18 @@ pub(super) fn dispatch_dashboard_change_location(app: &mut AppView, input: Strin
                 .as_mut()
                 .and_then(|d| d.location_picker.as_mut())
             {
-                lp.error = Some(format!("Not a directory: {}", input.trim()));
+                lp.error = Some(xai_grok_i18n::t_fmt(
+                    "dash.not_a_directory",
+                    &[("path", input.trim())],
+                ));
             } else if let Some(d) = app.dashboard.as_mut() {
                 // `/cd <bad path>` typed into the dispatch box (no picker
                 // open) — surface the error as a dashboard toast.
-                d.set_error_toast(&format!("Not a directory: {}", input.trim()));
+                let message = xai_grok_i18n::t_fmt(
+                    "dash.not_a_directory",
+                    &[("path", input.trim())],
+                );
+                d.set_error_toast(&message);
             }
             return vec![];
         }
@@ -969,7 +980,7 @@ pub(super) fn dispatch_dashboard_confirm_worktree(
             if let Some(p) = prompt {
                 d.dispatch.restore(p);
             }
-            d.set_error_toast("Not a git repository — can't create a worktree here");
+            d.set_error_toast(xai_grok_i18n::t("dash.not_git_repo_create_worktree"));
         }
         return vec![];
     }
@@ -1118,7 +1129,7 @@ pub(super) fn dispatch_dashboard_dispatch(
     // slash-fallback callers.
     if trimmed.is_empty() {
         if let Some(d) = app.dashboard.as_mut() {
-            d.set_error_toast("Type a prompt to dispatch a session");
+            d.set_error_toast(xai_grok_i18n::t("dash.type_prompt"));
         }
         return vec![];
     }
@@ -1130,12 +1141,14 @@ pub(super) fn dispatch_dashboard_dispatch(
     // char/byte unit mismatch isn't surprising.
     const MAX_DISPATCH_BYTES: usize = 64 * 1024;
     if text.len() > MAX_DISPATCH_BYTES {
-        let chars = text.chars().count();
+        let chars = text.chars().count().to_string();
+        let bytes = text.len().to_string();
         if let Some(d) = app.dashboard.as_mut() {
-            d.set_error_toast(&format!(
-                "Prompt too long ({chars} chars / {} bytes; max ~64 KiB)",
-                text.len()
-            ));
+            let message = xai_grok_i18n::t_fmt(
+                "dash.prompt_too_long",
+                &[("chars", &chars), ("bytes", &bytes)],
+            );
+            d.set_error_toast(&message);
         }
         return vec![];
     }
@@ -1337,10 +1350,14 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
             let token = invocation.token.to_string();
             if let Some(d) = app.dashboard.as_mut() {
                 d.dispatch.set_text("");
-                d.set_error_toast(&format!(
-                    "/{token} requires SuperGrok — upgrade at {}",
-                    super::billing::UPSELL_URL_UPGRADE
-                ));
+                let message = xai_grok_i18n::t_fmt(
+                    "dashboard.toast.requires_supergrok",
+                    &[
+                        ("command", &token),
+                        ("url", super::billing::UPSELL_URL_UPGRADE),
+                    ],
+                );
+                d.set_error_toast(&message);
             }
             return vec![];
         }
@@ -1362,7 +1379,11 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
             let name = command.name();
             if let Some(d) = app.dashboard.as_mut() {
                 d.dispatch.set_text("");
-                d.set_error_toast(&format!("/{name} only works in a session"));
+                let message = xai_grok_i18n::t_fmt(
+                    "dashboard.toast.session_only_command",
+                    &[("command", name)],
+                );
+                d.set_error_toast(&message);
             }
             return vec![];
         }
@@ -1500,7 +1521,7 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
         CommandResult::Action(Action::ShowPlan) => {
             if let Some(d) = app.dashboard.as_mut() {
                 d.dispatch.set_text("");
-                d.set_error_toast("No plan to show on the dashboard");
+                d.set_error_toast(xai_grok_i18n::t("dash.no_plan"));
             }
             vec![]
         }
@@ -1514,7 +1535,7 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
         CommandResult::Doctor(_) => {
             if let Some(d) = app.dashboard.as_mut() {
                 d.dispatch.set_text("");
-                d.set_error_toast("Open a session to run /doctor.");
+                d.set_error_toast(xai_grok_i18n::t("dash.open_session_doctor"));
             }
             vec![]
         }
@@ -1646,7 +1667,7 @@ pub(super) fn dispatch_dashboard_peek_cycle_mode(app: &mut AppView) -> Vec<Effec
         DashboardRowId::TopLevel(id) => id,
         DashboardRowId::Subagent { .. } => {
             if let Some(d) = app.dashboard.as_mut() {
-                d.set_error_toast("Can't change a subagent's mode");
+                d.set_error_toast(xai_grok_i18n::t("dashboard.toast.subagent_mode_readonly"));
             }
             return vec![];
         }
@@ -1655,7 +1676,7 @@ pub(super) fn dispatch_dashboard_peek_cycle_mode(app: &mut AppView) -> Vec<Effec
     if !app.agents.contains_key(&agent_id) {
         if let Some(d) = app.dashboard.as_mut() {
             d.set_peek(None);
-            d.set_error_toast("Session no longer exists");
+            d.set_error_toast(xai_grok_i18n::t("dash.session_gone"));
         }
         return vec![];
     }
@@ -1697,7 +1718,7 @@ pub(super) fn dispatch_dashboard_peek_reply(
     // peeks driven by their parent turn.
     let DashboardRowId::TopLevel(agent_id) = row else {
         if let Some(d) = app.dashboard.as_mut() {
-            d.set_error_toast("Can't reply to a subagent");
+            d.set_error_toast(xai_grok_i18n::t("dashboard.toast.subagent_reply_readonly"));
         }
         return vec![];
     };
@@ -1705,7 +1726,7 @@ pub(super) fn dispatch_dashboard_peek_reply(
     if !app.agents.contains_key(&agent_id) {
         if let Some(d) = app.dashboard.as_mut() {
             d.set_peek(None);
-            d.set_error_toast("Session no longer exists");
+            d.set_error_toast(xai_grok_i18n::t("dash.session_gone"));
         }
         return vec![];
     }
@@ -1731,7 +1752,7 @@ pub(super) fn dispatch_dashboard_peek_reply(
         let Some(agent) = app.agents.get_mut(&agent_id) else {
             if let Some(d) = app.dashboard.as_mut() {
                 d.set_peek(None);
-                d.set_error_toast("Session no longer exists");
+                d.set_error_toast(xai_grok_i18n::t("dash.session_gone"));
             }
             return vec![];
         };
@@ -1790,7 +1811,7 @@ pub(super) fn dispatch_dashboard_begin_rename(app: &mut AppView) {
     // Only top-level rows are renameable (subagents are tool-spawned
     // and have no user-visible name to rename).
     if sel.is_subagent() {
-        d.set_error_toast("Subagent rows can't be renamed");
+        d.set_error_toast(xai_grok_i18n::t("dash.subagent_no_rename"));
         return;
     }
     // The draft starts EMPTY (not prefilled with the current title):
@@ -2182,7 +2203,7 @@ pub(super) fn dispatch_dashboard_permission_select(
     let Some(agent) = app.agents.get_mut(&target_id) else {
         if let Some(d) = app.dashboard.as_mut() {
             d.set_peek(None);
-            d.set_error_toast("Row no longer exists");
+            d.set_error_toast(xai_grok_i18n::t("dash.row_gone"));
         }
         return vec![];
     };
@@ -2194,7 +2215,7 @@ pub(super) fn dispatch_dashboard_permission_select(
     if !front_matches {
         if let Some(d) = app.dashboard.as_mut() {
             d.set_peek(None);
-            d.set_error_toast("Permission has changed — re-open peek");
+            d.set_error_toast(xai_grok_i18n::t("dash.permission_changed"));
         }
         return vec![];
     }
@@ -2276,7 +2297,7 @@ pub(super) fn dispatch_dashboard_permission_followup(
     let Some(agent) = app.agents.get_mut(&target_id) else {
         if let Some(d) = app.dashboard.as_mut() {
             d.set_peek(None);
-            d.set_error_toast("Row no longer exists");
+            d.set_error_toast(xai_grok_i18n::t("dash.row_gone"));
         }
         return vec![];
     };
@@ -2288,7 +2309,7 @@ pub(super) fn dispatch_dashboard_permission_followup(
     if !front_matches {
         if let Some(d) = app.dashboard.as_mut() {
             d.set_peek(None);
-            d.set_error_toast("Permission has changed — re-open peek");
+            d.set_error_toast(xai_grok_i18n::t("dash.permission_changed"));
         }
         return vec![];
     }
@@ -2345,7 +2366,7 @@ pub(super) fn dispatch_dashboard_question_answer(
     let Some(agent) = app.agents.get_mut(&target_id) else {
         if let Some(d) = app.dashboard.as_mut() {
             d.set_peek(None);
-            d.set_error_toast("Row no longer exists");
+            d.set_error_toast(xai_grok_i18n::t("dash.row_gone"));
         }
         return vec![];
     };
