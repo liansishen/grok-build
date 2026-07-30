@@ -2294,12 +2294,11 @@ impl AgentView {
         }
         let mode_flags: &[PromptFlag] = &mode_flags_vec;
         let multiline = self.multiline_mode;
-        let usage_visible = self
-            .prompt
-            .slash_controller
-            .registry()
-            .get("usage")
-            .is_some();
+        // Consumer billing surface (personal OAuth), not slash-registry
+        // availability. `/usage` is tier-restricted on free/X Basic and when
+        // subscription_tier is still unknown, but the compact weekly/monthly
+        // status next to the model name must track the same gate as the
+        // welcome screen and credit warnings (`billing_surface_visible`).
         let warning = self.credit_balance.as_ref().and_then(|bal| {
             crate::views::credit_bar::usage_warning_for_session(
                 bal,
@@ -2315,7 +2314,7 @@ impl AgentView {
         let credit_status = self
             .credit_balance
             .as_ref()
-            .filter(|_| usage_visible && !self.chat_kind)
+            .filter(|_| self.billing_surface_visible && !self.chat_kind)
             .map(|bal| bal.prompt_status_line());
         // Live session tokens/cost (left of model; cost only when available).
         let session_status = self

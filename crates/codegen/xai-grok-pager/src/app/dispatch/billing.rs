@@ -403,7 +403,14 @@ pub(super) fn handle_billing_fetched(
     // Near-limit still benefits from turn-end fetches + this poll loop.
     app.billing_poll_wanted = true;
     if let Some(tier) = subscription_tier {
+        let prev = app.subscription_tier.clone();
         app.subscription_tier = Some(tier);
+        // Billing is often the first place the live paid tier lands (AuthMeta
+        // may arrive with tier still unknown). Recompute free/X Basic slash
+        // restrictions so `/usage` and related commands unhide for paid users.
+        if app.subscription_tier != prev {
+            app.apply_tier_restrictions();
+        }
     }
     app.sync_billing_cache_to_agents();
     // The account cache has already fanned out to every Build agent; only

@@ -4302,6 +4302,7 @@ pub(crate) fn execute(
                                 BillingConfigResponse,
                             >(result.clone()) {
                                 Ok(billing) => {
+                                    let subscription_tier = billing.subscription_tier;
                                     let balance = billing.config.map(credit_balance_from_config);
                                     let autotopup = if has_prepaid_credits(balance.as_ref()) {
                                         fetch_auto_topup_info(&tx).await
@@ -4311,6 +4312,7 @@ pub(crate) fn execute(
                                     TaskResult::AppBillingFetched {
                                         request,
                                         balance,
+                                        subscription_tier,
                                         autotopup,
                                     }
                                 }

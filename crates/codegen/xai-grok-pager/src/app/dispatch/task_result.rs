@@ -358,6 +358,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         TaskResult::AppBillingFetched {
             request,
             balance,
+            subscription_tier,
             autotopup,
         } => {
             // Reject hidden, old-account, and out-of-order results before they
@@ -375,6 +376,13 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             app.credit_balance = balance;
             apply_auto_topup(&mut app.auto_topup, &autotopup);
             app.billing_poll_wanted = true;
+            if let Some(tier) = subscription_tier {
+                let prev = app.subscription_tier.clone();
+                app.subscription_tier = Some(tier);
+                if app.subscription_tier != prev {
+                    app.apply_tier_restrictions();
+                }
+            }
             app.sync_billing_cache_to_agents();
             vec![]
         }

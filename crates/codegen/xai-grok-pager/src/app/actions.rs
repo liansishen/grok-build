@@ -2833,6 +2833,10 @@ pub enum TaskResult {
     AppBillingFetched {
         request: BillingRequestId,
         balance: Option<crate::views::credit_bar::CreditBalance>,
+        /// Subscription tier piggybacked from the billing response (same as
+        /// [`Self::BillingFetched`]). Lets startup/poll lifts free-tier slash
+        /// restrictions when AuthMeta still had an unknown tier.
+        subscription_tier: Option<String>,
         autotopup: crate::views::credit_bar::AutoTopupFetch,
     },
     /// App-level billing transport or payload parsing failed. The last-known-good

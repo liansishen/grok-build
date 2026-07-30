@@ -820,6 +820,89 @@ fn billing_fetched_enables_poll_for_prompt_status() {
 }
 
 #[test]
+fn billing_fetched_tier_lifts_usage_slash_restriction() {
+    let mut app = test_app_with_agent();
+    // Unknown/absent tier is treated as free-tier restricted for slash UI.
+    app.subscription_tier = None;
+    app.apply_tier_restrictions();
+    assert!(
+        app.tier_restricted_commands.iter().any(|c| c == "usage"),
+        "absent tier must restrict /usage"
+    );
+    assert!(
+        app.agents
+            .get(&AgentId(0))
+            .unwrap()
+            .prompt
+            .slash_controller
+            .registry()
+            .get("usage")
+            .is_none(),
+        "restricted /usage must not resolve via registry.get"
+    );
+
+    dispatch_billing(
+        &mut app,
+        Some(test_bal(42.0)),
+        true,
+        Some("SuperGrok".into()),
+    );
+
+    assert_eq!(app.subscription_tier.as_deref(), Some("SuperGrok"));
+    assert!(
+        !app.tier_restricted_commands.iter().any(|c| c == "usage"),
+        "paid tier from billing must lift /usage restriction"
+    );
+    assert!(
+        app.agents
+            .get(&AgentId(0))
+            .unwrap()
+            .prompt
+            .slash_controller
+            .registry()
+            .get("usage")
+            .is_some(),
+        "/usage must resolve again after billing reports a paid tier"
+    );
+}
+
+#[test]
+fn prompt_status_uses_billing_surface_not_slash_registry() {
+    let mut app = test_app_with_agent();
+    // Consumer surface stays on while free-tier slash restrictions hide /usage.
+    app.subscription_tier = None;
+    app.apply_tier_restrictions();
+    assert!(app.usage_visible);
+    assert!(
+        app.agents
+            .get(&AgentId(0))
+            .unwrap()
+            .prompt
+            .slash_controller
+            .registry()
+            .get("usage")
+            .is_none()
+    );
+
+    let bal = crate::views::credit_bar::CreditBalance {
+        period_type: Some("USAGE_PERIOD_TYPE_WEEKLY".into()),
+        period_end_display: Some("Mar 31, 12:00".into()),
+        ..test_bal(45.6)
+    };
+    dispatch_billing(&mut app, Some(bal), true, None);
+
+    let agent = app.agents.get(&AgentId(0)).unwrap();
+    assert!(agent.billing_surface_visible);
+    let agent_bal = agent.credit_balance.as_ref().expect("balance synced");
+    // Render path must not require registry.get("usage") — only the consumer
+    // billing surface + non-chat kind, matching welcome-screen prompt status.
+    assert!(agent.billing_surface_visible && !agent.chat_kind);
+    let status = agent_bal.prompt_status_line();
+    assert!(status.contains("45%"), "{status}");
+    assert!(status.contains("Mar 31, 12:00"), "{status}");
+}
+
+#[test]
 fn billing_fetched_keeps_poll_at_low_usage() {
     let mut app = test_app_with_agent();
     app.billing_poll_wanted = true;
@@ -990,6 +1073,7 @@ fn app_billing_fetched_stores_autotopup_and_arms_polling() {
         Action::TaskComplete(TaskResult::AppBillingFetched {
             request: next_billing_request(&mut app),
             balance: Some(bal),
+            subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Resolved(
                 crate::views::credit_bar::AutoTopupInfo::disabled(),
             ),
@@ -1050,6 +1134,7 @@ fn newer_billing_result_wins_over_older_overlapping_request() {
         Action::TaskComplete(TaskResult::AppBillingFetched {
             request: newer,
             balance: Some(test_bal(25.0)),
+            subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
         }),
         &mut app,
@@ -1085,6 +1170,7 @@ fn older_app_failure_does_not_change_cadence_after_newer_success() {
         Action::TaskComplete(TaskResult::AppBillingFetched {
             request: newer,
             balance: Some(test_bal(30.0)),
+            subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
         }),
         &mut app,
@@ -1143,6 +1229,7 @@ fn old_account_result_is_ignored_after_billing_surface_returns() {
         Action::TaskComplete(TaskResult::AppBillingFetched {
             request: old_request,
             balance: Some(test_bal(99.0)),
+            subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
         }),
         &mut app,
@@ -1172,6 +1259,7 @@ fn hidden_billing_surface_stops_polling_and_ignores_late_result() {
         Action::TaskComplete(TaskResult::AppBillingFetched {
             request: old_request,
             balance: Some(test_bal(99.0)),
+            subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
         }),
         &mut app,
