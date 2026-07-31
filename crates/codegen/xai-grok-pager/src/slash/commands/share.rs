@@ -1,6 +1,5 @@
 //! `/share` -- share current session via URL.
 
-use crate::app::actions::Action;
 use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
 
 /// Share the current session via a public URL.
@@ -24,13 +23,9 @@ impl SlashCommand for ShareCommand {
     }
 
     fn run(&self, ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
-        // Check if we have an active session
-        if ctx.session_id.is_none() {
-            return CommandResult::Error(
-                xai_grok_i18n::t("slash.err.no_active_session_share").to_string(),
-            );
-        }
-
-        CommandResult::Action(Action::ShareSession)
+        let _ = ctx;
+        CommandResult::Error(
+            xai_grok_i18n::t("slash.share.temporarily_disabled").to_string(),
+        )
     }
 }

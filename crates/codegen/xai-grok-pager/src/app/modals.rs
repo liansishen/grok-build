@@ -68,6 +68,7 @@ impl AgentView {
             cwd,
             has_session_announcements: slash_controller.has_session_announcements(),
             billing_surface_visible: slash_controller.billing_surface_visible(),
+            usage_command_visible: slash_controller.usage_command_visible(),
             workflows_available: slash_controller.workflows_available(),
             screen_mode: slash_controller.screen_mode(),
         };
@@ -711,7 +712,7 @@ impl AgentView {
                 let filtered = crate::views::modal::filter_palette_entries(
                     state.query(),
                     self.sharing_enabled,
-                    self.prompt.slash_controller.screen_mode(),
+                    &self.prompt.slash_controller,
                 );
                 let non_sel: Vec<bool> = filtered
                     .iter()
@@ -933,7 +934,7 @@ impl AgentView {
                             *entries = crate::views::modal::filter_palette_entries(
                                 state.query(),
                                 sharing_enabled,
-                                self.prompt.slash_controller.screen_mode(),
+                                &self.prompt.slash_controller,
                             );
                             state.selected = state.selected.min(entries.len().saturating_sub(1));
                         }
@@ -1717,7 +1718,7 @@ impl AgentView {
                 let filtered = modal::filter_palette_entries(
                     state.query(),
                     self.sharing_enabled,
-                    self.prompt.slash_controller.screen_mode(),
+                    &self.prompt.slash_controller,
                 );
                 let non_sel: Vec<bool> = filtered
                     .iter()
@@ -2769,7 +2770,7 @@ mod command_palette_vim_input_tests {
         agent.active_modal = Some(ActiveModal::CommandPalette {
             entries: crate::views::modal::default_palette_entries(
                 agent.sharing_enabled,
-                agent.prompt.slash_controller.screen_mode(),
+                &agent.prompt.slash_controller,
             ),
             state: PickerState::input_active(),
             window: crate::views::modal_window::ModalWindowState::new(),
@@ -2801,7 +2802,7 @@ mod command_palette_vim_input_tests {
         agent.active_modal = Some(ActiveModal::CommandPalette {
             entries: crate::views::modal::default_palette_entries(
                 agent.sharing_enabled,
-                crate::app::ScreenMode::Minimal,
+                &agent.prompt.slash_controller,
             ),
             state: {
                 let mut state = PickerState::input_active();
@@ -2860,7 +2861,7 @@ mod command_palette_vim_input_tests {
         agent.active_modal = Some(ActiveModal::CommandPalette {
             entries: crate::views::modal::default_palette_entries(
                 agent.sharing_enabled,
-                crate::app::ScreenMode::Minimal,
+                &agent.prompt.slash_controller,
             ),
             state: {
                 let mut state = PickerState::input_active();

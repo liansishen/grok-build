@@ -10,6 +10,7 @@ use crate::scrollback::types::{
 use crate::theme::Theme;
 
 use super::TOOL_HEADER_RANGE;
+use crate::appearance::AppearanceConfig;
 
 /// A single line match from search results.
 #[derive(Debug, Clone)]
@@ -566,7 +567,7 @@ impl BlockContent for SearchToolCallBlock {
         }
     }
 
-    fn has_vpad(&self, _ctx: &BlockContext) -> bool {
+    fn has_vpad_for(&self, _appearance: &AppearanceConfig) -> bool {
         false
     }
 

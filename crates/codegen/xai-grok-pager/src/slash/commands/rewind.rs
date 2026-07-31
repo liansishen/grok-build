@@ -8,6 +8,10 @@ impl SlashCommand for RewindCommand {
         "rewind"
     }
 
+    fn aliases(&self) -> &[&str] {
+        &["undo"]
+    }
+
     fn description(&self) -> &str {
         xai_grok_i18n::t("slash.rewind.description")
     }

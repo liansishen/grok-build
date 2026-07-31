@@ -122,7 +122,7 @@ impl AgentView {
                     ]
                 } else {
                     vec![
-                        HintItem::new(key!(Enter), xai_grok_i18n::t("hint.approve")),
+                        HintItem::new(key!('a'), xai_grok_i18n::t("hint.approve")),
                         HintItem::new(key!(Tab), xai_grok_i18n::t("hint.plan")),
                         HintItem::new(key!(Esc), xai_grok_i18n::t("hint.back")),
                     ]
@@ -724,6 +724,7 @@ impl AgentView {
             voice_interim,
             esc_owned_before_agent,
         } = app_params;
+        self.scrollback.begin_frame();
         self.in_dashboard_overlay = in_dashboard_overlay;
         let super::BannerSlotParams {
             height: banner_height,
