@@ -22,18 +22,15 @@ const DEFAULT_DEVICE_POLL_INTERVAL_SECS: i32 = 5;
 const DEVICE_SLOW_DOWN_INCREMENT_SECS: u64 = 5;
 const MIN_DEVICE_CODE_EXPIRY_FALLBACK_SECS: i64 = 10 * 60;
 
+/// Only the 404 "no device endpoint" case is typed, because the login flow
+/// matches on it to fall back to loopback. Every other device-code failure
+/// stays a plain `anyhow` error: wrapping one in a `#[error(transparent)]`
+/// variant hides the `reqwest::Error` the login funnel classifies, because
+/// transparent forwards `source()` past the error it wraps.
 #[derive(Debug, Error)]
 pub enum DeviceCodeError {
     #[error("{}", t("auth.device.not_enabled"))]
     NotEnabled,
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
-impl From<reqwest::Error> for DeviceCodeError {
-    fn from(e: reqwest::Error) -> Self {
-        Self::Other(e.into())
-    }
 }
 
 // --- Public types ---
@@ -135,7 +132,7 @@ pub async fn request_device_code(
     client_id: &str,
     scopes: &[String],
     surface: ClientSurface,
-) -> Result<DeviceCode, DeviceCodeError> {
+) -> anyhow::Result<DeviceCode> {
     let client = crate::http::shared_client();
     let url = format!("{}/oauth2/device/code", issuer.trim_end_matches('/'));
     let scope_str = scopes.join(" ");
@@ -162,7 +159,7 @@ pub async fn request_device_code(
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if status.as_u16() == 404 {
-            return Err(DeviceCodeError::NotEnabled);
+            anyhow::bail!(DeviceCodeError::NotEnabled);
         }
         let status = status.to_string();
         return Err(anyhow::anyhow!(t_fmt(

@@ -22,7 +22,7 @@ pub use self::doom_loop::{
 };
 pub use self::error::{
     EmptyReason, EmptyResponseContext, ResponseModelMetadata, Result, SamplingError,
-    is_context_length_error, status_user_message, user_facing_api_error_message,
+    SentCredential, is_context_length_error, status_user_message, user_facing_api_error_message,
 };
 pub use self::pricing::{CostSource, ModelPricing, USD_TICKS_PER_USD as PRICING_USD_TICKS_PER_USD};
 pub use self::tool_overrides::{
