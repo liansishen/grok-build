@@ -217,6 +217,10 @@ pub(crate) struct SubagentSpawnContext {
     pub available_models: indexmap::IndexMap<String, crate::agent::config::ModelEntry>,
     /// Per-subagent model ID overrides from config.toml `[subagents.models]`.
     pub subagent_model_overrides: std::collections::HashMap<String, String>,
+    /// LOCAL-PATCH(upstream-fork-secondary-model): default reasoning effort
+    /// from `[ui].fork_secondary_reasoning_effort` when no role/persona/spawn
+    /// override sets effort. Empty config → None.
+    pub default_subagent_reasoning_effort: Option<String>,
     /// Per-subagent enable/disable toggles from config.toml `[subagents.toggle]`.
     /// Omitted agents default to enabled (`true`).
     pub subagent_toggle: std::collections::HashMap<String, bool>,

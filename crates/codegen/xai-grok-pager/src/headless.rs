@@ -597,6 +597,19 @@ async fn open_session_with_id(
     })
 }
 
+/// LOCAL-PATCH(upstream-fork-secondary-model): mirror of
+/// `app::event_loop::load_initial_ui_config` (private to `app`).
+fn load_ui_config_for_fork() -> xai_grok_shell::agent::config::UiConfig {
+    use xai_grok_shell::agent::config::UiConfig;
+    let Ok(root) = xai_grok_shell::config::load_effective_config() else {
+        return UiConfig::default();
+    };
+    let Some(ui_value) = root.get("ui").cloned() else {
+        return UiConfig::default();
+    };
+    ui_value.try_into::<UiConfig>().unwrap_or_default()
+}
+
 async fn fork_then_open(
     acp_tx: &AcpAgentTx,
     launch_cwd: &Path,
@@ -617,7 +630,19 @@ async fn fork_then_open(
         ensure_session_id_available(nid, &new_cwd_str)?;
     }
     let parent_is_worktree = parent_session_is_worktree(parent_id, &write_cwd);
-    let payload = fork_session_params(parent_id, &write_cwd, new_id, parent_is_worktree);
+    // LOCAL-PATCH(upstream-fork-secondary-model): honor configured secondary model.
+    let fork_model = {
+        let ui = load_ui_config_for_fork();
+        crate::app::session_startup::effective_fork_secondary_model_id(&ui.fork_secondary_model)
+            .map(|s| s.to_string())
+    };
+    let payload = fork_session_params(
+        parent_id,
+        &write_cwd,
+        new_id,
+        parent_is_worktree,
+        fork_model.as_deref(),
+    );
     let fork_params = serde_json::value::to_raw_value(&payload)
         .map_err(|e| anyhow::anyhow!("serialize fork params: {e}"))?;
     let req = acp::ExtRequest::new("x.ai/session/fork", fork_params.into());

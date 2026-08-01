@@ -403,6 +403,11 @@ fn every_dynamic_enum_setting_has_action_for_string_arm() {
             "Test Model".to_string(),
             acp::ModelId::new(Arc::from("test-model")),
         )],
+        fork_secondary_effort_options: vec![(
+            "high".to_string(),
+            "High Effort".to_string(),
+            String::new(),
+        )],
         ..PagerLocalSnapshot::default()
     };
     for meta in reg.all() {
@@ -415,7 +420,15 @@ fn every_dynamic_enum_setting_has_action_for_string_arm() {
         // a generic `Action::DynamicSettingChanged(...)` would
         // pass `is_some()` while breaking the typed dispatch.
         let empty_action = action_for_string(meta.key, String::new(), &snapshot);
-        let nonempty_action = action_for_string(meta.key, "Test Model".to_string(), &snapshot);
+        let nonempty_action = action_for_string(
+            meta.key,
+            if meta.key == "fork_secondary_reasoning_effort" {
+                "high".to_string()
+            } else {
+                "Test Model".to_string()
+            },
+            &snapshot,
+        );
         match meta.key {
             "default_model" => {
                 assert!(
@@ -439,6 +452,19 @@ fn every_dynamic_enum_setting_has_action_for_string_arm() {
                     matches!(nonempty_action, Some(Action::SetForkSecondaryModel(_))),
                     "fork_secondary_model non-empty canonical must produce \
                      SetForkSecondaryModel(_), got {nonempty_action:?}",
+                );
+            }
+            "fork_secondary_reasoning_effort" => {
+                assert!(
+                    matches!(empty_action, Some(Action::ClearForkSecondaryReasoningEffort)),
+                    "fork_secondary_reasoning_effort empty must Clear, got {empty_action:?}",
+                );
+                assert!(
+                    matches!(
+                        nonempty_action,
+                        Some(Action::SetForkSecondaryReasoningEffort(_))
+                    ),
+                    "fork_secondary_reasoning_effort non-empty must Set, got {nonempty_action:?}",
                 );
             }
             other => panic!(

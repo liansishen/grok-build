@@ -127,8 +127,13 @@ pub async fn set_privacy_banner_acked(acked_at_rfc3339: String) -> Result<()> {
 
 /// Persist `[ui].fork_secondary_model` via `update_config`.
 ///
-/// Caller must validate against the model catalog. Empty string
-/// restores the built-in default. Length > [`MAX_DEFAULT_MODEL_LEN`] → `Err`.
+/// Caller must validate against the model catalog. Empty string means
+/// no override (inherit the source session model on fork).
+/// Length > [`MAX_DEFAULT_MODEL_LEN`] → `Err`.
+///
+/// LOCAL-PATCH(upstream-fork-secondary-model): upstream used empty →
+/// `default_model()`, which made selecting Grok indistinguishable from
+/// clear. Revert when upstream lands a proper fix.
 pub async fn set_fork_secondary_model(value: String) -> Result<()> {
     if value.len() > MAX_DEFAULT_MODEL_LEN {
         anyhow::bail!(
@@ -138,11 +143,28 @@ pub async fn set_fork_secondary_model(value: String) -> Result<()> {
         );
     }
     update_config(|cfg| {
-        cfg.ui.fork_secondary_model = if value.is_empty() {
-            crate::models::default_model().to_string()
-        } else {
-            value
-        };
+        // LOCAL-PATCH(upstream-fork-secondary-model): keep empty as empty.
+        cfg.ui.fork_secondary_model = value;
+    })
+    .await
+}
+
+/// Persist `[ui].fork_secondary_reasoning_effort` via `update_config`.
+///
+/// Empty string = no override. Caller must validate against the selected
+/// secondary model's effort menu. Length > [`MAX_DEFAULT_MODEL_LEN`] → `Err`.
+///
+/// LOCAL-PATCH(upstream-fork-secondary-model)
+pub async fn set_fork_secondary_reasoning_effort(value: String) -> Result<()> {
+    if value.len() > MAX_DEFAULT_MODEL_LEN {
+        anyhow::bail!(
+            "fork_secondary_reasoning_effort too long ({} > {} bytes)",
+            value.len(),
+            MAX_DEFAULT_MODEL_LEN
+        );
+    }
+    update_config(|cfg| {
+        cfg.ui.fork_secondary_reasoning_effort = value;
     })
     .await
 }

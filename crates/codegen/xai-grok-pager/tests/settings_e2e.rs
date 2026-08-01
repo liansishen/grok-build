@@ -58,6 +58,7 @@ const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "show_tips",
     "auto_update",
     "fork_secondary_model",
+    "fork_secondary_reasoning_effort",
     "show_thinking_blocks",
     "prompt_suggestions",
     "group_tool_verbs",
@@ -6562,35 +6563,47 @@ fn pr14_string_settings_use_known_model_validator() {
 }
 
 /// Defaults round-trip through `current_value_for`.
+/// LOCAL-PATCH(upstream-fork-secondary-model): empty default, no baseline fold.
 #[test]
 fn pr14_model_family_defaults_roundtrip_via_current_value_for() {
     use xai_grok_pager::settings::current_value_for;
     let ui = UiConfig::default();
     let pager = PagerLocalSnapshot::default();
 
-    // Baseline value folds to empty (no-opinion sentinel).
     let value = current_value_for("fork_secondary_model", &ui, &pager).unwrap();
     assert_eq!(
         value,
         SettingValue::String(String::new()),
-        "PR 14: `fork_secondary_model` defaults to empty string (no-opinion sentinel)",
+        "LOCAL-PATCH: `fork_secondary_model` defaults to empty string (no-override)",
     );
 }
 
-/// Non-baseline `fork_secondary_model` surfaces verbatim.
+/// Explicit model id surfaces; when catalog is present, prefer display name.
+/// LOCAL-PATCH(upstream-fork-secondary-model)
 #[test]
 fn pr14_fork_secondary_model_reads_ui_config_non_baseline() {
+    use std::sync::Arc;
     use xai_grok_pager::settings::current_value_for;
     let ui = UiConfig {
-        fork_secondary_model: "Custom Fork Model".to_string(),
+        fork_secondary_model: "grok-4.5".to_string(),
         ..UiConfig::default()
     };
-    let pager = PagerLocalSnapshot::default();
+    let pager = PagerLocalSnapshot {
+        available_models: vec![(
+            "Grok 4.5".to_string(),
+            agent_client_protocol::ModelId::new(Arc::from("grok-4.5")),
+        )],
+        ..PagerLocalSnapshot::default()
+    };
     assert_eq!(
         current_value_for("fork_secondary_model", &ui, &pager),
-        Some(SettingValue::String("Custom Fork Model".to_string())),
-        "non-baseline `fork_secondary_model` must surface verbatim — the \
-         baseline-equality fold only kicks in for the default value",
+        Some(SettingValue::String("Grok 4.5".to_string())),
+        "LOCAL-PATCH: stored model id maps to catalog display name for the picker",
+    );
+    // Selecting the built-in default Grok id must NOT fold to empty.
+    assert_ne!(
+        current_value_for("fork_secondary_model", &ui, &pager),
+        Some(SettingValue::String(String::new())),
     );
 }
 

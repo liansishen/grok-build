@@ -2054,6 +2054,9 @@ fn save_fork_secondary_model_toast(value: &str) -> String {
 
 /// Outer dispatcher for `Action::SetForkSecondaryModel`.
 /// Mirror + persist + toast. Idempotent: same-id → no-op.
+///
+/// LOCAL-PATCH(upstream-fork-secondary-model): persists model id; empty is
+/// reserved for clear/no-override (Grok ids are valid explicit pins).
 pub(in crate::app::dispatch) fn set_fork_secondary_model(
     app: &mut AppView,
     new_id: acp::ModelId,
@@ -2090,10 +2093,7 @@ pub(in crate::app::dispatch) fn set_fork_secondary_model(
         return vec![];
     }
     // Mirror, idempotency, persist, and rollback all use the model ID
-    // (catalog key), not the display name. The shell's
-    // `cfg.ui.fork_secondary_model` consumers match by slug / map key,
-    // and the `current_value_for` fold-to-empty comparison checks
-    // against `models::default_model()` (also a slug).
+    // (catalog key), not the display name. Consumers match by slug.
     let new_id_str = new_id.0.to_string();
     let prev_id_str = app.current_ui.fork_secondary_model.clone();
     if prev_id_str == new_id_str {
@@ -2101,31 +2101,50 @@ pub(in crate::app::dispatch) fn set_fork_secondary_model(
         return vec![];
     }
     set_fork_secondary_model_inner(app, new_id_str.clone());
+    // LOCAL-PATCH(upstream-fork-secondary-model): drop effort if not offered
+    // by the newly selected secondary model.
+    let mut effects = vec![Effect::PersistSetting {
+        key: "fork_secondary_model",
+        value: crate::settings::SettingValue::String(new_id_str),
+        rollback_value: crate::settings::SettingValue::String(prev_id_str),
+    }];
+    effects.extend(clear_effort_if_invalid_for_secondary_model(app));
     refresh_open_settings_modals(app);
     tracing::info!(
         target: "settings",
         key = "fork_secondary_model",
         new = ?new_display,
-        new_id = %new_id_str,
-        prev_id = %prev_id_str,
         "setting changed",
     );
     app.show_toast(&save_fork_secondary_model_toast(&new_display));
-    vec![Effect::PersistSetting {
-        key: "fork_secondary_model",
-        value: crate::settings::SettingValue::String(new_id_str),
-        rollback_value: crate::settings::SettingValue::String(prev_id_str),
-    }]
+    effects
 }
 
-/// Outer dispatcher for `Action::ClearForkSecondaryModel`. Resets
-/// the persisted override to the built-in baseline
-/// (`xai_grok_shell::models::default_model()`).
+/// LOCAL-PATCH(upstream-fork-secondary-model)
+fn clear_effort_if_invalid_for_secondary_model(app: &mut AppView) -> Vec<Effect> {
+    let effort = app.current_ui.fork_secondary_reasoning_effort.clone();
+    if effort.is_empty() {
+        return vec![];
+    }
+    let snapshot = super::ui::build_pager_snapshot(app);
+    if snapshot
+        .fork_secondary_effort_options
+        .iter()
+        .any(|(c, _, _)| c == &effort)
+    {
+        return vec![];
+    }
+    clear_fork_secondary_reasoning_effort(app)
+}
+
+/// Outer dispatcher for `Action::ClearForkSecondaryModel`.
+///
+/// LOCAL-PATCH(upstream-fork-secondary-model): clear writes empty (no
+/// override), not the built-in default model id.
 pub(in crate::app::dispatch) fn clear_fork_secondary_model(app: &mut AppView) -> Vec<Effect> {
-    let baseline = xai_grok_shell::models::default_model().to_string();
     let prev_id_str = app.current_ui.fork_secondary_model.clone();
-    if prev_id_str == baseline {
-        // Idempotent: already at baseline.
+    if prev_id_str.is_empty() {
+        // Idempotent: already at no-override.
         app.show_toast(xai_grok_i18n::t("toast.fork_model_default"));
         return vec![];
     }
@@ -2136,16 +2155,84 @@ pub(in crate::app::dispatch) fn clear_fork_secondary_model(app: &mut AppView) ->
         prev_id = %prev_id_str,
         "setting changed",
     );
-    set_fork_secondary_model_inner(app, baseline);
-    refresh_open_settings_modals(app);
-    app.show_toast(xai_grok_i18n::t("toast.fork_model_cleared"));
-    vec![Effect::PersistSetting {
+    set_fork_secondary_model_inner(app, String::new());
+    let mut effects = vec![Effect::PersistSetting {
         key: "fork_secondary_model",
-        // Persist payload is the empty-sentinel — the shell helper
-        // interprets empty as "restore the baseline default", same
-        // contract as `default_model`'s empty payload.
         value: crate::settings::SettingValue::String(String::new()),
         rollback_value: crate::settings::SettingValue::String(prev_id_str),
+    }];
+    effects.extend(clear_effort_if_invalid_for_secondary_model(app));
+    refresh_open_settings_modals(app);
+    app.show_toast(xai_grok_i18n::t("toast.fork_model_cleared"));
+    effects
+}
+
+// LOCAL-PATCH(upstream-fork-secondary-model): secondary reasoning effort.
+pub(super) fn set_fork_secondary_reasoning_effort_inner(app: &mut AppView, value: String) {
+    app.current_ui.fork_secondary_reasoning_effort = value;
+}
+
+fn save_fork_secondary_reasoning_effort_toast(value: &str) -> String {
+    save_value_toast(
+        xai_grok_i18n::t("settings.fork_secondary_reasoning_effort.label"),
+        value,
+    )
+}
+
+pub(in crate::app::dispatch) fn set_fork_secondary_reasoning_effort(
+    app: &mut AppView,
+    value: String,
+) -> Vec<Effect> {
+    let prev = app.current_ui.fork_secondary_reasoning_effort.clone();
+    if prev == value {
+        return vec![];
+    }
+    // Validate against the live secondary-model effort menu.
+    let snapshot = super::ui::build_pager_snapshot(app);
+    if !snapshot
+        .fork_secondary_effort_options
+        .iter()
+        .any(|(c, _, _)| c == &value)
+    {
+        tracing::error!(
+            target: "settings",
+            key = "fork_secondary_reasoning_effort",
+            value = %value,
+            "SetForkSecondaryReasoningEffort: value not in secondary model effort menu — no-op",
+        );
+        return vec![];
+    }
+    let display = snapshot
+        .fork_secondary_effort_options
+        .iter()
+        .find(|(c, _, _)| c == &value)
+        .map(|(_, d, _)| d.clone())
+        .unwrap_or_else(|| value.clone());
+    set_fork_secondary_reasoning_effort_inner(app, value.clone());
+    refresh_open_settings_modals(app);
+    app.show_toast(&save_fork_secondary_reasoning_effort_toast(&display));
+    vec![Effect::PersistSetting {
+        key: "fork_secondary_reasoning_effort",
+        value: crate::settings::SettingValue::String(value),
+        rollback_value: crate::settings::SettingValue::String(prev),
+    }]
+}
+
+pub(in crate::app::dispatch) fn clear_fork_secondary_reasoning_effort(
+    app: &mut AppView,
+) -> Vec<Effect> {
+    let prev = app.current_ui.fork_secondary_reasoning_effort.clone();
+    if prev.is_empty() {
+        app.show_toast(xai_grok_i18n::t("toast.fork_effort_default"));
+        return vec![];
+    }
+    set_fork_secondary_reasoning_effort_inner(app, String::new());
+    refresh_open_settings_modals(app);
+    app.show_toast(xai_grok_i18n::t("toast.fork_effort_cleared"));
+    vec![Effect::PersistSetting {
+        key: "fork_secondary_reasoning_effort",
+        value: crate::settings::SettingValue::String(String::new()),
+        rollback_value: crate::settings::SettingValue::String(prev),
     }]
 }
 

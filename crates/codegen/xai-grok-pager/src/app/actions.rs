@@ -590,6 +590,11 @@ pub enum Action {
     /// Clear the persisted fork-secondary model — restores to built-in
     /// default. Active agent keeps its value; next fork uses the default.
     ClearForkSecondaryModel,
+    /// LOCAL-PATCH(upstream-fork-secondary-model): commit secondary
+    /// reasoning effort (canonical effort id, e.g. `"high"`).
+    SetForkSecondaryReasoningEffort(String),
+    /// LOCAL-PATCH(upstream-fork-secondary-model): clear secondary effort.
+    ClearForkSecondaryReasoningEffort,
     /// Commit the `show_tips` preference. Persisted to `[cli].show_tips`.
     /// Restart-required — tips are resolved once at startup.
     SetShowTips(bool),
@@ -2072,6 +2077,9 @@ pub enum Effect {
         /// Optional client-chosen ID for the forked session (`--session-id`
         /// with `--fork-session`).
         new_session_id: Option<String>,
+        /// LOCAL-PATCH(upstream-fork-secondary-model): optional model id from
+        /// `[ui].fork_secondary_model`. `None` keeps the source session model.
+        new_model_id: Option<String>,
     },
     /// Read the display title (and its `/rename` manual-ness) from local
     /// `summary.json` (post-resume UI label + prompt-border title).

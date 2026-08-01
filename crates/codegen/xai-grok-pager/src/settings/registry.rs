@@ -101,6 +101,10 @@ pub enum DynamicEnumSource {
     /// Models from the active session's catalog. Prepends a
     /// `"(no override)"` sentinel so the user can clear the setting.
     ActiveModelCatalog,
+    /// Reasoning-effort levels for the effective fork-secondary model
+    /// (override or current session model). Prepends `(no override)`.
+    /// LOCAL-PATCH(upstream-fork-secondary-model)
+    ForkSecondaryReasoningEffort,
 }
 
 /// Build the owned choice list for a `DynamicEnum` at picker-open time.
@@ -123,6 +127,26 @@ pub fn dynamic_enum_choices(
                     canonical: name.clone(),
                     display: name.clone(),
                     description: String::new(),
+                });
+            }
+            out
+        }
+        // LOCAL-PATCH(upstream-fork-secondary-model)
+        DynamicEnumSource::ForkSecondaryReasoningEffort => {
+            let mut out = Vec::with_capacity(snapshot.fork_secondary_effort_options.len() + 1);
+            out.push(OwnedEnumChoice {
+                canonical: String::new(),
+                display: xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string(),
+                description: xai_grok_i18n::t(
+                    "settings.dynamic_enum.no_override_effort_desc",
+                )
+                .to_string(),
+            });
+            for (canonical, display, description) in &snapshot.fork_secondary_effort_options {
+                out.push(OwnedEnumChoice {
+                    canonical: canonical.clone(),
+                    display: display.clone(),
+                    description: description.clone(),
                 });
             }
             out
@@ -336,6 +360,10 @@ pub struct PagerLocalSnapshot {
     /// `AppView::scheduler_background_loops_seed` before the session response
     /// lands. `/loop` reads it to describe where a scheduled fire runs.
     pub scheduler_background_loops: bool,
+    /// LOCAL-PATCH(upstream-fork-secondary-model): effort menu for the
+    /// effective secondary model. Each entry is
+    /// `(canonical_id, display_label, description)`.
+    pub fork_secondary_effort_options: Vec<(String, String, String)>,
 }
 
 impl Default for PagerLocalSnapshot {
@@ -362,6 +390,7 @@ impl Default for PagerLocalSnapshot {
             voice_stt_language: xai_grok_voice::STT_LANGUAGE_DEFAULT.to_string(),
             // Matches `resolve_scheduler_background_loops`'s default.
             scheduler_background_loops: true,
+            fork_secondary_effort_options: Vec::new(),
         }
     }
 }
@@ -422,13 +451,14 @@ impl PagerLocalSnapshot {
         self.available_models.iter().map(|(name, _)| name.as_str())
     }
 
-    /// Resolve a user-supplied name to a `ModelId` via the snapshot.
-    /// Case-insensitive ASCII match against display names only (ids
-    /// aren't carried in the snapshot's primary key — callers needing
-    /// id-based resolution should reach for `ModelState::resolve_by_name_or_id`).
+    /// Resolve a user-supplied name **or model id** to a `ModelId` via the
+    /// snapshot. Case-insensitive ASCII match against display names and ids.
+    ///
+    /// LOCAL-PATCH(upstream-fork-secondary-model): also match ids so DynamicEnum
+    /// pickers that commit model-id canonicals (not display names) resolve.
     pub fn resolve_model_name(&self, query: &str) -> Option<acp::ModelId> {
         self.available_models.iter().find_map(|(name, id)| {
-            if name.eq_ignore_ascii_case(query) {
+            if name.eq_ignore_ascii_case(query) || id.0.eq_ignore_ascii_case(query) {
                 Some(id.clone())
             } else {
                 None
@@ -751,15 +781,28 @@ pub fn current_value_for(
         // CLI batch: snapshot mirrors; `None` → effective default `true`.
         "show_tips" => Some(SettingValue::Bool(pager.show_tips.unwrap_or(true))),
         "auto_update" => Some(SettingValue::Bool(pager.auto_update.unwrap_or(true))),
-        // fork_secondary_model: baseline value folds to empty string.
+        // LOCAL-PATCH(upstream-fork-secondary-model): empty = no override;
+        // any non-empty value (including default Grok id) is an explicit pin.
+        // Upstream folded `== default_model()` to empty, which made selecting
+        // Grok appear as "(no override)". Surface display names for picker
+        // matching (DynamicEnum canonicals are catalog display names).
         "fork_secondary_model" => Some(SettingValue::String({
-            let baseline = xai_grok_shell::models::default_model();
-            if ui.fork_secondary_model == baseline {
+            let raw = ui.fork_secondary_model.as_str();
+            if raw.is_empty() {
                 String::new()
             } else {
-                ui.fork_secondary_model.clone()
+                pager
+                    .available_models
+                    .iter()
+                    .find(|(name, id)| id.0.as_ref() == raw || name == raw)
+                    .map(|(name, _)| name.clone())
+                    .unwrap_or_else(|| raw.to_string())
             }
         })),
+        // LOCAL-PATCH(upstream-fork-secondary-model): store/display effort id.
+        "fork_secondary_reasoning_effort" => {
+            Some(SettingValue::String(ui.fork_secondary_reasoning_effort.clone()))
+        }
 
         _ => None,
     }
@@ -1230,21 +1273,23 @@ mod tests {
                          None, mapped to the `always_allow_all_sessions` canonical)",
                     );
                 }
-                // fork_secondary_model: empty-string default = "no opinion".
+                // LOCAL-PATCH(upstream-fork-secondary-model): empty = no override
+                // on both registry default and UiConfig default (no baseline fold).
                 ("fork_secondary_model", SettingKind::DynamicEnum { default, .. }) => {
                     assert_eq!(
                         *default, "",
-                        "fork_secondary_model registry default must be empty string — \
-                         the live default is `crate::models::default_model()` and the \
-                         current_value_for arm folds matching values to the empty sentinel",
+                        "fork_secondary_model registry default must be empty string \
+                         (no-override sentinel)",
                     );
-                    // Cross-check: the UiConfig field IS the built-in default.
                     assert_eq!(
-                        ui.fork_secondary_model,
-                        xai_grok_shell::models::default_model(),
-                        "UiConfig::default().fork_secondary_model must equal \
-                         models::default_model() — drift here breaks the empty-fold contract",
+                        ui.fork_secondary_model, "",
+                        "UiConfig::default().fork_secondary_model must be empty \
+                         (no-override) — LOCAL-PATCH vs upstream baseline fold",
                     );
+                }
+                ("fork_secondary_reasoning_effort", SettingKind::DynamicEnum { default, .. }) => {
+                    assert_eq!(*default, "");
+                    assert_eq!(ui.fork_secondary_reasoning_effort, "");
                 }
 
                 _ => panic!(

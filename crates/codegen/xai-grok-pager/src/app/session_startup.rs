@@ -60,11 +60,15 @@ impl DeferredStartupActions {
 ///
 /// `new_cwd` is the write namespace for the child (parent session cwd when
 /// cross-cwd); preflight must use the same path via [`effective_fork_new_cwd`].
+///
+/// LOCAL-PATCH(upstream-fork-secondary-model): `new_model_id` applies
+/// `[ui].fork_secondary_model` when non-empty. Revert with the patch.
 pub fn fork_session_params(
     parent_session_id: &str,
     parent_cwd: &Path,
     new_session_id: Option<&str>,
     parent_is_worktree: bool,
+    new_model_id: Option<&str>,
 ) -> serde_json::Value {
     let parent_cwd_str = parent_cwd.to_string_lossy().into_owned();
     let source_cwd = xai_grok_shell::session::resolve_local_session_any_cwd(parent_session_id)
@@ -81,7 +85,34 @@ pub fn fork_session_params(
     if parent_is_worktree {
         payload["sourceWorkspaceDir"] = serde_json::Value::String(parent_cwd_str);
     }
+    // LOCAL-PATCH(upstream-fork-secondary-model)
+    if let Some(mid) = new_model_id.map(str::trim).filter(|s| !s.is_empty()) {
+        payload["newModelId"] = serde_json::Value::String(mid.to_string());
+    }
     payload
+}
+
+/// LOCAL-PATCH(upstream-fork-secondary-model): non-empty configured id is an
+/// explicit pin; empty means keep the source session model.
+pub fn effective_fork_secondary_model_id(configured: &str) -> Option<&str> {
+    let s = configured.trim();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
+}
+
+/// LOCAL-PATCH(upstream-fork-secondary-model): parse configured secondary
+/// reasoning effort. Empty → None (no override).
+pub fn effective_fork_secondary_reasoning_effort(
+    configured: &str,
+) -> Option<xai_grok_shell::sampling::types::ReasoningEffort> {
+    let s = configured.trim();
+    if s.is_empty() {
+        return None;
+    }
+    s.parse().ok()
 }
 /// Whether a persisted session (or its cwd) is worktree-backed.
 /// Mirrors in-session `/fork` reading `agent.session.is_worktree`.
@@ -1343,19 +1374,42 @@ mod tests {
     #[test]
     fn fork_session_params_sets_new_session_id_and_workspace_dir() {
         let cwd = PathBuf::from("/wt");
-        let p = fork_session_params("parent-1", &cwd, Some("child-uuid"), true);
+        let p = fork_session_params("parent-1", &cwd, Some("child-uuid"), true, None);
         assert_eq!(p["sourceSessionId"], "parent-1");
         assert_eq!(p["newCwd"], "/wt");
         assert_eq!(p["newSessionId"], "child-uuid");
         assert_eq!(p["sourceWorkspaceDir"], "/wt");
         assert_eq!(p["sessionKind"], "fork");
+        assert!(p.get("newModelId").is_none());
     }
     #[test]
     fn fork_session_params_omits_workspace_dir_when_not_worktree() {
         let cwd = PathBuf::from("/proj");
-        let p = fork_session_params("parent-1", &cwd, None, false);
+        let p = fork_session_params("parent-1", &cwd, None, false, None);
         assert!(p.get("sourceWorkspaceDir").is_none());
         assert!(p.get("newSessionId").is_none());
+    }
+    // LOCAL-PATCH(upstream-fork-secondary-model)
+    #[test]
+    fn fork_session_params_includes_new_model_id_when_set() {
+        let cwd = PathBuf::from("/proj");
+        let p = fork_session_params(
+            "parent-1",
+            &cwd,
+            None,
+            false,
+            Some("grok-4.5"),
+        );
+        assert_eq!(p["newModelId"], "grok-4.5");
+    }
+    #[test]
+    fn effective_fork_secondary_model_id_empty_is_none() {
+        assert_eq!(effective_fork_secondary_model_id(""), None);
+        assert_eq!(effective_fork_secondary_model_id("   "), None);
+        assert_eq!(
+            effective_fork_secondary_model_id("grok-4.5"),
+            Some("grok-4.5")
+        );
     }
     #[test]
     fn fork_response_parses_nested_and_top_level_id() {

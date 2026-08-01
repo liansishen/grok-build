@@ -1024,6 +1024,20 @@ pub(super) fn action_for_string(
                     .map(Action::SetForkSecondaryModel)
             }
         }
+        // LOCAL-PATCH(upstream-fork-secondary-model)
+        "fork_secondary_reasoning_effort" => {
+            if value.is_empty() {
+                Some(Action::ClearForkSecondaryReasoningEffort)
+            } else if snapshot
+                .fork_secondary_effort_options
+                .iter()
+                .any(|(c, _, _)| c == &value)
+            {
+                Some(Action::SetForkSecondaryReasoningEffort(value))
+            } else {
+                None
+            }
+        }
 
         _ => {
             let _ = value;

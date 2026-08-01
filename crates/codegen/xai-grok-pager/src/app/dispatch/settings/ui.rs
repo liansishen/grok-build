@@ -6,7 +6,8 @@ use super::setters::{
     set_combine_queued_prompts_inner, set_compact_mode, set_compact_mode_inner,
     set_contextual_hint_inner, set_default_model_inner, set_default_selected_permission_inner,
     set_display_refresh_auto_cadence_inner, set_fork_secondary_model_inner,
-    set_group_tool_verbs_inner, set_hunk_tracker_mode_inner, set_invert_scroll_inner,
+    set_fork_secondary_reasoning_effort_inner, set_group_tool_verbs_inner,
+    set_hunk_tracker_mode_inner, set_invert_scroll_inner,
     set_keep_text_selection_inner, set_max_thoughts_width_inner, set_multiline_mode,
     set_page_flip_on_send_inner, set_prompt_suggestions_inner, set_remember_tool_approvals_inner,
     set_render_mermaid_inner, set_respect_manual_folds_inner, set_screen_mode_inner,
@@ -118,6 +119,32 @@ pub(crate) fn refresh_open_settings_modals(app: &mut AppView) {
                 scheduler_background_loops: agent
                     .scheduler_background_loops
                     .unwrap_or(scheduler_background_loops_seed),
+                fork_secondary_effort_options: {
+                    let model_id = if !app.current_ui.fork_secondary_model.is_empty() {
+                        Some(acp::ModelId::new(
+                            app.current_ui.fork_secondary_model.clone(),
+                        ))
+                    } else {
+                        agent.session.models.current.clone()
+                    };
+                    model_id
+                        .map(|mid| {
+                            agent
+                                .session
+                                .models
+                                .reasoning_effort_options_for(&mid)
+                                .into_iter()
+                                .map(|opt| {
+                                    (
+                                        opt.id.clone(),
+                                        opt.label.clone(),
+                                        opt.description.unwrap_or_default(),
+                                    )
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                },
             };
         }
     }
@@ -268,6 +295,32 @@ pub(in crate::app::dispatch) fn dispatch_open_settings(
         scheduler_background_loops: agent
             .scheduler_background_loops
             .unwrap_or(scheduler_background_loops_seed),
+        fork_secondary_effort_options: {
+            let model_id = if !app.current_ui.fork_secondary_model.is_empty() {
+                Some(acp::ModelId::new(
+                    app.current_ui.fork_secondary_model.clone(),
+                ))
+            } else {
+                agent.session.models.current.clone()
+            };
+            model_id
+                .map(|mid| {
+                    agent
+                        .session
+                        .models
+                        .reasoning_effort_options_for(&mid)
+                        .into_iter()
+                        .map(|opt| {
+                            (
+                                opt.id.clone(),
+                                opt.label.clone(),
+                                opt.description.unwrap_or_default(),
+                            )
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        },
     };
     let mut state = Box::new(SettingsModalState::new(
         registry,
@@ -746,6 +799,38 @@ fn agent_available_models(app: &AppView) -> Vec<(String, acp::ModelId)> {
     Vec::new()
 }
 
+/// LOCAL-PATCH(upstream-fork-secondary-model): effort menu for the effective
+/// secondary model (configured override, else active session model).
+fn fork_secondary_effort_options(
+    app: &AppView,
+) -> Vec<(String, String, String)> {
+    let ActiveView::Agent(id) = app.active_view else {
+        return Vec::new();
+    };
+    let Some(agent) = app.agents.get(&id) else {
+        return Vec::new();
+    };
+    let models = &agent.session.models;
+    let model_id = if !app.current_ui.fork_secondary_model.is_empty() {
+        acp::ModelId::new(app.current_ui.fork_secondary_model.clone())
+    } else if let Some(cur) = models.current.clone() {
+        cur
+    } else {
+        return Vec::new();
+    };
+    models
+        .reasoning_effort_options_for(&model_id)
+        .into_iter()
+        .map(|opt| {
+            (
+                opt.id.clone(),
+                opt.label.clone(),
+                opt.description.unwrap_or_default(),
+            )
+        })
+        .collect()
+}
+
 /// Build a `PagerLocalSnapshot` from the current `AppView`.
 pub(crate) fn build_pager_snapshot(app: &AppView) -> crate::settings::PagerLocalSnapshot {
     crate::settings::PagerLocalSnapshot {
@@ -766,6 +851,7 @@ pub(crate) fn build_pager_snapshot(app: &AppView) -> crate::settings::PagerLocal
         ask_user_question_timeout_enabled: app.ask_user_question_timeout_enabled,
         voice_stt_language: app.voice_config.language.clone(),
         scheduler_background_loops: agent_scheduler_background_loops(app),
+        fork_secondary_effort_options: fork_secondary_effort_options(app),
     }
 }
 
@@ -955,6 +1041,14 @@ pub(in crate::app::dispatch) fn action_for_reset(
                      registry/dispatch skew (default should be empty string)",
                 );
                 None
+            }
+        }
+        // LOCAL-PATCH(upstream-fork-secondary-model)
+        ("fork_secondary_reasoning_effort", SettingValue::String(s)) => {
+            if s.is_empty() {
+                Some(Action::ClearForkSecondaryReasoningEffort)
+            } else {
+                Some(Action::SetForkSecondaryReasoningEffort(s.to_string()))
             }
         }
 
@@ -1237,14 +1331,12 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
                 set_auto_update_inner(app, *b);
             }
         }
-        // fork_secondary_model: empty rollback restores baseline default.
+        // LOCAL-PATCH(upstream-fork-secondary-model): empty rollback = no override.
         ("fork_secondary_model", SettingValue::String(s)) => {
-            let restored = if s.is_empty() {
-                xai_grok_shell::models::default_model().to_string()
-            } else {
-                s.clone()
-            };
-            set_fork_secondary_model_inner(app, restored);
+            set_fork_secondary_model_inner(app, s.clone());
+        }
+        ("fork_secondary_reasoning_effort", SettingValue::String(s)) => {
+            set_fork_secondary_reasoning_effort_inner(app, s.clone());
         }
 
         _ => {

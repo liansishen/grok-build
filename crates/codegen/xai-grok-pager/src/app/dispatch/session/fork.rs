@@ -249,14 +249,43 @@ pub(in crate::app::dispatch) fn dispatch_fork_resolved(
         d.attached_agent = Some(new_id);
         d.focus_row(crate::views::dashboard::DashboardRowId::TopLevel(new_id));
     }
+    // LOCAL-PATCH(upstream-fork-secondary-model): apply configured secondary
+    // model + reasoning effort on fork (empty = keep source).
+    let fork_model_id = crate::app::session_startup::effective_fork_secondary_model_id(
+        &app.current_ui.fork_secondary_model,
+    )
+    .map(|s| s.to_string());
+    let fork_effort = crate::app::session_startup::effective_fork_secondary_reasoning_effort(
+        &app.current_ui.fork_secondary_reasoning_effort,
+    );
+    // After LoadSession, apply effort (and re-confirm model) via deferred switch.
+    let parent_current_model = app
+        .agents
+        .get(&parent_id)
+        .and_then(|p| p.session.models.current.clone());
+    if let Some(agent) = app.agents.get_mut(&new_id) {
+        let switch_model = fork_model_id
+            .as_deref()
+            .map(|s| acp::ModelId::new(s.to_string()))
+            .or(parent_current_model);
+        if let Some(mid) = switch_model
+            && (fork_effort.is_some() || fork_model_id.is_some())
+        {
+            agent.session.deferred_model_switch = Some((mid, fork_effort));
+        }
+    }
     if worktree {
         vec![Effect::CreateWorktreeSession {
             agent_id: new_id,
             load_session_id: Some(parent_session_id.0.to_string()),
             label: None,
             git_ref: None,
-            // Fork resumes the parent session, which carries its own model.
-            model_id: None,
+            // Worktree resume_session path does not honor model_id today;
+            // still pass through for fresh-create symmetry. Non-worktree
+            // forks use Effect::ForkSession.new_model_id.
+            model_id: fork_model_id
+                .as_deref()
+                .map(|s| acp::ModelId::new(s.to_string())),
             preferred_session_id: None,
             chat_kind: parent_chat_kind,
         }]
@@ -267,6 +296,7 @@ pub(in crate::app::dispatch) fn dispatch_fork_resolved(
             parent_cwd,
             parent_is_worktree,
             new_session_id: None,
+            new_model_id: fork_model_id,
         }]
     }
 }
@@ -506,12 +536,18 @@ pub(in crate::app::dispatch) fn dispatch_startup_fork_session(
     let cwd = parent_cwd.unwrap_or_else(|| app.cwd.clone());
     let parent_is_worktree =
         crate::app::session_startup::parent_session_is_worktree(&parent_session_id, &cwd);
+    // LOCAL-PATCH(upstream-fork-secondary-model)
+    let fork_model_id = crate::app::session_startup::effective_fork_secondary_model_id(
+        &app.current_ui.fork_secondary_model,
+    )
+    .map(|s| s.to_string());
     effects.push(Effect::ForkSession {
         agent_id,
         parent_session_id: acp::SessionId::new(parent_session_id),
         parent_cwd: cwd,
         parent_is_worktree,
         new_session_id,
+        new_model_id: fork_model_id,
     });
     effects
 }

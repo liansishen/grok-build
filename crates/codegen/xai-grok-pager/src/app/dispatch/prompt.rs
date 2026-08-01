@@ -582,6 +582,7 @@ pub(super) fn dispatch_send_prompt_inner(
                     scheduler_background_loops: agent
                         .scheduler_background_loops
                         .unwrap_or(scheduler_background_loops_seed),
+                    fork_secondary_effort_options: Vec::new(),
                 },
             };
 

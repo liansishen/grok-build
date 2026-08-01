@@ -1688,5 +1688,30 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+        // LOCAL-PATCH(upstream-fork-secondary-model): effort menu depends on
+        // the effective secondary model (override or current session model).
+        SettingMeta {
+            key: "fork_secondary_reasoning_effort",
+            category: SettingCategory::Models,
+            owner: SettingOwner::Shell,
+            label: "Fork secondary reasoning effort",
+            description: "Reasoning effort for forked/secondary agents. Options follow the secondary model (or the current model when no secondary model is set). Pick `(no override)` to clear.",
+            keywords: &[
+                "fork",
+                "secondary",
+                "reasoning",
+                "effort",
+                "thinking",
+                "subagent",
+                "model",
+            ],
+            kind: SettingKind::DynamicEnum {
+                default: "",
+                source: DynamicEnumSource::ForkSecondaryReasoningEffort,
+                supports_preview: false,
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
     ]
 }

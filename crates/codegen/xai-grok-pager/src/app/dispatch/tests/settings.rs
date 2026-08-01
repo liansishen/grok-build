@@ -1696,6 +1696,13 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
                 let _ = dispatch(Action::SetForkSecondaryModel(id), app);
             }
         }
+        "fork_secondary_reasoning_effort" => {
+            // Seed a synthetic effort menu entry via models meta is heavy;
+            // write the mirror + persist path through Clear is enough for
+            // "away from default" when default is empty — set a non-empty
+            // value directly then re-open validation relies on catalog.
+            app.current_ui.fork_secondary_reasoning_effort = "high".to_string();
+        }
         "default_selected_permission" => {
             let _ = dispatch(
                 Action::SetDefaultSelectedPermission("allow_once".to_string()),

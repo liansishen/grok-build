@@ -130,6 +130,15 @@ pub(crate) async fn run_shell_child(
         cwd,
         &definition,
     );
+    // LOCAL-PATCH(upstream-fork-secondary-model): settings default effort
+    // fills in when role/persona/spawn did not set one.
+    if effective_runtime.reasoning_effort.is_none() {
+        if let Some(ref effort) = ctx.default_subagent_reasoning_effort {
+            if !effort.is_empty() {
+                effective_runtime.reasoning_effort = Some(effort.clone());
+            }
+        }
+    }
     let prompt = request.prompt.clone();
     if let Some(ref err) = effective_runtime.persona_error {
         tracing::error!(

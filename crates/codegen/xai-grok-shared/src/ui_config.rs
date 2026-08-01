@@ -8,8 +8,23 @@ pub struct UiConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
     /// Model ID to use for the secondary agent when forking.
-    /// Defaults to the main default model (from default_models.json).
+    ///
+    /// Empty string = no override (child keeps the source session model).
+    /// Non-empty = explicit model id (including the built-in default Grok id).
+    ///
+    /// LOCAL-PATCH(upstream-fork-secondary-model): default was previously
+    /// `default_model()` with UI folding that made selecting Grok look like
+    /// "(no override)". Revert to upstream when they fix this properly.
     pub fork_secondary_model: String,
+    /// Reasoning effort for the secondary/forked agent (and default for
+    /// task subagents when no role/persona/spawn override applies).
+    ///
+    /// Empty = no override (inherit parent/model default). Non-empty must be
+    /// a level offered by the effective secondary model.
+    ///
+    /// LOCAL-PATCH(upstream-fork-secondary-model)
+    #[serde(default)]
+    pub fork_secondary_reasoning_effort: String,
     /// YOLO mode. Read by `util::config`, declared here for `serde_ignored`.
     #[serde(default)]
     pub yolo: bool,
@@ -279,7 +294,9 @@ impl Default for UiConfig {
         Self {
             max_thoughts_width: DEFAULT_MAX_THOUGHTS_WIDTH,
             theme: None,
-            fork_secondary_model: xai_grok_models::default_model().to_string(),
+            // LOCAL-PATCH(upstream-fork-secondary-model): empty = no override.
+            fork_secondary_model: String::new(),
+            fork_secondary_reasoning_effort: String::new(),
             yolo: false,
             ui_theme: None,
             compact_mode: false,

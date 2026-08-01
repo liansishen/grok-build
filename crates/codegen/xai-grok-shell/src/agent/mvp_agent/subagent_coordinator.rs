@@ -462,6 +462,17 @@ impl MvpAgent {
             parent_max_turns,
             available_models,
             subagent_model_overrides,
+            // LOCAL-PATCH(upstream-fork-secondary-model): settings default
+            // for subagent reasoning effort.
+            default_subagent_reasoning_effort: crate::util::config::load_effective_config()
+                .ok()
+                .and_then(|root| {
+                    root.get("ui")
+                        .and_then(|u| u.get("fork_secondary_reasoning_effort"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                }),
             subagent_toggle,
             subagent_roles,
             subagent_personas,

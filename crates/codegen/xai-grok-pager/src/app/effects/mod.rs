@@ -4099,6 +4099,7 @@ pub(crate) fn execute(
             parent_cwd,
             parent_is_worktree,
             new_session_id,
+            new_model_id,
         } => {
             let tx = acp_tx.clone();
             tasks
@@ -4116,11 +4117,13 @@ pub(crate) fn execute(
                             error: sanitize_user_error(&e.to_string()),
                         };
                     }
+                    // LOCAL-PATCH(upstream-fork-secondary-model)
                     let payload = crate::app::session_startup::fork_session_params(
                         &sid_str,
                         &parent_cwd,
                         new_session_id.as_deref(),
                         parent_is_worktree,
+                        new_model_id.as_deref(),
                     );
                     let req = acp::ExtRequest::new(
                         "x.ai/session/fork",
