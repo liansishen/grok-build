@@ -158,6 +158,10 @@ pub struct BashCommandPermission {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BashCommandSelectedTerms {
     pub command_parts: Vec<String>,
+    /// The user authored a free-form glob pattern (pattern editor) rather than
+    /// a literal word-scope selection, so it must be matched with glob semantics.
+    #[serde(default)]
+    pub is_glob: bool,
 }
 
 /// Delimiter used to qualify MCP tool names as `"<server>__<tool>"`.
@@ -290,6 +294,9 @@ pub enum PromptOutcome {
     /// Matches the UX of xai_grok_i18n::t("permission.option.allow_edits_session").
     AllowEditsForSession,
     AllowAlwaysBashCommand(String),
+    /// A free-form glob pattern authored in the "Always allow" editor. Matched
+    /// with glob semantics (unlike the literal-prefix [`Self::AllowAlwaysBashCommand`]).
+    AllowAlwaysBashGlob(String),
     AllowAlwaysDomain(String),
     /// Persist this exact MCP tool name in `allowed_mcp_tools`.
     AllowAlwaysMcpTool(String),
@@ -864,6 +871,7 @@ fn permission_decision_for_outcome(outcome: &PromptOutcome) -> PermissionDecisio
         | PromptOutcome::AllowAlways
         | PromptOutcome::AllowEditsForSession
         | PromptOutcome::AllowAlwaysBashCommand(_)
+        | PromptOutcome::AllowAlwaysBashGlob(_)
         | PromptOutcome::AllowAlwaysDomain(_)
         | PromptOutcome::AllowAlwaysMcpTool(_)
         | PromptOutcome::AllowAlwaysMcpServer(_) => PermissionDecision::Allow,
@@ -947,9 +955,12 @@ fn map_selected_outcome(
                         )
                         .ok()
                     }) {
-                        PromptOutcome::AllowAlwaysBashCommand(
-                            bash_selected_commands.command_parts.join(" "),
-                        )
+                        let pattern = bash_selected_commands.command_parts.join(" ");
+                        if bash_selected_commands.is_glob {
+                            PromptOutcome::AllowAlwaysBashGlob(pattern)
+                        } else {
+                            PromptOutcome::AllowAlwaysBashCommand(pattern)
+                        }
                     } else if let AccessKind::Bash(cmd) = access {
                         // No interactive selection meta (e.g. desktop client).
                         // Compute the primary command from the script.
@@ -1148,6 +1159,7 @@ mod tests {
         // BashCommandSelectedTerms meta and wins over the raw script.
         let meta = serde_json::to_value(BashCommandSelectedTerms {
             command_parts: vec!["cargo".to_owned(), "test".to_owned()],
+            is_glob: false,
         })
         .unwrap()
         .as_object()

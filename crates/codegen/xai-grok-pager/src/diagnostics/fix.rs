@@ -9,13 +9,16 @@ use xai_grok_config::managed_text::{
 };
 use xai_grok_i18n::{t, t_fmt, t_or};
 
-use crate::diagnostics::{DiagnosticId, DiagnosticReport, TmuxOptionFact, TmuxSupportFact};
+use crate::diagnostics::{
+    DiagnosticId, DiagnosticReport, TmuxColorPassthrough, TmuxOptionFact, TmuxSupportFact,
+};
 use crate::terminal::{ByobuBackend, TerminalContext};
 
 pub const SSH_WRAP_ID: DiagnosticId = DiagnosticId::new("terminal", "ssh-wrap");
 pub const TMUX_CLIPBOARD_ID: DiagnosticId = DiagnosticId::new("terminal", "tmux-clipboard");
 pub const DCS_PASSTHROUGH_ID: DiagnosticId = DiagnosticId::new("terminal", "dcs-passthrough");
 pub const TMUX_EXTENDED_KEYS_ID: DiagnosticId = DiagnosticId::new("terminal", "tmux-extended-keys");
+pub const TMUX_TRUECOLOR_ID: DiagnosticId = DiagnosticId::new("terminal", "tmux-truecolor");
 pub const SSH_WRAP_FIX_COMMAND: &str = "grok doctor fix terminal.ssh-wrap";
 pub const SSH_WRAP_ONE_OFF: &str = "grok wrap ssh <host>";
 
@@ -416,6 +419,20 @@ enum TmuxEvidence {
     Clipboard,
     DcsPassthrough,
     ExtendedKeys,
+    ColorPassthrough,
+}
+
+/// How a tmux remedy reaches its healthy state, which decides whether an
+/// existing line elsewhere in the config can defeat Grok's managed block.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TmuxRemedy {
+    /// `set -g <option> <value>`: the last assignment wins, so a direct
+    /// assignment in the user's own config must be classified before writing.
+    Assignment,
+    /// `set -as <option> …`: tmux accumulates these and Grok appends its block
+    /// at the end of the file, so earlier lines add to the fix rather than
+    /// override it and are never a conflict.
+    Accumulating,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -423,7 +440,10 @@ struct TmuxOptionSpec {
     id: DiagnosticId,
     option: &'static str,
     line: &'static str,
+    /// Values that already satisfy the fix. Empty for an accumulating remedy,
+    /// whose health comes from the attached client, not from one option value.
     healthy_values: &'static [&'static str],
+    remedy: TmuxRemedy,
     evidence: TmuxEvidence,
     scope: TmuxOptionScope,
     label: &'static str,
@@ -434,6 +454,7 @@ const TMUX_CLIPBOARD_SPEC: TmuxOptionSpec = TmuxOptionSpec {
     option: "set-clipboard",
     line: "set -g set-clipboard on",
     healthy_values: &["on", "external"],
+    remedy: TmuxRemedy::Assignment,
     evidence: TmuxEvidence::Clipboard,
     scope: TmuxOptionScope::Server,
     label: "Enable tmux clipboard forwarding",
@@ -443,6 +464,7 @@ const DCS_PASSTHROUGH_SPEC: TmuxOptionSpec = TmuxOptionSpec {
     option: "allow-passthrough",
     line: "set -wg allow-passthrough on",
     healthy_values: &["on", "all"],
+    remedy: TmuxRemedy::Assignment,
     evidence: TmuxEvidence::DcsPassthrough,
     scope: TmuxOptionScope::Window,
     label: "Enable tmux DCS passthrough",
@@ -452,9 +474,21 @@ const TMUX_EXTENDED_KEYS_SPEC: TmuxOptionSpec = TmuxOptionSpec {
     option: "extended-keys",
     line: "set -g extended-keys on",
     healthy_values: &["on"],
+    remedy: TmuxRemedy::Assignment,
     evidence: TmuxEvidence::ExtendedKeys,
     scope: TmuxOptionScope::Server,
     label: "Enable tmux extended keys",
+};
+
+const TMUX_TRUECOLOR_SPEC: TmuxOptionSpec = TmuxOptionSpec {
+    id: TMUX_TRUECOLOR_ID,
+    option: "terminal-features",
+    line: "set -as terminal-features \",*:RGB\"",
+    healthy_values: &[],
+    remedy: TmuxRemedy::Accumulating,
+    evidence: TmuxEvidence::ColorPassthrough,
+    scope: TmuxOptionScope::Server,
+    label: "Enable tmux truecolor passthrough",
 };
 
 const FIX_REGISTRY: &[FixSpec] = &[
@@ -486,6 +520,13 @@ const FIX_REGISTRY: &[FixSpec] = &[
         command: "grok doctor fix terminal.tmux-extended-keys",
         kind: FixKind::TmuxOption(&TMUX_EXTENDED_KEYS_SPEC),
     },
+    FixSpec {
+        id: TMUX_TRUECOLOR_ID,
+        handle: "tmux-truecolor",
+        label: TMUX_TRUECOLOR_SPEC.label,
+        command: "grok doctor fix terminal.tmux-truecolor",
+        kind: FixKind::TmuxOption(&TMUX_TRUECOLOR_SPEC),
+    },
 ];
 
 fn fix_spec(id: DiagnosticId) -> Option<&'static FixSpec> {
@@ -506,6 +547,10 @@ fn localized_fix_label(spec: &'static FixSpec) -> &'static str {
         TMUX_EXTENDED_KEYS_ID => {
             t_or("doctor_fix.label_tmux_extended_keys", "Enable tmux extended keys")
         }
+        TMUX_TRUECOLOR_ID => t_or(
+            "doctor_fix.label_tmux_truecolor",
+            "Enable tmux truecolor passthrough",
+        ),
         _ => spec.label,
     }
 }
@@ -682,7 +727,8 @@ pub(crate) fn format_fix_preview(plan: &FixPlan) -> String {
             );
         }
         FixPayload::TmuxOption(payload) => {
-            let instruction = reload_instruction(&plan.change.requested_path);
+            let instruction =
+                tmux_activation_instruction(payload.spec, &plan.change.requested_path);
             let text = t_or(
                 "doctor_fix.preview_tmux_changes",
                 "What this changes:\n  Persists `{line}`.\n  Grok does not reload or modify the live tmux server.\n  After applying, {instruction}\n  Run /doctor again to verify the live setting.",
@@ -784,11 +830,14 @@ fn plan_tmux_option(
         validator: None,
     })
     .map_err(FixError::TmuxManaged)?;
-    let direct = scan_direct_tmux_option(
-        managed.inspection().unmanaged_text(),
-        managed.target_path(),
-        spec,
-    )?;
+    let direct = match spec.remedy {
+        TmuxRemedy::Assignment => scan_direct_tmux_option(
+            managed.inspection().unmanaged_text(),
+            managed.target_path(),
+            spec,
+        )?,
+        TmuxRemedy::Accumulating => DirectOptionState::Absent,
+    };
     let item_state = managed
         .inspection()
         .requested_item_state(0)
@@ -806,13 +855,7 @@ fn plan_tmux_option(
     Ok(FixPlan {
         id: request.id,
         change,
-        caveats: vec![
-            t_or(
-                "doctor_fix.caveat_tmux_live_server_unchanged",
-                "The live tmux server is unchanged until you reload this config or detach and reattach.",
-            ),
-            t_or("doctor_fix.caveat_tmux_scanner", TMUX_SCANNER_CAVEAT),
-        ],
+        caveats: tmux_caveats(spec.remedy),
         payload: FixPayload::TmuxOption(TmuxOptionPlan {
             spec,
             managed,
@@ -825,8 +868,35 @@ fn plan_tmux_option(
     })
 }
 
+fn tmux_caveats(remedy: TmuxRemedy) -> Vec<&'static str> {
+    match remedy {
+        TmuxRemedy::Assignment => vec![
+            t_or(
+                "doctor_fix.caveat_tmux_live_server_restart",
+                "The live tmux server is unchanged until you reload this config or restart it.",
+            ),
+            t_or("doctor_fix.caveat_tmux_scanner", TMUX_SCANNER_CAVEAT),
+        ],
+        // Reloading is not enough on its own: tmux fixes a client's feature set
+        // when that client attaches.
+        TmuxRemedy::Accumulating => vec![
+            t_or(
+                "doctor_fix.caveat_tmux_reload_not_enough",
+                "Reloading alone is not enough: the attached client keeps its current color depth until it reattaches.",
+            ),
+            t_or(
+                "doctor_fix.caveat_tmux_truecolor_ignore",
+                "Terminals that cannot render 24-bit color ignore the extra escape sequence.",
+            ),
+        ],
+    }
+}
+
 fn tmux_evidence_is_applicable(report: &DiagnosticReport, spec: &TmuxOptionSpec) -> bool {
     match spec.evidence {
+        TmuxEvidence::ColorPassthrough => {
+            report.facts.tmux.color_passthrough == TmuxColorPassthrough::Reduced
+        }
         TmuxEvidence::Clipboard => matches!(
             &report.facts.tmux.set_clipboard,
             TmuxOptionFact::Available(value)
@@ -954,18 +1024,12 @@ fn fix_outcome(
 
 pub(crate) fn format_fix_success(outcome: &FixOutcome) -> String {
     let path = markdown_code_path(outcome.changed_path());
-    let kind = match outcome.id {
-        SSH_WRAP_ID => FixKind::SshWrap,
-        TMUX_CLIPBOARD_ID => FixKind::TmuxOption(&TMUX_CLIPBOARD_SPEC),
-        DCS_PASSTHROUGH_ID => FixKind::TmuxOption(&DCS_PASSTHROUGH_SPEC),
-        TMUX_EXTENDED_KEYS_ID => FixKind::TmuxOption(&TMUX_EXTENDED_KEYS_SPEC),
-        _ => {
-            return t_or(
-                "doctor_fix.success_applied_generic",
-                "Applied the Doctor fix.",
-            )
-            .to_owned();
-        }
+    let Some(kind) = fix_spec(outcome.id).map(|spec| spec.kind) else {
+        return t_or(
+            "doctor_fix.success_applied_generic",
+            "Applied the Doctor fix.",
+        )
+        .to_owned();
     };
     let status = match (kind, outcome.status) {
         (FixKind::SshWrap, FixStatus::Applied) => {
@@ -1000,9 +1064,9 @@ pub(crate) fn format_fix_success(outcome: &FixOutcome) -> String {
         (FixKind::SshWrap, FixActivation::SatisfiedNow) => {
             format!("\n{}", t("start_new_shell"))
         }
-        (FixKind::TmuxOption(_), FixActivation::RequiresReload) => format!(
+        (FixKind::TmuxOption(tmux), FixActivation::RequiresReload) => format!(
             "\n{}\n{}",
-            reload_instruction(outcome.changed_path()),
+            tmux_activation_instruction(tmux, outcome.changed_path()),
             t_or(
                 "doctor_fix.verify_live_setting",
                 "Run /doctor again to verify the live setting.",
@@ -1068,18 +1132,42 @@ fn shell_quote_path(path: &Path) -> Option<String> {
     Some(format!("'{}'", value.replace('\'', "'\\''")))
 }
 
+/// An accumulating remedy needs both steps: the server reads the new option
+/// only on reload, and a client resolves its feature set only at attach, so
+/// neither reloading nor reattaching alone changes anything.
+fn tmux_activation_instruction(spec: &TmuxOptionSpec, path: &Path) -> String {
+    match spec.remedy {
+        TmuxRemedy::Assignment => reload_instruction(path),
+        TmuxRemedy::Accumulating => match shell_quote_path(path) {
+            Some(shell_path) => t_or(
+                "doctor_fix.tmux_activation_accumulating",
+                "Run {command}, then detach and reattach: only clients that attach after the reload get 24-bit color.",
+            )
+            .replace(
+                "{command}",
+                &commonmark_code_span(&format!("tmux source-file {shell_path}")),
+            ),
+            None => t_or(
+                "doctor_fix.tmux_activation_accumulating_no_path",
+                "Reload your tmux config, then detach and reattach: only clients that attach after the reload get 24-bit color.",
+            )
+            .to_owned(),
+        },
+    }
+}
+
 fn reload_instruction(path: &Path) -> String {
     let Some(shell_path) = shell_quote_path(path) else {
         return t_or(
-            "doctor_fix.detach_reattach_activation",
-            "Detach and reattach to activate the persistent tmux setting.",
+            "doctor_fix.reload_tmux_or_restart_no_path",
+            "Reload your tmux config, or restart the tmux server, to activate the persistent setting.",
         )
         .to_owned();
     };
     let command = format!("tmux source-file {shell_path}");
     t_or(
-        "doctor_fix.reload_tmux_command",
-        "Reload tmux with {command}, or detach and reattach.",
+        "doctor_fix.reload_tmux_or_restart",
+        "Reload tmux with {command}, or restart the tmux server.",
     )
     .replace("{command}", &commonmark_code_span(&command))
 }
@@ -1108,11 +1196,17 @@ fn tmux_option_configured(path: &Path, spec: &'static TmuxOptionSpec) -> bool {
         comments: CommentSyntax::hash(),
         validator: None,
     };
-    ManagedConfig::plan(request).is_ok_and(|plan| {
-        let direct =
-            scan_direct_tmux_option(plan.inspection().unmanaged_text(), plan.target_path(), spec);
-        matches!(direct, Ok(DirectOptionState::Healthy))
-            || !plan.changes_file() && matches!(direct, Ok(DirectOptionState::Absent))
+    ManagedConfig::plan(request).is_ok_and(|plan| match spec.remedy {
+        TmuxRemedy::Accumulating => !plan.changes_file(),
+        TmuxRemedy::Assignment => {
+            let direct = scan_direct_tmux_option(
+                plan.inspection().unmanaged_text(),
+                plan.target_path(),
+                spec,
+            );
+            matches!(direct, Ok(DirectOptionState::Healthy))
+                || !plan.changes_file() && matches!(direct, Ok(DirectOptionState::Absent))
+        }
     })
 }
 

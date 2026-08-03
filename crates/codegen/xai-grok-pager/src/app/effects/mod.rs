@@ -4711,7 +4711,7 @@ fn format_session_info(
         ],
     )
 }
-/// Auth section for `/session-info` — login method + where to manage account/credits.
+/// Auth section for `/session-info` — active login method.
 ///
 /// This reflects the process login / ACP auth method, not per-model sampling
 /// credentials (a model `api_key`/`env_key` can still own the turn).
@@ -4728,15 +4728,16 @@ fn format_auth_lines(is_api_key_auth: bool, api_key_env_set: bool) -> String {
                 "  Auth method: API key\n",
             )
         };
+        // Upstream dropped manage-account links from /session-info; keep i18n.
         return t_fmt_or(
             "session_info.auth.api_key_details",
-            "{method}  Manage account and credits: console.x.ai\n  Run `grok login` to use your SuperGrok subscription instead.\n",
+            "{method}  Run `grok login` to use your SuperGrok subscription instead.\n",
             &[("method", method)],
         );
     }
     xai_grok_i18n::t_or(
         "session_info.auth.oauth",
-        "  Auth method: OAuth\n  Manage account and credits: https://grok.com/?_s=billing\n",
+        "  Auth method: OAuth\n",
     )
     .to_string()
 }

@@ -12,7 +12,7 @@ use crate::http::TransportFailureKind;
 use crate::util::grok_home;
 use xai_grok_telemetry::events::{LoginFailed, LoginFailureKind};
 
-pub type StderrCallback = Box<dyn Fn(&str)>;
+pub(crate) type StderrCallback = Box<dyn Fn(&str)>;
 
 /// Reject a cached credential for reuse if it lacks `oidc_issuer`, has a
 /// mismatched issuer, or its team principal violates the `force_login_team_uuid`
@@ -187,7 +187,7 @@ impl AuthUrlMode {
     }
 
     /// Back-compat flag for older clients that only read `external_provider`.
-    pub fn is_external_provider(self) -> bool {
+    pub(crate) fn is_external_provider(self) -> bool {
         matches!(self, Self::Command)
     }
 }
@@ -343,7 +343,7 @@ async fn run_external_auth_provider(
 }
 
 /// GUI auth: bridges external provider stderr to `url_tx`, pipes code submission via `code_rx`.
-pub async fn run_auth_flow_with_stderr_bridge(
+pub(crate) async fn run_auth_flow_with_stderr_bridge(
     auth_manager: &Arc<AuthManager>,
     grok_com_config: &GrokComConfig,
     channels: AuthChannels,
@@ -456,7 +456,7 @@ pub async fn run_auth_flow(
 /// Like [`run_auth_flow`] but with `force_interactive`: skip cached
 /// credentials without clearing them. Used by `/login` for mid-session
 /// re-auth where abandoning the flow must not disrupt the session.
-pub async fn run_auth_flow_interactive(
+pub(crate) async fn run_auth_flow_interactive(
     auth_manager: &Arc<AuthManager>,
     grok_com_config: &GrokComConfig,
     on_stderr: Option<StderrCallback>,
