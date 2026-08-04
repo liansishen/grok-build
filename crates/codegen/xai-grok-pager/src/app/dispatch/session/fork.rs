@@ -2,7 +2,7 @@
 use super::lifecycle::{dispatch_new_session_inner_with_id, refuse_chat_mode_build_agent};
 use crate::acp::tracker::AcpUpdateTracker;
 use crate::app::actions::Effect;
-use crate::app::agent::{AgentCommand, AgentId, AgentSession, AgentState};
+use crate::app::agent::{AgentCommand, AgentId, AgentSession, AgentState, DeferredModelSwitch};
 use crate::app::agent_view::AgentView;
 use crate::app::app_view::{ActiveView, AppView};
 use crate::app::dispatch::ctx::{SwitchCause, switch_to_agent};
@@ -265,11 +265,15 @@ pub(in crate::app::dispatch) fn dispatch_fork_resolved(
         let switch_model = fork_model_id
             .as_deref()
             .map(|s| acp::ModelId::new(s.to_string()))
-            .or(parent_current_model);
+            .or_else(|| parent_current_model.clone());
         if let Some(mid) = switch_model
             && (fork_effort.is_some() || fork_model_id.is_some())
         {
-            agent.session.deferred_model_switch = Some((mid, fork_effort));
+            agent.session.deferred_model_switch = Some(DeferredModelSwitch {
+                model_id: mid,
+                effort: fork_effort,
+                prev_model_id: parent_current_model,
+            });
         }
     }
     if worktree {
