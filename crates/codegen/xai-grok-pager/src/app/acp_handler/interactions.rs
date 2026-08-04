@@ -89,9 +89,6 @@ pub(crate) fn handle_ask_user_question(
                 LocalQuestionKind::AgentTypeMismatch { .. } => {
                     xai_grok_i18n::t("question.local.subject.model_switch")
                 }
-                LocalQuestionKind::ProjectSelect { .. } => {
-                    xai_grok_i18n::t("question.local.subject.project_select")
-                }
                 LocalQuestionKind::DoctorFix { .. } => "/doctor fix",
                 LocalQuestionKind::DeleteCurrentSession => "/delete",
             };
