@@ -784,6 +784,7 @@
 "dashboard.no_row_match" = "No rows match `{query}` — press Esc to clear the filter."
 "dashboard.no_state_match" = "No agents in state `{state}` — press Esc to clear the filter."
 "dashboard.open_to_change_location" = "Open the dashboard (/dashboard) to change location"
+"dashboard.overlay.prev_next_agent" = "prev/next agent"
 "dashboard.overlay_close" = "[Dashboard]"
 "dashboard.pending_prefix" = "Pending:"
 "dashboard.pending_question" = "question"

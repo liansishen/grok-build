@@ -784,6 +784,7 @@
 "dashboard.no_row_match" = "没有行匹配 `{query}` — 按 Esc 清除筛选。"
 "dashboard.no_state_match" = "没有处于「{state}」状态的智能体 — 按 Esc 清除筛选。"
 "dashboard.open_to_change_location" = "打开仪表盘（/dashboard）以更改位置"
+"dashboard.overlay.prev_next_agent" = "上一个/下一个智能体"
 "dashboard.overlay_close" = "[仪表盘]"
 "dashboard.pending_prefix" = "待处理："
 "dashboard.pending_question" = "问题"

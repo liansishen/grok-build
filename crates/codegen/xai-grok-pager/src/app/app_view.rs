@@ -4865,6 +4865,7 @@ impl AppView {
                             } else {
                                 None
                             };
+                        let overlay_can_cycle = position.is_some_and(|(_, n)| n > 1);
                         let (agent_area, header) = if overlay_active {
                             let theme = crate::theme::Theme::current();
                             let title = agents
@@ -4956,6 +4957,7 @@ impl AppView {
                                 },
                                 &self.bundle_state,
                                 overlay_active,
+                                overlay_can_cycle,
                                 link_spans,
                                 AppRenderParams {
                                     voice_available,
@@ -5077,6 +5079,7 @@ impl AppView {
                                                     crate::app::agent_view::BannerSlotParams::none(
                                                     ),
                                                     bundle_state,
+                                                    false,
                                                     false,
                                                     link_spans,
                                                     AppRenderParams {
@@ -10021,6 +10024,7 @@ pub(crate) mod tests {
             crate::app::agent_view::BannerSlotParams::none(),
             &BundleState::default(),
             false,
+            false,
             &mut Vec::new(),
             crate::app::agent_view::AppRenderParams::default(),
         );
@@ -10066,6 +10070,7 @@ pub(crate) mod tests {
             false,
             crate::app::agent_view::BannerSlotParams::none(),
             &BundleState::default(),
+            false,
             false,
             &mut Vec::new(),
             crate::app::agent_view::AppRenderParams::default(),
@@ -10116,6 +10121,7 @@ pub(crate) mod tests {
             false,
             crate::app::agent_view::BannerSlotParams::none(),
             &BundleState::default(),
+            false,
             false,
             &mut Vec::new(),
             crate::app::agent_view::AppRenderParams::default(),

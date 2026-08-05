@@ -51,7 +51,7 @@ struct Inner {
     fetch_lock: tokio::sync::Mutex<()>,
 }
 impl ChatModesManager {
-    pub fn new(auth: Arc<AuthManager>) -> Self {
+    pub(crate) fn new(auth: Arc<AuthManager>) -> Self {
         Self {
             inner: Arc::new(Inner {
                 auth,
@@ -67,7 +67,7 @@ impl ChatModesManager {
     }
     /// Chat model state for a `session/load` response. On missing auth or fetch
     /// failure, serves last-good cache else empty — never the build catalog.
-    pub async fn model_state(&self) -> acp::SessionModelState {
+    pub(crate) async fn model_state(&self) -> acp::SessionModelState {
         let Some(user_id) = self.current_user_id() else {
             return empty_state();
         };
