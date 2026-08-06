@@ -86,6 +86,17 @@ pub enum SessionEvent {
         /// Used to match known error patterns without fragile string matching.
         error_type: Option<String>,
     },
+    /// A non-success API / HTTP response (or similar terminal request error).
+    /// Rendered like [`SessionEvent::ReAuthRequired`]: warning color + accent,
+    /// no JSON dump.
+    RequestFailed {
+        /// HTTP status when known. `None` for transport / idle-timeout / etc.
+        status: Option<u16>,
+        /// Short headline, e.g. `"Server error (500)"`.
+        headline: String,
+        /// Sanitized one-line detail (server message or fallback guidance).
+        detail: String,
+    },
     /// The server rejected the credentials (401 / auth error) and automatic
     /// recovery was exhausted. Rendered as a prominent call-to-action that
     /// points the user at `/login` to re-authenticate, replacing the raw
@@ -96,6 +107,8 @@ pub enum SessionEvent {
     /// vs the server's max_prompt_length, or compaction suppressed/failed). One actionable
     /// prompt, replacing the CompactionFailed + RetryFailed + TurnFailed stack.
     ContextTooLarge,
+    /// Session disk is full.
+    DiskFull,
     /// Manual `/compact` command completed.
     CompactCompleted {
         /// Wall-clock elapsed time for the command.
@@ -217,18 +230,25 @@ impl SessionEvent {
                 xai_grok_i18n::t("session.compaction_cancelled").to_string()
             }
             SessionEvent::RetryFailed { error, error_type } => {
-                if error_type.as_deref() == Some("encrypted_content_mismatch") {
+                use crate::app::error_display::WireErrorType;
+                if WireErrorType::parse(error_type.as_deref())
+                    == WireErrorType::EncryptedContentMismatch
+                {
                     xai_grok_i18n::t("session.retry_encrypted_mismatch").to_string()
                 } else {
                     xai_grok_i18n::t_fmt("session.retry_failed", &[("error", error.as_str())])
                 }
             }
+            SessionEvent::RequestFailed {
+                headline, detail, ..
+            } => crate::app::error_display::banner_message(headline, detail),
             SessionEvent::ReAuthRequired => xai_grok_i18n::t("session.reauth_required").to_string(),
             SessionEvent::ContextTooLarge => {
                 xai_grok_i18n::t("session.context_too_large").to_string()
             }
+            SessionEvent::DiskFull => xai_grok_i18n::t("session.disk_full").to_string(),
             SessionEvent::CompactCompleted { elapsed } => xai_grok_i18n::t_fmt(
-                "session.compact_completed",
+                "session.compaction_completed_in",
                 &[("duration", &format_duration(*elapsed))],
             ),
             SessionEvent::HookAnnotation { message } => message.clone(),
@@ -279,9 +299,29 @@ impl SessionEvent {
         }
     }
 
+    /// Failures and actionable prompts stand out (warning color + accent bar).
+    fn is_warning_banner(&self) -> bool {
+        matches!(
+            self,
+            SessionEvent::ReAuthRequired
+                | SessionEvent::ContextTooLarge
+                | SessionEvent::DiskFull
+                | SessionEvent::CompactionFailed { .. }
+                | SessionEvent::RequestFailed { .. }
+                | SessionEvent::RetryFailed { .. }
+                | SessionEvent::TurnFailed { .. }
+        )
+    }
+
     /// Whether this event marks the end of an agent turn (the "Turn
     /// completed/cancelled/failed" markers). These are the only events that
     /// can carry the turn's stop/stop_failure hook runs inline.
+    ///
+    /// [`SessionEvent::RequestFailed`] is intentionally excluded — same as
+    /// [`SessionEvent::ReAuthRequired`]. RetryState may push it before
+    /// PromptResponse; treating it as terminal would change stop-hook
+    /// attribution. Dedicated banners skip the TurnFailed marker and flush
+    /// hooks standalone.
     pub fn is_turn_terminal(&self) -> bool {
         matches!(
             self,
@@ -535,12 +575,7 @@ impl BlockContent for SessionEventBlock {
         let theme = Theme::current();
         // Failures and re-auth / context-overflow prompts are actionable, not
         // informational — render them in the warning color, not muted noise.
-        let style = if matches!(
-            self.event,
-            SessionEvent::ReAuthRequired
-                | SessionEvent::ContextTooLarge
-                | SessionEvent::CompactionFailed { .. }
-        ) {
+        let style = if self.event.is_warning_banner() {
             ratatui::style::Style::default().fg(theme.warning)
         } else {
             theme.muted()
@@ -583,12 +618,7 @@ impl BlockContent for SessionEventBlock {
             return (ctx.mode != DisplayMode::Collapsed)
                 .then(|| AccentStyle::static_color(theme.accent_tool));
         }
-        if matches!(
-            self.event,
-            SessionEvent::ReAuthRequired
-                | SessionEvent::ContextTooLarge
-                | SessionEvent::CompactionFailed { .. }
-        ) {
+        if self.event.is_warning_banner() {
             Some(AccentStyle::static_color(theme.warning))
         } else {
             None
@@ -794,6 +824,26 @@ mod tests {
             accent.map(|a| a.color),
             Some(theme.warning),
             "re-auth prompt must stand out with a warning accent"
+        );
+    }
+
+    #[test]
+    fn request_failed_message_and_warning_accent() {
+        let event = SessionEvent::RequestFailed {
+            status: Some(500),
+            headline: "Server error (500)".into(),
+            detail: "upstream exploded".into(),
+        };
+        assert_eq!(
+            event.message(),
+            "Server error (500) \u{2014} upstream exploded"
+        );
+        let block = SessionEventBlock::new(event);
+        let theme = Theme::current();
+        assert_eq!(
+            block.accent(&ctx()).map(|a| a.color),
+            Some(theme.warning),
+            "request-failed banner must stand out like re-auth"
         );
     }
 

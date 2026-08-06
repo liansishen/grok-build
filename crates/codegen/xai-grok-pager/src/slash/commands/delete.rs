@@ -1,4 +1,4 @@
-//! `/delete` — delete this session's history and return home.
+//! `/delete` — delete this session's history (welcome, or dashboard when attached).
 
 use crate::app::actions::Action;
 use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
