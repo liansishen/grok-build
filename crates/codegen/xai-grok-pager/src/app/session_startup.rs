@@ -1383,7 +1383,7 @@ pub(crate) fn classify_remote_restore(
         xai_grok_i18n::t("startup.remote_restore_unavailable").to_string(),
     )
 }
-}
+
 /// Resolve a non-id resume arg as a session title among local sessions for `cwd`.
 ///
 /// Matching/disambiguation rules live in [`super::session_title_resolve`]
