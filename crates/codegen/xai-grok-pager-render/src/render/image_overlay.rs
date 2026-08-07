@@ -25,7 +25,7 @@ use crate::util::format_bytes;
 mod content;
 mod geometry;
 
-use content::{build_meta_line, format_mime, paint_path_line, truncate_path_for_overlay};
+use content::{build_meta_line, format_mime, truncate_path_for_overlay};
 
 #[cfg(test)]
 use geometry::ImagePlacement;
@@ -181,7 +181,10 @@ fn render_image_overlay_inner(
             None
         };
         lines.push(Line::from(status.unwrap_or_else(|| {
-            xai_grok_i18n::t_fmt("img.size", &[("size", &format_bytes(image.byte_len))])
+            xai_grok_i18n::t_fmt(
+                "img.size",
+                &[("size", &format_bytes(image.byte_len as u64))],
+            )
         })));
         // Short boxes need the path in the body because no footer fits.
         if path_footer.is_none()
