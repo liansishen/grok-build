@@ -3200,7 +3200,7 @@ pub(crate) fn execute(
                     }
                 });
         }
-        Effect::ShowSessionInfo { agent_id, session_id, show_resolved_model } => {
+        Effect::ShowSessionInfo { agent_id, session_id, show_resolved_model, nonce } => {
             let is_api_key_auth = session_flags.is_api_key_auth;
             let api_key_env_set = xai_grok_shell::agent::auth_method::has_xai_api_key_env();
             let tx = acp_tx.clone();
@@ -3218,14 +3218,18 @@ pub(crate) fn execute(
                             );
                             TaskResult::SessionInfoComplete {
                                 agent_id,
+                                session_id,
                                 info: Box::new(info),
                                 text,
+                                nonce,
                             }
                         }
                         Err(error) => {
                             TaskResult::SessionInfoFailed {
                                 agent_id,
+                                session_id,
                                 error,
+                                nonce,
                             }
                         }
                     }
@@ -3417,7 +3421,7 @@ pub(crate) fn execute(
                     }
                 });
         }
-        Effect::ShowContextInfo { agent_id, session_id } => {
+        Effect::ShowContextInfo { agent_id, session_id, nonce } => {
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -3425,13 +3429,17 @@ pub(crate) fn execute(
                         Ok(info) => {
                             TaskResult::ContextInfoComplete {
                                 agent_id,
+                                session_id,
                                 info: Box::new(info),
+                                nonce,
                             }
                         }
                         Err(error) => {
                             TaskResult::ContextInfoFailed {
                                 agent_id,
+                                session_id,
                                 error,
+                                nonce,
                             }
                         }
                     }
@@ -3441,6 +3449,7 @@ pub(crate) fn execute(
             agent_id,
             session_id,
             for_status_bar,
+            nonce,
         } => {
             let tx = acp_tx.clone();
             tasks
@@ -3452,6 +3461,7 @@ pub(crate) fn execute(
                                 session_id,
                                 usage: Box::new(usage),
                                 for_status_bar,
+                                nonce,
                             }
                         }
                         Err(error) => {
@@ -3460,6 +3470,7 @@ pub(crate) fn execute(
                                 session_id,
                                 error,
                                 for_status_bar,
+                                nonce,
                             }
                         }
                     }
@@ -4167,6 +4178,7 @@ pub(crate) fn execute(
             agent_id,
             silent,
             request,
+            nonce,
         } => {
             if !session_flags.billing_surface_visible {
                 return (false, meta);
@@ -4202,6 +4214,7 @@ pub(crate) fn execute(
                                 request,
                                 error: sanitize_user_error(&format!("{e}")),
                                 silent,
+                                nonce,
                             };
                         }
                     };
@@ -4213,6 +4226,7 @@ pub(crate) fn execute(
                                 request,
                                 error: format!("Parse error: {e}"),
                                 silent,
+                                nonce,
                             };
                         }
                     };
@@ -4230,6 +4244,7 @@ pub(crate) fn execute(
                         silent,
                         subscription_tier,
                         autotopup,
+                        nonce,
                     }
                 });
         }
@@ -4372,7 +4387,7 @@ pub(crate) fn execute(
         Effect::DebouncePluginCta { agent_id, generation } => {
             tasks
                 .spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     TaskResult::PluginCtaDebounceExpired {
                         agent_id,
                         generation,

@@ -51,6 +51,13 @@ fn next_billing_request(app: &mut AppView) -> crate::app::actions::BillingReques
 }
 
 /// Dispatch a `BillingFetched` task result with sensible defaults.
+fn open_usage_modal_nonce(app: &AppView) -> u64 {
+    match app.agents[&AgentId(0)].active_modal.as_ref() {
+        Some(crate::views::modal::ActiveModal::UsageInfo { state }) => state.fetch_nonce,
+        _ => 0,
+    }
+}
+
 fn dispatch_billing(
     app: &mut AppView,
     balance: Option<crate::views::credit_bar::CreditBalance>,
@@ -58,6 +65,7 @@ fn dispatch_billing(
     subscription_tier: Option<String>,
 ) {
     let request = next_billing_request(app);
+    let nonce = open_usage_modal_nonce(app);
     dispatch(
         Action::TaskComplete(TaskResult::BillingFetched {
             agent_id: AgentId(0),
@@ -66,6 +74,7 @@ fn dispatch_billing(
             silent,
             subscription_tier,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Unchanged,
+            nonce,
         }),
         app,
     );
@@ -538,7 +547,7 @@ fn is_session_usage_fetch(effects: &[Effect]) -> bool {
 fn is_nonsilent_billing(effects: &[Effect]) -> bool {
     matches!(
         effects,
-        [Effect::FetchBilling { agent_id, silent, request: None }] if *agent_id == AgentId(0) && !*silent
+        [Effect::FetchBilling { agent_id, silent, .. }] if *agent_id == AgentId(0) && !*silent
     )
 }
 
@@ -553,6 +562,7 @@ fn complete_session_usage(
             agent_id: AgentId(0),
             session_id: session_id.to_string().into(),
             usage: Box::new(usage),
+            nonce: 0,
         }),
         app,
     )
@@ -565,6 +575,7 @@ fn fail_session_usage(app: &mut AppView, session_id: &str, error: &str) -> Vec<E
             session_id: session_id.to_string().into(),
             error: error.into(),
             for_status_bar: false,
+            nonce: 0,
         }),
         app,
     )
@@ -573,6 +584,8 @@ fn fail_session_usage(app: &mut AppView, session_id: &str, error: &str) -> Vec<E
 #[test]
 fn show_usage_schedules_session_fetch_only() {
     let mut app = test_app_with_agent();
+    // Scrollback flow is minimal-only.
+    app.screen_mode = crate::app::ScreenMode::Minimal;
     assert!(is_session_usage_fetch(&dispatch(
         Action::ShowUsage,
         &mut app
@@ -588,6 +601,7 @@ fn show_usage_schedules_session_fetch_only() {
 #[test]
 fn show_usage_without_session_still_surfaces_credits() {
     let mut app = test_app_with_agent();
+    app.screen_mode = crate::app::ScreenMode::Minimal;
     app.agents.get_mut(&AgentId(0)).unwrap().session.session_id = None;
     let before = agent_scrollback_len(&app);
     let effects = dispatch(Action::ShowUsage, &mut app);
@@ -650,6 +664,7 @@ fn manage_billing_gates_on_consumer_billing_surface() {
 #[test]
 fn session_usage_complete_pushes_block_and_chains_billing() {
     let mut app = test_app_with_agent();
+    app.screen_mode = crate::app::ScreenMode::Minimal;
     let before = agent_scrollback_len(&app);
     let usage = xai_grok_shell::extensions::notification::PromptUsage {
         totals: xai_grok_shell::extensions::notification::PromptUsageModel {
@@ -675,6 +690,7 @@ fn session_usage_complete_pushes_block_and_chains_billing() {
 #[test]
 fn session_usage_complete_no_billing_when_surface_hidden() {
     let mut app = test_app_with_agent();
+    app.screen_mode = crate::app::ScreenMode::Minimal;
     app.usage_visible = false;
     let before = agent_scrollback_len(&app);
     let effects = complete_session_usage(&mut app, "test-session", Default::default());
@@ -686,6 +702,7 @@ fn session_usage_complete_no_billing_when_surface_hidden() {
 #[test]
 fn session_usage_complete_redirect_after_session_block() {
     let mut app = test_app_with_agent();
+    app.screen_mode = crate::app::ScreenMode::Minimal;
     app.usage_billing_redirect_url = Some("https://billing.example.com/me".into());
     // Dispatch defers the redirect until after the session block.
     let before = agent_scrollback_len(&app);
@@ -724,6 +741,7 @@ fn session_usage_complete_drops_stale_session() {
 #[test]
 fn session_usage_failed_pushes_error_and_chains_billing() {
     let mut app = test_app_with_agent();
+    app.screen_mode = crate::app::ScreenMode::Minimal;
     let before = agent_scrollback_len(&app);
     let effects = fail_session_usage(&mut app, "test-session", "boom");
     assert_eq!(agent_scrollback_len(&app), before + 1);
@@ -978,6 +996,7 @@ fn billing_fetched_stores_autotopup_on_app_and_agent() {
             silent: true,
             subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Resolved(autotopup),
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1008,6 +1027,7 @@ fn billing_fetched_unchanged_autotopup_keeps_cached_rule() {
             silent: true,
             subscription_tier: None,
             autotopup: resolved,
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1020,6 +1040,7 @@ fn billing_fetched_unchanged_autotopup_keeps_cached_rule() {
             silent: true,
             subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Unchanged,
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1049,6 +1070,7 @@ fn billing_fetched_cleared_autotopup_resets_cache() {
                     max_amount_cents: None,
                 },
             ),
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1062,6 +1084,7 @@ fn billing_fetched_cleared_autotopup_resets_cache() {
             silent: true,
             subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1295,6 +1318,7 @@ fn billing_error_silent_does_not_push_scrollback() {
             request: next_billing_request(&mut app),
             error: "network timeout".into(),
             silent: true,
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1340,6 +1364,7 @@ fn billing_error_non_silent_pushes_error_message() {
             request: next_billing_request(&mut app),
             error: "service unavailable".into(),
             silent: false,
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1805,4 +1830,75 @@ fn credit_limit_upsell_submit_shows_url_when_browser_unavailable() {
 
     // SAFETY: serialized via `serial_test`.
     unsafe { std::env::remove_var("GROK_TEST_OPEN_URL_FILE") };
+}
+
+#[test]
+fn billing_fetched_clears_usage_modal_loading() {
+    let mut app = test_app_with_agent();
+    dispatch(Action::ShowUsage, &mut app);
+    dispatch_billing(
+        &mut app,
+        Some(test_bal(50.0)),
+        true,
+        Some("SuperGrok".into()),
+    );
+    let agent = &app.agents[&AgentId(0)];
+    let Some(crate::views::modal::ActiveModal::UsageInfo { state }) = agent.active_modal.as_ref()
+    else {
+        panic!("expected the usage modal to be open");
+    };
+    assert!(!state.billing_loading);
+    assert!(state.billing_error.is_none());
+    assert_eq!(state.ctx.subscription_tier.as_deref(), Some("SuperGrok"));
+    // The modal renders from the agent's cached billing mirrors.
+    assert_eq!(agent.credit_balance.as_ref().unwrap().usage_pct, 50.0);
+}
+
+#[test]
+fn background_billing_reply_does_not_settle_modal_loading() {
+    let mut app = test_app_with_agent();
+    dispatch(Action::ShowUsage, &mut app);
+    // A turn-end refresh (nonce 0) lands while the modal's own fetch is in
+    // flight: mirrors update, but the modal's loading/error flags don't.
+    dispatch(
+        Action::TaskComplete(TaskResult::BillingError {
+            agent_id: AgentId(0),
+            error: "background boom".to_string(),
+            silent: true,
+            nonce: 0,
+        }),
+        &mut app,
+    );
+    let Some(crate::views::modal::ActiveModal::UsageInfo { state }) =
+        app.agents[&AgentId(0)].active_modal.as_ref()
+    else {
+        panic!("expected the usage modal to be open");
+    };
+    assert!(state.billing_loading, "still waiting on its own fetch");
+    assert!(state.billing_error.is_none());
+}
+
+#[test]
+fn billing_error_surfaces_in_usage_modal_without_scrollback() {
+    let mut app = test_app_with_agent();
+    dispatch(Action::ShowUsage, &mut app);
+    let before = agent_scrollback_len(&app);
+    let nonce = open_usage_modal_nonce(&app);
+    dispatch(
+        Action::TaskComplete(TaskResult::BillingError {
+            agent_id: AgentId(0),
+            error: "billing boom".to_string(),
+            silent: true,
+            nonce,
+        }),
+        &mut app,
+    );
+    let Some(crate::views::modal::ActiveModal::UsageInfo { state }) =
+        app.agents[&AgentId(0)].active_modal.as_ref()
+    else {
+        panic!("expected the usage modal to be open");
+    };
+    assert!(!state.billing_loading);
+    assert_eq!(state.billing_error.as_deref(), Some("billing boom"));
+    assert_eq!(agent_scrollback_len(&app), before);
 }

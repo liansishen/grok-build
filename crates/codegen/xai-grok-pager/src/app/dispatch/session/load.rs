@@ -1154,6 +1154,7 @@ pub(in crate::app::dispatch) fn handle_session_loaded(
             agent_id,
             silent: true,
             request: None,
+            nonce: 0,
         });
         if let Some(switch) = deferred {
             agent.session.model_switch_pending = true;

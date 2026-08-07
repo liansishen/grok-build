@@ -596,6 +596,7 @@ pub(in crate::app::dispatch) fn set_show_session_usage_bar(
                         agent_id: id,
                         session_id,
                         for_status_bar: true,
+                        nonce: 0,
                     });
                 }
             }

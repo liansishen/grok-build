@@ -2372,6 +2372,13 @@ pub(crate) async fn run(
                     effs.extend(crate::app::dispatch::status::append_cpa_quota(
                         &mut app, id, false,
                     ));
+                    // Background agent billing refresh (usage-modal nonce 0).
+                    effs.push(Effect::FetchBilling {
+                        agent_id: id,
+                        silent: true,
+                        request: None,
+                        nonce: 0,
+                    });
                 }
                 if !effs.is_empty() {
                     if process_effects(effs, &mut tasks, &mut app, &progress_tx) {

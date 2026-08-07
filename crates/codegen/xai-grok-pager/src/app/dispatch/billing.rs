@@ -375,6 +375,7 @@ pub(super) fn handle_billing_fetched(
     silent: bool,
     subscription_tier: Option<String>,
     autotopup: crate::views::credit_bar::AutoTopupFetch,
+    nonce: u64,
 ) -> Vec<Effect> {
     // Reject hidden, old-account, and out-of-order results before they can
     // repopulate or roll back the app-scoped cache.
@@ -414,6 +415,16 @@ pub(super) fn handle_billing_fetched(
         }
     }
     app.sync_billing_cache_to_agents();
+    // Settle usage-modal loading for the generation that requested this fetch.
+    if let Some(agent) = app.agents.get_mut(&agent_id) {
+        if let Some(state) = super::status::usage_modal_state_mut(agent)
+            && state.fetch_nonce == nonce
+        {
+            state.billing_loading = false;
+            state.billing_error = None;
+            state.ctx.subscription_tier = app.subscription_tier.clone();
+        }
+    }
     // The account cache has already fanned out to every Build agent; only
     // the explicitly requested tab receives the non-silent transcript block.
     if !silent {
@@ -573,6 +584,7 @@ pub(super) fn handle_credit_limit_recheck_complete(
         agent_id,
         silent: true,
         request: None,
+        nonce: 0,
     });
     if billing_refresh_needed {
         drain

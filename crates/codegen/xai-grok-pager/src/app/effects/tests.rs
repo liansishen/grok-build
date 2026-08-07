@@ -1834,6 +1834,7 @@ async fn hidden_billing_surface_drops_account_billing_effects() {
             agent_id: AgentId(7),
             silent: true,
             request: Some(request),
+            nonce: 0,
         },
         Effect::FetchAppBilling {
             request: Some(request),
