@@ -616,6 +616,8 @@
 "cli.worktree.detail.creation_mode" = "  创建模式：      {value}"
 "cli.worktree.detail.creator_pid" = "  创建者 PID：    {value}"
 "cli.worktree.detail.disk_usage" = "  磁盘用量：      {value}"
+"cli.worktree.detail.disk_skipped_many" = "（已跳过 {count} 项）"
+"cli.worktree.detail.disk_skipped_one" = "（已跳过 {count} 项）"
 "cli.worktree.detail.git_ref" = "  Git 引用：      {value}"
 "cli.worktree.detail.head" = "  HEAD：           {value}"
 "cli.worktree.detail.id" = "  ID：             {value}"

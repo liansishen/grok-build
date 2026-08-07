@@ -616,6 +616,8 @@
 "cli.worktree.detail.creation_mode" = "  Creation Mode:  {value}"
 "cli.worktree.detail.creator_pid" = "  Creator PID:    {value}"
 "cli.worktree.detail.disk_usage" = "  Disk Usage:     {value}"
+"cli.worktree.detail.disk_skipped_many" = "({count} entries skipped)"
+"cli.worktree.detail.disk_skipped_one" = "({count} entry skipped)"
 "cli.worktree.detail.git_ref" = "  Git Ref:        {value}"
 "cli.worktree.detail.head" = "  HEAD:           {value}"
 "cli.worktree.detail.id" = "  ID:             {value}"

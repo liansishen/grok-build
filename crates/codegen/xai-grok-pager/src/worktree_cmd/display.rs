@@ -4,11 +4,10 @@ use std::path::Path;
 use unicode_width::UnicodeWidthStr;
 use xai_fast_worktree::WorktreeRecord;
 use xai_grok_i18n::{t, t_fmt};
-use xai_grok_shell::session::worktree::META_KEY_LABEL;
 
 use super::{DbStats, GcReport, RebuildReport};
 use crate::fs_size::{Volume, physical_dir_size};
-use crate::util::{format_age, format_bytes, pad_to_width, truncate_to_width, unix_now};
+use crate::util::{format_bytes, pad_to_width, truncate_to_width, unix_now};
 
 const REPO_WIDTH: usize = 6;
 const BRANCH_WIDTH: usize = 20;
@@ -22,8 +21,8 @@ fn cell(s: &str, width: usize) -> String {
 
 pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io::Result<()> {
     if records.is_empty() {
-        println!("{}", t("cli.worktree.none_found"));
-        return;
+        writeln!(out, "{}", t("cli.worktree.none_found"))?;
+        return Ok(());
     }
 
     let id_width = records
@@ -40,24 +39,33 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
         .unwrap_or(0)
         .clamp(5, 24);
 
-    let header = format!(
-        "  {:<id_width$} {:<8} {:<6} {:<label_width$} {:<20} {:<10} {}",
-        t("cli.worktree.header.id"),
-        t("cli.worktree.header.type"),
-        t("cli.worktree.header.repo"),
-        t("cli.worktree.header.label"),
-        t("cli.worktree.header.branch"),
+    let type_header = t("cli.worktree.header.type");
+    // Derived, not fixed: `cell` truncates rather than shifting, and
+    // `subagent` already fills 8 columns.
+    let type_width = records
+        .iter()
+        .map(|r| UnicodeWidthStr::width(r.kind.as_str()))
+        .fold(UnicodeWidthStr::width(type_header), usize::max);
+
+    writeln!(
+        out,
+        "  {} {} {} {} {} {:<AGE_WIDTH$} {}",
+        pad_to_width(t("cli.worktree.header.id"), id_width),
+        cell(type_header, type_width),
+        cell(t("cli.worktree.header.repo"), REPO_WIDTH),
+        cell(t("cli.worktree.header.label"), label_width),
+        cell(t("cli.worktree.header.branch"), BRANCH_WIDTH),
         t("cli.worktree.header.age"),
         t("cli.worktree.header.path"),
-    );
-    println!("{header}");
+    )?;
+    let now = unix_now();
     for rec in records {
-        let age = format_age(rec.created_at);
+        let age = format_age_i18n(rec.created_at, now);
         let branch = rec
             .git_ref
             .as_deref()
             .unwrap_or_else(|| t("cli.worktree.detached"));
-        let label = extract_label(rec);
+        let label = rec.label().unwrap_or("");
         let path = abbreviate_home(&rec.path);
         // AGE is ASCII, so format-width padding is width-true; every other
         // cell pads by display width.
@@ -83,7 +91,8 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
                 m
             });
     let breakdown: Vec<String> = by_kind.iter().map(|(k, v)| format!("{v} {k}")).collect();
-    println!(
+    writeln!(
+        out,
         "{}",
         t_fmt(
             "cli.worktree.total",
@@ -92,7 +101,7 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
                 ("breakdown", breakdown.join(", ").as_str()),
             ],
         )
-    );
+    )
 }
 
 pub fn print_json(records: &[WorktreeRecord], out: &mut impl Write) -> std::io::Result<()> {
@@ -100,23 +109,50 @@ pub fn print_json(records: &[WorktreeRecord], out: &mut impl Write) -> std::io::
     writeln!(out, "{json}")
 }
 
-pub fn print_show(rec: &WorktreeRecord) {
-    print_detail(
-        "cli.worktree.detail.path",
-        rec.path.to_string_lossy().as_ref(),
-    );
-    print_detail("cli.worktree.detail.id", rec.id.as_str());
-    print_detail("cli.worktree.detail.type", rec.kind.as_str());
-    print_detail(
-        "cli.worktree.detail.source_repo",
-        rec.source_repo.to_string_lossy().as_ref(),
-    );
-    print_detail(
-        "cli.worktree.detail.creation_mode",
-        rec.creation_mode.as_str(),
-    );
+pub fn print_show(rec: &WorktreeRecord, out: &mut impl Write) -> std::io::Result<()> {
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.detail.path",
+            &[("value", rec.path.to_string_lossy().as_ref())]
+        )
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt("cli.worktree.detail.id", &[("value", rec.id.as_str())])
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.detail.type",
+            &[("value", rec.kind.as_str())]
+        )
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.detail.source_repo",
+            &[("value", rec.source_repo.to_string_lossy().as_ref())]
+        )
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.detail.creation_mode",
+            &[("value", rec.creation_mode.as_str())]
+        )
+    )?;
     if let Some(ref git_ref) = rec.git_ref {
-        print_detail("cli.worktree.detail.git_ref", git_ref);
+        writeln!(
+            out,
+            "{}",
+            t_fmt("cli.worktree.detail.git_ref", &[("value", git_ref)])
+        )?;
     }
     if let Some(ref commit) = rec.head_commit {
         let short = if commit.len() > 12 {
@@ -124,111 +160,196 @@ pub fn print_show(rec: &WorktreeRecord) {
         } else {
             commit
         };
-        print_detail("cli.worktree.detail.head", short);
+        writeln!(
+            out,
+            "{}",
+            t_fmt("cli.worktree.detail.head", &[("value", short)])
+        )?;
     }
-    print_detail(
-        "cli.worktree.detail.created",
-        format_timestamp(rec.created_at).as_str(),
-    );
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.detail.created",
+            &[("value", format_timestamp(rec.created_at).as_str())]
+        )
+    )?;
     if let Some(ts) = rec.last_accessed_at {
-        print_detail(
-            "cli.worktree.detail.last_accessed",
-            format_timestamp(ts).as_str(),
-        );
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.detail.last_accessed",
+                &[("value", format_timestamp(ts).as_str())]
+            )
+        )?;
     }
     if let Some(ref sid) = rec.session_id {
-        print_detail("cli.worktree.detail.session_id", sid);
+        writeln!(
+            out,
+            "{}",
+            t_fmt("cli.worktree.detail.session_id", &[("value", sid)])
+        )?;
     }
     if let Some(pid) = rec.creator_pid {
-        print_detail("cli.worktree.detail.creator_pid", pid.to_string().as_str());
+        let pid_s = pid.to_string();
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.detail.creator_pid",
+                &[("value", pid_s.as_str())]
+            )
+        )?;
     }
-    print_detail("cli.worktree.detail.status", rec.status.as_str());
-    let label = extract_label(rec);
-    if !label.is_empty() {
-        print_detail("cli.worktree.detail.label", label);
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.detail.status",
+            &[("value", rec.status.as_str())]
+        )
+    )?;
+    if let Some(label) = rec.label() {
+        writeln!(
+            out,
+            "{}",
+            t_fmt("cli.worktree.detail.label", &[("value", label)])
+        )?;
     }
 
-    if rec.path.exists()
-        && let Ok(size) = dir_size(&rec.path)
-    {
-        print_detail(
-            "cli.worktree.detail.disk_usage",
-            format_bytes(size).as_str(),
-        );
+    if rec.path.exists() {
+        // Anchored to the worktree's own volume: one tree, not a share of
+        // some other total.
+        let size = physical_dir_size(&rec.path, Volume::of(&rec.path));
+        let bytes = size.measure.bytes().unwrap_or_default();
+        let mut value = format_bytes(bytes);
+        let skipped = size.issues.skipped();
+        if skipped > 0 {
+            let key = if skipped == 1 {
+                "cli.worktree.detail.disk_skipped_one"
+            } else {
+                "cli.worktree.detail.disk_skipped_many"
+            };
+            value = format!(
+                "{value} {}",
+                t_fmt(key, &[("count", skipped.to_string().as_str())])
+            );
+        }
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.detail.disk_usage",
+                &[("value", value.as_str())]
+            )
+        )?;
     }
     Ok(())
 }
 
-fn print_detail(key: &str, value: &str) {
-    println!("{}", t_fmt(key, &[("value", value)]));
+pub fn print_stats(stats: &DbStats, out: &mut impl Write) -> std::io::Result<()> {
+    writeln!(out, "{}", t("cli.worktree.stats.title"))?;
+    writeln!(out, "{}", t("cli.worktree.stats.divider"))?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.stats.total_records",
+            &[("value", stats.total_records.to_string().as_str())]
+        )
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.stats.alive",
+            &[("value", stats.alive_count.to_string().as_str())]
+        )
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.stats.dead",
+            &[("value", stats.dead_count.to_string().as_str())]
+        )
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.stats.db_size",
+            &[("value", format_bytes(stats.db_file_bytes).as_str())]
+        )
+    )
 }
 
-pub fn print_stats(stats: &DbStats) {
-    println!("{}", t("cli.worktree.stats.title"));
-    println!("{}", t("cli.worktree.stats.divider"));
-    print_detail(
-        "cli.worktree.stats.total_records",
-        stats.total_records.to_string().as_str(),
-    );
-    print_detail(
-        "cli.worktree.stats.alive",
-        stats.alive_count.to_string().as_str(),
-    );
-    print_detail(
-        "cli.worktree.stats.dead",
-        stats.dead_count.to_string().as_str(),
-    );
-    print_detail(
-        "cli.worktree.stats.db_size",
-        format_bytes(stats.db_file_bytes).as_str(),
-    );
-}
-
+/// Used by `mod` without a `Write` handle (stdout only).
 pub fn print_gc(report: &GcReport) {
     println!("{}", t("cli.worktree.gc.title"));
-    print_detail(
-        "cli.worktree.gc.dead_removed",
-        report.dead_removed.to_string().as_str(),
+    println!(
+        "{}",
+        t_fmt(
+            "cli.worktree.gc.dead_removed",
+            &[("value", report.dead_removed.to_string().as_str())]
+        )
     );
-    print_detail(
-        "cli.worktree.gc.expired_removed",
-        report.expired_removed.to_string().as_str(),
+    println!(
+        "{}",
+        t_fmt(
+            "cli.worktree.gc.expired_removed",
+            &[("value", report.expired_removed.to_string().as_str())]
+        )
     );
-    print_detail(
-        "cli.worktree.gc.skipped_alive",
-        report.skipped_alive.to_string().as_str(),
+    println!(
+        "{}",
+        t_fmt(
+            "cli.worktree.gc.skipped_alive",
+            &[("value", report.skipped_alive.to_string().as_str())]
+        )
     );
     if report.remove_failed > 0 {
-        print_detail(
-            "cli.worktree.gc.remove_failed",
-            report.remove_failed.to_string().as_str(),
+        println!(
+            "{}",
+            t_fmt(
+                "cli.worktree.gc.remove_failed",
+                &[("value", report.remove_failed.to_string().as_str())]
+            )
         );
     }
-    Ok(())
 }
 
-pub fn print_rebuild(report: &RebuildReport) {
-    println!("{}", t("cli.worktree.rebuild.title"));
-    print_detail(
-        "cli.worktree.rebuild.discovered",
-        report.discovered.to_string().as_str(),
-    );
-    print_detail(
-        "cli.worktree.rebuild.registered",
-        report.registered.to_string().as_str(),
-    );
-    print_detail(
-        "cli.worktree.rebuild.already_tracked",
-        report.already_tracked.to_string().as_str(),
-    );
+pub fn print_rebuild(report: &RebuildReport, out: &mut impl Write) -> std::io::Result<()> {
+    writeln!(out, "{}", t("cli.worktree.rebuild.title"))?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.rebuild.discovered",
+            &[("value", report.discovered.to_string().as_str())]
+        )
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.rebuild.registered",
+            &[("value", report.registered.to_string().as_str())]
+        )
+    )?;
+    writeln!(
+        out,
+        "{}",
+        t_fmt(
+            "cli.worktree.rebuild.already_tracked",
+            &[("value", report.already_tracked.to_string().as_str())]
+        )
+    )
 }
 
-fn format_age(created_at: i64) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64;
-    let delta = now.saturating_sub(created_at);
+fn format_age_i18n(created_at: i64, now: i64) -> String {
+    let delta = now.saturating_sub(created_at).max(0);
     let (key, value) = if delta < 60 {
         ("cli.worktree.age.seconds", delta)
     } else if delta < 3600 {
