@@ -475,21 +475,16 @@ pub(super) fn dispatch_rewind_success(
     }
 
     // An inline resubmit skips the confirmation — the edited prompt
-    // re-appearing at the same spot is self-explanatory. (Files-only keeps
-    // it: nothing is resubmitted there, so the revert needs its signal.)
-    if inline_resubmit.is_none() || is_files_only {
-        let msg = match mode_str {
-            "conversation_only" => xai_grok_i18n::t("rewind.reverted_conversation"),
-            "files_only" => xai_grok_i18n::t("rewind.reverted_files"),
-            _ => xai_grok_i18n::t("rewind.reverted_both"),
-        };
+    // re-appearing at the same spot is self-explanatory.
+    if inline_resubmit.is_none() {
+        let msg = xai_grok_i18n::t("rewind.reverted_conversation");
         if app.screen_mode.is_minimal() {
             // Minimal has no toast surface and can't erase committed lines, so the confirmation stays in scrollback there.
             agent
                 .scrollback
-                .push_block(RenderBlock::system(MSG.to_string()));
+                .push_block(RenderBlock::system(msg.to_string()));
         } else {
-            agent.show_toast(MSG);
+            agent.show_toast(msg);
         }
     }
 

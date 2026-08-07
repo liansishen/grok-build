@@ -127,42 +127,21 @@ impl SlashCommand for AcpSlashCommand {
     }
 
     fn run(&self, _ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
-        // Malformed skill metadata — surface error, don't silently degrade.
-        if self.meta_malformed {
-            return CommandResult::Error(
-                xai_grok_i18n::t_or(
-                    "slash.acp.malformed_skill_metadata",
-                    "Malformed skill metadata for /{name}",
-                )
-                .replace("{name}", &self.name),
-            );
-        }
-
-        // Non-skill ACP commands: pass through to the shell as before.
-        if self.skill_path.is_none() || self.skill_scope.is_none() {
-            let text = if args.trim().is_empty() {
-                format!("/{}", self.name)
-            } else {
-                format!("/{} {}", self.name, args)
-            };
-            return CommandResult::PassThrough(text);
-        }
-
         // --- Pass skill through to the shell for expansion ---
         //
         // The shell's slash_commands::resolve() handles skill detection,
         // SKILL.md loading, substitution, and assembly of the
         // <user_query> + <skill_information> format. The pager just
         // sends the raw `/skill args` text as a single prompt block.
-        let display_text = if args.trim().is_empty() {
+        let text = if args.trim().is_empty() {
             format!("/{}", self.name)
         } else {
             format!("/{} {}", self.name, args)
         };
         match self.skill {
-            SkillMeta::Malformed => {
-                CommandResult::Error(format!("Malformed skill metadata for /{}", self.name))
-            }
+            SkillMeta::Malformed => CommandResult::Error(
+                xai_grok_i18n::t_fmt("slash.acp.malformed_skill_metadata", &[("name", &self.name)]),
+            ),
             SkillMeta::Absent | SkillMeta::Foreign => CommandResult::PassThrough(text),
             SkillMeta::Skill(_) => CommandResult::InjectSkill {
                 display_text: text.clone(),

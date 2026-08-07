@@ -163,7 +163,7 @@ impl WebFetchToolCallBlock {
         if let Some(bytes) = self.bytes {
             parts.push(vec![
                 Span::styled(xai_grok_i18n::t("tool.web_fetch.size_label"), label_style),
-                Span::styled(Self::format_bytes(bytes), value_style),
+                Span::styled(crate::util::format_bytes(bytes as u64), value_style),
             ]);
         }
 
