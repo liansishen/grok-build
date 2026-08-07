@@ -535,10 +535,42 @@ fn allowance_lines(
 /// Model/runtime details rendered as one compact `Label: value` block; every
 /// other field gets a spaced label-over-value group.
 fn is_compact_session_field(label: &str) -> bool {
-    matches!(
-        label,
-        "Model" | "Model Hash" | "API Backend" | "Sandbox" | "Turn" | "Context"
-    )
+    [
+        "session_info.label.model",
+        "session_info.label.model_hash",
+        "session_info.label.api_backend",
+        "session_info.label.sandbox",
+        "session_info.label.turn",
+        "session_info.label.context",
+    ]
+    .iter()
+    .any(|key| xai_grok_i18n::t(key) == label)
+        // English fallbacks for injected test fixtures / pre-i18n snapshots.
+        || matches!(
+            label,
+            "Model" | "Model Hash" | "API Backend" | "Sandbox" | "Turn" | "Context"
+        )
+}
+
+fn session_id_label() -> &'static str {
+    xai_grok_i18n::t("session_info.label.session_id")
+}
+
+fn is_session_id_label(label: &str) -> bool {
+    label == session_id_label() || label == "Session ID"
+}
+
+fn is_hidden_auth_line(trimmed: &str) -> bool {
+    // Auth method (and its `grok login` upsell) is deliberately not part of
+    // this surface — match current locale and English fixtures.
+    let auth_prefix = xai_grok_i18n::t("session_info.auth.line_prefix");
+    let login_prefix = xai_grok_i18n::t("session_info.auth.login_upsell_prefix");
+    trimmed.starts_with(auth_prefix)
+        || trimmed.starts_with(login_prefix)
+        || trimmed.starts_with("Auth method:")
+        || trimmed.starts_with("Run `grok login`")
+        || trimmed.starts_with("Manage account")
+        || trimmed.starts_with("管理账户")
 }
 
 fn session_info_content(state: &UsageInfoModalState, theme: &Theme) -> TabContent {
@@ -572,12 +604,7 @@ fn session_info_content(state: &UsageInfoModalState, theme: &Theme) -> TabConten
     let mut prev_compact = false;
     for row in text.lines() {
         let trimmed = row.trim_start();
-        // The auth method (and its `grok login` upsell) is deliberately
-        // not part of this surface.
-        if trimmed.is_empty()
-            || trimmed.starts_with("Auth method:")
-            || trimmed.starts_with("Run `grok login`")
-        {
+        if trimmed.is_empty() || is_hidden_auth_line(trimmed) {
             continue;
         }
         let Some((label, value)) = trimmed.split_once(": ").filter(|(l, _)| l.len() <= 24) else {
@@ -590,7 +617,7 @@ fn session_info_content(state: &UsageInfoModalState, theme: &Theme) -> TabConten
         }
         // The session-ID value is underlined: its row is click-to-copy.
         let mut value_style = Style::default().fg(theme.text_primary);
-        if label == "Session ID" {
+        if is_session_id_label(label) {
             value_style = value_style.add_modifier(Modifier::UNDERLINED);
         }
         if compact {
@@ -600,16 +627,16 @@ fn session_info_content(state: &UsageInfoModalState, theme: &Theme) -> TabConten
             ]));
         } else {
             let mut label_spans = vec![Span::styled(format!("{label}:"), theme.muted())];
-            if label == "Session ID" {
+            if is_session_id_label(label) {
                 label_spans.push(Span::styled(
-                    "   click to copy \u{b7} press c",
+                    xai_grok_i18n::t("usage.modal.click_to_copy"),
                     Style::default().fg(theme.gray_dim),
                 ));
             }
             lines.push(Line::from(label_spans));
             lines.push(Line::from(Span::styled(value.to_string(), value_style)));
         }
-        if label == "Session ID" {
+        if is_session_id_label(label) {
             session_id_row = Some(lines.len() - 1);
         }
         prev_compact = compact;
