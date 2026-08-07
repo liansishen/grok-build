@@ -1356,7 +1356,28 @@ fn nonzero_message(status: &str, stderr: &str) -> String {
     )
 }
 
+fn reported_fork_version(output: &[u8]) -> Option<semver::Version> {
+    String::from_utf8_lossy(output)
+        .split(|ch: char| ch.is_whitespace() || ch == '(' || ch == ')')
+        .filter_map(|token| {
+            token
+                .trim_start_matches('v')
+                .parse::<semver::Version>()
+                .ok()
+        })
+        .find(|version| crate::version::is_fork_version(&version.to_string()))
+}
+
 async fn smoke_test_binary(binary_path: &std::path::Path) -> Result<(), SmokeTestFailure> {
+    smoke_test_binary_version(binary_path, None).await
+}
+
+/// Run `--version` on a downloaded binary. When `expected_version` is set,
+/// require the reported fork version to match (fork release path).
+async fn smoke_test_binary_version(
+    binary_path: &std::path::Path,
+    expected_version: Option<&str>,
+) -> Result<(), SmokeTestFailure> {
     // ETXTBSY race: while a concurrent updater in this process is between
     // fork and exec (pre_exec in detach_command forces the fork/exec path),
     // its child briefly holds every open fd — including the write-side fd of
@@ -1369,13 +1390,27 @@ async fn smoke_test_binary(binary_path: &std::path::Path) -> Result<(), SmokeTes
         let mut cmd = tokio::process::Command::new(binary_path);
         cmd.arg("--version")
             .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
         xai_grok_tools::util::detach_command(&mut cmd);
         match tokio::time::timeout(SMOKE_TEST_TIMEOUT, cmd.output()).await {
             Err(_) => return Err(SmokeTestFailure::Timeout),
-            Ok(Ok(output)) if output.status.success() => return Ok(()),
+            Ok(Ok(output)) if output.status.success() => {
+                if let Some(expected) = expected_version {
+                    let matched = reported_fork_version(&output.stdout)
+                        .zip(semver::Version::parse(expected).ok())
+                        .is_some_and(|(reported, expected)| reported == expected);
+                    if !matched {
+                        let stderr = truncate_err(&String::from_utf8_lossy(&output.stdout), 400);
+                        return Err(SmokeTestFailure::NonZero {
+                            status: "version mismatch".into(),
+                            stderr,
+                        });
+                    }
+                }
+                return Ok(());
+            }
             Ok(Ok(output)) => {
                 let status = output
                     .status
@@ -2314,7 +2349,7 @@ async fn install_gh_release(target: Option<&str>, channel: &str) -> Result<()> {
                 .await?;
         }
 
-        if !smoke_test_binary_version(&binary_path, Some(&version)).await {
+        if let Err(_fail) = smoke_test_binary_version(&binary_path, Some(&version)).await {
             anyhow::bail!(t("update.error.github_binary_smoke_test_failed"));
         }
         Ok::<(), anyhow::Error>(())
