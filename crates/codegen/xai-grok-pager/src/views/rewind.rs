@@ -401,14 +401,16 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                         let count = point.num_file_snapshots.to_string();
                         xai_grok_i18n::t_fmt("rewind.file_count", &[("count", &count)])
                     } else {
-                        Modifier::empty()
-                    });
+                        String::new()
+                    };
 
-                Line::from(vec![
-                    Span::styled("\u{00B7} ", dot_style),
-                    Span::styled(preview, text_style),
-                ])
-            });
+                    Line::from(vec![
+                        Span::styled("\u{00B7} ", dot_style),
+                        Span::styled(preview, text_style),
+                        Span::styled(file_info, meta_style),
+                    ])
+                },
+            );
             return;
         }
         RewindPhase::CancelOffer { active_idx } => {
