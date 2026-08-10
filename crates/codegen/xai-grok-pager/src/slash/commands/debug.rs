@@ -120,6 +120,7 @@ mod tests {
             usage_command_visible: true,
             workflows_available: true,
             screen_mode: crate::app::ScreenMode::Fullscreen,
+            current_title: None,
         }
     }
 
