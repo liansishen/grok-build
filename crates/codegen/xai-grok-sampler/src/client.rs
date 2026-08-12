@@ -101,37 +101,35 @@ impl GrokRequestHeaders<'_> {
 /// `ResponseUsage` unchanged so billing telemetry stays correct. When
 /// the API doesn't emit `context_details` (older deployments) `total_tokens`
 /// passes through unchanged.
-fn deserialize_response_event(data: &str) -> Result<rs::ResponseStreamEvent> {
-    let mut event = match serde_json::from_str::<rs::ResponseStreamEvent>(data) {
-        Ok(event) => event,
+///
+/// Parse a single Responses SSE payload. Returns `Ok(None)` when the frame
+/// should be skipped (unknown event type / unsalvageable after lenient
+/// sanitize) so one bad chunk does not abort the whole stream.
+fn deserialize_response_event(data: &str) -> Result<Option<rs::ResponseStreamEvent>> {
+    use crate::responses_lenient::{LenientStreamEvent, parse_response_stream_event};
+
+    match parse_response_stream_event(data) {
+        Ok(LenientStreamEvent::Event(mut event)) => {
+            apply_terminal_event_overrides(&mut event, data);
+            Ok(Some(event))
+        }
+        Ok(LenientStreamEvent::Skip { reason }) => {
+            tracing::warn!(
+                reason = %reason,
+                raw_data = %data,
+                "Skipping Responses stream event that could not be typed"
+            );
+            Ok(None)
+        }
         Err(first_err) => {
-            // Try sanitizing: parse as Value, strip unknown tools, retry.
-            if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(data) {
-                // Strip tools that async_openai's rs::Tool can't deserialize
-                // (e.g., xAI-specific "x_search"). Instead of maintaining a
-                // hardcoded allowlist, try deserializing each tool entry —
-                // if it fails, drop it.
-                if let Some(tools) = value
-                    .pointer_mut("/response/tools")
-                    .and_then(|v| v.as_array_mut())
-                {
-                    tools.retain(|t| serde_json::from_value::<rs::Tool>(t.clone()).is_ok());
-                }
-                if let Ok(mut event) = serde_json::from_value::<rs::ResponseStreamEvent>(value) {
-                    apply_terminal_event_overrides(&mut event, data);
-                    return Ok(event);
-                }
-            }
             tracing::error!(
                 error = %first_err,
                 raw_data = %data,
                 "Failed to deserialize ResponseStreamEvent from stream"
             );
-            return Err(SamplingError::Serialization(first_err));
+            Err(SamplingError::Serialization(first_err))
         }
-    };
-    apply_terminal_event_overrides(&mut event, data);
-    Ok(event)
+    }
 }
 
 /// On terminal Responses API events (`response.completed` /
@@ -1268,7 +1266,7 @@ impl SamplingClient {
             });
         }
 
-        let response_obj = serde_json::from_slice::<rs::Response>(&bytes).map_err(|e| {
+        let response_obj = crate::responses_lenient::parse_response_object(&bytes).map_err(|e| {
             let raw_body = String::from_utf8_lossy(&bytes);
             tracing::error!(
                 error = %e,
@@ -1500,7 +1498,11 @@ impl SamplingClient {
                         } else if let Some(stream_error) = try_parse_stream_error(data) {
                             Some(Some(Err(stream_error)))
                         } else {
-                            Some(Some(deserialize_response_event(data)))
+                            match deserialize_response_event(data) {
+                                Ok(Some(event)) => Some(Some(Ok(event))),
+                                Ok(None) => Some(None),
+                                Err(err) => Some(Some(Err(err))),
+                            }
                         }
                     }
                     Err(e) => {
@@ -2868,7 +2870,7 @@ mod tests {
                 }
             }
         }"#;
-        let event = deserialize_response_event(sse).expect("parse");
+        let event = deserialize_response_event(sse).expect("parse").expect("event");
         let rs::ResponseStreamEvent::ResponseCompleted(e) = event else {
             panic!("expected ResponseCompleted");
         };
@@ -2906,7 +2908,7 @@ mod tests {
             )
         };
 
-        let event = deserialize_response_event(&make(78)).expect("parse");
+        let event = deserialize_response_event(&make(78)).expect("parse").expect("event");
         let rs::ResponseStreamEvent::ResponseCompleted(e) = event else {
             panic!("expected ResponseCompleted");
         };
@@ -2920,7 +2922,7 @@ mod tests {
         );
 
         // The REST mapper backfills 0 for unbilled requests: no stash.
-        let event = deserialize_response_event(&make(0)).expect("parse");
+        let event = deserialize_response_event(&make(0)).expect("parse").expect("event");
         let rs::ResponseStreamEvent::ResponseCompleted(e) = event else {
             panic!("expected ResponseCompleted");
         };
@@ -2950,7 +2952,7 @@ mod tests {
                 }
             }
         }"#;
-        let event = deserialize_response_event(sse).expect("parse");
+        let event = deserialize_response_event(sse).expect("parse").expect("event");
         let rs::ResponseStreamEvent::ResponseCompleted(e) = event else {
             panic!("expected ResponseCompleted");
         };
@@ -2987,7 +2989,7 @@ mod tests {
                 }
             }
         }"#;
-        let event = deserialize_response_event(sse).expect("parse");
+        let event = deserialize_response_event(sse).expect("parse").expect("event");
         let rs::ResponseStreamEvent::ResponseCompleted(e) = event else {
             panic!("expected ResponseCompleted");
         };
@@ -3008,7 +3010,7 @@ mod tests {
             "delta": "hello",
             "logprobs": []
         }"#;
-        let event = deserialize_response_event(sse).expect("non-terminal event parses");
+        let event = deserialize_response_event(sse).expect("non-terminal event parses").expect("event");
         assert!(matches!(
             event,
             rs::ResponseStreamEvent::ResponseOutputTextDelta(_)

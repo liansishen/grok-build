@@ -26,6 +26,7 @@ pub mod events;
 pub mod handle;
 pub mod metrics;
 pub mod retry;
+mod responses_lenient;
 pub mod sampling_log;
 mod shared_http;
 pub mod stream;
