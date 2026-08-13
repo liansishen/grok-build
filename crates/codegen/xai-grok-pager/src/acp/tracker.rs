@@ -134,7 +134,7 @@ impl WaitingReason {
             Self::Subagent { display } => match display.as_deref().map(clamp_activity_subject) {
                 Some(display) if !display.is_empty() => xai_grok_i18n::t_fmt(
                     "turn.wait.subagent_named",
-                    &[("display", display)],
+                    &[("display", display.as_str())],
                 ),
                 _ => xai_grok_i18n::t("turn.wait.subagent").to_string(),
             },
