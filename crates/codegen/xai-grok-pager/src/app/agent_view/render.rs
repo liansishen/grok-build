@@ -2139,6 +2139,7 @@ impl AgentView {
                 &mut self.last_btw_selection_model,
                 Some(&mut btw_links),
                 &self.media_link_paths,
+                self.scrollback.cwd(),
             );
             self.last_btw_area = layout.btw;
             if !btw_links.is_empty() {
@@ -2183,7 +2184,10 @@ impl AgentView {
             };
             let tick = self.scrollback.animation_tick();
             let activity = self.resolve_turn_activity();
-            if activity != self.last_activity {
+            if crate::acp::tracker::is_phase_transition(
+                self.last_activity.as_ref(),
+                activity.as_ref(),
+            ) {
                 if let Some(prev) = &self.last_activity {
                     let phase_ms = self
                         .activity_started_at
@@ -2203,6 +2207,8 @@ impl AgentView {
                     );
                 }
                 self.activity_started_at = Some(Instant::now());
+            }
+            if activity != self.last_activity {
                 self.last_activity = activity.clone();
             }
             self.hit_plan_approval_status.clear();

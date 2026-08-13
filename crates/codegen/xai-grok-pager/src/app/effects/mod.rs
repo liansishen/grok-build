@@ -29,6 +29,7 @@ use xai_grok_telemetry::startup::{self, StartupPhase};
 use actions::{
     ClipboardPasteTarget, Effect, ProbedAttachment, SubagentKillOutcome, SwitchModelError, TaskResult,
 };
+use crate::views::usage_modal::SessionInfoField;
 #[cfg(test)]
 use actions::{BillingRequestId, PermissionModePersist};
 #[cfg(test)]
@@ -49,7 +50,7 @@ pub(crate) fn execute(
     match effect {
         Effect::RegisterActiveSession { session_id, cwd } => {
             crate::app::signal_handler::set_current_session_id(Some(session_id.clone()));
-            if let Err(e) = xai_grok_shell::active_sessions::register(xai_grok_shell::active_sessions::ActiveSession {
+            if let Err(e) = xai_grok_active_sessions::register(xai_grok_active_sessions::ActiveSession {
                 session_id,
                 pid: std::process::id(),
                 cwd,
@@ -649,7 +650,7 @@ pub(crate) fn execute(
                     }
                     let summaries = tokio::task::spawn_blocking(move || {
                             let _permit = permit;
-                            xai_grok_workspace::foreign_sessions::scan_foreign_sessions(
+                            xai_grok_foreign_sessions::scan_foreign_sessions(
                                 &cwd,
                                 enabled,
                             )
@@ -702,7 +703,7 @@ pub(crate) fn execute(
                             compat,
                             &grok_home,
                             |enabled| async move {
-                                tokio::task::spawn_blocking(move || xai_grok_workspace::foreign_sessions::most_recent_foreign_session(
+                                tokio::task::spawn_blocking(move || xai_grok_foreign_sessions::most_recent_foreign_session(
                                         &cwd_for_scan,
                                         enabled,
                                         crate::app::foreign_sessions::RESUME_HINT_WINDOW,
@@ -1621,7 +1622,7 @@ pub(crate) fn execute(
                     }
                 });
         }
-        Effect::KillBgTask { session_id, task_id } => {
+        Effect::KillBgTask { session_id, task_id, source } => {
             let tx = acp_tx.clone();
             let sid = session_id.0.to_string();
             tasks
@@ -1629,6 +1630,7 @@ pub(crate) fn execute(
                     let params = xai_grok_shell::extensions::task::KillTaskRequest {
                         session_id: sid.clone(),
                         task_id: task_id.clone(),
+                        source,
                     };
                     let req = acp::ExtRequest::new(
                         "x.ai/task/kill",
@@ -3221,11 +3223,17 @@ pub(crate) fn execute(
                                 is_api_key_auth,
                                 api_key_env_set,
                             );
+                            let fields = session_info_fields(
+                                &info,
+                                title.as_deref(),
+                                show_resolved_model,
+                            );
                             TaskResult::SessionInfoComplete {
                                 agent_id,
                                 session_id,
                                 info: Box::new(info),
                                 text,
+                                fields,
                                 nonce,
                             }
                         }
@@ -4624,15 +4632,54 @@ fn t_fmt_or(key: &str, fallback: &'static str, args: &[(&str, &str)]) -> String 
 /// Format session info into a human-readable string.
 ///
 /// Mirrors the TUI's `render_session_info` for pager display.
-fn format_session_info(
+/// Structured `/session-info` rows — the single source of truth for both the
+/// formatted string ([`format_session_info`]) and the modal, so neither has to
+/// re-parse the other. Auth is not a field here; it is prose the string appends
+/// on its own. `compact` marks the dense model/runtime group the modal renders
+/// as `Label: value` on one line.
+fn session_info_fields(
     info: &SessionInfoResponse,
     title: Option<&str>,
     show_resolved_model: bool,
-    is_api_key_auth: bool,
-    api_key_env_set: bool,
-) -> String {
-    let session_id = &info.session_id;
-    let cwd = &info.cwd;
+) -> Vec<SessionInfoField> {
+    let mut fields = Vec::new();
+    let mut push = |label: &'static str, value: String, compact: bool| {
+        fields.push(SessionInfoField {
+            label,
+            value,
+            compact,
+        });
+    };
+    if let Some(t) = title {
+        push(xai_grok_i18n::t("session_info.label.title"), t.to_string(), false);
+    }
+    push(
+        xai_grok_i18n::t("session_info.label.shell_version"),
+        xai_grok_version::display_version(xai_grok_update::channel_label()),
+        false,
+    );
+    push(
+        xai_grok_i18n::t("session_info.label.session_id"),
+        info.session_id.to_string(),
+        false,
+    );
+    if let Some(id) = info
+        .data
+        .conversation_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+    {
+        push(
+            xai_grok_i18n::t("session_info.label.conversation_id"),
+            id.to_string(),
+            false,
+        );
+    }
+    push(
+        xai_grok_i18n::t("session_info.label.working_directory"),
+        info.cwd.to_string(),
+        false,
+    );
     let model = info
         .data
         .model
@@ -4644,96 +4691,82 @@ fn format_session_info(
         info.data.resolved_model_id.as_deref(),
         show_resolved_model,
     );
-    let ctx = &info.data.context;
-    let title_line = title
-        .map(|title| {
-            t_fmt_or(
-                "session_info.title",
-                "  Title: {title}\n",
-                &[("title", title)],
-            )
-        })
-        .unwrap_or_default();
-    let model_hash_line = if xai_grok_shell::session::should_show_model_fingerprint(
+    push(
+        xai_grok_i18n::t("session_info.label.model"),
+        model_display.to_string(),
+        true,
+    );
+    if xai_grok_shell::session::should_show_model_fingerprint(
         info.data.show_model_fingerprint,
         model,
-    ) {
-        info.data
-            .model_fingerprint
-            .as_deref()
-            .map(|fingerprint| {
-                t_fmt_or(
-                    "session_info.model_hash",
-                    "\n  Model Hash: {fingerprint}",
-                    &[("fingerprint", fingerprint)],
-                )
-            })
-            .unwrap_or_default()
-    } else {
-        String::new()
-    };
-    let backend_line = info
-        .data
-        .api_backend
-        .as_deref()
-        .map(|backend| {
-            t_fmt_or(
-                "session_info.api_backend",
-                "\n  API Backend: {backend}",
-                &[("backend", backend)],
-            )
-        })
-        .unwrap_or_default();
-    let sandbox_line = xai_grok_sandbox::profile_name()
-        .map(|profile| {
-            t_fmt_or(
-                "session_info.sandbox",
-                "\n  Sandbox: {profile}",
-                &[("profile", profile)],
-            )
-        })
-        .unwrap_or_default();
-    let turn_line = t_fmt_or(
-        "session_info.turn",
-        "\n  Turn: {turn}",
-        &[("turn", &info.data.turn_index.to_string())],
+    ) && let Some(fp) = info.data.model_fingerprint.as_deref()
+    {
+        push(
+            xai_grok_i18n::t("session_info.label.model_hash"),
+            fp.to_string(),
+            true,
+        );
+    }
+    if let Some(b) = info.data.api_backend.as_deref() {
+        push(
+            xai_grok_i18n::t("session_info.label.api_backend"),
+            b.to_string(),
+            true,
+        );
+    }
+    if let Some(profile) = xai_grok_sandbox::profile_name() {
+        push(
+            xai_grok_i18n::t("session_info.label.sandbox"),
+            profile.to_string(),
+            true,
+        );
+    }
+    push(
+        xai_grok_i18n::t("session_info.label.turn"),
+        info.data.turn_index.to_string(),
+        true,
     );
-    let conversation_line = info
-        .data
-        .conversation_id
-        .as_deref()
-        .filter(|id| !id.is_empty())
-        .map(|id| {
-            t_fmt_or(
-                "session_info.conversation_id",
-                "\n  Conversation ID: {id}",
-                &[("id", id)],
-            )
-        })
-        .unwrap_or_default();
-    let version_display =
-        xai_grok_version::display_version(xai_grok_update::channel_label());
+    let ctx = &info.data.context;
+    let used = ctx.used.to_string();
+    let total = ctx.total.to_string();
+    let pct = ctx.usage_pct.to_string();
+    push(
+        xai_grok_i18n::t("session_info.label.context"),
+        xai_grok_i18n::t_fmt(
+            "session_info.context_value",
+            &[("used", used.as_str()), ("total", total.as_str()), ("pct", pct.as_str())],
+        ),
+        true,
+    );
+    fields
+}
+
+/// The `/session-info` block as a plain string for minimal-mode scrollback.
+/// Built from [`session_info_fields`] (one `  Label: value` line each) with the
+/// auth prose spliced in after the shell version, so it stays a single source
+/// of truth with the modal.
+fn format_session_info(
+    info: &SessionInfoResponse,
+    title: Option<&str>,
+    show_resolved_model: bool,
+    is_api_key_auth: bool,
+    api_key_env_set: bool,
+) -> String {
     let auth_lines = format_auth_lines(is_api_key_auth, api_key_env_set);
-    t_fmt_or(
-        "session_info.summary",
-        "{title_line}  Shell version: {version}\n{auth_lines}  Session ID: {session_id}{conversation_line}\n  Working directory: {cwd}\n  Model: {model}{model_hash_line}{backend_line}{sandbox_line}{turn_line}\n  Context: {used} / {total} tokens ({pct}%)",
-        &[
-            ("title_line", &title_line),
-            ("version", &version_display),
-            ("auth_lines", &auth_lines),
-            ("session_id", session_id),
-            ("conversation_line", &conversation_line),
-            ("cwd", cwd),
-            ("model", &model_display),
-            ("model_hash_line", &model_hash_line),
-            ("backend_line", &backend_line),
-            ("sandbox_line", &sandbox_line),
-            ("turn_line", &turn_line),
-            ("used", &ctx.used.to_string()),
-            ("total", &ctx.total.to_string()),
-            ("pct", &ctx.usage_pct.to_string()),
-        ],
-    )
+    let shell_label = xai_grok_i18n::t("session_info.label.shell_version");
+    let mut out = String::new();
+    for field in session_info_fields(info, title, show_resolved_model) {
+        out.push_str("  ");
+        out.push_str(field.label);
+        out.push_str(": ");
+        out.push_str(&field.value);
+        out.push('\n');
+        if field.label == shell_label {
+            out.push_str(&auth_lines);
+        }
+    }
+    out.truncate(out.trim_end_matches('\n').len());
+    out
 }
 /// Auth section for `/session-info` — active login method.
 ///

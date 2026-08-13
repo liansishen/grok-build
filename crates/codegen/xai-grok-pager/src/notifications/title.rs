@@ -254,6 +254,7 @@ fn write_activity(buf: &mut String, activity: &TurnActivity) {
                 ],
             ));
         }
+        TurnActivity::WritingToolCall(writing) => buf.push_str(&writing.label()),
         TurnActivity::Waiting(reason) => buf.push_str(&reason.label()),
     }
 }
