@@ -434,6 +434,7 @@ pub(crate) fn chat_session_spawn_options<'a>(
         chat_history: Vec::new(),
         rewind_points_file_path: None,
         initial_total_tokens: 0,
+        initial_session_usage: None,
         origin_client: None,
         client_code_nav_enabled: false,
         client_terminal: false,

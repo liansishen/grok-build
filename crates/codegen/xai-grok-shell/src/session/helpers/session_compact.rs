@@ -281,16 +281,8 @@ fn token_usage_from_responses_usage(
         prompt_tokens: u.input_tokens,
         completion_tokens: u.output_tokens,
         total_tokens: u.total_tokens,
-        reasoning_tokens: u
-            .output_tokens_details
-            .as_ref()
-            .map(|d| d.reasoning_tokens)
-            .unwrap_or(0),
-        cached_prompt_tokens: u
-            .input_tokens_details
-            .as_ref()
-            .map(|d| d.cached_tokens)
-            .unwrap_or(0),
+        reasoning_tokens: u.output_tokens_details.reasoning_tokens,
+        cached_prompt_tokens: u.input_tokens_details.cached_tokens,
         cache_creation_prompt_tokens: 0,
     }
 }
