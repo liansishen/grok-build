@@ -50,6 +50,11 @@ pub struct ChatStateSnapshot {
     pub turn_start_ms: Option<i64>,
     /// Prompt index at which the last compaction occurred.
     pub last_compaction_prompt_index: Option<usize>,
+    /// Session-wide cumulative usage ledger (main loop + subagent folds +
+    /// compaction side calls). Restored from the persisted session so the
+    /// accurate totals survive resume; `Default` for brand-new sessions.
+    #[serde(default)]
+    pub session_usage: crate::usage::UsageLedger,
     /// Opaque credential secrets (API key, optional extra auth, client version).
     #[serde(default)]
     pub credentials: Credentials,

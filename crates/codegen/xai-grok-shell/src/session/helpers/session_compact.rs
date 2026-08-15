@@ -11,6 +11,7 @@ use async_openai::types::responses::ResponseStreamEvent;
 use futures_util::StreamExt;
 use reqwest::StatusCode;
 use xai_grok_sampler::SamplerConfig as SamplingConfig;
+use xai_grok_sampling_types::TokenUsage;
 
 // Re-export compaction utilities from xai-chat-state so existing callers
 // that import from this module continue to work.
@@ -243,6 +244,55 @@ pub(crate) struct CompactOutput {
     pub stream_ms: Option<u64>,
     pub delta_count: u64,
     pub itl_max_ms: Option<u64>,
+    /// Token usage reported by the successfully completed request, so
+    /// compaction spend can be folded into the session ledger. `None` when
+    /// the backend stream carried no usage.
+    pub usage: Option<TokenUsage>,
+}
+
+/// Map a Chat Completions usage chunk (the final chunk carries the totals)
+/// into the shared wire shape: `prompt_tokens` includes cache hits, mirroring
+/// the main-loop path in `stream/chat_completions.rs`.
+fn token_usage_from_chat_usage(u: &xai_grok_sampling_types::Usage) -> TokenUsage {
+    TokenUsage {
+        prompt_tokens: u.prompt_tokens,
+        completion_tokens: u.completion_tokens,
+        total_tokens: u.total_tokens,
+        reasoning_tokens: u
+            .completion_tokens_details
+            .as_ref()
+            .map(|d| d.reasoning_tokens)
+            .unwrap_or(0),
+        cached_prompt_tokens: u
+            .prompt_tokens_details
+            .as_ref()
+            .map(|d| d.cached_tokens)
+            .unwrap_or(0),
+        cache_creation_prompt_tokens: 0,
+    }
+}
+
+/// Map the Responses API terminal usage into the shared wire shape (same
+/// field semantics as the main-loop path in `stream/responses.rs`).
+fn token_usage_from_responses_usage(
+    u: &async_openai::types::responses::ResponseUsage,
+) -> TokenUsage {
+    TokenUsage {
+        prompt_tokens: u.input_tokens,
+        completion_tokens: u.output_tokens,
+        total_tokens: u.total_tokens,
+        reasoning_tokens: u
+            .output_tokens_details
+            .as_ref()
+            .map(|d| d.reasoning_tokens)
+            .unwrap_or(0),
+        cached_prompt_tokens: u
+            .input_tokens_details
+            .as_ref()
+            .map(|d| d.cached_tokens)
+            .unwrap_or(0),
+        cache_creation_prompt_tokens: 0,
+    }
 }
 
 /// Structured compaction outcome. Converted to a stable string only at the
@@ -483,6 +533,7 @@ pub(crate) async fn generate_session_compact(
             let mut truncated = false;
             let mut stop_reason: Option<String> = None;
             let mut content = String::new();
+            let mut usage: Option<TokenUsage> = None;
             let mut last_progress_at = std::time::Instant::now();
             loop {
                 let idle_remaining = idle_timeout.saturating_sub(last_progress_at.elapsed());
@@ -511,6 +562,9 @@ pub(crate) async fn generate_session_compact(
                 }
                 match chunk_result {
                     Ok(chunk) => {
+                        if let Some(u) = &chunk.usage {
+                            usage = Some(token_usage_from_chat_usage(u));
+                        }
                         if let Some(choice) = chunk.choices.first() {
                             let delta = &choice.delta;
                             if choice.finish_reason.is_some()
@@ -546,6 +600,7 @@ pub(crate) async fn generate_session_compact(
                 stream_ms: timing.stream_ms(),
                 delta_count: timing.count,
                 itl_max_ms: timing.itl_max_ms(),
+                usage,
             }
         }
         ApiBackend::Responses => {
@@ -574,6 +629,7 @@ pub(crate) async fn generate_session_compact(
             let mut truncated = false;
             let mut stop_reason: Option<String> = None;
             let mut content = String::new();
+            let mut usage: Option<TokenUsage> = None;
             let mut last_progress_at = std::time::Instant::now();
             loop {
                 let idle_remaining = idle_timeout.saturating_sub(last_progress_at.elapsed());
@@ -614,6 +670,11 @@ pub(crate) async fn generate_session_compact(
                             ResponseStreamEvent::ResponseOutputTextDelta(text_delta_event) => {
                                 timing.record_delta();
                                 content.push_str(&text_delta_event.delta);
+                            }
+                            ResponseStreamEvent::ResponseCompleted(completed_event) => {
+                                if let Some(u) = &completed_event.response.usage {
+                                    usage = Some(token_usage_from_responses_usage(u));
+                                }
                             }
                             ResponseStreamEvent::ResponseFailed(failed_event) => {
                                 let event_error = failed_event.response.error.as_ref();
@@ -670,6 +731,7 @@ pub(crate) async fn generate_session_compact(
                 stream_ms: timing.stream_ms(),
                 delta_count: timing.count,
                 itl_max_ms: timing.itl_max_ms(),
+                usage,
             }
         }
         ApiBackend::Messages => {
@@ -699,6 +761,7 @@ pub(crate) async fn generate_session_compact(
             let mut truncated = false;
             let mut stop_reason: Option<String> = None;
             let mut content = String::new();
+            let mut usage: Option<TokenUsage> = None;
             let mut last_progress_at = std::time::Instant::now();
             loop {
                 let idle_remaining = idle_timeout.saturating_sub(last_progress_at.elapsed());
@@ -741,7 +804,29 @@ pub(crate) async fn generate_session_compact(
                             timing.record_delta();
                             content.push_str(&text);
                         }
-                        xai_grok_sampling_types::messages::MessageStreamEvent::MessageDelta { delta, .. } => {
+                        xai_grok_sampling_types::messages::MessageStreamEvent::MessageDelta {
+                            delta,
+                            usage: msg_usage,
+                            ..
+                        } => {
+                            // Same convention as the main-loop Messages path:
+                            // prompt = uncached input + cache read + cache write.
+                            let input = msg_usage.input_tokens.unwrap_or(0);
+                            let cache_read = msg_usage.cache_read_input_tokens.unwrap_or(0);
+                            let cache_creation = msg_usage.cache_creation_input_tokens.unwrap_or(0);
+                            if input > 0 || cache_read > 0 || msg_usage.output_tokens > 0 {
+                                let prompt = input
+                                    .saturating_add(cache_read)
+                                    .saturating_add(cache_creation);
+                                usage = Some(TokenUsage {
+                                    prompt_tokens: prompt,
+                                    completion_tokens: msg_usage.output_tokens,
+                                    total_tokens: prompt.saturating_add(msg_usage.output_tokens),
+                                    reasoning_tokens: 0,
+                                    cached_prompt_tokens: cache_read,
+                                    cache_creation_prompt_tokens: cache_creation,
+                                });
+                            }
                             if let Some(sr) = delta.stop_reason {
                                 truncated = matches!(
                                     sr,
@@ -777,6 +862,7 @@ pub(crate) async fn generate_session_compact(
                 stream_ms: timing.stream_ms(),
                 delta_count: timing.count,
                 itl_max_ms: timing.itl_max_ms(),
+                usage,
             }
         }
     };

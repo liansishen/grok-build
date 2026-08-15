@@ -478,6 +478,19 @@ impl ChatStateActor {
             .record_subagent(by_model, incomplete);
     }
 
+    /// Fold one side call (compaction, …) into the session ledger only.
+    pub(super) fn record_session_side_usage(
+        &mut self,
+        model_id: &str,
+        usage: &xai_grok_sampling_types::TokenUsage,
+        api_duration_ms: Option<u64>,
+        cost_usd_ticks: Option<i64>,
+    ) {
+        self.state
+            .session_usage
+            .record_side_call(model_id, usage, api_duration_ms, cost_usd_ticks);
+    }
+
     pub(super) fn mark_usage_incomplete(&mut self, prompt: bool, session: bool) {
         if prompt {
             self.state
@@ -593,6 +606,9 @@ impl ChatStateActor {
         self.state.credentials = snap.credentials;
         // Drop abandoned prompt billing; session ledger is lifetime.
         self.state.prompt_usage = None;
+        // Restore the persisted session ledger so resumed sessions keep the
+        // accurate cumulative totals (incl. compaction side calls).
+        self.state.session_usage = snap.session_usage;
     }
 
     /// If turn capture is active, append the current turn's tail items into

@@ -99,6 +99,18 @@ pub enum ChatStateCommand {
         cost_usd_ticks: Option<i64>,
     },
 
+    /// Fold one side call (compaction, …) into the session ledger only —
+    /// never the open prompt ledger, never `main_loop_model_calls`.
+    RecordSessionSideUsage {
+        model_id: String,
+        usage: TokenUsage,
+        api_duration_ms: Option<u64>,
+        cost_usd_ticks: Option<i64>,
+    },
+
+    /// Current session ledger (accurate cumulative usage incl. side calls).
+    GetSessionUsage { reply: oneshot::Sender<Option<crate::usage::UsageLedger>> },
+
     /// Subagent usage into session (and prompt when attributable). Replies when applied.
     RecordSubagentUsage {
         by_model: Vec<(String, crate::usage::UsageTotals)>,

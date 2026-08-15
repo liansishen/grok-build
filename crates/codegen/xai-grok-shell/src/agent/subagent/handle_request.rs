@@ -994,6 +994,7 @@ pub(crate) async fn run_shell_child(
         None,
         None,
         initial_child_tokens,
+        None,
         crate::session::StartupHints {
             inherited_prefix_len: Some(inherited_prefix_len),
             is_subagent: true,

@@ -478,6 +478,7 @@ impl MvpAgent {
                     chat_history,
                     rewind_points_file_path: None,
                     initial_total_tokens: 0,
+                    initial_session_usage: None,
                     origin_client: origin_client.clone(),
                     client_code_nav_enabled,
                     client_terminal,
@@ -865,6 +866,8 @@ impl MvpAgent {
                 no_replay,
             )
             .await?;
+        let initial_session_usage =
+            Self::extract_initial_session_usage_from_updates(&updates_file_path);
         let ClientCaps {
             code_nav: client_code_nav_enabled,
             terminal: client_terminal,
@@ -902,6 +905,7 @@ impl MvpAgent {
                     chat_history,
                     rewind_points_file_path,
                     initial_total_tokens,
+                    initial_session_usage,
                     origin_client: origin_client.clone(),
                     client_code_nav_enabled,
                     client_terminal,

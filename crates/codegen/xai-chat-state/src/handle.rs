@@ -158,6 +158,31 @@ impl ChatStateHandle {
         .is_some()
     }
 
+    /// Fold one side call (compaction, …) into the session ledger only.
+    pub async fn record_session_side_usage(
+        &self,
+        model_id: &str,
+        usage: &xai_grok_sampling_types::TokenUsage,
+        api_duration_ms: Option<u64>,
+        cost_usd_ticks: Option<i64>,
+    ) {
+        let _ = self.cmd_tx.send(ChatStateCommand::RecordSessionSideUsage {
+            model_id: model_id.to_string(),
+            usage: usage.clone(),
+            api_duration_ms,
+            cost_usd_ticks,
+        });
+    }
+
+    /// Current session ledger (accurate cumulative usage incl. side calls).
+    pub async fn get_session_usage(&self) -> Option<crate::usage::UsageLedger> {
+        self.query("GetSessionUsage", |reply| {
+            ChatStateCommand::GetSessionUsage { reply }
+        })
+        .await
+        .flatten()
+    }
+
     /// Increment prompt index (called at start of each user turn).
     pub fn increment_prompt_index(&self) {
         let _ = self.cmd_tx.send(ChatStateCommand::IncrementPromptIndex);

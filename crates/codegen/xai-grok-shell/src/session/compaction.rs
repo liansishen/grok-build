@@ -165,13 +165,46 @@ impl SessionActor {
         )
         .await
         {
-            Ok(out) => Some(out),
+            Ok(out) => {
+                // Successful summarization sample — fold its reported usage
+                // into the session ledger (failed attempts never reach here).
+                self.record_compaction_output_usage(&out).await;
+                Some(out)
+            }
             Err(e) => {
                 tracing::warn!(error = ?e, "two_pass: summarization sample failed");
                 None
             }
         }
     }
+    /// Fold a successful compaction sample's reported usage into the session
+    /// ledger. `server_ticks` is `None` (the compact stream path does not
+    /// surface the server cost header); cost falls back to the model's local
+    /// price sheet via [`SessionActor::resolve_cost_usd_ticks`], preserving
+    /// the server-priority rule when ticks are available elsewhere.
+    async fn record_compaction_output_usage(&self, out: &CompactOutput) {
+        if let Some(usage) = &out.usage {
+            self.record_compaction_usage(usage, out.stream_ms).await;
+        }
+    }
+
+    async fn record_compaction_usage(
+        &self,
+        usage: &xai_grok_sampling_types::TokenUsage,
+        api_duration_ms: Option<u64>,
+    ) {
+        let model_id = self
+            .chat_state_handle
+            .get_sampling_config()
+            .await
+            .map(|c| c.model)
+            .unwrap_or_default();
+        let cost_usd_ticks = self.resolve_cost_usd_ticks(Some(&model_id), usage, None);
+        self.chat_state_handle
+            .record_session_side_usage(&model_id, usage, api_duration_ms, cost_usd_ticks)
+            .await;
+    }
+
     /// Per-turn prefire decision: usage has reached `threshold - lead` (so there
     /// is still runway before the hard auto-compact line at `threshold`).
     pub(crate) async fn should_prefire_two_pass(&self) -> bool {
@@ -1086,6 +1119,12 @@ impl SessionActor {
             {
                 Ok(summary) => {
                     compact_summary = Some(summary.summary);
+                    // Every completed full-replace sampling request is billable
+                    // (the shared engine may have retried); fold the summed
+                    // usage into the session ledger.
+                    if let Some(usage) = sampler.take_accumulated_usage() {
+                        self.record_compaction_usage(&usage, None).await;
+                    }
                     break;
                 }
                 Err(xai_grok_compaction::FullReplaceError::NothingToCompact) => {

@@ -1377,7 +1377,7 @@ impl SessionActor {
     }
     /// Prefer server-reported cost; when missing (or `cost_source = local`),
     /// estimate from the model's configured price sheet.
-    fn resolve_cost_usd_ticks(
+    pub(crate) fn resolve_cost_usd_ticks(
         &self,
         model_id: Option<&str>,
         usage: &xai_grok_sampling_types::TokenUsage,

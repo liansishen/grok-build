@@ -30,7 +30,7 @@ use xai_grok_compaction::{
     FullReplaceObserver, LlmCompactionOutput,
 };
 use xai_grok_sampler::SamplerConfig as SamplingConfig;
-use xai_grok_sampling_types::{ConversationItem, HostedTool, ToolSpec};
+use xai_grok_sampling_types::{ConversationItem, HostedTool, TokenUsage, ToolSpec};
 use xai_grok_telemetry::events::{CompactionRetryDegraded, CompactionTrigger};
 
 use xai_chat_state::compaction_utils::{
@@ -49,6 +49,9 @@ use crate::session::helpers::session_compact::{
 struct SamplerState {
     last_success: Option<CompactOutput>,
     last_attempted_items: Option<Vec<ConversationItem>>,
+    /// Sum of `usage` across every successful sampling attempt (the shared
+    /// engine may retry; each completed request is billable).
+    accumulated_usage: Option<TokenUsage>,
 }
 
 impl SamplerState {
@@ -130,6 +133,11 @@ impl ShellCompactionSampler {
         self.state.lock().unwrap().last_success.take()
     }
 
+    /// Take the summed usage of every successful sampling attempt, if any.
+    pub(crate) fn take_accumulated_usage(&self) -> Option<TokenUsage> {
+        self.state.lock().unwrap().accumulated_usage.take()
+    }
+
     /// Take the exact image-budgeted items from the latest transport attempt.
     pub(crate) fn take_last_attempted_items(&self) -> Option<Vec<ConversationItem>> {
         self.state.lock().unwrap().last_attempted_items.take()
@@ -174,7 +182,30 @@ impl CompactionSampler for ShellCompactionSampler {
         {
             Ok(output) => {
                 let response = output.content.clone();
-                self.state.lock().unwrap().last_success = Some(output);
+                let mut state = self.state.lock().unwrap();
+                if let Some(u) = &output.usage {
+                    state.accumulated_usage = Some(match state.accumulated_usage.take() {
+                        Some(acc) => TokenUsage {
+                            prompt_tokens: acc.prompt_tokens.saturating_add(u.prompt_tokens),
+                            completion_tokens: acc
+                                .completion_tokens
+                                .saturating_add(u.completion_tokens),
+                            total_tokens: acc.total_tokens.saturating_add(u.total_tokens),
+                            reasoning_tokens: acc
+                                .reasoning_tokens
+                                .saturating_add(u.reasoning_tokens),
+                            cached_prompt_tokens: acc
+                                .cached_prompt_tokens
+                                .saturating_add(u.cached_prompt_tokens),
+                            cache_creation_prompt_tokens: acc
+                                .cache_creation_prompt_tokens
+                                .saturating_add(u.cache_creation_prompt_tokens),
+                        },
+                        None => u.clone(),
+                    });
+                }
+                state.last_success = Some(output);
+                drop(state);
                 Ok(LlmCompactionOutput {
                     response,
                     thinking: String::new(),

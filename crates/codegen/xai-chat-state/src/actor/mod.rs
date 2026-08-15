@@ -183,6 +183,17 @@ impl ChatStateActor {
             } => {
                 self.record_model_call_usage(model_id, &usage, api_duration_ms, cost_usd_ticks);
             }
+            ChatStateCommand::RecordSessionSideUsage {
+                model_id,
+                usage,
+                api_duration_ms,
+                cost_usd_ticks,
+            } => {
+                self.record_session_side_usage(&model_id, &usage, api_duration_ms, cost_usd_ticks);
+            }
+            ChatStateCommand::GetSessionUsage { reply } => {
+                let _ = reply.send(Some(self.state.session_usage.clone()));
+            }
             ChatStateCommand::RecordSubagentUsage {
                 by_model,
                 attribute_to_prompt,

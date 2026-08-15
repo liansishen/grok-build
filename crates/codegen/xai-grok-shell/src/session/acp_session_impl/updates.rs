@@ -234,6 +234,7 @@ impl SessionActor {
             }
         }
         let total_tokens = self.chat_state_handle.get_estimated_total_tokens().await;
+        let session_usage = self.chat_state_handle.get_session_usage().await;
         let meta_info = self.chat_state_handle.get_notification_meta().await;
         let (stream_start_ms, turn_start_ms) = meta_info
             .map(|m| (m.stream_start_ms, m.turn_start_ms))
@@ -250,6 +251,12 @@ impl SessionActor {
         let obj = meta
             .as_object_mut()
             .expect("json! literal is always an Object");
+        if let Some(ledger) = session_usage {
+            obj.insert(
+                "sessionUsage".to_string(),
+                serde_json::to_value(&ledger).unwrap_or(serde_json::Value::Null),
+            );
+        }
         if let Some(pid) = self.current_prompt_id.lock().ok().and_then(|g| g.clone()) {
             obj.insert("promptId".to_string(), pid.into());
         }

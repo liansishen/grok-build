@@ -26,9 +26,10 @@
 //! and scrubs costs when partial or incomplete.
 
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 use xai_grok_sampling_types::TokenUsage;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UsageTotals {
     pub input_tokens: u64,
     pub output_tokens: u64,
@@ -103,7 +104,7 @@ fn merge_cost_ticks(a: Option<i64>, b: Option<i64>) -> Option<i64> {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UsageLedger {
     pub totals: UsageTotals,
     pub by_model: IndexMap<String, UsageTotals>,
@@ -137,6 +138,22 @@ impl UsageLedger {
         if incomplete {
             self.incomplete = true;
         }
+    }
+
+    /// Fold one side call (compaction summarization, background utility
+    /// requests, …) into the totals without incrementing
+    /// `main_loop_model_calls` (the wire `numTurns` counts main-loop rounds
+    /// only). Failed requests never reach this: callers record only
+    /// successfully completed responses.
+    pub fn record_side_call(
+        &mut self,
+        model_id: &str,
+        usage: &TokenUsage,
+        api_duration_ms: Option<u64>,
+        cost_usd_ticks: Option<i64>,
+    ) {
+        let call = UsageTotals::from_call(usage, api_duration_ms, cost_usd_ticks);
+        self.fold_entry(model_id, &call);
     }
 
     pub fn mark_incomplete(&mut self) {

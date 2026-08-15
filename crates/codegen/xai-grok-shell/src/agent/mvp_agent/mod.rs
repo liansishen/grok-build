@@ -249,6 +249,9 @@ pub(crate) struct SessionSpawnOptions<'a> {
     pub chat_history: Vec<crate::sampling::ConversationItem>,
     pub rewind_points_file_path: Option<std::path::PathBuf>,
     pub initial_total_tokens: u64,
+    /// Persisted session-wide usage ledger (accurate cumulative totals incl.
+    /// compaction side calls), restored on resume.
+    pub initial_session_usage: Option<xai_chat_state::UsageLedger>,
     pub origin_client: Option<crate::http::OriginClientInfo>,
     pub client_code_nav_enabled: bool,
     pub client_terminal: bool,
@@ -1614,6 +1617,43 @@ impl MvpAgent {
             );
         }
         result
+    }
+    /// Extract the persisted session usage ledger from the tail of the
+    /// updates file (`_meta.sessionUsage`), mirroring
+    /// [`Self::extract_initial_tokens_from_updates`]. `None` on fresh
+    /// sessions or any read/parse failure (restore is best-effort).
+    pub(super) fn extract_initial_session_usage_from_updates(
+        updates_file_path: &Option<PathBuf>,
+    ) -> Option<xai_chat_state::UsageLedger> {
+        use std::io::{Read, Seek, SeekFrom};
+        let updates_path = updates_file_path.as_ref()?;
+        let mut file = std::fs::File::open(updates_path).ok()?;
+        let file_len = file.metadata().ok()?.len();
+        const TAIL_SIZE: u64 = 256 * 1024;
+        let start_pos = file_len.saturating_sub(TAIL_SIZE);
+        if file.seek(SeekFrom::Start(start_pos)).is_err() {
+            return None;
+        }
+        let mut buf = String::new();
+        if file.read_to_string(&mut buf).is_err() {
+            return None;
+        }
+        let ledger = buf
+            .lines()
+            .rev()
+            .filter(|line| !line.trim().is_empty())
+            .find_map(|line| {
+                let value: serde_json::Value = serde_json::from_str(line).ok()?;
+                let raw = value.get("params")?.get("meta")?.get("sessionUsage")?;
+                serde_json::from_value::<xai_chat_state::UsageLedger>(raw.clone()).ok()
+            });
+        if ledger.is_none() {
+            tracing::debug!(
+                path = %updates_path.display(),
+                "extract_initial_session_usage: no sessionUsage found in updates tail"
+            );
+        }
+        ledger
     }
     /// Check whether the user has access via remote settings `allow_access`.
     ///

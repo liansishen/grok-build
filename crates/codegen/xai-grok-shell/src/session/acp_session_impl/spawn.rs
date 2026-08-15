@@ -133,6 +133,7 @@ pub(crate) async fn spawn_session_actor(
     initial_prompt_texts: Vec<String>,
     fs_notify_config: Option<ClientFsConfig>,
     initial_total_tokens: u64,
+    initial_session_usage: Option<xai_chat_state::UsageLedger>,
     mut startup_hints: StartupHints,
     client_type: ClientType,
     auto_compact_threshold_percent: u8,
@@ -476,7 +477,8 @@ pub(crate) async fn spawn_session_actor(
     );
     if (!initial_prompt_texts.is_empty()
         || initial_total_tokens > 0
-        || initial_last_compaction.is_some())
+        || initial_last_compaction.is_some()
+        || initial_session_usage.is_some())
         && let Some(mut snap) = chat_state_handle.snapshot().await
     {
         snap.prompt_index = initial_prompt_texts.len();
@@ -485,6 +487,9 @@ pub(crate) async fn spawn_session_actor(
             snap.total_tokens = initial_total_tokens;
         }
         snap.last_compaction_prompt_index = initial_last_compaction;
+        if let Some(ledger) = initial_session_usage {
+            snap.session_usage = ledger;
+        }
         chat_state_handle.restore_snapshot(snap);
     }
     chat_state_handle.update_credentials(credentials);
@@ -2111,6 +2116,7 @@ pub(crate) async fn spawn_session_on_thread(
     rewind_points_path: Option<std::path::PathBuf>,
     fs_notify_config: Option<ClientFsConfig>,
     initial_total_tokens: u64,
+    initial_session_usage: Option<xai_chat_state::UsageLedger>,
     startup_hints: StartupHints,
     client_type: ClientType,
     auto_compact_threshold_percent: u8,
@@ -2285,6 +2291,7 @@ pub(crate) async fn spawn_session_on_thread(
                         initial_prompt_texts,
                         fs_notify_config,
                         initial_total_tokens,
+                        initial_session_usage,
                         startup_hints,
                         client_type,
                         auto_compact_threshold_percent,
