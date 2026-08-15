@@ -108,9 +108,6 @@ pub enum ChatStateCommand {
         cost_usd_ticks: Option<i64>,
     },
 
-    /// Current session ledger (accurate cumulative usage incl. side calls).
-    GetSessionUsage { reply: oneshot::Sender<Option<crate::usage::UsageLedger>> },
-
     /// Subagent usage into session (and prompt when attributable). Replies when applied.
     RecordSubagentUsage {
         by_model: Vec<(String, crate::usage::UsageTotals)>,

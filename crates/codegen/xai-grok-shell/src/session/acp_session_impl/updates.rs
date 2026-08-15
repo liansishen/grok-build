@@ -234,7 +234,7 @@ impl SessionActor {
             }
         }
         let total_tokens = self.chat_state_handle.get_estimated_total_tokens().await;
-        let session_usage = self.chat_state_handle.get_session_usage().await;
+        let session_usage = self.chat_state_handle.try_get_session_usage().await.ok();
         let meta_info = self.chat_state_handle.get_notification_meta().await;
         let (stream_start_ms, turn_start_ms) = meta_info
             .map(|m| (m.stream_start_ms, m.turn_start_ms))

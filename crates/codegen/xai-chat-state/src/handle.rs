@@ -174,15 +174,6 @@ impl ChatStateHandle {
         });
     }
 
-    /// Current session ledger (accurate cumulative usage incl. side calls).
-    pub async fn get_session_usage(&self) -> Option<crate::usage::UsageLedger> {
-        self.query("GetSessionUsage", |reply| {
-            ChatStateCommand::GetSessionUsage { reply }
-        })
-        .await
-        .flatten()
-    }
-
     /// Increment prompt index (called at start of each user turn).
     pub fn increment_prompt_index(&self) {
         let _ = self.cmd_tx.send(ChatStateCommand::IncrementPromptIndex);
