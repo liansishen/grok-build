@@ -42,6 +42,15 @@ pub enum SessionEvent {
         /// Wall-clock elapsed time before cancellation.
         elapsed: Duration,
     },
+    /// Agent turn ended because a hook denied it — today only a
+    /// `UserPromptSubmit` block (a `PreToolUse` deny feeds back and the turn
+    /// continues). Distinct from [`SessionEvent::TurnCancelled`] so the
+    /// marker never claims the USER cancelled a policy block; the warning
+    /// annotation above the marker attributes the hook and reason.
+    TurnBlockedByHook {
+        /// Wall-clock elapsed time before the block.
+        elapsed: Duration,
+    },
     /// Agent turn was halted by the system (e.g. doom loop detection).
     TurnHalted {
         /// Wall-clock elapsed time before the turn was halted.
@@ -166,6 +175,10 @@ impl SessionEvent {
             SessionEvent::TurnCompleted { elapsed: None } => {
                 xai_grok_i18n::t("session.turn_completed").to_string()
             }
+            SessionEvent::TurnBlockedByHook { elapsed } => xai_grok_i18n::t_fmt(
+                "session.turn_blocked_by_hook",
+                &[("duration", &format_duration(*elapsed))],
+            ),
             SessionEvent::TurnCancelled { elapsed } => xai_grok_i18n::t_fmt(
                 "session.turn_cancelled",
                 &[("duration", &format_duration(*elapsed))],
@@ -327,6 +340,7 @@ impl SessionEvent {
             self,
             SessionEvent::TurnCompleted { .. }
                 | SessionEvent::TurnCancelled { .. }
+                | SessionEvent::TurnBlockedByHook { .. }
                 | SessionEvent::TurnHalted { .. }
                 | SessionEvent::TurnFailed { .. }
         )

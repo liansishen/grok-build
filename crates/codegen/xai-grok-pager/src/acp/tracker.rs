@@ -189,13 +189,44 @@ impl WritingToolCall {
                 "turn.activity.writing_subagent_prompt",
                 &[("ordinal", &ordinal)],
             ),
+            Some(xai_grok_tools::USE_TOOL_NAME) => xai_grok_i18n::t_fmt(
+                "turn.activity.preparing_mcp_tool",
+                &[("ordinal", &ordinal)],
+            ),
+            Some(xai_grok_tools::SEARCH_TOOL_NAME) => xai_grok_i18n::t_fmt(
+                "turn.activity.searching_mcp_tools",
+                &[("ordinal", &ordinal)],
+            ),
             Some(name) => {
-                let name = xai_grok_workspace::permission::mcp_pretty_name_if_qualified(name);
-                let subject = clamp_activity_subject(&name);
-                xai_grok_i18n::t_fmt(
-                    "turn.activity.preparing_named",
-                    &[("name", subject.as_str()), ("ordinal", ordinal.as_str())],
-                )
+                use xai_grok_tools::types::tool::ToolKind;
+                let key =
+                    xai_grok_tools::tool_taxonomy::writing_tool_kind(name).and_then(|kind| {
+                        match kind {
+                            ToolKind::Write => Some("turn.activity.writing_file"),
+                            ToolKind::Edit => Some("turn.activity.writing_edit"),
+                            ToolKind::Execute => Some("turn.activity.writing_command"),
+                            ToolKind::Plan => Some("turn.activity.updating_todo_list"),
+                            ToolKind::Workflow => Some("turn.activity.writing_workflow"),
+                            ToolKind::ImageGen => Some("turn.activity.writing_image_prompt"),
+                            ToolKind::ImageToVideo | ToolKind::ReferenceToVideo => {
+                                Some("turn.activity.writing_video_prompt")
+                            }
+                            ToolKind::AskUser => Some("turn.activity.preparing_question"),
+                            _ => None,
+                        }
+                    });
+                match key {
+                    Some(key) => xai_grok_i18n::t_fmt(key, &[("ordinal", &ordinal)]),
+                    None => {
+                        let name =
+                            xai_grok_workspace::permission::mcp_pretty_name_if_qualified(name);
+                        let subject = clamp_activity_subject(&name);
+                        xai_grok_i18n::t_fmt(
+                            "turn.activity.preparing_named",
+                            &[("name", subject.as_str()), ("ordinal", ordinal.as_str())],
+                        )
+                    }
+                }
             }
             None => xai_grok_i18n::t_fmt(
                 "turn.activity.preparing_tool_call",
@@ -1442,7 +1473,11 @@ impl AcpUpdateTracker {
                 .and_then(|m| m.get(user_message_chunk_meta::PROMPT_INDEX))
                 .and_then(|v| v.as_u64())
                 .map(|v| v as usize);
-            if let Some(pi) = prompt_index {
+            let replay_ts = meta
+                .is_replay
+                .then(|| meta.turn_start_ms.or(meta.agent_timestamp_ms))
+                .flatten();
+            if prompt_index.is_some() || replay_ts.is_some() {
                 for idx in (0..scrollback.len()).rev() {
                     if let Some(entry) = scrollback.get_mut(idx)
                         && let RenderBlock::UserPrompt(ref mut block) = entry.block
@@ -1450,8 +1485,13 @@ impl AcpUpdateTracker {
                         if block.is_interjection {
                             continue;
                         }
-                        if block.prompt_index.is_none() {
+                        if let Some(pi) = prompt_index
+                            && block.prompt_index.is_none()
+                        {
                             block.prompt_index = Some(pi);
+                        }
+                        if let Some(ms) = replay_ts {
+                            entry.created_at = Some(utc_ms_to_local(ms));
                         }
                         break;
                     }
