@@ -54,7 +54,7 @@ fn feedback_pane_blocked(agent: &AgentView) -> Option<&'static str> {
         // pane would hand it the wrong draft on the way out. A viewer outranks every card for keys, so the box would be untypeable.
         Some(t("feedback.close_or_answer"))
     } else if agent.session.session_id.is_none() {
-        Some(no_session_notice())
+        Some(t("toast.no_active_session"))
     } else {
         None
     }
@@ -132,7 +132,7 @@ pub(super) fn dispatch_send_feedback(app: &mut AppView, text: String) -> Vec<Eff
     let Some(session_id) = agent.session.session_id.clone() else {
         agent
             .scrollback
-            .push_block(RenderBlock::system(no_session_notice().to_string()));
+            .push_block(RenderBlock::system(t("toast.no_active_session").to_string()));
         return vec![];
     };
 
