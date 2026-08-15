@@ -196,9 +196,9 @@ impl QueuedPromptEntry {
         // Build the suffix for multiline prompts: " (+N lines)" or " (+1 line)"
         let suffix = if extra_lines > 0 {
             if extra_lines == 1 {
-                " (+1 line)".to_string()
+                xai_grok_i18n::t("queue.lines_one").to_string()
             } else {
-                format!(" (+{extra_lines} lines)")
+                xai_grok_i18n::t_fmt("queue.lines_many", &[("count", &extra_lines.to_string())])
             }
         } else {
             String::new()
@@ -995,7 +995,7 @@ impl QueuePane {
                 let mut right = inner.x + inner.width;
                 let fits = |right: u16, w: u16| right.checked_sub(w).filter(|&x| x >= inner.x);
 
-                let cancel_label = "[cancel]";
+                let cancel_label = xai_grok_i18n::t("queue.cancel");
                 let cancel_w = cancel_label.len() as u16;
                 if let Some(cancel_x) = fits(right, cancel_w) {
                     right = cancel_x;
@@ -1012,7 +1012,7 @@ impl QueuePane {
                     // would let the queued message behind the row leak through
                     // the seam. Unlike [Send now] it renders regardless of
                     // turn state — the keyboard `e` edit works either way.
-                    let edit_label = "[edit]";
+                    let edit_label = xai_grok_i18n::t("queue.edit");
                     let edit_w = edit_label.len() as u16;
                     if let Some(edit_x) = fits(right, edit_w) {
                         right = edit_x;
@@ -1030,7 +1030,7 @@ impl QueuePane {
                         // Compact action wording; same mouse hit-test as before
                         // (force-interject). Leftmost in the chain, flush
                         // against [edit] for the same no-seam reason.
-                        let interject_label = "[Send now]";
+                        let interject_label = xai_grok_i18n::t("queue.send_now");
                         let interject_w = interject_label.len() as u16;
                         if let Some(interject_x) = fits(right, interject_w) {
                             // Brighten the fg on hover (same hover color as the

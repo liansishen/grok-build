@@ -324,13 +324,25 @@ impl AgentArgs {
                 Ok(canonical) if canonical.is_dir() => Some(canonical),
                 Ok(_) => {
                     eprintln!(
-                        "grok: --plugin-dir {}: not a directory; skipping",
-                        p.display()
+                        "{}",
+                        xai_grok_i18n::t_fmt(
+                            "cli.plugin.error.not_directory_skip",
+                            &[("path", &p.display().to_string())],
+                        )
                     );
                     None
                 }
                 Err(e) => {
-                    eprintln!("grok: --plugin-dir {}: {e}; skipping", p.display());
+                    eprintln!(
+                        "{}",
+                        xai_grok_i18n::t_fmt(
+                            "cli.plugin.error.not_directory_skip_err",
+                            &[
+                                ("path", &p.display().to_string()),
+                                ("error", &format!("{e}")),
+                            ],
+                        )
+                    );
                     None
                 }
             })
@@ -991,7 +1003,13 @@ impl PagerArgs {
             ref sandbox_profile,
         } = pinned
         {
-            eprintln!("Resuming session {} (matched by title)", id);
+            eprintln!(
+                "{}",
+                xai_grok_i18n::t_fmt(
+                    "cli.resume.matched_by_title",
+                    &[("session_id", &id)],
+                )
+            );
             self.pinned_resume_profile = Some(sandbox_profile.clone());
         }
         let Some(id) = pinned.id() else {

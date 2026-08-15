@@ -95,7 +95,7 @@ pub(super) async fn run_one_turn_attempt(
             SubagentResult {
                 success: false,
                 cancelled: true,
-                error: Some("Subagent was cancelled".to_string()),
+                error: Some(xai_grok_i18n::t("subagent.error.cancelled").to_string()),
                 ..base_result(&input, tool_calls, turns, duration_ms)
             }
         }
@@ -161,7 +161,10 @@ pub(super) async fn run_one_turn_attempt(
                 })) => SubagentResult {
                     success: false,
                     cancelled: true,
-                    error: Some(format!("max turns reached (limit: {limit})")),
+                    error: Some(xai_grok_i18n::t_fmt(
+                        "subagent.error.max_turns",
+                        &[("limit", &format!("{limit}"))],
+                    )),
                     output: text_or_summary(final_text, || {
                         format!(
                             "Subagent '{}' ({}) hit max-turns limit ({limit}). {tool_calls} \
@@ -182,7 +185,10 @@ pub(super) async fn run_one_turn_attempt(
                         (true, Some(Ok(value))) => (true, None, Arc::from(value.to_string())),
                         (true, Some(Err(error))) => (
                             false,
-                            Some(format!("structured output validation failed: {error}")),
+                            Some(xai_grok_i18n::t_fmt(
+                                "subagent.error.validation_failed",
+                                &[("error", &format!("{error}"))],
+                            )),
                             Arc::from(final_text),
                         ),
                         (true, None) => (
@@ -218,9 +224,12 @@ pub(super) async fn run_one_turn_attempt(
                         success: false,
                         cancelled: was_cancelled,
                         error: Some(if was_cancelled {
-                            "Subagent was cancelled".to_string()
+                            xai_grok_i18n::t("subagent.error.cancelled").to_string()
                         } else {
-                            format!("Session error: {error}")
+                            xai_grok_i18n::t_fmt(
+                                "subagent.error.session_error",
+                                &[("error", &format!("{error}"))],
+                            )
                         }),
                         ..base_result(&input, tool_calls, turns, duration_ms)
                     }
@@ -231,9 +240,9 @@ pub(super) async fn run_one_turn_attempt(
                         success: false,
                         cancelled: was_cancelled,
                         error: Some(if was_cancelled {
-                            "Subagent was cancelled".to_string()
+                            xai_grok_i18n::t("subagent.error.cancelled").to_string()
                         } else {
-                            "Child session dropped unexpectedly".to_string()
+                            xai_grok_i18n::t("subagent.error.dropped").to_string()
                         }),
                         ..base_result(&input, tool_calls, turns, duration_ms)
                     }

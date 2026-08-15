@@ -131,7 +131,7 @@ fn external_prompt_editor_refuses_elements_with_visible_message() {
             .scrollback
             .iter_entries()
             .any(|(_, entry)| entry.block.searchable_text().as_deref()
-                == Some(crate::app::external_editor::ATTACHMENT_MESSAGE))
+                == Some(crate::app::external_editor::attachment_message()))
     );
     let agent = app.agents.get_mut(&id).unwrap();
     agent.prompt.set_text("");
@@ -198,7 +198,7 @@ fn external_prompt_editor_refuses_voice_and_pending_paste_with_visible_messages(
                 .scrollback
                 .iter_entries()
                 .any(|(_, entry)| entry.block.searchable_text().as_deref()
-                    == Some(crate::app::external_editor::VOICE_MESSAGE))
+                    == Some(crate::app::external_editor::voice_message()))
         );
     }
     for (probes, deferred_send) in [
@@ -223,7 +223,7 @@ fn external_prompt_editor_refuses_voice_and_pending_paste_with_visible_messages(
                 .scrollback
                 .iter_entries()
                 .any(|(_, entry)| entry.block.searchable_text().as_deref()
-                    == Some(crate::app::external_editor::PASTE_MESSAGE))
+                    == Some(crate::app::external_editor::paste_message()))
         );
     }
 }

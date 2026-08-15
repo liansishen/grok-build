@@ -1096,35 +1096,35 @@ fn render_pattern_preview_line(
     match edit.trimmed() {
         None => {
             spans.push(Span::styled(
-                "type a command pattern to allow (e.g. gh api repos/*)",
+                xai_grok_i18n::t("permission.hint.edit_pattern_placeholder"),
                 dim,
             ));
         }
         Some(pattern) if xai_grok_workspace::permission::bash_glob_is_catchall(pattern) => {
             spans.push(Span::styled(
-                "\u{2717} matches everything \u{2014} won't be saved",
+                xai_grok_i18n::t("permission.hint.matches_everything"),
                 Style::default().fg(theme.accent_error),
             ));
             spans.push(sep);
             spans.push(Span::styled("Esc", Style::default().fg(theme.accent_user)));
-            spans.push(Span::styled(" cancel", dim));
+            spans.push(Span::styled(xai_grok_i18n::t("permission.hint.cancel"), dim));
         }
         Some(pattern) => {
             if xai_grok_workspace::permission::bash_pattern_matches_command(pattern, command) {
                 spans.push(Span::styled(
-                    "\u{2713} matches this command",
+                    xai_grok_i18n::t("permission.hint.matches_command"),
                     Style::default().fg(theme.accent_success),
                 ));
             } else {
                 spans.push(Span::styled(
-                    "\u{2717} won't match this command",
+                    xai_grok_i18n::t("permission.hint.no_match"),
                     Style::default().fg(theme.accent_error),
                 ));
             }
             if xai_grok_workspace::permission::bash_pattern_is_broad(pattern) {
                 spans.push(sep.clone());
                 spans.push(Span::styled(
-                    "\u{26a0} very broad",
+                    xai_grok_i18n::t("permission.hint.very_broad"),
                     Style::default().fg(theme.warning),
                 ));
             }
@@ -1133,9 +1133,9 @@ fn render_pattern_preview_line(
                 "Enter",
                 Style::default().fg(theme.accent_user),
             ));
-            spans.push(Span::styled(" save  ", dim));
+            spans.push(Span::styled(xai_grok_i18n::t("permission.hint.save"), dim));
             spans.push(Span::styled("Esc", Style::default().fg(theme.accent_user)));
-            spans.push(Span::styled(" cancel", dim));
+            spans.push(Span::styled(xai_grok_i18n::t("permission.hint.cancel"), dim));
         }
     }
     buf.set_line(content_x, y, &Line::from(spans), content_width);

@@ -1816,9 +1816,12 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                     let error_msg = if let Some(sig) = &bash.signal {
                         sig.clone()
                     } else if bash.exit_code != 0 {
-                        format!("exit code {}", bash.exit_code)
+                        xai_grok_i18n::t_fmt(
+                            "tool.error.exit_code",
+                            &[("code", &bash.exit_code.to_string())],
+                        )
                     } else {
-                        "Command failed".into()
+                        xai_grok_i18n::t("tool.error.command_failed").into()
                     };
                     block = block.with_error(error_msg);
                 }
@@ -1833,7 +1836,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                 if !success {
                     let text = content_text(tc);
                     let error_msg = if text.is_empty() {
-                        "Command failed".to_string()
+                        xai_grok_i18n::t("tool.error.command_failed").to_string()
                     } else {
                         text
                     };
@@ -1886,7 +1889,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
             } else if !success {
                 let text = content_text(tc);
                 block = block.with_error(if text.is_empty() {
-                    "Read failed".to_string()
+                    xai_grok_i18n::t("tool.error.read_failed").to_string()
                 } else {
                     text
                 });
@@ -1919,7 +1922,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                 block = block.with_untrusted_summary();
             }
             if is_write {
-                block = block.with_prefix("Creating ");
+                block = block.with_prefix(xai_grok_i18n::t("tool.prefix.creating"));
             }
             RenderBlock::ToolCall(ToolCallBlock::Edit(block))
         }
@@ -1954,7 +1957,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
             if is_backend {
                 let variant = extract_raw_field(tc, "variant").unwrap_or_default();
                 if variant == "XSearch" {
-                    block.label = Some("X Search ".to_string());
+                    block.label = Some(xai_grok_i18n::t("tool.prefix.x_search").to_string());
                     block.is_x_search = true;
                 }
                 if let Some(ref raw) = tc.raw_output {
@@ -2056,7 +2059,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                 }
             }
             if !success {
-                block = block.with_error("Web search failed");
+                block = block.with_error(xai_grok_i18n::t("tool.error.web_search_failed"));
             }
             RenderBlock::ToolCall(ToolCallBlock::WebSearch(block))
         }
@@ -2072,7 +2075,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
             block.file_matches = grep.file_matches;
             block.file_paths = grep.file_paths;
             if !success {
-                block.error = Some("Search failed".into());
+                block.error = Some(xai_grok_i18n::t("tool.error.search_failed").into());
             }
             RenderBlock::ToolCall(ToolCallBlock::Search(block))
         }
@@ -2094,7 +2097,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                 block.output = Some(text);
             }
             if !success {
-                block = block.with_error("Fetch failed");
+                block = block.with_error(xai_grok_i18n::t("tool.error.fetch_failed"));
             }
             RenderBlock::ToolCall(ToolCallBlock::WebFetch(block))
         }
@@ -2105,7 +2108,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                 block = block.with_output(content);
             }
             if !success {
-                block = block.with_error("List directory failed");
+                block = block.with_error(xai_grok_i18n::t("tool.error.list_failed"));
             }
             RenderBlock::ToolCall(ToolCallBlock::ListDir(block))
         }
@@ -2129,7 +2132,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                 block.content = Some(content);
             }
             if !success {
-                block = block.with_error("Search failed");
+                block = block.with_error(xai_grok_i18n::t("tool.error.search_failed"));
             }
             RenderBlock::ToolCall(ToolCallBlock::IntegrationSearch(block))
         }
@@ -2148,7 +2151,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                     block
                         .output
                         .take()
-                        .unwrap_or_else(|| "Tool call failed".into()),
+                        .unwrap_or_else(|| xai_grok_i18n::t("tool.error.tool_failed").into()),
                 );
             }
             RenderBlock::ToolCall(ToolCallBlock::UseTool(block))
@@ -2173,7 +2176,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                     crate::scrollback::blocks::tool::memory_search::parse_memory_results(&text);
             }
             if !success {
-                block.error = Some("Memory search failed".into());
+                block.error = Some(xai_grok_i18n::t("tool.error.memory_failed").into());
             }
             RenderBlock::ToolCall(ToolCallBlock::MemorySearch(block))
         }
@@ -2193,9 +2196,12 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                         let error_msg = if let Some(sig) = &bash.signal {
                             sig.clone()
                         } else if bash.exit_code != 0 {
-                            format!("exit code {}", bash.exit_code)
+                            xai_grok_i18n::t_fmt(
+                                "tool.error.exit_code",
+                                &[("code", &bash.exit_code.to_string())],
+                            )
                         } else {
-                            "Command failed".into()
+                            xai_grok_i18n::t("tool.error.command_failed").into()
                         };
                         block = block.with_error(error_msg);
                     }
@@ -2209,7 +2215,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                 if !success {
                     let text = content_text(tc);
                     block = block.with_error(if text.is_empty() {
-                        "Command failed".to_string()
+                        xai_grok_i18n::t("tool.error.command_failed").to_string()
                     } else {
                         text
                     });
@@ -2232,8 +2238,11 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
                 || name.to_ascii_lowercase().starts_with("skill:")
             {
                 let label = match name.find(':') {
-                    Some(i) => format!("Skill{}", &name[i..]),
-                    None => "Skill".into(),
+                    Some(i) => xai_grok_i18n::t_fmt(
+                        "tool.label.skill_named",
+                        &[("name", &name[i..])],
+                    ),
+                    None => xai_grok_i18n::t("tool.label.skill").into(),
                 };
                 (label, ToolCallBlock::Skill)
             } else {
@@ -2243,7 +2252,7 @@ fn tool_call_to_block(tc: &acp::ToolCall, session_cwd: Option<&Path>) -> RenderB
             let ct = content_text(tc);
             if !success {
                 block.error = Some(if ct.is_empty() {
-                    "Failed".into()
+                    xai_grok_i18n::t("tool.error.failed").into()
                 } else {
                     ct.clone()
                 });
@@ -2268,7 +2277,11 @@ fn media_gen_block(tc: &acp::ToolCall, success: bool) -> RenderBlock {
     let mut block = OtherToolCallBlock::new(tool_call_title(tc), String::new());
     if !success {
         let err = content_text(tc);
-        block.error = Some(if err.is_empty() { "Failed".into() } else { err });
+        block.error = Some(if err.is_empty() {
+            xai_grok_i18n::t("tool.error.failed").into()
+        } else {
+            err
+        });
     } else if let Some((path, is_video)) = media_gen_ref(tc) {
         block = block.with_media_ref(path, is_video);
     } else if let Some(text) = media_gen_text(tc) {
@@ -2536,16 +2549,30 @@ fn extract_edit_error(tc: &acp::ToolCall) -> String {
         && let Ok(ToolOutput::SearchReplace(sr)) = serde_json::from_value::<ToolOutput>(raw.clone())
     {
         return match sr {
-            SearchReplaceOutput::InvalidInput(_) => "Invalid input".to_owned(),
-            SearchReplaceOutput::FileNotFound(_) => "File not found".to_owned(),
-            SearchReplaceOutput::MultipleMatchesFound(_) => "Multiple matches found".to_owned(),
-            SearchReplaceOutput::FileAlreadyExists(_) => "File already exists".to_owned(),
-            SearchReplaceOutput::FilenameTooLong(_) => "Filename too long".to_owned(),
-            SearchReplaceOutput::NoMatchesFound(_) => "No matches found".to_owned(),
-            SearchReplaceOutput::EditsApplied(_) => "Edit failed".to_owned(),
+            SearchReplaceOutput::InvalidInput(_) => {
+                xai_grok_i18n::t("tool.error.edit_invalid_input").to_owned()
+            }
+            SearchReplaceOutput::FileNotFound(_) => {
+                xai_grok_i18n::t("tool.error.edit_file_not_found").to_owned()
+            }
+            SearchReplaceOutput::MultipleMatchesFound(_) => {
+                xai_grok_i18n::t("tool.error.edit_multiple_matches").to_owned()
+            }
+            SearchReplaceOutput::FileAlreadyExists(_) => {
+                xai_grok_i18n::t("tool.error.edit_file_exists").to_owned()
+            }
+            SearchReplaceOutput::FilenameTooLong(_) => {
+                xai_grok_i18n::t("tool.error.edit_filename_too_long").to_owned()
+            }
+            SearchReplaceOutput::NoMatchesFound(_) => {
+                xai_grok_i18n::t("tool.error.edit_no_matches").to_owned()
+            }
+            SearchReplaceOutput::EditsApplied(_) => {
+                xai_grok_i18n::t("tool.error.edit_failed").to_owned()
+            }
         };
     }
-    "Edit failed".to_owned()
+    xai_grok_i18n::t("tool.error.edit_failed").to_owned()
 }
 /// Extract search input metadata from a tool call's rawInput.
 fn extract_search_meta(tc: &acp::ToolCall) -> SearchInputMeta {

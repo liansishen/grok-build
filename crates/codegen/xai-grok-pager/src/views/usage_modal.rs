@@ -514,7 +514,7 @@ pub fn render_usage_modal(
         && state.session_fields.as_ref().is_some_and(|f| !f.is_empty())
     {
         shortcuts.push(Shortcut {
-            label: "y copy all",
+            label: xai_grok_i18n::t("usage.modal.footer.copy_all"),
             clickable: true,
             id: COPY_ALL_SESSION_INFO_SHORTCUT,
         });

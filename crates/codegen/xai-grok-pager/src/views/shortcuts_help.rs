@@ -115,51 +115,39 @@ pub fn default_collapsed() -> std::collections::HashSet<usize> {
 // Man-page body for the paste pseudo-row (Enter detail). Keep claims that
 // hold on every host (agent + dashboard); non-image file paths are agent-only.
 #[cfg(target_os = "windows")]
-const PASTE_LONG_HELP: &str = "\
-Pastes clipboard images into the prompt as chips, and plain text as typed.\n\
-Prefer Ctrl+V. Use Alt+V as a fallback when Ctrl+V fails (some terminals or \
-configs drop image clipboards; older Windows Terminal versions only pasted \
-text).\n\
-You can also drag an image file from Explorer into the prompt.";
+fn paste_long_help() -> &'static str {
+    xai_grok_i18n::t("shortcuts.pseudo.paste_long_help_windows")
+}
 #[cfg(target_os = "macos")]
-const PASTE_LONG_HELP: &str = "\
-Pastes clipboard images into the prompt as chips, and plain text as typed.\n\
-Use Ctrl+V for screenshots, browser \"Copy Image\", and file-manager image \
-copies (many terminals swallow Cmd+V and never deliver it to the TUI).\n\
-You can also drag an image file into the prompt.";
+fn paste_long_help() -> &'static str {
+    xai_grok_i18n::t("shortcuts.pseudo.paste_long_help_macos")
+}
 #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-const PASTE_LONG_HELP: &str = "\
-Pastes clipboard images into the prompt as chips, and plain text as typed.\n\
-Use Ctrl+V for screenshots, browser \"Copy Image\", and file-manager image \
-copies.\n\
-You can also drag an image file into the prompt.";
+fn paste_long_help() -> &'static str {
+    xai_grok_i18n::t("shortcuts.pseudo.paste_long_help_other")
+}
 
 // Undo/redo are textarea chords, not ActionRegistry entries. Super/Cmd also
 // works where the terminal delivers it; list Ctrl only (hosts often swallow Super).
-const UNDO_LONG_HELP: &str = "\
-Undoes the last change in the prompt editor.\n\
-Covers typing, deletes, line/word kills, and clearing a draft.";
+fn undo_long_help() -> &'static str {
+    xai_grok_i18n::t("shortcuts.pseudo.undo_long_help")
+}
 
-const REDO_LONG_HELP: &str = "\
-Redoes the last undone change in the prompt editor.\n\
-Ctrl+Shift+Z is primary; Ctrl+R is an alternate.";
+fn redo_long_help() -> &'static str {
+    xai_grok_i18n::t("shortcuts.pseudo.redo_long_help")
+}
 
 // Prompt history is not an ActionRegistry entry: Up is an inline key handler and
 // /history is a slash command. Surface both here for discoverability.
-const HISTORY_LONG_HELP: &str = "\
-Recalls previously sent prompts.\n\
-Press Up on an empty prompt to browse earlier prompts, newest first; each move \
-live-populates the composer so you can edit and resend.\n\
-Run /history to open a searchable history panel and filter by text.";
+fn history_long_help() -> &'static str {
+    xai_grok_i18n::t("shortcuts.pseudo.history_long_help")
+}
 
 // Scrollback search has no ActionRegistry entry: it's the vim `/` inline handler,
 // or the /find slash command in simple mode. Surface both triggers here.
-const SCROLLBACK_SEARCH_LONG_HELP: &str = "\
-Searches the conversation scrollback for text and jumps between matches.\n\
-In the prompt input, run /find to search. In vim mode, you can also press / \
-while the scrollback is focused.\n\
-Type a query, then use n and N (or the arrow keys) to step through matches. \
-Press Enter to jump to a match and Esc to dismiss.";
+fn scrollback_search_long_help() -> &'static str {
+    xai_grok_i18n::t("shortcuts.pseudo.search_scrollback_long_help")
+}
 
 /// Build the entries vector for the modal, grouped by category.
 ///
@@ -313,7 +301,7 @@ pub fn build_entries(
                 item,
                 dimmed,
                 action_id: None,
-                long_help: Some(SCROLLBACK_SEARCH_LONG_HELP),
+                long_help: Some(scrollback_search_long_help()),
             });
         }
         // Simple mode reaches scrollback search via the `/find` slash command,
@@ -331,7 +319,7 @@ pub fn build_entries(
                 item,
                 dimmed,
                 action_id: None,
-                long_help: Some(SCROLLBACK_SEARCH_LONG_HELP),
+                long_help: Some(scrollback_search_long_help()),
             });
         }
         // Clipboard + textarea chords not in ActionRegistry. Super/Cmd omitted
@@ -354,18 +342,18 @@ pub fn build_entries(
             paste.description = Some(xai_grok_i18n::t("shortcuts.pseudo.paste_clipboard").into());
             #[cfg(target_os = "windows")]
             paste.keys.push(crate::key!('v', ALT));
-            push_pseudo(&mut entries, paste, Some(PASTE_LONG_HELP));
+            push_pseudo(&mut entries, paste, Some(paste_long_help()));
 
             let mut undo = HintItem::new(crate::key!('z', CONTROL), "undo");
             undo.description = Some(xai_grok_i18n::t("shortcuts.pseudo.undo").into());
-            push_pseudo(&mut entries, undo, Some(UNDO_LONG_HELP));
+            push_pseudo(&mut entries, undo, Some(undo_long_help()));
 
             // Textarea: Ctrl+Shift+Z (+ Ctrl+R alt). Ctrl+R is prompt-only;
             // scrollback may bind it to mouse reporting when that toggle is on.
             let mut redo = HintItem::new(crate::key!('z', CONTROL | SHIFT), "redo");
             redo.description = Some(xai_grok_i18n::t("shortcuts.pseudo.redo").into());
             redo.keys.push(crate::key!('r', CONTROL));
-            push_pseudo(&mut entries, redo, Some(REDO_LONG_HELP));
+            push_pseudo(&mut entries, redo, Some(redo_long_help()));
 
             // Prompt history (Up / /history). Not part of the shared paste/undo/redo
             // `dimmed`: that also lights on DashboardFocused, but Up-history is
@@ -377,7 +365,7 @@ pub fn build_entries(
                 item: history,
                 dimmed: history_dimmed,
                 action_id: None,
-                long_help: Some(HISTORY_LONG_HELP),
+                long_help: Some(history_long_help()),
             });
         }
         let count = entries.len() - header_idx - 1;

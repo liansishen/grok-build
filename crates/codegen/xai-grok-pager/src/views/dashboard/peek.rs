@@ -1199,16 +1199,26 @@ fn block_short_text(block: &crate::scrollback::block::RenderBlock) -> Option<Str
     match block {
         RenderBlock::UserPrompt(b) => Some(format!("\u{2771} {}", first_line_of(&b.text))),
         RenderBlock::AgentMessage(b) => Some(first_line_of(&b.text())),
-        RenderBlock::Thinking(b) => Some(format!("(thinking) {}", first_line_of(&b.text()))),
-        RenderBlock::System(_) => Some("(system event)".to_string()),
-        RenderBlock::SessionEvent(_) => Some("(session event)".to_string()),
-        RenderBlock::ToolCall(_) => Some("(tool call)".to_string()),
-        RenderBlock::BgTask(_) => Some("(background task)".to_string()),
-        RenderBlock::Subagent(_) => Some("(subagent)".to_string()),
-        RenderBlock::Workflow(_) => Some("(workflow)".to_string()),
-        RenderBlock::Btw(_) => Some("(btw)".to_string()),
-        RenderBlock::ContextInfo(_) => Some("(context info)".to_string()),
-        RenderBlock::CreditLimit(_) => Some("(credit limit)".to_string()),
+        RenderBlock::Thinking(b) => Some(format!(
+            "{} {}",
+            xai_grok_i18n::t("dashboard.peek.thinking"),
+            first_line_of(&b.text())
+        )),
+        RenderBlock::System(_) => Some(xai_grok_i18n::t("dashboard.peek.system_event").to_string()),
+        RenderBlock::SessionEvent(_) => {
+            Some(xai_grok_i18n::t("dashboard.peek.session_event").to_string())
+        }
+        RenderBlock::ToolCall(_) => Some(xai_grok_i18n::t("dashboard.peek.tool_call").to_string()),
+        RenderBlock::BgTask(_) => Some(xai_grok_i18n::t("dashboard.peek.bg_task").to_string()),
+        RenderBlock::Subagent(_) => Some(xai_grok_i18n::t("dashboard.peek.subagent").to_string()),
+        RenderBlock::Workflow(_) => Some(xai_grok_i18n::t("dashboard.peek.workflow").to_string()),
+        RenderBlock::Btw(_) => Some(xai_grok_i18n::t("dashboard.peek.btw").to_string()),
+        RenderBlock::ContextInfo(_) => {
+            Some(xai_grok_i18n::t("dashboard.peek.context_info").to_string())
+        }
+        RenderBlock::CreditLimit(_) => {
+            Some(xai_grok_i18n::t("dashboard.peek.credit_limit").to_string())
+        }
         RenderBlock::Stub(_) => None,
     }
 }

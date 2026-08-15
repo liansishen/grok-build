@@ -91,14 +91,26 @@ fn resolve_agent_profile_path(path: &std::path::Path) -> std::path::PathBuf {
 /// Print startup information for the serve command.
 fn print_serve_startup_info(bind_addr: SocketAddr, secret: &str) {
     eprintln!();
-    eprintln!("   Grok agent server starting...");
-    eprintln!();
-    eprintln!("   Address:  {}:{}", bind_addr.ip(), bind_addr.port());
-    eprintln!("   Secret:   {}", secret);
+    eprintln!("   {}", xai_grok_i18n::t("cli.server.starting"));
     eprintln!();
     eprintln!(
-        "   WebSocket URL: ws://{}/ws?server-key={}",
-        bind_addr, secret
+        "   {}",
+        xai_grok_i18n::t_fmt(
+            "cli.server.address",
+            &[
+                ("ip", &format!("{}", bind_addr.ip())),
+                ("port", &format!("{}", bind_addr.port()))
+            ]
+        )
+    );
+    eprintln!("   {}", xai_grok_i18n::t_fmt("cli.server.secret", &[("secret", secret)]));
+    eprintln!();
+    eprintln!(
+        "   {}",
+        xai_grok_i18n::t_fmt(
+            "cli.server.ws_url",
+            &[("endpoint", &format!("{bind_addr}")), ("key", secret)]
+        )
     );
     eprintln!();
 }
@@ -155,10 +167,10 @@ fn init_tracing_simple(app_entrypoint: &'static str) {
 async fn run_setup_command(json: bool) {
     use xai_grok_shell::managed_config::{self, SetupOutcome};
     if !managed_config::has_principal() {
-        eprintln!("No deployment key or team sign-in found.");
+        eprintln!("{}", xai_grok_i18n::t("cli.setup.no_principal"));
         eprintln!();
-        eprintln!("To install managed configuration, sign in with a team using `grok login`,");
-        eprintln!("or set a deployment key:");
+        eprintln!("{}", xai_grok_i18n::t("cli.setup.sign_in_or_key"));
+        eprintln!("{}", xai_grok_i18n::t("cli.setup.set_deployment_key"));
         eprintln!();
         if cfg!(unix) {
             eprintln!("  export GROK_DEPLOYMENT_KEY=<your-key>");
@@ -167,14 +179,12 @@ async fn run_setup_command(json: bool) {
         }
         eprintln!("  grok setup");
         eprintln!();
-        eprintln!("Or add the key to ~/.grok/config.toml:");
+        eprintln!("{}", xai_grok_i18n::t("cli.setup.add_key_to_config"));
         eprintln!();
         eprintln!("  [endpoints]");
         eprintln!("  deployment_key = \"<your-key>\"");
         eprintln!();
-        eprintln!(
-            "If you don't have a deployment key, contact your organization's Grok administrator."
-        );
+        eprintln!("{}", xai_grok_i18n::t("cli.setup.contact_admin"));
         std::process::exit(1);
     }
     if json {
@@ -184,32 +194,32 @@ async fn run_setup_command(json: bool) {
                     .expect("setup report has no non-serializable values");
                 println!("{out}");
                 if !report.configured {
-                    eprintln!(
-                        "Your team doesn't have a managed configuration yet. A team admin can set one up at console.x.ai."
-                    );
+                    eprintln!("{}", xai_grok_i18n::t("cli.setup.nothing_configured"));
                 }
             }
             Err(e) => {
-                eprintln!("Couldn't fetch managed configuration. {e}");
+                eprintln!(
+                    "{}",
+                    xai_grok_i18n::t_fmt("cli.setup.fetch_failed", &[("error", &format!("{e}"))])
+                );
                 std::process::exit(1);
             }
         }
         return;
     }
     match managed_config::run_setup().await {
-        SetupOutcome::Installed => eprintln!("Applied managed configuration."),
+        SetupOutcome::Installed => eprintln!("{}", xai_grok_i18n::t("cli.setup.applied")),
         SetupOutcome::NothingConfigured => {
-            eprintln!(
-                "Your team doesn't have a managed configuration yet. A team admin can set one up at console.x.ai."
-            );
+            eprintln!("{}", xai_grok_i18n::t("cli.setup.nothing_configured"));
         }
         SetupOutcome::Skipped => {
-            eprintln!(
-                "Managed configuration was not applied this run (another process held the apply lock, or the credential changed during the fetch). Run `grok setup` again."
-            );
+            eprintln!("{}", xai_grok_i18n::t("cli.setup.skipped"));
         }
         SetupOutcome::Failed(e) => {
-            eprintln!("Couldn't apply managed configuration. {e}");
+            eprintln!(
+                "{}",
+                xai_grok_i18n::t_fmt("cli.setup.apply_failed", &[("error", &format!("{e}"))])
+            );
             std::process::exit(1);
         }
     }
@@ -226,7 +236,7 @@ async fn run_leader_mgmt(args: LeaderMgmtArgs) -> Result<()> {
                     serde_json::to_string(&serde_json::Value::Array(payload))?
                 );
             } else if leaders.is_empty() {
-                println!("No leader candidates found.");
+                println!("{}", xai_grok_i18n::t("cli.leader.no_candidates"));
             } else {
                 for d in &leaders {
                     print_leader_descriptor(d);
@@ -251,9 +261,7 @@ async fn run_leader_mgmt(args: LeaderMgmtArgs) -> Result<()> {
                 println!("{info:#?}");
             } else {
                 print_leader_descriptor(&descriptor);
-                eprintln!(
-                    "  (detailed info unavailable — leader does not advertise control capabilities)"
-                );
+                eprintln!("{}", xai_grok_i18n::t("cli.leader.details_unavailable"));
             }
             client.cancel();
             Ok(())
@@ -263,7 +271,7 @@ async fn run_leader_mgmt(args: LeaderMgmtArgs) -> Result<()> {
 async fn kill_leaders() -> Result<()> {
     let leaders = xai_grok_shell::leader::discover_leaders().await;
     if leaders.is_empty() {
-        eprintln!("No leader candidates found.");
+        eprintln!("{}", xai_grok_i18n::t("cli.leader.no_candidates"));
         return Ok(());
     }
     let mut killed = 0u32;
@@ -274,7 +282,10 @@ async fn kill_leaders() -> Result<()> {
         };
         if !xai_grok_shell::util::is_grok_process(pid) {
             if let Some(ref lock) = d.lock_path {
-                eprintln!("  PID {pid} is not a grok process, removing stale lock");
+                eprintln!(
+                    "{}",
+                    xai_grok_i18n::t_fmt("cli.leader.remove_stale_lock", &[("pid", &format!("{pid}"))])
+                );
                 let _ = std::fs::remove_file(lock);
                 cleaned += 1;
             }
@@ -283,19 +294,28 @@ async fn kill_leaders() -> Result<()> {
             }
             continue;
         }
-        eprintln!("  Killing leader PID {pid}");
+        eprintln!("{}", xai_grok_i18n::t_fmt("cli.leader.killing", &[("pid", &format!("{pid}"))]));
         if let Err(e) = xai_grok_shell::util::kill_process_by_pid(pid) {
-            eprintln!("  warning: failed to terminate PID {pid}: {e}");
+            eprintln!(
+                "{}",
+                xai_grok_i18n::t_fmt(
+                    "cli.leader.kill_failed",
+                    &[("pid", &format!("{pid}")), ("error", &format!("{e}"))]
+                )
+            );
             continue;
         }
         killed += 1;
     }
     if killed > 0 {
-        eprintln!("Killed {killed} leader process(es).");
+        eprintln!("{}", xai_grok_i18n::t_fmt("cli.leader.killed", &[("count", &format!("{killed}"))]));
     } else if cleaned > 0 {
-        eprintln!("No live leader processes found (cleaned up {cleaned} stale lock(s)).");
+        eprintln!(
+            "{}",
+            xai_grok_i18n::t_fmt("cli.leader.no_live_cleaned", &[("count", &format!("{cleaned}"))])
+        );
     } else {
-        eprintln!("No live leader processes found.");
+        eprintln!("{}", xai_grok_i18n::t("cli.leader.no_live"));
     }
     Ok(())
 }

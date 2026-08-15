@@ -414,27 +414,22 @@ impl SessionActor {
         for call in tool_calls.into_iter() {
             if final_result.is_some() {
                 let message = match &*final_result {
-                    Some(ToolLoop::PermissionReject { .. }) => {
-                        format!(
-                            "Tool execution cancelled due to earlier permission rejection for tool `{}`",
-                            call.function.name
-                        )
-                    }
-                    Some(ToolLoop::Cancelled) => {
-                        format!(
-                            "Tool execution cancelled due to earlier user cancellation for tool `{}`",
-                            call.function.name
-                        )
-                    }
-                    Some(ToolLoop::FollowupMessage(_)) => {
-                        format!(
-                            "Tool execution cancelled due to earlier user followup message for tool `{}`",
-                            call.function.name
-                        )
-                    }
-                    _ => {
-                        format!("Tool execution cancelled for tool `{}`", call.function.name)
-                    }
+                    Some(ToolLoop::PermissionReject { .. }) => xai_grok_i18n::t_fmt(
+                        "tool.cancelled.permission",
+                        &[("name", &call.function.name)],
+                    ),
+                    Some(ToolLoop::Cancelled) => xai_grok_i18n::t_fmt(
+                        "tool.cancelled.user",
+                        &[("name", &call.function.name)],
+                    ),
+                    Some(ToolLoop::FollowupMessage(_)) => xai_grok_i18n::t_fmt(
+                        "tool.cancelled.followup",
+                        &[("name", &call.function.name)],
+                    ),
+                    _ => xai_grok_i18n::t_fmt(
+                        "tool.cancelled.generic",
+                        &[("name", &call.function.name)],
+                    ),
                 };
                 self.chat_state_handle
                     .push_tool_result(ConversationItem::tool_result(call.id.clone(), message));

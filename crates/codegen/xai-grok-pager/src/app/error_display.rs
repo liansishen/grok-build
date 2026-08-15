@@ -108,8 +108,8 @@ pub(crate) fn format_request_failure(
     let class = classify(status, wire);
     let why = extracted
         .filter(|d| !is_server_fault(status, wire) && !is_headline_echo(d, &class.headline))
-        .or_else(|| class.default_why.map(str::to_string));
-    let detail = compose_detail(why.as_deref(), class.action);
+        .or(class.default_why);
+    let detail = compose_detail(why.as_deref(), class.action.as_deref());
     FormattedRequestFailure {
         status,
         headline: class.headline,
@@ -120,67 +120,67 @@ pub(crate) fn format_request_failure(
 struct Classified {
     headline: String,
     /// What the user can do. Omitted when we have no real next step.
-    action: Option<&'static str>,
+    action: Option<String>,
     /// Used only when the server body added nothing.
-    default_why: Option<&'static str>,
+    default_why: Option<String>,
 }
 
 fn classify(status: Option<u16>, wire: WireErrorType) -> Classified {
     if let Some(code) = status {
         let (prefix, action, default_why) = match code {
             400 | 422 => (
-                "Bad request",
+                xai_grok_i18n::t("error.status.bad_request"),
                 None,
-                Some("The server rejected this request."),
+                Some(xai_grok_i18n::t("error.why.server_rejected")),
             ),
             403 => (
-                "Request denied",
+                xai_grok_i18n::t("error.status.request_denied"),
                 None,
-                Some("You don't have permission to do this."),
+                Some(xai_grok_i18n::t("error.why.no_permission")),
             ),
             404 => (
-                "Not found",
-                Some("Run /model to pick another."),
-                Some("This model isn't available."),
+                xai_grok_i18n::t("error.status.not_found"),
+                Some(xai_grok_i18n::t("error.action.pick_another_model")),
+                Some(xai_grok_i18n::t("error.why.model_unavailable")),
             ),
             408 | 504 => (
-                "Request timed out",
-                Some("Try again shortly."),
-                Some("The server took too long to respond."),
+                xai_grok_i18n::t("error.status.request_timed_out"),
+                Some(xai_grok_i18n::t("error.action.retry_shortly")),
+                Some(xai_grok_i18n::t("error.why.server_slow")),
             ),
             409 => (
-                "Conflict",
-                Some("Try again."),
-                Some("The request conflicted with the current state."),
+                xai_grok_i18n::t("error.status.conflict"),
+                Some(xai_grok_i18n::t("error.action.retry")),
+                Some(xai_grok_i18n::t("error.why.conflict_state")),
             ),
             413 => (
-                "Request too large",
-                Some("Try a smaller prompt or run /compact."),
+                xai_grok_i18n::t("error.status.request_too_large"),
+                Some(xai_grok_i18n::t("error.action.smaller_prompt")),
                 None,
             ),
             429 => (
-                "Rate limited",
-                Some("Try again later."),
-                Some("You've hit the rate limit for your plan."),
+                xai_grok_i18n::t("error.status.rate_limited"),
+                Some(xai_grok_i18n::t("error.action.retry_later")),
+                Some(xai_grok_i18n::t("error.why.rate_limit_hit")),
             ),
             502 | 503 => (
-                "Service unavailable",
-                Some("The service is busy. Wait a minute and send again."),
+                xai_grok_i18n::t("error.status.service_unavailable"),
+                Some(xai_grok_i18n::t("error.action.service_busy")),
                 None,
             ),
             100..=399 => (
-                "Request failed",
+                xai_grok_i18n::t("error.status.request_failed"),
                 None,
-                Some("The request did not complete successfully."),
+                Some(xai_grok_i18n::t("error.why.request_incomplete")),
             ),
             400..=499 => (
-                "Request failed",
+                xai_grok_i18n::t("error.status.request_failed"),
                 None,
-                Some("The server rejected this request."),
+                Some(xai_grok_i18n::t("error.why.server_rejected")),
             ),
             _ => (
-                "Server error",
-                Some("Something went wrong on our side. Wait a minute and send again."),
+                xai_grok_i18n::t("error.status.server_error"),
+                Some(xai_grok_i18n::t("error.action.server_error_wait")),
                 None,
             ),
         };
@@ -192,49 +192,49 @@ fn classify(status: Option<u16>, wire: WireErrorType) -> Classified {
     }
     let (headline, action, default_why) = match wire {
         WireErrorType::IdleTimeout => (
-            "No response from the model",
-            Some("Try sending again."),
-            Some("It may be stuck."),
+            xai_grok_i18n::t("error.status.no_response"),
+            Some(xai_grok_i18n::t("error.action.send_again")),
+            Some(xai_grok_i18n::t("error.why.may_be_stuck")),
         ),
         WireErrorType::EmptyResponse => (
-            "Empty response",
-            Some("Try sending again."),
-            Some("The model returned no content."),
+            xai_grok_i18n::t("error.status.empty_response"),
+            Some(xai_grok_i18n::t("error.action.send_again")),
+            Some(xai_grok_i18n::t("error.why.empty_no_content")),
         ),
         WireErrorType::Serialization => (
-            "Couldn't read the response",
-            Some("Try sending again."),
+            xai_grok_i18n::t("error.status.couldnt_read"),
+            Some(xai_grok_i18n::t("error.action.send_again")),
             None,
         ),
         WireErrorType::Http => (
-            "Connection failed",
-            Some("Check your network and try again."),
+            xai_grok_i18n::t("error.status.connection_failed"),
+            Some(xai_grok_i18n::t("error.action.check_network")),
             None,
         ),
         WireErrorType::MaxTokensTruncation => (
-            "Response truncated",
-            Some("Try asking for a shorter answer."),
-            Some("The model hit its output limit."),
+            xai_grok_i18n::t("error.status.response_truncated"),
+            Some(xai_grok_i18n::t("error.action.shorter_answer")),
+            Some(xai_grok_i18n::t("error.why.output_limit")),
         ),
         WireErrorType::RateLimited => (
-            "Rate limited",
-            Some("Try again later."),
-            Some("You've hit the rate limit for your plan."),
+            xai_grok_i18n::t("error.status.rate_limited"),
+            Some(xai_grok_i18n::t("error.action.retry_later")),
+            Some(xai_grok_i18n::t("error.why.rate_limit_hit")),
         ),
         WireErrorType::Api => (
-            "Server error",
-            Some("Something went wrong on our side. Wait a minute and send again."),
+            xai_grok_i18n::t("error.status.server_error"),
+            Some(xai_grok_i18n::t("error.action.server_error_wait")),
             None,
         ),
         WireErrorType::AuthTransient => (
-            "Authentication temporarily unavailable",
-            Some("Try sending again in a moment."),
+            xai_grok_i18n::t("error.status.auth_temporarily_unavailable"),
+            Some(xai_grok_i18n::t("error.action.send_again_moment")),
             None,
         ),
         _ => (
-            "Request failed",
-            Some("Try sending again."),
-            Some("Something went wrong."),
+            xai_grok_i18n::t("error.status.request_failed"),
+            Some(xai_grok_i18n::t("error.action.send_again")),
+            Some(xai_grok_i18n::t("error.why.something_went_wrong")),
         ),
     };
     Classified {

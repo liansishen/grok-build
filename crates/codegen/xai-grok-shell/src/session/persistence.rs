@@ -2142,14 +2142,16 @@ pub(crate) fn is_disk_full_io_error(e: &io::Error) -> bool {
 /// `message` and a stable `data.code` for log aggregation.
 pub(crate) fn io_error_to_acp(e: &io::Error) -> acp::Error {
     let (message, code) = if is_disk_full_io_error(e) {
-        ("No space left on device", "FS_DISK_QUOTA_EXCEEDED")
+        (xai_grok_i18n::t("error.fs.disk_full"), "FS_DISK_QUOTA_EXCEEDED")
     } else {
         match e.kind() {
-            io::ErrorKind::NotFound => ("Path not found.", "FS_NOT_FOUND"),
-            io::ErrorKind::PermissionDenied => ("Permission denied.", "FS_PERMISSION_DENIED"),
+            io::ErrorKind::NotFound => (xai_grok_i18n::t("error.fs.not_found"), "FS_NOT_FOUND"),
+            io::ErrorKind::PermissionDenied => {
+                (xai_grok_i18n::t("error.fs.permission_denied"), "FS_PERMISSION_DENIED")
+            }
             _ => {
                 tracing::warn!(error = %e, kind = ?e.kind(), raw_os = ?e.raw_os_error(), "unclassified persistence I/O error");
-                ("An unexpected I/O error occurred.", "FS_OTHER")
+                (xai_grok_i18n::t("error.fs.other"), "FS_OTHER")
             }
         }
     };

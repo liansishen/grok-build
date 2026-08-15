@@ -346,16 +346,16 @@ pub fn render_turn_status(
         // story (Enter acts on the queue immediately), so it replaces the
         // generic interrupt copy.
         let parked_suffix = if held_queue > 0 && held_queue_top_sendable {
-            format!(" \u{00b7} {held_queue} queued — Enter to send now")
+            xai_grok_i18n::t_fmt("turn.queue.send_now", &[("count", &held_queue.to_string())])
         } else if held_queue > 0 {
-            format!(" \u{00b7} {held_queue} queued")
+            xai_grok_i18n::t_fmt("turn.queue.queued", &[("count", &held_queue.to_string())])
         } else {
-            " \u{00b7} send a message to interrupt".to_string()
+            xai_grok_i18n::t("turn.status.interrupt_send").to_string()
         };
         let cue = match (still_running_label(watchers), parked) {
             (Some(label), true) => Some(format!("{label}{parked_suffix}")),
             (Some(label), false) => Some(label),
-            (None, true) => Some(format!("waiting{parked_suffix}")),
+            (None, true) => Some(format!("{}{parked_suffix}", xai_grok_i18n::t("turn.status.waiting"))),
             (None, false) => None,
         };
         if let Some(cue) = cue {

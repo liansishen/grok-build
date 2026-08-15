@@ -233,7 +233,10 @@ fn build_local_rows(
                     parent: *id,
                     child_session_id: format!("__more_{}", id.0),
                 },
-                label: format!("\u{2026} {} more", total - keep),
+                label: xai_grok_i18n::t_fmt(
+                    "dashboard.more_count_collapse",
+                    &[("count", &(total - keep).to_string())],
+                ),
                 subtitle: None,
                 state: RowState::Idle,
                 activity: None,
@@ -870,7 +873,14 @@ fn subagent_activity(info: &SubagentInfo, state: RowState) -> Option<String> {
         let turns = info.turns.unwrap_or(0);
         let tools = info.tool_calls.unwrap_or(0);
         let toks = info.tokens_used.unwrap_or(0);
-        Some(format!("{tools} tools · {toks} tok · {turns} turns"))
+        Some(xai_grok_i18n::t_fmt(
+            "dashboard.usage_summary",
+            &[
+                ("tools", &tools.to_string()),
+                ("toks", &toks.to_string()),
+                ("turns", &turns.to_string()),
+            ],
+        ))
     } else {
         None
     }

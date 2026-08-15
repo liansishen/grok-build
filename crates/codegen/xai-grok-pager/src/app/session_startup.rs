@@ -462,7 +462,7 @@ pub fn resolve_local_workspace_config(
         return Ok(None);
     }
     if !chat {
-        anyhow::bail!("{LOCAL_WORKSPACE_REQUIRES_CHAT}");
+        anyhow::bail!("{}", xai_grok_i18n::t("cli.local_workspace.requires_chat"));
     }
     let mode = if cli_attach.is_some() {
         LocalWorkspaceMode::Attach
@@ -510,7 +510,10 @@ pub fn resolve_local_workspace_config(
                 .or(env_server_id)
                 .filter(|s| !s.is_empty());
             let Some(server_id) = server_id else {
-                anyhow::bail!("{LOCAL_WORKSPACE_ATTACH_NEEDS_SERVER_ID}");
+                anyhow::bail!(
+                    "{}",
+                    xai_grok_i18n::t("cli.local_workspace.attach_needs_server_id")
+                );
             };
             ensure_attach_fs_only_toolset(&server_id)?;
             Ok(Some(LocalWorkspaceConfig {
@@ -550,12 +553,12 @@ pub fn validate_local_workspace_cwd(path: &std::path::Path) -> anyhow::Result<st
         return Ok(canon);
     }
     if canon == std::path::Path::new("/") {
-        anyhow::bail!("{LOCAL_WORKSPACE_HOME_DENIED}");
+        anyhow::bail!("{}", xai_grok_i18n::t("cli.local_workspace.home_denied"));
     }
     if let Some(home_path) = dirs::home_dir().or_else(|| std::env::var_os("HOME").map(Into::into)) {
         let home_canon = home_path.canonicalize().unwrap_or(home_path);
         if canon == home_canon {
-            anyhow::bail!("{LOCAL_WORKSPACE_HOME_DENIED}");
+            anyhow::bail!("{}", xai_grok_i18n::t("cli.local_workspace.home_denied"));
         }
     }
     Ok(canon)
@@ -580,16 +583,16 @@ pub fn emit_local_workspace_startup_ux_with(
         .as_ref()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "<session cwd>".to_string());
-    let banner = LOCAL_WORKSPACE_BANNER.replace("<cwd>", &cwd_display);
+    let banner = xai_grok_i18n::t_fmt("cli.local_workspace.banner", &[("cwd", &cwd_display)]);
     eprintln!("{banner}");
-    eprintln!("{LOCAL_WORKSPACE_HITL_HINT}");
+    eprintln!("{}", xai_grok_i18n::t("cli.local_workspace.hitl_hint"));
     if local_workspace_ack_satisfied() {
         return Ok(());
     }
     if !stdin_is_terminal {
-        anyhow::bail!("{LOCAL_WORKSPACE_ACK_REQUIRED}");
+        anyhow::bail!("{}", xai_grok_i18n::t("cli.local_workspace.ack_required"));
     }
-    eprint!("Continue with local workspace on this machine? [y/N] ");
+    eprint!("{}", xai_grok_i18n::t("cli.local_workspace.confirm_prompt"));
     use std::io::Write;
     let _ = std::io::stderr().flush();
     let mut line = String::new();
@@ -829,9 +832,7 @@ pub(crate) fn pre_acp_auth_manager(
 /// never applied on this path; `--restore-code` requires `--worktree`.
 const REMOTE_RESTORE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
 /// `--restore-code` without `--worktree` on a remote miss: refuse in-place checkout.
-const REMOTE_RESTORE_NEEDS_WORKTREE: &str = "--restore-code on a remote session requires --worktree \
-     (refusing to check out snapshot code into the current directory)";
-/// `--worktree` resume without `--restore-code`: conversation only.
+/// Snapshot code will not be restored into the worktree; pass --restore-code to restore it.
 pub(crate) const WORKTREE_NO_RESTORE_CODE_NOTICE: &str =
     "Snapshot code will not be restored into the worktree; pass --restore-code to restore it.";
 /// Preflight: preferred id must be a UUID and not a persisted session under `cwd`.
@@ -1019,7 +1020,10 @@ async fn resolve_existing_session(
         tracing::info!(session_id = %session_id, local_id = %local_id, "Session found locally");
         if !in_place_restore_code_allowed(ctx.restore_code, ctx.has_worktree, session_id, &local_id)
         {
-            anyhow::bail!("{REMOTE_RESTORE_NEEDS_WORKTREE}");
+            anyhow::bail!(
+                "{}",
+                xai_grok_i18n::t("startup.remote_restore_needs_worktree")
+            );
         }
         return Ok(ResolvedExisting {
             id: local_id,
@@ -1074,7 +1078,10 @@ async fn resolve_existing_session(
                 )
             );
             if !ctx.restore_code {
-                eprintln!("{WORKTREE_NO_RESTORE_CODE_NOTICE}");
+                eprintln!(
+                    "{}",
+                    xai_grok_i18n::t("startup.worktree_no_restore_code")
+                );
             }
             Ok(ResolvedExisting {
                 id: session_id.to_string(),
@@ -1086,12 +1093,16 @@ async fn resolve_existing_session(
         }
         RemoteMissPlan::RejectInPlaceCodeRestore { title_miss_hint } => {
             if title_miss_hint {
-                anyhow::bail!(
-                    "{REMOTE_RESTORE_NEEDS_WORKTREE}; {}",
+                anyhow::bail!(format!(
+                    "{}; {}",
+                    xai_grok_i18n::t("startup.remote_restore_needs_worktree"),
                     super::session_title_resolve::title_miss_hint(session_id)
-                );
+                ));
             }
-            anyhow::bail!("{REMOTE_RESTORE_NEEDS_WORKTREE}")
+            anyhow::bail!(
+                "{}",
+                xai_grok_i18n::t("startup.remote_restore_needs_worktree")
+            )
         }
         RemoteMissPlan::NotFound { title_miss_hint } => {
             if title_miss_hint {

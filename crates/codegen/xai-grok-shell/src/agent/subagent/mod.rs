@@ -2081,7 +2081,7 @@ async fn cancel_pending_shell_child(
     let result = SubagentResult {
         success: false,
         cancelled: true,
-        error: Some("Subagent was cancelled".to_string()),
+        error: Some(xai_grok_i18n::t("subagent.error.cancelled").to_string()),
         subagent_id: subagent_id.to_string(),
         child_session_id: child_session_id.0.to_string(),
         duration_ms,

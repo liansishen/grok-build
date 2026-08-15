@@ -667,8 +667,9 @@ impl HostService {
                 Err(err) => {
                     let mut result = result;
                     result.success = false;
-                    let output = serde_json::Value::String(format!(
-                        "structured output validation failed: {err}"
+                    let output = serde_json::Value::String(xai_grok_i18n::t_fmt(
+                        "subagent.error.validation_failed",
+                        &[("error", &format!("{err}"))],
                     ));
                     break (result, output);
                 }

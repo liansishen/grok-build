@@ -254,11 +254,11 @@ impl McpServerDisplayStatus {
     /// Short human label for the status.
     pub(crate) fn label(&self) -> &'static str {
         match self {
-            Self::Ready => "ready",
-            Self::NeedsAuth => "needs auth",
-            Self::SetupRequired => "setup required",
-            Self::Unavailable => "unavailable",
-            Self::Initializing => "initializing",
+            Self::Ready => xai_grok_i18n::t("extensions.mcp.status.ready"),
+            Self::NeedsAuth => xai_grok_i18n::t("extensions.mcp.status.needs_auth"),
+            Self::SetupRequired => xai_grok_i18n::t("extensions.mcp.status.setup_required"),
+            Self::Unavailable => xai_grok_i18n::t("extensions.mcp.status.unavailable"),
+            Self::Initializing => xai_grok_i18n::t("extensions.mcp.status.initializing"),
         }
     }
 }

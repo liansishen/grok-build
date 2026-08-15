@@ -641,7 +641,7 @@ impl RenderBlock {
         if let ToolCallBlock::Other(ref mut b) = block
             && !success
         {
-            b.error = Some("Tool call failed".to_string());
+            b.error = Some(xai_grok_i18n::t("tool.error.tool_failed").to_string());
         }
         RenderBlock::ToolCall(block)
     }
@@ -655,7 +655,7 @@ impl RenderBlock {
     ) -> Self {
         let mut block = OtherToolCallBlock::new(kind, summary).with_output(output);
         if !success {
-            block = block.with_error("Tool call failed");
+            block = block.with_error(xai_grok_i18n::t("tool.error.tool_failed"));
         }
         RenderBlock::ToolCall(ToolCallBlock::Other(block))
     }

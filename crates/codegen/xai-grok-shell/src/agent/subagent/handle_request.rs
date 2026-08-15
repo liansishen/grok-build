@@ -49,13 +49,13 @@ pub(crate) async fn run_shell_child(
     let mut completion_data = ShellCompletionData::from_context(&ctx);
     if request.owner.is_workflow() && cancel_token.is_cancelled() {
         return child_run_output(
-            cancelled_result(&request, "Subagent was cancelled"),
+            cancelled_result(&request, xai_grok_i18n::t("subagent.error.cancelled")),
             completion_data,
             None,
         );
     }
     let Some(mut definition) = resolve_agent_definition(&request.subagent_type, &ctx) else {
-        let msg = format!("Unknown subagent type: {}", request.subagent_type);
+        let msg = xai_grok_i18n::t_fmt("subagent.error.unknown_type", &[("name", &request.subagent_type)]);
         return child_run_output(failure_result(&request, &msg), completion_data, None);
     };
     match gate_subagent_type(&request.subagent_type, &ctx) {
@@ -76,12 +76,12 @@ pub(crate) async fn run_shell_child(
         }
         SubagentValidateTypeOutcome::Unknown { .. }
         | SubagentValidateTypeOutcome::ValidationUnavailable => {
-            let msg = format!("Cannot validate subagent '{}'", request.subagent_type);
+            let msg = xai_grok_i18n::t_fmt("subagent.error.cannot_validate", &[("name", &request.subagent_type)]);
             return child_run_output(failure_result(&request, &msg), completion_data, None);
         }
         SubagentValidateTypeOutcome::Ok => {}
         _ => {
-            let msg = format!("Cannot validate subagent '{}'", request.subagent_type);
+            let msg = xai_grok_i18n::t_fmt("subagent.error.cannot_validate", &[("name", &request.subagent_type)]);
             return child_run_output(failure_result(&request, &msg), completion_data, None);
         }
     }

@@ -578,7 +578,10 @@ fn raw_deny_rejection(cmd: &str, state: &PermissionState) -> Option<SegmentEvalu
         .iter()
         .find(|d| matches_whitelist_prefix(cmd, d))
         .map(|d| {
-            SegmentEvaluation::Reject(format!("User previously rejected `{d}` in this project"))
+            SegmentEvaluation::Reject(xai_grok_i18n::t_fmt(
+                "permission.reason.previously_rejected",
+                &[("path", d)],
+            ))
         })
 }
 
@@ -676,8 +679,9 @@ fn evaluate_bash(cmd: &str, state: &PermissionState, honor_safe_lists: bool) -> 
             .find(|d| matches_whitelist_prefix(&s, d))
         {
             return BashEvaluation {
-                segments: SegmentEvaluation::Reject(format!(
-                    "User previously rejected `{d}` in this project"
+                segments: SegmentEvaluation::Reject(xai_grok_i18n::t_fmt(
+                    "permission.reason.previously_rejected",
+                    &[("path", d)],
                 )),
                 exact_grant,
                 all_segments_granted,
@@ -2208,7 +2212,10 @@ fn spawn_permission_manager_with_pin(
                             } else {
                                 match state.edit_policy {
                                     EditPolicy::Reject => Some((
-                                        Decision::Reject("edits prohibited".to_owned()),
+                                        Decision::Reject(
+                                            xai_grok_i18n::t("permission.reason.edits_prohibited")
+                                                .to_owned(),
+                                        ),
                                         reasons::SESSION_DENY,
                                     )),
                                     // `Allow` is a legacy on-disk value that the startup
@@ -2436,21 +2443,26 @@ fn spawn_permission_manager_with_pin(
                                     Decision::Allow
                                 }
                                 PromptOutcome::RejectOnce => {
-                                    Decision::Reject("User rejected the execution".to_owned())
+                                    Decision::Reject(
+                                        xai_grok_i18n::t("permission.reason.user_rejected")
+                                            .to_owned(),
+                                    )
                                 }
                                 PromptOutcome::RejectAlwaysBashCommand(prefix) => {
                                     state.disallowed_bash_commands.insert(prefix.clone());
                                     persist_state(&cwd, &state, client_id_ref).await;
-                                    Decision::Reject(format!(
-                                        "User rejected the execution and excluded `{prefix}` from future runs in this project"
+                                    Decision::Reject(xai_grok_i18n::t_fmt(
+                                        "permission.reason.user_rejected_excluded",
+                                        &[("prefix", &prefix)],
                                     ))
                                 }
                                 PromptOutcome::Cancelled => Decision::Cancelled,
                                 PromptOutcome::FollowupMessage(msg) => {
                                     Decision::FollowupMessage(msg)
                                 }
-                                PromptOutcome::Error(e) => Decision::Reject(format!(
-                                    "Failed to request permission from user: {e}"
+                                PromptOutcome::Error(e) => Decision::Reject(xai_grok_i18n::t_fmt(
+                                    "permission.reason.request_failed",
+                                    &[("error", &format!("{e}"))],
                                 )),
                             };
                             let outcome_str = effective_kind.wire_str();
@@ -2586,14 +2598,21 @@ fn spawn_permission_manager_with_pin(
                                 }
                                 PromptOutcome::RejectAlwaysBashCommand(_) => {
                                     // Not reachable for non-bash access; defensive.
-                                    Decision::Reject("User rejected the execution".to_owned())
+                                    Decision::Reject(
+                                        xai_grok_i18n::t("permission.reason.user_rejected")
+                                            .to_owned(),
+                                    )
                                 }
                                 PromptOutcome::RejectOnce => {
-                                    Decision::Reject("User rejected the execution".to_owned())
+                                    Decision::Reject(
+                                        xai_grok_i18n::t("permission.reason.user_rejected")
+                                            .to_owned(),
+                                    )
                                 }
                                 PromptOutcome::Cancelled => Decision::Cancelled,
-                                PromptOutcome::Error(e) => Decision::Reject(format!(
-                                    "Failed to request permission from user: {e}"
+                                PromptOutcome::Error(e) => Decision::Reject(xai_grok_i18n::t_fmt(
+                                    "permission.reason.request_failed",
+                                    &[("error", &format!("{e}"))],
                                 )),
                                 PromptOutcome::FollowupMessage(followup_message) => {
                                     Decision::FollowupMessage(followup_message.clone())

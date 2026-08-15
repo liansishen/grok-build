@@ -238,7 +238,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 }
                 Err(err) => {
                     tracing::warn!("welcome local-workspace ack: {err}");
-                    app.show_toast(&format!("Local workspace: {err}"));
+                    let msg = xai_grok_i18n::t_fmt(
+                        "welcome.local_workspace_error",
+                        &[("error", &format!("{err}"))],
+                    );
+                    app.show_toast(&msg);
                     vec![]
                 }
             }

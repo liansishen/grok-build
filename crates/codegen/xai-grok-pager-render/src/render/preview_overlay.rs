@@ -216,7 +216,10 @@ fn render_content_lines(
         // Dots separator
         if row < max_rows {
             let omitted = total - preview_lines * 2;
-            let dots_text = format!("⋮ ({omitted} more lines)");
+            let dots_text = xai_grok_i18n::t_fmt(
+                "media.more_lines",
+                &[("count", &omitted.to_string())],
+            );
             buf.set_span_safe(
                 inner.x,
                 inner.y + row,

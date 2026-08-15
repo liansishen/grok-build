@@ -139,13 +139,21 @@ fn scope_for_access(access: &AccessKind) -> &'static str {
 }
 fn describe_access(access: &AccessKind) -> String {
     match access {
-        AccessKind::Bash(_) => "Run a terminal command".to_owned(),
-        AccessKind::Edit(path) => format!("Edit {path}"),
-        AccessKind::MCPTool { name, .. } => format!("Run MCP tool {name}"),
-        AccessKind::WebFetch(url) => format!("Fetch {url}"),
-        AccessKind::WebSearch(query) => format!("Search the web for {query}"),
-        AccessKind::Read(_) => "Read a file".to_owned(),
-        AccessKind::Grep { .. } => "Search file contents".to_owned(),
+        AccessKind::Bash(_) => xai_grok_i18n::t("permission.description.bash").to_owned(),
+        AccessKind::Edit(path) => {
+            xai_grok_i18n::t_fmt("permission.description.edit", &[("path", path.as_str())])
+        }
+        AccessKind::MCPTool { name, .. } => {
+            xai_grok_i18n::t_fmt("permission.description.mcp_tool", &[("name", name.as_str())])
+        }
+        AccessKind::WebFetch(url) => {
+            xai_grok_i18n::t_fmt("permission.description.web_fetch", &[("url", url.as_str())])
+        }
+        AccessKind::WebSearch(query) => {
+            xai_grok_i18n::t_fmt("permission.description.web_search", &[("query", query.as_str())])
+        }
+        AccessKind::Read(_) => xai_grok_i18n::t("permission.description.read").to_owned(),
+        AccessKind::Grep { .. } => xai_grok_i18n::t("permission.description.grep").to_owned(),
     }
 }
 /// Build the server → chat `permission_request` payload. The field set matches

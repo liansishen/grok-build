@@ -413,7 +413,7 @@ pub(crate) fn execute(
                             return TaskResult::WorktreeSessionFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    &format!("couldn't create worktree: {e}"),
+                                    &xai_grok_i18n::t_fmt("error.effects.create_worktree_err", &[("error", &format!("{e}"))]),
                                 ),
                             };
                         }
@@ -426,7 +426,7 @@ pub(crate) fn execute(
                             return TaskResult::WorktreeSessionFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    &format!("couldn't create worktree: {e}"),
+                                    &xai_grok_i18n::t_fmt("error.effects.create_worktree_err", &[("error", &format!("{e}"))]),
                                 ),
                             };
                         }
@@ -439,7 +439,7 @@ pub(crate) fn execute(
                         return TaskResult::WorktreeSessionFailed {
                             agent_id,
                             error: sanitize_user_error(
-                                &format!("couldn't create worktree: {msg}"),
+                                &xai_grok_i18n::t_fmt("error.effects.create_worktree_err", &[("error", &format!("{msg}"))]),
                             ),
                         };
                     }
@@ -453,7 +453,7 @@ pub(crate) fn execute(
                             return TaskResult::WorktreeSessionFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    "couldn't create worktree: response missing worktreePath",
+                                    xai_grok_i18n::t("error.effects.create_worktree_missing_path"),
                                 ),
                             };
                         }
@@ -518,8 +518,7 @@ pub(crate) fn execute(
                             TaskResult::WorktreeSessionFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    &format!(
-                            "couldn't create session in worktree: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.create_session_worktree_err", &[("error", &format!("{e}"))]),
                         ),
                                 ),
                             }
@@ -766,7 +765,7 @@ pub(crate) fn execute(
                                 .unwrap_or_default();
                             if let Some(err) = wrapper.get("error") {
                                 return TaskResult::SessionListFailed {
-                                    error: err.as_str().unwrap_or("unknown error").to_string(),
+                                    error: err.as_str().unwrap_or(xai_grok_i18n::t("error.unknown")).to_string(),
                                     seq,
                                     query,
                                 };
@@ -830,7 +829,7 @@ pub(crate) fn execute(
                                 None => {
                                     tracing::warn!("failed to parse x.ai/sessions/list response");
                                     TaskResult::RosterFailed {
-                                        error: "parse error".to_string(),
+                                        error: xai_grok_i18n::t("error.parse").to_string(),
                                     }
                                 }
                             }
@@ -2200,13 +2199,12 @@ pub(crate) fn execute(
                                 crate::views::mcps_modal::McpsListResponse,
                             >(inner.clone())
                                 .map(crate::views::mcps_modal::convert_list_response)
-                                .map_err(|_| "couldn't load server list".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.load_server_list").to_string())
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't load server list: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.load_server_list_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -2257,7 +2255,7 @@ pub(crate) fn execute(
                                         >(value)
                                             .ok()
                                     })
-                                    .ok_or_else(|| "setup required".to_string());
+                                    .ok_or_else(|| xai_grok_i18n::t("error.effects.setup_required").to_string());
                                 setup
                                     .map(
                                         crate::app::actions::McpAuthTriggerOutcome::SetupRequired,
@@ -2273,7 +2271,7 @@ pub(crate) fn execute(
                         }
                         Err(e) => {
                             Err(
-                                sanitize_user_error(&format!("authentication failed: {e}")),
+                                sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.auth_failed_err", &[("error", &format!("{e}"))])),
                             )
                         }
                     };
@@ -2317,11 +2315,11 @@ pub(crate) fn execute(
                                     .and_then(|r| r.get("error"))
                                     .and_then(|e| e.as_str())
                                     .map(|s| s.to_string())
-                                    .unwrap_or_else(|| "setup failed".to_string());
+                                    .unwrap_or_else(|| xai_grok_i18n::t("error.effects.setup_failed").to_string());
                                 Err(detail)
                             }
                         }
-                        Err(e) => Err(sanitize_user_error(&format!("setup failed: {e}"))),
+                        Err(e) => Err(sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.setup_failed_err", &[("error", &format!("{e}"))]))),
                     };
                     TaskResult::McpSetupSubmitDone {
                         agent_id,
@@ -2353,11 +2351,11 @@ pub(crate) fn execute(
                             serde_json::from_value::<
                                 xai_hooks_plugins_types::HooksListResponse,
                             >(inner.clone())
-                                .map_err(|_| "couldn't load hooks".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.load_hooks").to_string())
                         }
                         Err(e) => {
                             Err(
-                                sanitize_user_error(&format!("couldn't load hooks: {e}")),
+                                sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.load_hooks_err", &[("error", &format!("{e}"))])),
                             )
                         }
                     };
@@ -2390,11 +2388,11 @@ pub(crate) fn execute(
                             serde_json::from_value::<
                                 xai_hooks_plugins_types::PluginsListResponse,
                             >(inner.clone())
-                                .map_err(|_| "couldn't load plugins".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.load_plugins").to_string())
                         }
                         Err(e) => {
                             Err(
-                                sanitize_user_error(&format!("couldn't load plugins: {e}")),
+                                sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.load_plugins_err", &[("error", &format!("{e}"))])),
                             )
                         }
                     };
@@ -2428,13 +2426,12 @@ pub(crate) fn execute(
                             serde_json::from_value::<
                                 xai_hooks_plugins_types::ActionOutcome,
                             >(inner.clone())
-                                .map_err(|_| "couldn't complete hooks action".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.complete_hooks_action").to_string())
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't complete hooks action: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.complete_hooks_action_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -2470,13 +2467,12 @@ pub(crate) fn execute(
                             serde_json::from_value::<
                                 xai_hooks_plugins_types::ActionOutcome,
                             >(inner.clone())
-                                .map_err(|_| "couldn't complete plugins action".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.complete_plugins_action").to_string())
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't complete plugins action: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.complete_plugins_action_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -2511,13 +2507,12 @@ pub(crate) fn execute(
                             serde_json::from_value::<
                                 xai_hooks_plugins_types::MarketplaceListResponse,
                             >(inner.clone())
-                                .map_err(|_| "couldn't load marketplace".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.load_marketplace").to_string())
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't load marketplace: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.load_marketplace_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -2552,13 +2547,12 @@ pub(crate) fn execute(
                             serde_json::from_value::<
                                 xai_hooks_plugins_types::MarketplaceListResponse,
                             >(inner.clone())
-                                .map_err(|_| "couldn't load marketplace".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.load_marketplace").to_string())
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't load marketplace: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.load_marketplace_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -2595,11 +2589,11 @@ pub(crate) fn execute(
                                     xai_grok_tools::implementations::skills::types::SkillInfo,
                                 >,
                             >(inner.get("skills").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't load skills".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.load_skills").to_string())
                         }
                         Err(e) => {
                             Err(
-                                sanitize_user_error(&format!("couldn't load skills: {e}")),
+                                sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.load_skills_err", &[("error", &format!("{e}"))])),
                             )
                         }
                     };
@@ -2632,13 +2626,12 @@ pub(crate) fn execute(
                             serde_json::from_value::<
                                 Vec<crate::views::extensions_modal::WorkflowInfo>,
                             >(inner.get("workflows").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't load workflows".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.load_workflows").to_string())
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't load workflows: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.load_workflows_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -2678,7 +2671,7 @@ pub(crate) fn execute(
                                     xai_grok_tools::implementations::skills::types::SkillInfo,
                                 >,
                             >(inner.get("skills").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't toggle skill".to_string());
+                                .map_err(|_| xai_grok_i18n::t("error.effects.toggle_skill").to_string());
                             if parsed.is_ok() {
                                 let refresh = acp::ExtRequest::new(
                                     "x.ai/skills/refresh-baseline",
@@ -2692,7 +2685,7 @@ pub(crate) fn execute(
                         }
                         Err(e) => {
                             Err(
-                                sanitize_user_error(&format!("couldn't toggle skill: {e}")),
+                                sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.toggle_skill_err", &[("error", &format!("{e}"))])),
                             )
                         }
                     };
@@ -2841,14 +2834,13 @@ pub(crate) fn execute(
                             >(inner.clone())
                                 .map_err(|e| {
                                     tracing::debug!("failed to parse marketplace action response: {e}");
-                                    "couldn't complete marketplace action".to_string()
+                                    xai_grok_i18n::t("error.effects.complete_marketplace_action").to_string()
                                 })
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't complete marketplace action: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.complete_marketplace_action_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -2900,14 +2892,13 @@ pub(crate) fn execute(
                             >(inner.clone())
                                 .map_err(|e| {
                                     tracing::debug!("failed to parse marketplace action response: {e}");
-                                    "couldn't complete marketplace action".to_string()
+                                    xai_grok_i18n::t("error.effects.complete_marketplace_action").to_string()
                                 })
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't complete marketplace action: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.complete_marketplace_action_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -2944,13 +2935,12 @@ pub(crate) fn execute(
                             serde_json::from_value::<
                                 xai_hooks_plugins_types::ActionOutcome,
                             >(inner.clone())
-                                .map_err(|_| "couldn't complete plugins action".to_string())
+                                .map_err(|_| xai_grok_i18n::t("error.effects.complete_plugins_action").to_string())
                         }
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't complete plugins action: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.complete_plugins_action_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -3018,8 +3008,7 @@ pub(crate) fn execute(
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
-                                    &format!(
-                        "couldn't save server config: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.save_server_config_err", &[("error", &format!("{e}"))]),
                     ),
                                 ),
                             )
@@ -3054,7 +3043,7 @@ pub(crate) fn execute(
                         Ok(_) => Ok(()),
                         Err(e) => {
                             Err(
-                                sanitize_user_error(&format!("couldn't delete server: {e}")),
+                                sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.delete_server_err", &[("error", &format!("{e}"))])),
                             )
                         }
                     };
@@ -3116,7 +3105,7 @@ pub(crate) fn execute(
                         Ok(_) => Ok(()),
                         Err(e) => {
                             Err(
-                                sanitize_user_error(&format!("couldn't toggle tool: {e}")),
+                                sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.toggle_tool_err", &[("error", &format!("{e}"))])),
                             )
                         }
                     };
@@ -3151,7 +3140,7 @@ pub(crate) fn execute(
                                 let msg = err
                                     .as_str()
                                     .map(String::from)
-                                    .unwrap_or_else(|| "unknown error".to_string());
+                                    .unwrap_or_else(|| xai_grok_i18n::t("error.unknown").to_string());
                                 return TaskResult::ShareSessionFailed {
                                     agent_id,
                                     error: msg,
@@ -3170,7 +3159,7 @@ pub(crate) fn execute(
                                 Err(_) => {
                                     TaskResult::ShareSessionFailed {
                                         agent_id,
-                                        error: "couldn't share session".to_string(),
+                                        error: xai_grok_i18n::t("error.effects.share_session").to_string(),
                                     }
                                 }
                             }
@@ -3179,7 +3168,7 @@ pub(crate) fn execute(
                             TaskResult::ShareSessionFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    &format!("couldn't share session: {e}"),
+                                    &xai_grok_i18n::t_fmt("error.effects.share_session_err", &[("error", &format!("{e}"))]),
                                 ),
                             }
                         }
@@ -3367,7 +3356,7 @@ pub(crate) fn execute(
                                 source,
                                 session_id,
                                 error: sanitize_user_error(
-                                    &format!("couldn't delete session: {e}"),
+                                    &xai_grok_i18n::t_fmt("error.effects.delete_session_err", &[("error", &format!("{e}"))]),
                                 ),
                             }
                         }
@@ -3527,8 +3516,7 @@ pub(crate) fn execute(
                             return TaskResult::FeedbackFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    &format!(
-                                "couldn't serialize feedback: {e}"
+                                    &xai_grok_i18n::t_fmt("error.effects.serialize_feedback_err", &[("error", &format!("{e}"))]),
                             ),
                                 ),
                             };
@@ -3548,7 +3536,7 @@ pub(crate) fn execute(
                             TaskResult::FeedbackFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    &format!("couldn't send feedback: {e}"),
+                                    &xai_grok_i18n::t_fmt("error.effects.send_feedback_err", &[("error", &format!("{e}"))]),
                                 ),
                             }
                         }
@@ -3655,7 +3643,7 @@ pub(crate) fn execute(
                                 .get("result")
                                 .and_then(|r| r.get("answer"))
                                 .and_then(|a| a.as_str())
-                                .unwrap_or("No response")
+                                .unwrap_or(xai_grok_i18n::t("error.effects.no_response"))
                                 .to_string();
                             TaskResult::BtwResponse {
                                 agent_id,
@@ -3700,7 +3688,7 @@ pub(crate) fn execute(
                             TaskResult::RecapRequested {
                                 session_id,
                                 auto,
-                                error: Some(format!("recap request failed: {e}")),
+                                error: Some(xai_grok_i18n::t_fmt("error.effects.recap_request_err", &[("error", &format!("{e}"))])),
                             }
                         }
                     }
@@ -3738,7 +3726,7 @@ pub(crate) fn execute(
                             TaskResult::InterjectFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    &format!("couldn't send interjection: {e}"),
+                                    &xai_grok_i18n::t_fmt("error.effects.send_interjection_err", &[("error", &format!("{e}"))]),
                                 ),
                                 text,
                                 blocks,
@@ -3768,7 +3756,7 @@ pub(crate) fn execute(
                                 let msg = err
                                     .as_str()
                                     .map(String::from)
-                                    .unwrap_or_else(|| "unknown error".to_string());
+                                    .unwrap_or_else(|| xai_grok_i18n::t("error.unknown").to_string());
                                 return TaskResult::CatalogEntryFailed {
                                     error: msg,
                                 };
@@ -3787,7 +3775,7 @@ pub(crate) fn execute(
                                 Err(e) => {
                                     tracing::debug!("failed to parse catalog entry response: {e}");
                                     TaskResult::CatalogEntryFailed {
-                                        error: "couldn't load entry".to_string(),
+                                        error: xai_grok_i18n::t("error.effects.load_entry").to_string(),
                                     }
                                 }
                             }
@@ -3795,7 +3783,7 @@ pub(crate) fn execute(
                         Err(e) => {
                             TaskResult::CatalogEntryFailed {
                                 error: sanitize_user_error(
-                                    &format!("couldn't load entry: {e}"),
+                                    &xai_grok_i18n::t_fmt("error.effects.load_entry_err", &[("error", &format!("{e}"))]),
                                 ),
                             }
                         }
@@ -3822,7 +3810,7 @@ pub(crate) fn execute(
                                 let msg = err
                                     .as_str()
                                     .map(String::from)
-                                    .unwrap_or_else(|| "unknown error".to_string());
+                                    .unwrap_or_else(|| xai_grok_i18n::t("error.unknown").to_string());
                                 return TaskResult::BundleStatusFailed {
                                     error: msg,
                                 };
@@ -3845,7 +3833,7 @@ pub(crate) fn execute(
                                 }
                                 Err(_) => {
                                     TaskResult::BundleStatusFailed {
-                                        error: "couldn't fetch bundle status".to_string(),
+                                        error: xai_grok_i18n::t("error.effects.fetch_bundle_status").to_string(),
                                     }
                                 }
                             }
@@ -3853,7 +3841,10 @@ pub(crate) fn execute(
                         Err(e) => {
                             TaskResult::BundleStatusFailed {
                                 error: sanitize_user_error(
-                                    &format!("couldn't fetch bundle status: {e}"),
+                                    &xai_grok_i18n::t_fmt(
+                                        "error.effects.fetch_bundle_status_err",
+                                        &[("error", &format!("{e}"))],
+                                    ),
                                 ),
                             }
                         }
@@ -3923,7 +3914,7 @@ pub(crate) fn execute(
                             {
                                 return TaskResult::RewindPointsFailed {
                                     agent_id,
-                                    error: err.as_str().unwrap_or("unknown error").to_string(),
+                                    error: err.as_str().unwrap_or(xai_grok_i18n::t("error.unknown")).to_string(),
                                 };
                             }
                             let result_val = wrapper

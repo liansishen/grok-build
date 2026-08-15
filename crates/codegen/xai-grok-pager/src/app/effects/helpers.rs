@@ -111,10 +111,11 @@ pub(super) async fn fetch_plugin_cta_mcps(
                 crate::views::mcps_modal::McpsListResponse,
             >(inner.clone())
                 .map(crate::views::mcps_modal::convert_list_response)
-                .map_err(|_| "couldn't load server list".to_string())
+                .map_err(|_| xai_grok_i18n::t("error.effects.load_server_list").to_string())
         }
-        Err(e) => Err(sanitize_user_error(&format!(
-            "couldn't load server list: {e}"
+        Err(e) => Err(sanitize_user_error(&xai_grok_i18n::t_fmt(
+            "error.effects.load_server_list_err",
+            &[("error", &format!("{e}"))],
         ))),
     };
     TaskResult::PluginCtaMcpsLoaded {

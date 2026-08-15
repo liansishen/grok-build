@@ -457,10 +457,17 @@ fn expired_task_notice(info: &crate::app::agent::ScheduledTaskInfo) -> String {
     if head.len() < first_line.len() {
         head.push('\u{2026}');
     }
-    format!(
-        "Scheduled task expired: \"{head}\" ({}). Recurring tasks auto-expire after {} days; re-create it if still needed.",
-        info.human_schedule,
-        xai_grok_tools::implementations::grok_build::scheduler::types::RECURRING_TASK_TTL_DAYS,
+    xai_grok_i18n::t_fmt(
+        "tasks.expired_notice",
+        &[
+            ("head", &head),
+            ("schedule", &info.human_schedule),
+            (
+                "days",
+                &xai_grok_tools::implementations::grok_build::scheduler::types::RECURRING_TASK_TTL_DAYS
+                    .to_string(),
+            ),
+        ],
     )
 }
 

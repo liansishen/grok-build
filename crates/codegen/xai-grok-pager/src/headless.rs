@@ -215,7 +215,7 @@ impl HeadlessEmitter {
         Some(
             self.structured_output
                 .clone()
-                .unwrap_or_else(|| Err("model did not produce structured output".to_string())),
+                .unwrap_or_else(|| Err(xai_grok_i18n::t("cli.headless.no_structured_output").to_string())),
         )
     }
 
@@ -275,7 +275,7 @@ impl HeadlessEmitter {
         let result = self
             .structured_output
             .clone()
-            .unwrap_or_else(|| Err("model did not produce structured output".to_string()));
+            .unwrap_or_else(|| Err(xai_grok_i18n::t("cli.headless.no_structured_output").to_string()));
         crate::headless::reducer::attach_structured_output(target, Some(result));
     }
 
@@ -341,7 +341,7 @@ impl HeadlessEmitter {
     /// Emit the max turns marker for the active format.
     fn on_max_turns(&mut self) {
         match self.format {
-            OutputFormat::Plain => eprintln!("Max turns reached"),
+            OutputFormat::Plain => eprintln!("{}", xai_grok_i18n::t("cli.headless.max_turns_reached")),
             // Conveyed by `stopReason` in the terminal JSON and result.
             OutputFormat::Json => {}
             OutputFormat::StreamingJson | OutputFormat::StreamingMessagesJson => {
@@ -444,15 +444,9 @@ fn auto_respond_to_permissions(
 /// "Not signed in" error message, tailored to the session type.
 fn auth_required_message(interactive: bool) -> String {
     if interactive {
-        "Not signed in. Run `grok login` to authenticate \
-         (or `grok login --device-code` if no browser is available)."
-            .to_string()
+        xai_grok_i18n::t("cli.headless.auth_required_interactive").to_string()
     } else {
-        "Not signed in. To authenticate without a browser, run:\n  \
-         grok login --device-code\n\n\
-         Alternatively, set the XAI_API_KEY environment variable \
-         or run `grok login` on a machine with a browser."
-            .to_string()
+        xai_grok_i18n::t("cli.headless.auth_required_non_interactive").to_string()
     }
 }
 
@@ -556,7 +550,7 @@ async fn open_session(
                 cwd: cwd.to_path_buf(),
             });
         }
-        anyhow::bail!("Session does not exist");
+        anyhow::bail!(xai_grok_i18n::t("cli.headless.session_not_exists"));
     }
 
     let new_resp: acp::NewSessionResponse = acp_send(
@@ -645,14 +639,14 @@ async fn fork_then_open(
         fork_model.as_deref(),
     );
     let fork_params = serde_json::value::to_raw_value(&payload)
-        .map_err(|e| anyhow::anyhow!("serialize fork params: {e}"))?;
+        .map_err(|e| anyhow::anyhow!(xai_grok_i18n::t_fmt("cli.headless.fork_serialize_failed", &[("error", &format!("{e}"))])))?;
     let req = acp::ExtRequest::new("x.ai/session/fork", fork_params.into());
     let resp = acp_send(req, acp_tx).await?;
     if let Some(err) = fork_response_error(resp.0.get()) {
-        anyhow::bail!("fork failed: {err}");
+        anyhow::bail!(xai_grok_i18n::t_fmt("cli.headless.fork_failed", &[("error", &format!("{err}"))]));
     }
     let child = fork_response_new_session_id(resp.0.get())
-        .ok_or_else(|| anyhow::anyhow!("fork response missing newSessionId"))?;
+        .ok_or_else(|| anyhow::anyhow!(xai_grok_i18n::t("cli.headless.fork_missing_session_id")))?;
     match open_session(acp_tx, &write_cwd, Some(&child), restore_code).await {
         Ok(opened) => Ok(opened),
         Err(e) => Err(anyhow::anyhow!(
@@ -680,7 +674,7 @@ async fn apply_headless_model_and_effort(
             .unwrap_or_else(|| acp::ModelId::new(name))
     } else {
         models.current.clone().ok_or_else(|| {
-            anyhow::anyhow!("--effort/--reasoning-effort: no active model to apply effort to")
+            anyhow::anyhow!(xai_grok_i18n::t("cli.headless.effort_no_active_model"))
         })?
     };
 
@@ -689,10 +683,10 @@ async fn apply_headless_model_and_effort(
         // Pre-catalog: canonical tokens are already stamped; remapped menu ids can't resolve yet.
         Some(token) if models.available.is_empty() => {
             if parse_canonical_effort_token(token).is_none() {
-                anyhow::bail!(
-                    "--effort/--reasoning-effort: unknown effort level '{token}' \
-                     (model catalog unavailable; remapped menu ids require a loaded catalog)"
-                );
+                anyhow::bail!(xai_grok_i18n::t_fmt(
+                    "cli.headless.effort_unknown_level",
+                    &[("token", token)]
+                ));
             }
             None
         }
@@ -706,7 +700,12 @@ async fn apply_headless_model_and_effort(
                 );
                 None
             }
-            Err(err) => anyhow::bail!("--effort/--reasoning-effort: {}", err.message()),
+            Err(err) => {
+                anyhow::bail!(xai_grok_i18n::t_fmt(
+                    "cli.headless.effort_error",
+                    &[("error", &err.message())]
+                ))
+            }
         },
     };
 
@@ -730,13 +729,12 @@ async fn apply_headless_model_and_effort(
     .await
     .map_err(|e| {
         if let Some(name) = model_name {
-            anyhow::anyhow!(
-                "Couldn't set model '{}': {}. Run 'grok models' to see available models.",
-                name,
-                e
-            )
+            anyhow::anyhow!(xai_grok_i18n::t_fmt(
+                "cli.headless.couldnt_set_model",
+                &[("model", &format!("{name}")), ("error", &format!("{e}"))]
+            ))
         } else {
-            anyhow::anyhow!("Couldn't apply reasoning effort: {e}")
+            anyhow::anyhow!(xai_grok_i18n::t_fmt("cli.headless.apply_effort_failed", &[("error", &format!("{e}"))]))
         }
     })?;
     tracing::debug!(
@@ -788,16 +786,24 @@ pub async fn run_single_turn(
     if options.include_partial_messages
         && options.output_format != OutputFormat::StreamingMessagesJson
     {
-        eprintln!(
-            "warning: --include-partial-messages only affects --output-format streaming-messages-json; ignoring it"
-        );
+        eprintln!("{}", xai_grok_i18n::t("cli.headless.include_partial_warning"));
     }
 
     let t_spawn = Instant::now();
     let raw_config = xai_grok_shell::config::load_effective_config()
-        .map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
+        .map_err(|e| {
+            anyhow::anyhow!(xai_grok_i18n::t_fmt(
+                "cli.config.load_failed",
+                &[("error", &format!("{e}"))]
+            ))
+        })?;
     let mut agent_config = AgentConfig::new_from_toml_cfg(&raw_config)
-        .map_err(|e| anyhow::anyhow!("Failed to create agent config: {e}"))?;
+        .map_err(|e| {
+            anyhow::anyhow!(xai_grok_i18n::t_fmt(
+                "cli.config.agent_create_failed",
+                &[("error", &format!("{e}"))]
+            ))
+        })?;
 
     // Canonical-only early stamp; remaps need the post-session catalog resolve below.
     if let Some(ref token) = options.reasoning_effort
@@ -848,7 +854,12 @@ pub async fn run_single_turn(
             .as_deref()
             .map(|s| {
                 serde_json::from_value(serde_json::Value::String(s.to_string()))
-                    .map_err(|e| anyhow::anyhow!("--permission-mode: invalid value: {e}"))
+                    .map_err(|e| {
+                        anyhow::anyhow!(xai_grok_i18n::t_fmt(
+                            "cli.headless.permission_mode_invalid",
+                            &[("error", &format!("{e}"))]
+                        ))
+                    })
             })
             .transpose()?,
     };
@@ -874,7 +885,7 @@ pub async fn run_single_turn(
         Ok(s) => s,
         Err(e) => {
             report_startup_failure(&timer);
-            let msg = format!("Couldn't start session: {e}");
+            let msg = xai_grok_i18n::t_fmt("cli.headless.start_session_failed", &[("error", &format!("{e}"))]);
             emitter.on_error(&msg, None);
             anyhow::bail!("{msg}");
         }
@@ -898,7 +909,7 @@ pub async fn run_single_turn(
         Ok(r) => r,
         Err(e) => {
             report_startup_failure(&timer);
-            let msg = format!("Couldn't initialize: {e}");
+            let msg = xai_grok_i18n::t_fmt("cli.headless.initialize_failed", &[("error", &format!("{e}"))]);
             emitter.on_error(&msg, None);
             anyhow::bail!("{msg}");
         }
@@ -1016,7 +1027,7 @@ pub async fn run_single_turn(
         Ok(v) => v,
         Err(e) => {
             PendingStartup::finish_held(&mut pending_startup, crate::acp::StartupOutcome::Error);
-            let msg = format!("Couldn't create session: {e}");
+            let msg = xai_grok_i18n::t_fmt("cli.headless.create_session_failed", &[("error", &format!("{e}"))]);
             emitter.on_error(&msg, None);
             anyhow::bail!("{msg}");
         }
@@ -1198,7 +1209,7 @@ pub async fn run_single_turn(
             biased;
             msg = acp_rx.recv() => {
                 let Some(msg) = msg else {
-                    emitter.on_error("Connection closed unexpectedly", None);
+                    emitter.on_error(xai_grok_i18n::t("cli.headless.connection_closed_unexpectedly"), None);
                     connection_closed = true;
                     break;
                 };
@@ -1276,7 +1287,7 @@ pub async fn run_single_turn(
     }
     // A mid-turn ACP close already reaped above; return that error before the normal outcome.
     if connection_closed {
-        anyhow::bail!("Connection closed unexpectedly");
+        anyhow::bail!(xai_grok_i18n::t("cli.headless.connection_closed_unexpectedly"));
     }
     let outcome: Result<()> = match prompt_result {
         Some(Ok(resp)) => {
@@ -1315,7 +1326,7 @@ pub async fn run_single_turn(
             if is_max_turns {
                 emitter.on_max_turns();
                 emitter.on_end(&stop_reason, sid, rid);
-                Err(anyhow::anyhow!("max turns reached"))
+                Err(anyhow::anyhow!(xai_grok_i18n::t("cli.headless.max_turns_reached_short")))
             } else {
                 emitter.on_end(&stop_reason, sid, rid);
                 Ok(())

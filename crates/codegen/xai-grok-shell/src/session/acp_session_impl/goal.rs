@@ -412,7 +412,10 @@ impl SessionActor {
         self.events
             .emit(crate::session::events::Event::GoalClassifierCapReached { attempt });
         let msg = format_goal_pause_message(
-            &format!("Goal classifier rejected completion {attempt} times — goal auto-paused."),
+            &xai_grok_i18n::t_fmt(
+                "goal.pause.classifier_cap",
+                &[("attempt", &format!("{attempt}"))],
+            ),
             pause_summary,
             details_path,
         );
@@ -425,8 +428,7 @@ impl SessionActor {
 
     async fn auto_pause_for_classifier_stall(&self, details_path: &str, pause_summary: &str) {
         let msg = format_goal_pause_message(
-            "Goal verification flagged the same gaps with no progress across \
-             consecutive attempts — goal auto-paused.",
+            xai_grok_i18n::t("goal.pause.no_progress"),
             pause_summary,
             details_path,
         );

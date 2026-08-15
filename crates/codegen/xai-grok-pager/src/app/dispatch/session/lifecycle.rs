@@ -336,9 +336,11 @@ fn apply_welcome_workspace_on_new_session(app: &mut AppView) -> Result<(), Vec<E
         }
         Err(err) => {
             tracing::warn!("welcome workspace mode: {err}");
-            app.show_toast(&format!(
-                "Local workspace unavailable ({err}); using sandbox"
-            ));
+            let msg = xai_grok_i18n::t_fmt(
+                "welcome.local_workspace_unavailable",
+                &[("error", &format!("{err}"))],
+            );
+            app.show_toast(&msg);
             app.welcome_session_local_workspace = Some(None);
             app.welcome_workspace_mode = WelcomeWorkspaceMode::Sandbox;
             Ok(())

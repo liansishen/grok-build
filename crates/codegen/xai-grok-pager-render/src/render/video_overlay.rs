@@ -55,9 +55,12 @@ pub fn render_video_overlay(
             " {} ({}\u{00d7}{}) ",
             name, viewer.video_width, viewer.video_height
         ),
-        None => format!(
-            " Video ({}\u{00d7}{}) ",
-            viewer.video_width, viewer.video_height
+        None => xai_grok_i18n::t_fmt(
+            "media.video_dimensions",
+            &[
+                ("w", &viewer.video_width.to_string()),
+                ("h", &viewer.video_height.to_string()),
+            ],
         ),
     };
     let title_style = Style::default()
