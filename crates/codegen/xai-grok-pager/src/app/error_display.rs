@@ -120,9 +120,9 @@ pub(crate) fn format_request_failure(
 struct Classified {
     headline: String,
     /// What the user can do. Omitted when we have no real next step.
-    action: Option<String>,
+    action: Option<&'static str>,
     /// Used only when the server body added nothing.
-    default_why: Option<String>,
+    default_why: Option<&'static str>,
 }
 
 fn classify(status: Option<u16>, wire: WireErrorType) -> Classified {
