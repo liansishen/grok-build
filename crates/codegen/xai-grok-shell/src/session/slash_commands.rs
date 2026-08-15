@@ -552,6 +552,19 @@ static RESERVED_SLASH_NAMES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| 
 fn slash_key(name: &str) -> String {
     name.to_lowercase()
 }
+/// Localized description for a built-in slash command
+/// (`slash.builtin.<name>.description`), falling back to the English
+/// literal in the table (default locale keeps the fallback text).
+fn builtin_description(builtin: &BuiltinCommand) -> &'static str {
+    let key = xai_grok_i18n::intern_key(&format!("slash.builtin.{}.description", builtin.name));
+    xai_grok_i18n::t_or(key, builtin.description)
+}
+/// Localized argument hint (`slash.builtin.<name>.hint`). Callers must
+/// only invoke this when `argument_hint` is `Some`.
+fn builtin_hint(builtin: &BuiltinCommand) -> &'static str {
+    let key = xai_grok_i18n::intern_key(&format!("slash.builtin.{}.hint", builtin.name));
+    xai_grok_i18n::t_or(key, builtin.argument_hint.unwrap_or_default())
+}
 pub(crate) fn is_reserved_slash_name(name: &str) -> bool {
     RESERVED_SLASH_NAMES.contains(slash_key(name).as_str())
 }
@@ -690,13 +703,15 @@ pub(super) fn available_commands(
     let mut commands =
         Vec::with_capacity(catalog.builtins.len() + catalog.skills.len() + catalog.workflows.len());
     commands.extend(catalog.builtins.iter().map(|builtin| {
-        acp::AvailableCommand::new(builtin.name.to_string(), builtin.description.to_string()).input(
-            builtin.argument_hint.map(|hint| {
-                acp::AvailableCommandInput::Unstructured(acp::UnstructuredCommandInput::new(
-                    hint.to_string(),
-                ))
-            }),
+        acp::AvailableCommand::new(
+            builtin.name.to_string(),
+            builtin_description(builtin).to_string(),
         )
+        .input(builtin.argument_hint.map(|_| {
+            acp::AvailableCommandInput::Unstructured(acp::UnstructuredCommandInput::new(
+                builtin_hint(builtin).to_string(),
+            ))
+        }))
     }));
     commands.extend(catalog.skills.iter().map(|command| {
         let skill = command.skill;
@@ -745,7 +760,11 @@ pub(super) fn available_commands(
         .cloned();
         acp::AvailableCommand::new(
             workflow.name.clone(),
-            format!("Workflow: {}", workflow.description),
+            format!(
+                "{}{}",
+                xai_grok_i18n::t("slash.workflow_prefix"),
+                workflow.description
+            ),
         )
         .input(Some(acp::AvailableCommandInput::Unstructured(
             acp::UnstructuredCommandInput::new("<args>".to_string()),
@@ -769,13 +788,12 @@ pub(crate) fn builtin_commands(availability: CommandAvailability) -> Vec<acp::Av
         .iter()
         .filter(|cmd| availability.allows(cmd.gate))
         .map(|cmd| {
-            acp::AvailableCommand::new(cmd.name.to_string(), cmd.description.to_string()).input(
-                cmd.argument_hint.map(|hint| {
+            acp::AvailableCommand::new(cmd.name.to_string(), builtin_description(cmd).to_string())
+                .input(cmd.argument_hint.map(|_| {
                     acp::AvailableCommandInput::Unstructured(acp::UnstructuredCommandInput::new(
-                        hint.to_string(),
+                        builtin_hint(cmd).to_string(),
                     ))
-                }),
-            )
+                }))
         })
         .collect()
 }
