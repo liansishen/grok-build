@@ -26,10 +26,6 @@ pub(crate) fn feedback_question_label() -> &'static str {
     t("feedback.question_label")
 }
 
-/// Shared by the pane guard and the send path so both say the same thing.
-fn no_session_notice() -> &'static str {
-    t("toast.no_active_session")
-}
 
 /// Minimal mode has no toast surface, so the notice goes to the transcript instead.
 fn feedback_notice(app: &mut AppView, message: &str) {
@@ -375,7 +371,9 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
             return vec![];
         };
 
-        agent.prompt.set_text("");
+        // Composer clearing belongs to the submit funnel: `dispatch_send_prompt_inner` clears it
+        // when `consume_input` is set, so draft-preserving callers (palette, edited
+        // queue row) keep theirs.
         let minimal_request_id = if minimal {
             Some(crate::minimal_api::start_minimal_btw(
                 agent,

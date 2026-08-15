@@ -43,6 +43,8 @@ enum SessionsCommand {
 }
 
 pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
+    xai_grok_shell::config::apply_session_search_gate(agent_config);
+
     // Best-effort only. Do not force an interactive public login for enterprise
     // deployments that only configure a deployment_key + custom xai_api_base_url.
     // If the user has previously run the interactive `grok` TUI (which succeeds
@@ -116,6 +118,11 @@ pub async fn run(args: SessionsArgs, agent_config: &AgentConfig) -> Result<()> {
             });
 
             let resp = local_resp?;
+            if let Some(by) = xai_grok_shell::config::session_search_turned_off_by() {
+                eprintln!(
+                    "warning: local session search is off ({by}); local sessions were not searched."
+                );
+            }
             let local_ids: HashSet<&str> =
                 resp.results.iter().map(|r| r.session_id.as_str()).collect();
 

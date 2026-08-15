@@ -1034,6 +1034,12 @@ impl AgentView {
                     .is_some_and(|pav| pav.focus == PlanApprovalFocus::Commenting)
             {
                 Some(xai_grok_i18n::t("prompt.placeholder.comment"))
+            } else if self
+                .plan_approval_view
+                .as_ref()
+                .is_some_and(|pav| pav.focus == PlanApprovalFocus::Prompt)
+            {
+                Some(xai_grok_i18n::t("prompt.placeholder.revision_notes"))
             } else {
                 None
             },

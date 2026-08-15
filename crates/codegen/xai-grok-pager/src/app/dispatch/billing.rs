@@ -293,6 +293,7 @@ fn open_supergrok_upsell(
         auth_method,
     });
 
+    // /supergrok lists all plans; every upgrade option lands there.
     let options = vec![
         QuestionOption {
             label: t("billing.upgrade_supergrok").into(),
@@ -301,11 +302,15 @@ fn open_supergrok_upsell(
             id: Some(UPSELL_URL_UPGRADE.into()),
         },
         QuestionOption {
+            label: t("billing.upgrade_supergrok_plus").into(),
+            description: t("billing.upgrade_supergrok_plus_desc").into(),
+            preview: None,
+            id: Some(UPSELL_URL_UPGRADE.into()),
+        },
+        QuestionOption {
             label: t("billing.upgrade_supergrok_heavy").into(),
             description: t("billing.upgrade_supergrok_heavy_desc").into(),
             preview: None,
-            // No Heavy-specific URL exists; the /supergrok page lists
-            // both plans, so both upgrade options land there.
             id: Some(UPSELL_URL_UPGRADE.into()),
         },
     ];

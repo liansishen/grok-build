@@ -28,8 +28,8 @@ pub use self::error::{
 };
 pub use self::pricing::{CostSource, ModelPricing, USD_TICKS_PER_USD as PRICING_USD_TICKS_PER_USD};
 pub use self::tool_overrides::{
-    ClearableField, SearchDateBound, SearchDateBoundError, ToolOverrides, ToolOverridesUpdate,
-    WebSearchOptions, XSearchOptions,
+    ClearableField, MAX_WEB_SEARCH_DOMAINS, SearchDateBound, SearchDateBoundError, ToolOverrides,
+    ToolOverridesUpdate, WebSearchOptions, WebSearchOptionsError, XSearchOptions,
 };
 pub use self::types::*;
 

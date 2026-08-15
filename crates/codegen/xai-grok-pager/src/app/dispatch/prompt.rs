@@ -26,6 +26,8 @@ use crate::slash::command::DoctorRequest;
 use agent_client_protocol as acp;
 use xai_grok_telemetry::session_ctx::log_event;
 
+/// Shared by every submit guard that refuses while the session reconnects.
+
 /// Chat kind for the next create: CLI `--chat` (`app.chat_mode`) or one-shot
 /// `/chat` (`deferred_startup.pending_chat`, consumed here).
 pub(super) fn consume_chat_kind(app: &mut AppView) -> bool {
@@ -600,6 +602,9 @@ pub(super) fn dispatch_send_prompt_inner(
                     // filtered out of every completion surface, but it stays
                     // resolvable so a fully-typed invocation earns a hint that
                     // names the way out instead of leaking to the model.
+                    // A refusal added here must also extend the pre-check in `EditedCommandGate`
+                    // (`dispatch::queue`): that caller has to know the command will be refused
+                    // before it drops the queued row the text came from.
                     if let Some(refusal) = command
                         .mode_support()
                         .refusal(invocation.token, ctx.screen_mode)
@@ -872,7 +877,10 @@ pub(super) fn dispatch_send_prompt_inner(
                 Some(&sid_str),
                 Some(serde_json::json!({ "kind": "prompt", "len": text.len() })),
             );
-            if queued_while_running && !parked_sendable_wait {
+            if queued_while_running
+                && !parked_sendable_wait
+                && !crate::appearance::cache::load_follow_up_steer()
+            {
                 maybe_show_send_now_tip(app);
             }
             return vec![Effect::SendPrompt {
