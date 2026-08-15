@@ -108,7 +108,7 @@ pub(crate) fn format_request_failure(
     let class = classify(status, wire);
     let why = extracted
         .filter(|d| !is_server_fault(status, wire) && !is_headline_echo(d, &class.headline))
-        .or(class.default_why);
+        .or_else(|| class.default_why.map(str::to_string));
     let detail = compose_detail(why.as_deref(), class.action.as_deref());
     FormattedRequestFailure {
         status,
