@@ -518,8 +518,10 @@ pub(crate) fn execute(
                             TaskResult::WorktreeSessionFailed {
                                 agent_id,
                                 error: sanitize_user_error(
-                                    &xai_grok_i18n::t_fmt("error.effects.create_session_worktree_err", &[("error", &format!("{e}"))]),
-                        ),
+                                    &xai_grok_i18n::t_fmt(
+                                        "error.effects.create_session_worktree_err",
+                                        &[("error", &format!("{e}"))],
+                                    ),
                                 ),
                             }
                         }
@@ -2202,12 +2204,10 @@ pub(crate) fn execute(
                                 .map_err(|_| xai_grok_i18n::t("error.effects.load_server_list").to_string())
                         }
                         Err(e) => {
-                            Err(
-                                sanitize_user_error(
-                                    &xai_grok_i18n::t_fmt("error.effects.load_server_list_err", &[("error", &format!("{e}"))]),
-                    ),
-                                ),
-                            )
+                            Err(sanitize_user_error(&xai_grok_i18n::t_fmt(
+                                "error.effects.load_server_list_err",
+                                &[("error", &format!("{e}"))],
+                            )))
                         }
                     };
                     TaskResult::McpsListLoaded {
@@ -2429,12 +2429,10 @@ pub(crate) fn execute(
                                 .map_err(|_| xai_grok_i18n::t("error.effects.complete_hooks_action").to_string())
                         }
                         Err(e) => {
-                            Err(
-                                sanitize_user_error(
-                                    &xai_grok_i18n::t_fmt("error.effects.complete_hooks_action_err", &[("error", &format!("{e}"))]),
-                    ),
-                                ),
-                            )
+                            Err(sanitize_user_error(&xai_grok_i18n::t_fmt(
+                                "error.effects.complete_hooks_action_err",
+                                &[("error", &format!("{e}"))],
+                            )))
                         }
                     };
                     TaskResult::HooksActionResult {
@@ -2473,7 +2471,6 @@ pub(crate) fn execute(
                             Err(
                                 sanitize_user_error(
                                     &xai_grok_i18n::t_fmt("error.effects.complete_plugins_action_err", &[("error", &format!("{e}"))]),
-                    ),
                                 ),
                             )
                         }
@@ -2513,7 +2510,6 @@ pub(crate) fn execute(
                             Err(
                                 sanitize_user_error(
                                     &xai_grok_i18n::t_fmt("error.effects.load_marketplace_err", &[("error", &format!("{e}"))]),
-                    ),
                                 ),
                             )
                         }
@@ -2553,7 +2549,6 @@ pub(crate) fn execute(
                             Err(
                                 sanitize_user_error(
                                     &xai_grok_i18n::t_fmt("error.effects.load_marketplace_err", &[("error", &format!("{e}"))]),
-                    ),
                                 ),
                             )
                         }
@@ -2632,7 +2627,6 @@ pub(crate) fn execute(
                             Err(
                                 sanitize_user_error(
                                     &xai_grok_i18n::t_fmt("error.effects.load_workflows_err", &[("error", &format!("{e}"))]),
-                    ),
                                 ),
                             )
                         }
@@ -2841,7 +2835,6 @@ pub(crate) fn execute(
                             Err(
                                 sanitize_user_error(
                                     &xai_grok_i18n::t_fmt("error.effects.complete_marketplace_action_err", &[("error", &format!("{e}"))]),
-                    ),
                                 ),
                             )
                         }
@@ -2899,7 +2892,6 @@ pub(crate) fn execute(
                             Err(
                                 sanitize_user_error(
                                     &xai_grok_i18n::t_fmt("error.effects.complete_marketplace_action_err", &[("error", &format!("{e}"))]),
-                    ),
                                 ),
                             )
                         }
@@ -2941,7 +2933,6 @@ pub(crate) fn execute(
                             Err(
                                 sanitize_user_error(
                                     &xai_grok_i18n::t_fmt("error.effects.complete_plugins_action_err", &[("error", &format!("{e}"))]),
-                    ),
                                 ),
                             )
                         }
@@ -3009,7 +3000,6 @@ pub(crate) fn execute(
                             Err(
                                 sanitize_user_error(
                                     &xai_grok_i18n::t_fmt("error.effects.save_server_config_err", &[("error", &format!("{e}"))]),
-                    ),
                                 ),
                             )
                         }
@@ -3515,10 +3505,10 @@ pub(crate) fn execute(
                         Err(e) => {
                             return TaskResult::FeedbackFailed {
                                 agent_id,
-                                error: sanitize_user_error(
-                                    &xai_grok_i18n::t_fmt("error.effects.serialize_feedback_err", &[("error", &format!("{e}"))]),
-                            ),
-                                ),
+                                error: sanitize_user_error(&xai_grok_i18n::t_fmt(
+                                    "error.effects.serialize_feedback_err",
+                                    &[("error", &format!("{e}"))],
+                                )),
                             };
                         }
                     };
