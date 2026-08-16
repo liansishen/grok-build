@@ -252,9 +252,18 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
                     // a live one would otherwise drop the context bar below the
                     // real usage. The dedup already drops the render; the
                     // token/timing state must respect it too.
+                    let mut usage_snapshot_changed = false;
                     if !dedup_drop {
                         if let Some(tokens) = meta.total_tokens {
                             confirm_context_used(agent, tokens);
+                        }
+                        // Live per-request usage: the shell stamps the session
+                        // ledger projection on every update, so the usage bar
+                        // reflects each accounted request immediately instead
+                        // of waiting for the next session/usage RPC.
+                        if let Some(usage) = meta.session_usage_view.take() {
+                            agent.session_usage_snapshot = Some(usage);
+                            usage_snapshot_changed = true;
                         }
                         if let Some(ts) = meta.turn_start_ms {
                             agent.turn_start_ms = Some(ts);
@@ -523,8 +532,10 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
                     }
 
                     // Mutation always happens; redraw only when the matched
-                    // agent is the visible one.
-                    mutated && is_active
+                    // agent is the visible one. A usage-view stamp alone
+                    // (e.g. a deduped chunk that still carries fresh usage)
+                    // also forces the redraw.
+                    (mutated || usage_snapshot_changed) && is_active
                 }
                 Some(SessionMatch::Child(parent_id)) => {
                     let is_active = is_matched_agent_active(app, parent_id);

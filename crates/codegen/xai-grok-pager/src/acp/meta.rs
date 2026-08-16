@@ -44,6 +44,11 @@ pub struct NotificationMeta {
     /// pager keeps a highwater and drops anything `<=` it. `None` when the agent
     /// didn't stamp an `eventId` (older shell) — such updates always apply.
     pub event_seq: Option<u64>,
+    /// Live session usage projection (`sessionUsageView`) stamped on every
+    /// update by the shell, so the usage bar refreshes as soon as each
+    /// request is accounted instead of waiting for the next `session/usage`
+    /// RPC. `None` before the first recorded call or on older shells.
+    pub session_usage_view: Option<xai_grok_shell::extensions::notification::PromptUsage>,
 }
 
 /// Serializable counterpart of the replay stamp the agent injects on
@@ -128,6 +133,14 @@ impl NotificationMeta {
             is_replay: m.get("isReplay").and_then(|v| v.as_bool()).unwrap_or(false),
             event_id,
             event_seq,
+            session_usage_view: m
+                .get("sessionUsageView")
+                .and_then(|v| {
+                    serde_json::from_value::<
+                        xai_grok_shell::extensions::notification::PromptUsage,
+                    >(v.clone())
+                    .ok()
+                }),
         }
     }
 }

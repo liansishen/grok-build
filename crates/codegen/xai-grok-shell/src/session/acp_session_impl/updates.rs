@@ -256,6 +256,20 @@ impl SessionActor {
                 "sessionUsage".to_string(),
                 serde_json::to_value(&ledger).unwrap_or(serde_json::Value::Null),
             );
+            // Live projection for the pager's usage bar: carried on every
+            // update so the displayed totals refresh as soon as a request
+            // is accounted, without waiting for a session/usage RPC.
+            if let Some(view) =
+                crate::extensions::notification::PromptUsage::project_from_ledger(
+                    Some(&ledger),
+                    ledger.incomplete,
+                )
+            {
+                obj.insert(
+                    "sessionUsageView".to_string(),
+                    serde_json::to_value(&view).unwrap_or(serde_json::Value::Null),
+                );
+            }
         }
         if let Some(pid) = self.current_prompt_id.lock().ok().and_then(|g| g.clone()) {
             obj.insert("promptId".to_string(), pid.into());
