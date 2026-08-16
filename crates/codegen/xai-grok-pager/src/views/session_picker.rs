@@ -789,7 +789,7 @@ pub(crate) fn build_session_entry_data(
                     && !recap.is_empty()
                 {
                     field_data.push((
-                        xai_grok_i18n::t("session_picker.field.recap"),
+                        xai_grok_i18n::t("session_picker.field.recap").to_string(),
                         truncate_str(recap, max_w),
                     ));
                 }
@@ -797,7 +797,7 @@ pub(crate) fn build_session_entry_data(
                     && !last_turn.is_empty()
                 {
                     field_data.push((
-                        xai_grok_i18n::t("session_picker.field.last_turn"),
+                        xai_grok_i18n::t("session_picker.field.last_turn").to_string(),
                         truncate_str(last_turn, max_w),
                     ));
                 }
