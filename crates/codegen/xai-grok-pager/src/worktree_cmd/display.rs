@@ -285,39 +285,149 @@ pub fn print_stats(stats: &DbStats, out: &mut impl Write) -> std::io::Result<()>
     )
 }
 
-/// Used by `mod` without a `Write` handle (stdout only).
-pub fn print_gc(report: &GcReport) {
-    println!("{}", t("cli.worktree.gc.title"));
-    println!(
+/// Print a `grok worktree gc` report. Named lines (the ones that exist) are
+/// localized; the layout matches upstream's English output for the en locale.
+pub fn print_gc(report: &GcReport, out: &mut impl Write) -> std::io::Result<()> {
+    writeln!(out, "{}", t("cli.worktree.gc.title"))?;
+    writeln!(
+        out,
         "{}",
         t_fmt(
             "cli.worktree.gc.dead_removed",
             &[("value", report.dead_removed.to_string().as_str())]
         )
-    );
-    println!(
+    )?;
+    writeln!(
+        out,
         "{}",
         t_fmt(
             "cli.worktree.gc.expired_removed",
             &[("value", report.expired_removed.to_string().as_str())]
         )
-    );
-    println!(
+    )?;
+    if report.no_repo_paths > 0 {
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.gc.no_repo_paths",
+                &[("value", report.no_repo_paths.to_string().as_str())]
+            )
+        )?;
+    }
+    writeln!(
+        out,
         "{}",
         t_fmt(
             "cli.worktree.gc.skipped_alive",
             &[("value", report.skipped_alive.to_string().as_str())]
         )
-    );
+    )?;
+    if report.never_expiring > 0 {
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.gc.never_expiring",
+                &[("value", report.never_expiring.to_string().as_str())]
+            )
+        )?;
+    }
+    if report.kept_unsafe > 0 {
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.gc.kept_unsafe",
+                &[("value", report.kept_unsafe.to_string().as_str())]
+            )
+        )?;
+        for (reason, count) in &report.kept_reasons {
+            writeln!(
+                out,
+                "{}",
+                t_fmt(
+                    "cli.worktree.gc.kept_reason",
+                    &[
+                        ("reason", reason.as_str()),
+                        ("value", count.to_string().as_str())
+                    ]
+                )
+            )?;
+        }
+        // Named, so `grok worktree rm <path>` needs no log reading. The
+        // remainder counts from the total: the report itself carries only the
+        // first hundred, and each keep is logged.
+        const MAX_KEPT_PRINTED: usize = 20;
+        let printed = report.kept.len().min(MAX_KEPT_PRINTED);
+        for kept in report.kept.iter().take(MAX_KEPT_PRINTED) {
+            writeln!(
+                out,
+                "{}",
+                t_fmt(
+                    "cli.worktree.gc.kept_item",
+                    &[
+                        ("path", kept.path.as_str()),
+                        ("reason", kept.reason.as_str())
+                    ]
+                )
+            )?;
+        }
+        let rest = usize::try_from(report.kept_unsafe)
+            .unwrap_or(usize::MAX)
+            .saturating_sub(printed);
+        if rest > 0 {
+            writeln!(
+                out,
+                "{}",
+                t_fmt(
+                    "cli.worktree.gc.kept_rest",
+                    &[("value", rest.to_string().as_str())]
+                )
+            )?;
+        }
+    }
+    if report.names_collected > 0 {
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.gc.names_collected",
+                &[("value", report.names_collected.to_string().as_str())]
+            )
+        )?;
+    }
+    if report.not_judged > 0 {
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.gc.not_judged",
+                &[("value", report.not_judged.to_string().as_str())]
+            )
+        )?;
+    }
+    if report.unnamed > 0 {
+        writeln!(
+            out,
+            "{}",
+            t_fmt(
+                "cli.worktree.gc.unnamed",
+                &[("value", report.unnamed.to_string().as_str())]
+            )
+        )?;
+    }
     if report.remove_failed > 0 {
-        println!(
+        writeln!(
+            out,
             "{}",
             t_fmt(
                 "cli.worktree.gc.remove_failed",
                 &[("value", report.remove_failed.to_string().as_str())]
             )
-        );
+        )?;
     }
+    Ok(())
 }
 
 pub fn print_rebuild(report: &RebuildReport, out: &mut impl Write) -> std::io::Result<()> {
