@@ -565,6 +565,15 @@ fn builtin_hint(builtin: &BuiltinCommand) -> &'static str {
     let key = xai_grok_i18n::intern_key(&format!("slash.builtin.{}.hint", builtin.name));
     xai_grok_i18n::t_or(key, builtin.argument_hint.unwrap_or_default())
 }
+
+/// Localized skill description (`slash.skill.<bare-name>.description`),
+/// falling back to the skill's own frontmatter text for skills without a
+/// catalog entry (user-installed skills, future builtins).
+fn localized_skill_description(skill: &SkillInfo) -> &'static str {
+    let key = xai_grok_i18n::intern_key(&format!("slash.skill.{}.description", skill.name));
+    let fallback = skill.short_description.as_deref().unwrap_or(&skill.description);
+    xai_grok_i18n::t_or(key, fallback)
+}
 pub(crate) fn is_reserved_slash_name(name: &str) -> bool {
     RESERVED_SLASH_NAMES.contains(slash_key(name).as_str())
 }
@@ -738,11 +747,7 @@ pub(super) fn available_commands(
         }
         acp::AvailableCommand::new(
             command.name.clone(),
-            skill
-                .short_description
-                .as_deref()
-                .unwrap_or(&skill.description)
-                .to_string(),
+            localized_skill_description(skill).to_string(),
         )
         .input(skill.argument_hint.as_ref().map(|hint| {
             acp::AvailableCommandInput::Unstructured(acp::UnstructuredCommandInput::new(
