@@ -9,9 +9,10 @@
 //! This module rewrites the JSON **before** typed deserialize so common
 //! drift is absorbed:
 //! - missing scalar defaults are filled
-//! - tools / output items that still cannot parse are dropped
+//! - required empty output-text collections are restored without dropping text
+//! - malformed unknown tools / output item types may be dropped
 //! - string-only maps coerce non-string values
-//! - unknown stream event `type`s are reported as skippable
+//! - unknown non-terminal stream event `type`s are reported as skippable
 
 use serde_json::{Map, Value};
 use xai_grok_sampling_types::rs;
@@ -80,6 +81,13 @@ pub(crate) enum LenientStreamEvent {
     Event(rs::ResponseStreamEvent),
     /// Unknown or unsalvageable frame; caller should skip without failing.
     Skip { reason: String },
+}
+
+fn is_terminal_stream_event_type(ty: &str) -> bool {
+    matches!(
+        ty,
+        "response.completed" | "response.incomplete" | "response.failed"
+    )
 }
 
 fn is_known_stream_event_type(ty: &str) -> bool {
@@ -194,6 +202,32 @@ fn filter_tools_array(tools: &mut Vec<Value>) {
     tools.retain(|t| serde_json::from_value::<rs::Tool>(t.clone()).is_ok());
 }
 
+fn sanitize_output_text_part(part: &mut Value) {
+    let Some(obj) = part.as_object_mut() else {
+        return;
+    };
+    if obj.get("type").and_then(Value::as_str) != Some("output_text") {
+        return;
+    }
+    match obj.get("text") {
+        Some(Value::String(_)) => {}
+        Some(Value::Null) | None => {
+            obj.insert("text".to_owned(), Value::String(String::new()));
+        }
+        Some(_) => {}
+    }
+    ensure_array(obj, "annotations");
+    if !obj.contains_key("logprobs") || obj.get("logprobs").is_some_and(Value::is_null) {
+        obj.insert("logprobs".to_owned(), Value::Null);
+    }
+}
+
+fn sanitize_message_content(parts: &mut [Value]) {
+    for part in parts {
+        sanitize_output_text_part(part);
+    }
+}
+
 /// Best-effort fix for a single `output` item; returns false when it must drop.
 fn sanitize_output_item(item: &mut Value) -> bool {
     if serde_json::from_value::<rs::OutputItem>(item.clone()).is_ok() {
@@ -213,11 +247,8 @@ fn sanitize_output_item(item: &mut Value) -> bool {
             ensure_string(obj, "role", "assistant");
             ensure_string(obj, "status", "completed");
             ensure_array(obj, "content");
-            // Drop content parts that cannot parse.
             if let Some(Value::Array(parts)) = obj.get_mut("content") {
-                parts.retain(|p| {
-                    serde_json::from_value::<rs::OutputMessageContent>(p.clone()).is_ok()
-                });
+                sanitize_message_content(parts);
             }
         }
         "function_call" => {
@@ -302,13 +333,20 @@ pub(crate) fn sanitize_response_object(value: &mut Value) {
     if let Some(Value::Array(output)) = obj.get_mut("output") {
         let mut kept = Vec::with_capacity(output.len());
         for mut item in output.drain(..) {
-            if sanitize_output_item(&mut item) {
+            let item_type = item
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_owned();
+            if sanitize_output_item(&mut item)
+                || matches!(item_type.as_str(), "message" | "function_call" | "reasoning")
+            {
                 kept.push(item);
             } else {
                 tracing::debug!(
                     target: "xai_grok_sampler::responses_lenient",
                     item = %item,
-                    "dropping unparseable Responses output item"
+                    "dropping unknown unparseable Responses output item"
                 );
             }
         }
@@ -410,23 +448,17 @@ fn sanitize_stream_event_fields(obj: &mut Map<String, Value>, event_type: &str) 
         }
     }
 
-    // content part / summary part: if unparseable, use empty text part.
+    // content part / summary part: repair known output_text omissions. Other
+    // known part types must still deserialize or the event remains an error.
     if let Some(part) = obj.get_mut("part") {
+        sanitize_output_text_part(part);
         let ok_output = serde_json::from_value::<rs::OutputContent>(part.clone()).is_ok();
         let ok_summary = serde_json::from_value::<rs::SummaryPart>(part.clone()).is_ok();
-        if !ok_output && !ok_summary {
-            if event_type.contains("reasoning_summary") {
-                *part = serde_json::json!({
-                    "type": "summary_text",
-                    "text": ""
-                });
-            } else {
-                *part = serde_json::json!({
-                    "type": "output_text",
-                    "text": "",
-                    "annotations": []
-                });
-            }
+        if !ok_output && !ok_summary && event_type.contains("reasoning_summary") {
+            *part = serde_json::json!({
+                "type": "summary_text",
+                "text": ""
+            });
         }
     }
 
@@ -484,9 +516,9 @@ pub(crate) fn parse_response_stream_event(data: &str) -> Result<LenientStreamEve
     match serde_json::from_value::<rs::ResponseStreamEvent>(value.clone()) {
         Ok(event) => Ok(LenientStreamEvent::Event(event)),
         Err(err) => {
-            // Still unsalvageable after rewrite — skip rather than kill the
-            // stream, unless we have no type at all (then surface the error).
-            if event_type.is_empty() {
+            // Unknown extension events may be skipped, but known terminal
+            // events define the accepted response and must never disappear.
+            if event_type.is_empty() || is_terminal_stream_event_type(&event_type) {
                 Err(err)
             } else {
                 Ok(LenientStreamEvent::Skip {
@@ -585,6 +617,53 @@ mod tests {
         assert_eq!(meta.get("n").map(String::as_str), Some("1"));
         assert_eq!(meta.get("ok").map(String::as_str), Some("yes"));
         assert_eq!(meta.get("flag").map(String::as_str), Some("true"));
+    }
+
+    #[test]
+    fn sub2api_completed_message_keeps_text_and_fills_required_fields() {
+        let data = r#"{
+            "type":"response.completed",
+            "sequence_number":17,
+            "response":{
+                "id":"resp_sub2api","object":"response","created_at":1,"model":"gpt-test",
+                "status":"completed",
+                "output":[{
+                    "type":"message","role":"assistant",
+                    "content":[{"type":"output_text","text":"Ready. What would you like me to test?"}]
+                }]
+            }
+        }"#;
+        match parse_response_stream_event(data).expect("parse") {
+            LenientStreamEvent::Event(rs::ResponseStreamEvent::ResponseCompleted(e)) => {
+                let rs::OutputItem::Message(message) = &e.response.output[0] else {
+                    panic!("expected message output");
+                };
+                let rs::OutputMessageContent::OutputText(text) = &message.content[0] else {
+                    panic!("expected output text");
+                };
+                assert_eq!(text.text, "Ready. What would you like me to test?");
+                assert!(text.annotations.is_empty());
+                assert!(text.logprobs.is_none());
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn malformed_known_terminal_event_is_not_skipped() {
+        let data = r#"{
+            "type":"response.completed",
+            "sequence_number":1,
+            "response":{
+                "id":"r1","object":"response","created_at":1,"model":"m",
+                "status":"completed",
+                "output":[{
+                    "type":"message","role":"assistant","status":"completed","id":"m1",
+                    "content":[{"type":"output_text","text":{"bad":true}}]
+                }]
+            }
+        }"#;
+        assert!(parse_response_stream_event(data).is_err());
     }
 
     #[test]

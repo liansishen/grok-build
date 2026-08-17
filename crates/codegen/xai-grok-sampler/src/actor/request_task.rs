@@ -645,6 +645,7 @@ async fn drive_l2(
     output_observed: Arc<AtomicBool>,
 ) -> AttemptOutcome {
     let mut l2 = pin!(l2);
+    let mut visible_output_observed = false;
     loop {
         tokio::select! {
             biased;
@@ -678,6 +679,13 @@ async fn drive_l2(
                     let content_filtered = response.stop_reason
                         == Some(xai_grok_sampling_types::StopReason::ContentFilter);
                     if !content_filtered && let Some(reason) = response.empty_reason() {
+                        if visible_output_observed {
+                            return AttemptOutcome::Failed {
+                                error: SamplingError::serialization_message(
+                                    "Responses terminal event contained no usable assistant output after visible stream content",
+                                ),
+                            };
+                        }
                         let context = build_empty_context(reason, &response);
                         return AttemptOutcome::Empty { context };
                     }
@@ -693,7 +701,22 @@ async fn drive_l2(
                 }
                 Some(other) => {
                     if matches!(
-                        other,
+                        &other,
+                        SamplingEvent::ChannelToken {
+                            channel: crate::events::SamplingChannel::Text,
+                            text,
+                            ..
+                        } if !text.is_empty()
+                    ) || matches!(
+                        &other,
+                        SamplingEvent::ToolCallDelta { .. }
+                            | SamplingEvent::BackendToolCallStarted { .. }
+                            | SamplingEvent::BackendToolCallCompleted { .. }
+                    ) {
+                        visible_output_observed = true;
+                    }
+                    if matches!(
+                        &other,
                         SamplingEvent::FirstToken { .. }
                             | SamplingEvent::ChannelToken { .. }
                             | SamplingEvent::ToolCallDelta { .. }
@@ -1126,6 +1149,55 @@ mod tests {
             Some(SamplingEvent::Failed { .. })
         ));
         assert!(completion_rx.await.expect("completion sent").is_err());
+    }
+
+    #[tokio::test]
+    async fn visible_text_then_empty_terminal_is_non_retryable_serialization() {
+        let request_id = RequestId::from("visible-empty-terminal");
+        let response = ConversationResponse {
+            items: vec![xai_grok_sampling_types::ConversationItem::assistant("")],
+            stop_reason: Some(xai_grok_sampling_types::StopReason::Stop),
+            usage: None,
+            cost_usd_ticks: None,
+            message_chunks_emitted: 1,
+            doom_loop_signals: Vec::new(),
+            stop_message: None,
+            message_id: None,
+            raw_stop_reason: None,
+            stop_sequence: None,
+        };
+        let events = stream::iter(vec![
+            SamplingEvent::ChannelToken {
+                request_id: request_id.clone(),
+                channel: crate::events::SamplingChannel::Text,
+                text: "visible".into(),
+                chunk_index: 1,
+            },
+            SamplingEvent::Completed {
+                request_id: request_id.clone(),
+                response: Box::new(response),
+                metrics: InferenceLatencyStats::default(),
+            },
+        ]);
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let outcome = drive_l2(
+            events,
+            request_id,
+            &event_tx,
+            &CancellationToken::new(),
+            Arc::new(Mutex::new(None)),
+            None,
+            Arc::new(AtomicBool::new(false)),
+        )
+        .await;
+
+        match outcome {
+            AttemptOutcome::Failed { error } => {
+                assert!(matches!(&error, SamplingError::Serialization(_)));
+                assert!(!error.is_retryable());
+            }
+            _ => panic!("expected non-retryable serialization failure"),
+        }
     }
 
     #[tokio::test]

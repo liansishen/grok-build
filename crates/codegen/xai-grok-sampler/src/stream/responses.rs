@@ -94,6 +94,170 @@ pub(crate) fn responses_event_may_have_output(event: &rs::ResponseStreamEvent) -
         && responses_event_has_meaningful_content(event)
 }
 
+const MAX_COMPLETED_OUTPUT_ITEMS: usize = 1024;
+const MAX_COMPLETED_OUTPUT_BYTES: usize = 8 * 1024 * 1024;
+const MAX_COMPLETED_OUTPUT_INDEX: u32 = 4096;
+
+fn output_item_json(item: &rs::OutputItem) -> Option<serde_json::Value> {
+    serde_json::to_value(item).ok()
+}
+
+fn output_item_identity(item: &rs::OutputItem) -> Option<String> {
+    let value = output_item_json(item)?;
+    value
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .filter(|id| !id.is_empty())
+        .map(|id| format!("id:{id}"))
+        .or_else(|| {
+            value
+                .get("call_id")
+                .and_then(serde_json::Value::as_str)
+                .filter(|id| !id.is_empty())
+                .map(|id| format!("call_id:{id}"))
+        })
+}
+
+fn output_item_type(item: &rs::OutputItem) -> Option<String> {
+    output_item_json(item)?
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+}
+
+fn output_message_text(item: &rs::OutputItem) -> Option<String> {
+    let value = output_item_json(item)?;
+    if value.get("type").and_then(serde_json::Value::as_str) != Some("message") {
+        return None;
+    }
+    let mut text = String::new();
+    for part in value
+        .get("content")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        if let Some(part_text) = part.get("text").and_then(serde_json::Value::as_str) {
+            text.push_str(part_text);
+        }
+        if let Some(refusal) = part.get("refusal").and_then(serde_json::Value::as_str) {
+            text.push_str(refusal);
+        }
+    }
+    Some(text)
+}
+
+fn output_item_has_placeholder_id(item: &rs::OutputItem) -> bool {
+    output_item_json(item)
+        .and_then(|value| {
+            value
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        })
+        .is_some_and(|id| matches!(id.as_str(), "msg_unknown" | "msg_dropped" | "item_unknown"))
+}
+
+fn should_replace_terminal_item(terminal: &rs::OutputItem, done: &rs::OutputItem) -> bool {
+    if output_item_type(terminal) != output_item_type(done) {
+        return false;
+    }
+    match (output_message_text(terminal), output_message_text(done)) {
+        (Some(terminal_text), Some(done_text)) => {
+            (!done_text.is_empty() && terminal_text.is_empty())
+                || (output_item_has_placeholder_id(terminal) && terminal_text == done_text)
+        }
+        _ => false,
+    }
+}
+
+fn output_items_semantically_equal(left: &rs::OutputItem, right: &rs::OutputItem) -> bool {
+    output_item_type(left) == output_item_type(right)
+        && match (output_message_text(left), output_message_text(right)) {
+            (Some(left), Some(right)) => left == right,
+            _ => output_item_identity(left).is_some()
+                && output_item_identity(left) == output_item_identity(right),
+        }
+}
+
+fn streamed_text_output_item(text: String) -> Option<rs::OutputItem> {
+    serde_json::from_value(serde_json::json!({
+        "type": "message",
+        "id": "msg_stream_fallback",
+        "role": "assistant",
+        "status": "completed",
+        "content": [{
+            "type": "output_text",
+            "text": text,
+            "annotations": [],
+            "logprobs": null
+        }]
+    }))
+    .ok()
+}
+
+fn recover_terminal_output(
+    response: &mut rs::Response,
+    completed_output_items: BTreeMap<u32, rs::OutputItem>,
+    streamed_text: String,
+) {
+    if response.output.is_empty() && !completed_output_items.is_empty() {
+        response.output = completed_output_items.into_values().collect();
+    } else {
+        for (output_index, done_item) in completed_output_items {
+            let identity = output_item_identity(&done_item);
+            if let Some(identity) = identity.as_ref()
+                && let Some(terminal_item) = response
+                    .output
+                    .iter_mut()
+                    .find(|item| output_item_identity(item).as_ref() == Some(identity))
+            {
+                if should_replace_terminal_item(terminal_item, &done_item) {
+                    *terminal_item = done_item;
+                }
+                continue;
+            }
+
+            if let Some(terminal_item) = response.output.get_mut(output_index as usize)
+                && (should_replace_terminal_item(terminal_item, &done_item)
+                    || (output_items_semantically_equal(terminal_item, &done_item)
+                        && output_item_has_placeholder_id(terminal_item)))
+            {
+                *terminal_item = done_item;
+                continue;
+            }
+
+            if !response
+                .output
+                .iter()
+                .any(|item| output_items_semantically_equal(item, &done_item))
+            {
+                response.output.push(done_item);
+            }
+        }
+    }
+
+    let has_message_text = response
+        .output
+        .iter()
+        .filter_map(output_message_text)
+        .any(|text| !text.is_empty());
+    if !has_message_text && !streamed_text.is_empty() {
+        if let Some(empty_message) = response
+            .output
+            .iter_mut()
+            .find(|item| output_message_text(item).is_some())
+            && let Some(fallback) = streamed_text_output_item(streamed_text.clone())
+        {
+            *empty_message = fallback;
+            return;
+        }
+        if let Some(fallback) = streamed_text_output_item(streamed_text) {
+            response.output.push(fallback);
+        }
+    }
+}
+
 /// Transform a raw Responses API event stream into a stream of
 /// [`SamplingEvent`]s.
 ///
@@ -151,6 +315,10 @@ pub(crate) fn stream_responses_tracked<'a>(
         }
 
         let mut final_response: Option<rs::Response> = None;
+        let mut completed_output_items: BTreeMap<u32, rs::OutputItem> = BTreeMap::new();
+        let mut completed_output_bytes: usize = 0;
+        let mut completed_output_overflowed = false;
+        let mut streamed_text = String::new();
         let mut chunk_index: u64 = 0;
         let mut message_chunk_count: u64 = 0;
         let mut first_token_emitted = false;
@@ -232,6 +400,7 @@ pub(crate) fn stream_responses_tracked<'a>(
                         chunk_timestamps.push(Instant::now());
                         chunk_index += 1;
                         message_chunk_count += 1;
+                        streamed_text.push_str(&delta);
                         yield SamplingEvent::ChannelToken {
                             request_id: request_id.clone(),
                             channel: SamplingChannel::Text,
@@ -416,6 +585,38 @@ pub(crate) fn stream_responses_tracked<'a>(
                 // For WebSearchCall this includes the query and source URLs.
                 // For CustomToolCall this includes x_search results.
                 ResponseStreamEvent::ResponseOutputItemDone(done_event) => {
+                    if !completed_output_overflowed
+                        && done_event.output_index <= MAX_COMPLETED_OUTPUT_INDEX
+                    {
+                        let item_bytes = serde_json::to_vec(&done_event.item)
+                            .map_or(MAX_COMPLETED_OUTPUT_BYTES + 1, |json| json.len());
+                        let replaced_bytes = completed_output_items
+                            .get(&done_event.output_index)
+                            .and_then(|item| serde_json::to_vec(item).ok())
+                            .map_or(0, |json| json.len());
+                        let next_bytes = completed_output_bytes
+                            .saturating_sub(replaced_bytes)
+                            .saturating_add(item_bytes);
+                        let next_count = completed_output_items.len()
+                            + usize::from(
+                                !completed_output_items.contains_key(&done_event.output_index),
+                            );
+                        if next_bytes <= MAX_COMPLETED_OUTPUT_BYTES
+                            && next_count <= MAX_COMPLETED_OUTPUT_ITEMS
+                        {
+                            completed_output_bytes = next_bytes;
+                            completed_output_items
+                                .insert(done_event.output_index, done_event.item.clone());
+                        } else {
+                            completed_output_items.clear();
+                            completed_output_bytes = 0;
+                            completed_output_overflowed = true;
+                            tracing::warn!(
+                                request_id = %request_id,
+                                "Responses output_item.done recovery buffer exceeded limits"
+                            );
+                        }
+                    }
                     match &done_event.item {
                         rs::OutputItem::WebSearchCall(ws) => {
                             let result = serde_json::to_value(ws).ok();
@@ -512,6 +713,12 @@ pub(crate) fn stream_responses_tracked<'a>(
                 return;
             }
         };
+
+        recover_terminal_output(
+            &mut response,
+            completed_output_items,
+            streamed_text,
+        );
 
         // Billing fields (`prompt_tokens`, `completion_tokens`,
         // `cached_prompt_tokens`, `reasoning_tokens`) are the cumulative
@@ -675,6 +882,30 @@ mod tests {
         })
     }
 
+    fn message_output_item(id: &str, text: &str) -> rs::OutputItem {
+        serde_json::from_value(serde_json::json!({
+            "type": "message",
+            "id": id,
+            "role": "assistant",
+            "status": "completed",
+            "content": [{
+                "type": "output_text",
+                "text": text,
+                "annotations": [],
+                "logprobs": null
+            }]
+        }))
+        .expect("message output item")
+    }
+
+    fn output_item_done_event(output_index: u32, item: rs::OutputItem) -> rs::ResponseStreamEvent {
+        rs::ResponseStreamEvent::ResponseOutputItemDone(rs_types::ResponseOutputItemDoneEvent {
+            sequence_number: 0,
+            output_index,
+            item,
+        })
+    }
+
     fn completed_event() -> rs::ResponseStreamEvent {
         rs::ResponseStreamEvent::ResponseCompleted(rs_types::ResponseCompletedEvent {
             response: empty_completed_response(),
@@ -710,6 +941,77 @@ mod tests {
                 assert_eq!(error.status_code, Some(500));
             }
             other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn output_item_done_restores_empty_terminal_output() {
+        let done = output_item_done_event(0, message_output_item("msg_done", "hello"));
+        let raw = stream::iter(vec![Ok(done), Ok(completed_event())]).boxed();
+        let events = collect(stream_responses(
+            raw,
+            None,
+            rid(),
+            Duration::from_secs(60),
+            None,
+        ))
+        .await;
+
+        match events.last().unwrap() {
+            SamplingEvent::Completed { response, .. } => {
+                assert_eq!(response.assistant().unwrap().content.as_ref(), "hello");
+            }
+            other => panic!("expected Completed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn output_item_done_replaces_placeholder_terminal_message() {
+        let done = output_item_done_event(0, message_output_item("msg_real", "final"));
+        let mut response = empty_completed_response();
+        response.output = vec![message_output_item("msg_unknown", "final")];
+        let completed = rs::ResponseStreamEvent::ResponseCompleted(
+            rs_types::ResponseCompletedEvent {
+                response,
+                sequence_number: 1,
+            },
+        );
+        let raw = stream::iter(vec![Ok(done), Ok(completed)]).boxed();
+        let events = collect(stream_responses(
+            raw,
+            None,
+            rid(),
+            Duration::from_secs(60),
+            None,
+        ))
+        .await;
+
+        match events.last().unwrap() {
+            SamplingEvent::Completed { response, .. } => {
+                assert_eq!(response.assistant().unwrap().content.as_ref(), "final");
+            }
+            other => panic!("expected Completed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn text_delta_recovers_message_when_terminal_and_done_are_empty() {
+        let raw = stream::iter(vec![Ok(text_delta_event("hello")), Ok(completed_event())]).boxed();
+        let events = collect(stream_responses(
+            raw,
+            None,
+            rid(),
+            Duration::from_secs(60),
+            None,
+        ))
+        .await;
+
+        match events.last().unwrap() {
+            SamplingEvent::Completed { response, .. } => {
+                assert_eq!(response.assistant().unwrap().content.as_ref(), "hello");
+                assert_eq!(response.message_chunks_emitted, 1);
+            }
+            other => panic!("expected Completed, got {other:?}"),
         }
     }
 
