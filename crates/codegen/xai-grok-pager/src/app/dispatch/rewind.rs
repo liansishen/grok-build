@@ -431,7 +431,7 @@ pub(super) fn dispatch_rewind_success(
     let inline_resubmit = agent.pending_inline_resubmit.take();
 
     if !response.success {
-        let err = response.error.unwrap_or_else(|| "unknown error".into());
+        let err = response.error.unwrap_or_else(|| xai_grok_i18n::t("error.unknown").to_string());
         let anchor = agent
             .rewind_state
             .as_ref()

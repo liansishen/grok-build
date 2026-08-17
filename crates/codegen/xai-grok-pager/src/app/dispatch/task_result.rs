@@ -717,9 +717,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         }
         TaskResult::ConsentPersistFailed { error } => {
             tracing::warn!(%error, "consent answer not persisted; the notice re-arms next launch");
-            app.show_toast(
-                "\u{2717} Could not save your answer, so this notice returns next launch",
-            );
+            app.show_toast(xai_grok_i18n::t("consent.save_failed"));
             vec![]
         }
         TaskResult::ConsentRecorded { notice_id, version } => match app.account_email.clone() {

@@ -26,10 +26,6 @@ const BODY_TOP_OFFSET: u16 = 2;
 /// Below this the fallback message is shortened, because the long one would itself be clipped.
 const NARROW_COLS: u16 = 40;
 
-const TOO_SMALL: &str = "Enlarge the window to read this notice";
-const TOO_SMALL_NARROW: &str = "Window too small";
-/// Localized "enlarge" / "too small" fallback text (en values match the
-/// consts above, so the default English output is byte-identical).
 fn too_small_text(narrow: bool) -> &'static str {
     xai_grok_i18n::t(if narrow {
         "consent.window_too_small"

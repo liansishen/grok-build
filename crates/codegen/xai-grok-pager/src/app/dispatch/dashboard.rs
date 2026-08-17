@@ -141,7 +141,7 @@ pub(super) fn dispatch_open_dashboard(app: &mut AppView) -> Vec<Effect> {
         app.consent_state,
         crate::app::consent::ConsentState::Pending { .. }
     ) {
-        app.show_toast("Answer the terms notice to open the dashboard");
+        app.show_toast(xai_grok_i18n::t("dashboard.consent_first"));
         return vec![];
     }
     // Same rationale for folder trust: opening the dashboard would visually
