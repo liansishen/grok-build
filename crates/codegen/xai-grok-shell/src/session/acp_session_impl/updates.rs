@@ -351,18 +351,25 @@ impl SessionActor {
     ///
     /// - **ACP** (`AgentMessageChunk`, `AgentThoughtChunk`) ->
     ///   delegates to `emit_notification_direct` (persists + gateway).
-    /// - **xAI** (`ToolCallDeltaChunk`) -> inlines a gateway
-    ///   forward as `ExtNotification` only. Two deliberate omissions:
-    ///   (1) no persistence -- per-chunk deltas have no replay value
-    ///   because the canonical `acp::SessionUpdate::ToolCall` (with
-    ///   assembled `raw_input`) is persisted at end-of-turn and is the
-    ///   source of truth for replay; (2) no hook dispatch.
+    /// - **xAI** updates -> inline gateway forwarding in stream order. The
+    ///   response boundary is stamped and persisted for history metrics;
+    ///   high-frequency tool argument deltas remain broadcast-only because the
+    ///   canonical ACP `ToolCall` is their replay source of truth.
     pub(super) async fn emit_buffered(&self, notification: SessionNotification) {
         match notification {
             SessionNotification::Acp(n) => {
                 self.emit_notification_direct(*n).await;
             }
-            SessionNotification::Xai(n) => {
+            SessionNotification::Xai(mut n) => {
+                if matches!(&n.update, XaiSessionUpdate::ResponseCompleted { .. }) {
+                    n.meta = Some(self.build_notification_meta());
+                    let _ = self
+                        .notifications
+                        .persistence_tx
+                        .send(PersistenceMsg::Update(
+                            crate::session::storage::SessionUpdate::Xai(Box::new((*n).clone())),
+                        ));
+                }
                 self.log_outbound_xai_buffered(&n);
                 if self
                     .notifications
@@ -937,6 +944,9 @@ impl SessionActor {
     pub(super) fn response_completed_update(
         &self,
         response: &xai_grok_sampling_types::ConversationResponse,
+        prompt_id: &str,
+        time_to_first_token_ms: Option<u64>,
+        duration_ms: u64,
     ) -> XaiSessionUpdate {
         let usage =
             response
@@ -957,10 +967,13 @@ impl SessionActor {
             .reasoning_items()
             .find_map(|r| r.encrypted_content.clone());
         XaiSessionUpdate::ResponseCompleted {
+            prompt_id: Some(prompt_id.to_string()),
             message_id: response.message_id.clone(),
             stop_reason: response.raw_stop_reason.clone(),
             usage,
             signature,
+            time_to_first_token_ms,
+            duration_ms: Some(duration_ms),
             stop_sequence: response.stop_sequence.clone(),
         }
     }

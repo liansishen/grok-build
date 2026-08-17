@@ -16,9 +16,9 @@ use super::blocks::mermaid_content::DiagramAffordance;
 use super::blocks::{
     AgentMessageBlock, BgTaskBlock, BtwBlock, ContextInfoBlock, CreditLimitBlock,
     EditToolCallBlock, ExecuteToolCallBlock, LineRange, ListDirToolCallBlock, OtherToolCallBlock,
-    ReadToolCallBlock, SearchFileMatch, SearchToolCallBlock, SessionEvent, SessionEventBlock,
-    SubagentBlock, SubagentBlockKind, SystemMessageBlock, ThinkingBlock, ToolCallBlock,
-    UserPromptBlock, WorkflowBlock,
+    ReadToolCallBlock, RequestMetricsBlock, SearchFileMatch, SearchToolCallBlock, SessionEvent,
+    SessionEventBlock, SubagentBlock, SubagentBlockKind, SystemMessageBlock, ThinkingBlock,
+    ToolCallBlock, UserPromptBlock, WorkflowBlock,
 };
 use super::types::{
     AccentStyle, BlockBackground, BlockContext, BlockOutput, DisplayMode, RenderedBlockOutput,
@@ -383,6 +383,8 @@ pub enum RenderBlock {
     System(SystemMessageBlock),
     /// Session-level event (typed: turn completed, cancelled, failed, etc.).
     SessionEvent(SessionEventBlock),
+    /// Per-model-request latency and token metrics.
+    RequestMetrics(RequestMetricsBlock),
     /// Background task (always collapsed, animated bullet while running).
     BgTask(BgTaskBlock),
     /// Subagent lifecycle (started / completed / failed).
@@ -407,6 +409,7 @@ macro_rules! delegate_block {
             RenderBlock::Thinking(b) => b.$method($($arg),*),
             RenderBlock::System(b) => b.$method($($arg),*),
             RenderBlock::SessionEvent(b) => b.$method($($arg),*),
+            RenderBlock::RequestMetrics(b) => b.$method($($arg),*),
             RenderBlock::BgTask(b) => b.$method($($arg),*),
             RenderBlock::Subagent(b) => b.$method($($arg),*),
             RenderBlock::Workflow(b) => b.$method($($arg),*),
@@ -788,6 +791,19 @@ impl RenderBlock {
         RenderBlock::SessionEvent(SessionEventBlock::new(event))
     }
 
+    /// Create a compact per-model-request metrics block.
+    pub fn request_metrics(
+        time_to_first_token_ms: Option<u64>,
+        duration_ms: u64,
+        usage: &xai_grok_shell::extensions::notification::ResponseUsage,
+    ) -> Self {
+        RenderBlock::RequestMetrics(RequestMetricsBlock::new(
+            time_to_first_token_ms,
+            duration_ms,
+            usage,
+        ))
+    }
+
     /// Create a credit-limit card (inline scrollback block for max-tier users).
     pub fn credit_limit_card(
         heading: impl Into<String>,
@@ -1027,6 +1043,7 @@ impl RenderBlock {
             }
             RenderBlock::System(_)
             | RenderBlock::SessionEvent(_)
+            | RenderBlock::RequestMetrics(_)
             | RenderBlock::ContextInfo(_)
             | RenderBlock::CreditLimit(_) => None,
             RenderBlock::Btw(_) => Some(theme.accent_plan),
@@ -1146,6 +1163,7 @@ impl RenderBlock {
             RenderBlock::Thinking(b) => join_searchable([Some(b.copy_text(false))]),
             RenderBlock::System(b) => join_searchable([Some(b.text.clone())]),
             RenderBlock::SessionEvent(b) => join_searchable([Some(b.event.message())]),
+            RenderBlock::RequestMetrics(b) => join_searchable([Some(b.message())]),
             RenderBlock::BgTask(b) => {
                 join_searchable([Some(b.command.clone()), b.description.clone()])
             }

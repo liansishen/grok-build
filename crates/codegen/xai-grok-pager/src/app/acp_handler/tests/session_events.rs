@@ -92,6 +92,88 @@
         }
     }
 
+    #[test]
+    fn response_completed_pushes_compact_request_metrics() {
+        let mut app = make_app_with_agent("sess-1");
+        let changed = handle(
+            make_ext_session_notification(
+                "sess-1",
+                XaiSessionUpdate::ResponseCompleted {
+                    prompt_id: Some("p-1".into()),
+                    message_id: Some("msg-1".into()),
+                    stop_reason: Some("end_turn".into()),
+                    usage: Some(xai_grok_shell::extensions::notification::ResponseUsage {
+                        input_tokens: 440,
+                        output_tokens: 480,
+                        cache_read_input_tokens: 2_650,
+                        ..Default::default()
+                    }),
+                    signature: None,
+                    time_to_first_token_ms: Some(900),
+                    duration_ms: Some(11_900),
+                    stop_sequence: None,
+                },
+            ),
+            &mut app,
+        );
+        assert!(changed);
+        let agent = app.agents.get(&AgentId(0)).unwrap();
+        match &agent.scrollback.last().expect("metrics block").block {
+            RenderBlock::RequestMetrics(_) => {}
+            other => panic!("expected RequestMetrics block, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn response_completed_for_hidden_prompt_is_invisible() {
+        let mut app = make_app_with_agent("sess-1");
+        let changed = handle(
+            make_ext_session_notification(
+                "sess-1",
+                XaiSessionUpdate::ResponseCompleted {
+                    prompt_id: Some("goal-summary-1".into()),
+                    message_id: Some("msg-hidden".into()),
+                    stop_reason: Some("end_turn".into()),
+                    usage: Some(xai_grok_shell::extensions::notification::ResponseUsage {
+                        input_tokens: 100,
+                        output_tokens: 20,
+                        ..Default::default()
+                    }),
+                    signature: None,
+                    time_to_first_token_ms: Some(500),
+                    duration_ms: Some(1_500),
+                    stop_sequence: None,
+                },
+            ),
+            &mut app,
+        );
+        assert!(!changed);
+        assert_eq!(app.agents[&AgentId(0)].scrollback.len(), 0);
+    }
+
+    #[test]
+    fn response_completed_without_new_timing_is_invisible() {
+        let mut app = make_app_with_agent("sess-1");
+        let changed = handle(
+            make_ext_session_notification(
+                "sess-1",
+                XaiSessionUpdate::ResponseCompleted {
+                    prompt_id: None,
+                    message_id: Some("msg-old".into()),
+                    stop_reason: Some("end_turn".into()),
+                    usage: Some(Default::default()),
+                    signature: None,
+                    time_to_first_token_ms: None,
+                    duration_ms: None,
+                    stop_sequence: None,
+                },
+            ),
+            &mut app,
+        );
+        assert!(!changed);
+        assert_eq!(app.agents[&AgentId(0)].scrollback.len(), 0);
+    }
+
     /// A successful compression needs no user action: log-only — no toast,
     /// no scrollback block, no redraw. Same live and on session replay.
     #[test]

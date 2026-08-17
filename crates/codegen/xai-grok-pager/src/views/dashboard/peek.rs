@@ -1084,7 +1084,10 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
             // no agent response after it yet.
             RenderBlock::UserPrompt(_) => break,
             // Structural blocks carry no response type — keep scanning.
-            RenderBlock::System(_) | RenderBlock::SessionEvent(_) | RenderBlock::Stub(_) => {}
+            RenderBlock::System(_)
+            | RenderBlock::SessionEvent(_)
+            | RenderBlock::RequestMetrics(_)
+            | RenderBlock::Stub(_) => {}
         }
     }
     if running {
@@ -1208,6 +1211,7 @@ fn block_short_text(block: &crate::scrollback::block::RenderBlock) -> Option<Str
         RenderBlock::SessionEvent(_) => {
             Some(xai_grok_i18n::t("dashboard.peek.session_event").to_string())
         }
+        RenderBlock::RequestMetrics(b) => Some(b.message()),
         RenderBlock::ToolCall(_) => Some(xai_grok_i18n::t("dashboard.peek.tool_call").to_string()),
         RenderBlock::BgTask(_) => Some(xai_grok_i18n::t("dashboard.peek.bg_task").to_string()),
         RenderBlock::Subagent(_) => Some(xai_grok_i18n::t("dashboard.peek.subagent").to_string()),

@@ -1094,6 +1094,9 @@ pub enum SessionUpdate {
     /// assistant frame per response. Ordered with the response's chunks; a tool
     /// loop emits several. The durable outcome rides `TurnCompleted`.
     ResponseCompleted {
+        /// Prompt/turn that produced this response, used to suppress hidden wake metrics.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        prompt_id: Option<String>,
         /// Provider message id (Messages `message.id`), when reported.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         message_id: Option<String>,
@@ -1105,6 +1108,12 @@ pub enum SessionUpdate {
         /// Reasoning signature (encrypted content) for this response's thinking.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         signature: Option<String>,
+        /// Time from request start to the first streamed content token.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        time_to_first_token_ms: Option<u64>,
+        /// Wall-clock duration of this model request through stream completion.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u64>,
         /// The provider's matched stop sequence (Messages API
         /// `message.stop_sequence`), present only when the model stopped on a
         /// configured stop sequence; `None` otherwise. Headless
@@ -2312,6 +2321,52 @@ mod tests {
         assert_eq!(json["sessionId"], "sess-abc");
         assert_eq!(json["update"]["sessionUpdate"], "model_changed");
         assert_eq!(json["update"]["model_id"], "grok-4");
+    }
+
+    // ── ResponseCompleted (per-model-response boundary) ──
+
+    #[test]
+    fn response_completed_metrics_roundtrip_and_remain_optional() {
+        let update = SessionUpdate::ResponseCompleted {
+            prompt_id: Some("p-1".into()),
+            message_id: Some("msg-1".into()),
+            stop_reason: Some("end_turn".into()),
+            usage: Some(ResponseUsage {
+                input_tokens: 440,
+                output_tokens: 480,
+                cache_read_input_tokens: 2_650,
+                ..Default::default()
+            }),
+            signature: None,
+            time_to_first_token_ms: Some(900),
+            duration_ms: Some(11_900),
+            stop_sequence: None,
+        };
+        let json = serde_json::to_value(&update).unwrap();
+        assert_eq!(json["sessionUpdate"], "response_completed");
+        assert_eq!(json["prompt_id"], "p-1");
+        assert_eq!(json["time_to_first_token_ms"], 900);
+        assert_eq!(json["duration_ms"], 11_900);
+        let parsed: SessionUpdate = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed, update);
+
+        let legacy: SessionUpdate = serde_json::from_str(
+            r#"{"sessionUpdate":"response_completed","message_id":"msg-old"}"#,
+        )
+        .unwrap();
+        match legacy {
+            SessionUpdate::ResponseCompleted {
+                prompt_id,
+                time_to_first_token_ms,
+                duration_ms,
+                ..
+            } => {
+                assert!(prompt_id.is_none());
+                assert!(time_to_first_token_ms.is_none());
+                assert!(duration_ms.is_none());
+            }
+            other => panic!("expected ResponseCompleted, got {other:?}"),
+        }
     }
 
     // ── TurnCompleted (durable, replayable turn-end signal) ──

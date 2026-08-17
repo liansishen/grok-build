@@ -2524,7 +2524,8 @@ impl SessionActor {
                 );
             }
             self.record_response_token_usage(&response, Some(model_duration_ms));
-            let response_completed = self.response_completed_update(&response);
+            let response_completed =
+                self.response_completed_update(&response, req_id, ttft_ms, model_duration_ms);
             if let Some(pt) = prompt_timing.take() {
                 let mcp_count = self.mcp_state.lock().await.configs.len() as u32;
                 let mcp_tools = self
@@ -2578,6 +2579,7 @@ impl SessionActor {
                         "max_retries": MAX_MEDIA_GEN_OVER_CAP_RESAMPLES,
                     })),
                 );
+                self.send_buffered_xai_update(response_completed).await;
                 self.send_xai_notification(XaiSessionUpdate::RetryState(
                     crate::extensions::notification::RetryState::Retrying {
                         attempt: media_gen_resamples,

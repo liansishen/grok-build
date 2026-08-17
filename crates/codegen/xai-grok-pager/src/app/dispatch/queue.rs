@@ -601,7 +601,9 @@ fn trailing_user_prompt_matching(
                 break;
             }
             RenderBlock::UserPrompt(ub) if claim_interjection && ub.is_interjection => continue,
-            RenderBlock::SessionEvent(_) | RenderBlock::System(_) => continue,
+            RenderBlock::SessionEvent(_)
+            | RenderBlock::System(_)
+            | RenderBlock::RequestMetrics(_) => continue,
             _ => break,
         }
     }
@@ -628,7 +630,9 @@ fn trailing_user_prompts(
                     return Some(out);
                 }
             }
-            RenderBlock::SessionEvent(_) | RenderBlock::System(_) => continue,
+            RenderBlock::SessionEvent(_)
+            | RenderBlock::System(_)
+            | RenderBlock::RequestMetrics(_) => continue,
             _ => return None,
         }
     }

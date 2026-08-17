@@ -522,7 +522,10 @@ fn scrollback_waiting_on_user_turn(scrollback: &crate::scrollback::state::Scroll
         }
         if matches!(
             &entry.block,
-            RenderBlock::AgentMessage(_) | RenderBlock::Thinking(_) | RenderBlock::ToolCall(_)
+            RenderBlock::AgentMessage(_)
+                | RenderBlock::Thinking(_)
+                | RenderBlock::ToolCall(_)
+                | RenderBlock::RequestMetrics(_)
         ) {
             return false;
         }

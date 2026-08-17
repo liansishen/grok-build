@@ -195,7 +195,11 @@ pub(super) fn trailing_session_events(
         .take_while(|(_, block)| {
             matches!(
                 block,
-                Some(RenderBlock::SessionEvent(_) | RenderBlock::System(_))
+                Some(
+                    RenderBlock::SessionEvent(_)
+                        | RenderBlock::System(_)
+                        | RenderBlock::RequestMetrics(_)
+                )
             )
         })
         .filter_map(|(idx, block)| match block {
