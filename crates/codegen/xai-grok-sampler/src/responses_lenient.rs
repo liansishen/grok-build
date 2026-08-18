@@ -155,6 +155,18 @@ fn ensure_string(obj: &mut Map<String, Value>, key: &str, default: &str) {
     }
 }
 
+fn ensure_response_status(obj: &mut Map<String, Value>, default: &str) {
+    let valid = obj.get("status").and_then(Value::as_str).is_some_and(|status| {
+        matches!(
+            status,
+            "completed" | "failed" | "in_progress" | "cancelled" | "queued" | "incomplete"
+        )
+    });
+    if !valid {
+        obj.insert("status".to_owned(), Value::String(default.to_owned()));
+    }
+}
+
 fn ensure_array(obj: &mut Map<String, Value>, key: &str) {
     match obj.get(key) {
         Some(Value::Array(_)) => {}
@@ -315,6 +327,7 @@ pub(crate) fn sanitize_response_object(value: &mut Value) {
     ensure_string(obj, "id", "resp_unknown");
     ensure_string(obj, "model", "unknown");
     ensure_string(obj, "object", "response");
+    ensure_response_status(obj, "completed");
     ensure_array(obj, "output");
     coerce_string_map(obj, "metadata");
 
@@ -431,6 +444,14 @@ fn sanitize_stream_event_fields(obj: &mut Map<String, Value>, event_type: &str) 
     }
 
     if let Some(resp) = obj.get_mut("response") {
+        if let Some(response_obj) = resp.as_object_mut() {
+            let default_status = match event_type {
+                "response.failed" => "failed",
+                "response.incomplete" => "incomplete",
+                _ => "completed",
+            };
+            ensure_response_status(response_obj, default_status);
+        }
         sanitize_response_object(resp);
     }
 
@@ -576,6 +597,25 @@ mod tests {
                 assert!(reason.contains("unknown"), "{reason}");
             }
             other => panic!("expected skip, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn terminal_event_type_supplies_matching_missing_status() {
+        for (event_type, expected) in [
+            ("response.completed", "completed"),
+            ("response.incomplete", "incomplete"),
+            ("response.failed", "failed"),
+        ] {
+            let mut value = serde_json::json!({
+                "type": event_type,
+                "response": {}
+            });
+            sanitize_stream_event_value(&mut value);
+            assert_eq!(
+                value.pointer("/response/status").and_then(Value::as_str),
+                Some(expected)
+            );
         }
     }
 
