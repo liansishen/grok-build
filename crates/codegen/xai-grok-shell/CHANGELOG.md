@@ -1,5 +1,12 @@
 # Changelog
 
+# 1.0.5-fork.4 — 2026-08-18
+
+## Bug Fixes
+
+- **Git session metadata** now reads the HEAD object ID directly from refs without loading the commit object, so session startup and file watching remain responsive when a repository has a missing or damaged commit object.
+- **Git session recovery** now correctly handles unborn repositories, missing HEAD objects, status reporting, and checkout repair.
+
 # 1.0.5 — 2026-08-15
 
 ## Features
