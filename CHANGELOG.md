@@ -2,14 +2,12 @@
 
 This changelog tracks releases published from the `liansishen/grok-build` fork.
 
-## v1.0.5-fork.5 — 2026-08-18
+## v1.0.5-fork.4 — 2026-08-18
 
 ### Release Process
 
 - Added the fork release changelog and documented the requirement that every release include written changelog and GitHub Release notes.
-- This documentation-only follow-up release records the release-process correction for `v1.0.5-fork.4`.
-
-## v1.0.5-fork.4 — 2026-08-18
+- This documentation follow-up corrects the release process record for `v1.0.5-fork.4` without creating a new release.
 
 ### Upstream Sync
 
