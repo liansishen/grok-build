@@ -201,7 +201,9 @@ async fn thinking_block_emits_reasoning_channel_and_preserved_in_response() {
     assert_eq!(reasoning_tokens, vec!["let me think..."]);
 
     match evs.last().unwrap() {
-        SamplingEvent::Completed { response, .. } => {
+        SamplingEvent::Completed {
+            response, metrics, ..
+        } => {
             let r = response
                 .reasoning_items()
                 .next()
@@ -209,6 +211,34 @@ async fn thinking_block_emits_reasoning_channel_and_preserved_in_response() {
             let rs::SummaryPart::SummaryText(t) = &r.summary[0];
             assert_eq!(t.text, "let me think...");
             assert_eq!(r.encrypted_content.as_deref(), Some("abc123"));
+            assert!(metrics.time_to_first_token_ms.is_some());
+            assert_eq!(metrics.chunk_count, 0);
+        }
+        other => panic!("expected Completed, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn signature_only_thinking_block_records_first_output() {
+    let events: Vec<Result<MessageStreamEvent, SamplingError>> = vec![
+        Ok(message_start()),
+        Ok(MessageStreamEvent::ContentBlockStart {
+            index: 0,
+            content_block: ContentBlock::Thinking {
+                thinking: String::new(),
+                signature: "encrypted".into(),
+            },
+        }),
+        Ok(block_stop(0)),
+        Ok(MessageStreamEvent::MessageStop),
+    ];
+    let raw = stream::iter(events).boxed();
+    let evs = collect(stream_messages(raw, None, rid(), Duration::from_secs(60))).await;
+
+    match evs.last().unwrap() {
+        SamplingEvent::Completed { metrics, .. } => {
+            assert!(metrics.time_to_first_token_ms.is_some());
+            assert_eq!(metrics.chunk_count, 0);
         }
         other => panic!("expected Completed, got {other:?}"),
     }
@@ -334,13 +364,17 @@ async fn tool_use_block_assembles_into_tool_call() {
     assert_eq!(deltas[2].3.as_deref(), Some("1}"));
 
     match evs.last().unwrap() {
-        SamplingEvent::Completed { response, .. } => {
+        SamplingEvent::Completed {
+            response, metrics, ..
+        } => {
             let calls = response.tool_calls();
             assert_eq!(calls.len(), 1);
             assert_eq!(calls[0].id.as_ref(), "call_xyz");
             assert_eq!(calls[0].name, "do_thing");
             assert_eq!(calls[0].arguments.as_ref(), "{\"x\":1}");
             assert_eq!(response.stop_reason, Some(StopReason::ToolCalls));
+            assert!(metrics.time_to_first_token_ms.is_some());
+            assert_eq!(metrics.chunk_count, 0);
         }
         other => panic!("expected Completed, got {other:?}"),
     }

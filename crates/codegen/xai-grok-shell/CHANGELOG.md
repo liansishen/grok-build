@@ -1,5 +1,38 @@
 # Changelog
 
+# 1.0.5-fork.5 — 2026-08-18
+
+## 问题修复
+
+### 逐次模型请求首字时间与生成速度
+
+- 修复工具调用轮次、推理先行轮次和 Responses API 终止帧恢复正文时，逐次请求指标间歇显示 `首-`、`速-` 的问题。
+- 根因是采样器虽然会为推理和工具输出发送首 token 事件，但首字耗时只从正文文本增量的时间戳计算；没有正文增量的有效响应因此丢失首字时间，pager 也无法计算生成速度。
+- 首字时间现在以第一次有意义的模型输出为准，覆盖正文、推理、客户端工具调用、托管工具进度，以及仅在终止响应或 `output_item.done` 中出现的恢复输出。
+- Chat Completions、Messages 和 Responses 三种流式协议使用同一语义，工具循环中间轮次与最终正文轮次不再因响应形态不同而交替缺失指标。
+
+### 指标与兼容性边界
+
+- 正文增量时间戳继续单独用于正文块数量和 inter-token latency（ITL）统计；工具与推理输出不会伪造成正文块，也不会改变既有 ITL 含义。
+- 如果调用方已有正文时间戳但没有显式传入首输出时间，指标构造会回退到第一个正文时间戳，保持旧调用语义。
+- pager 的展示格式、TPS 公式、会话通知结构和持久化格式保持不变；旧会话缺少首字时间时仍兼容并显示 `-`。
+- 本次没有新增用户可见字段、提示或错误文案，无需新增英文或简体中文翻译键。
+
+### 验证
+
+- 单元测试覆盖独立首输出时间、正文时间戳回退、推理无正文、纯工具调用、Responses 终止帧恢复正文，以及正文块与 ITL 统计不受影响。
+- GitHub Actions 在 Linux 上运行 `xai-grok-sampler` 库测试，并完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.5-fork.5-linux-x86_64`
+- `grok-1.0.5-fork.5-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.4...v1.0.5-fork.5
+
 # 1.0.5-fork.4 — 2026-08-18
 
 同步上游 monorepo `d71f6e0c` / Source-Revision `c2dab005`，产品版本保持 **1.0.5**。

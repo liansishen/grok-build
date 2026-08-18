@@ -94,6 +94,57 @@ pub(crate) fn responses_event_may_have_output(event: &rs::ResponseStreamEvent) -
         && responses_event_has_meaningful_content(event)
 }
 
+fn responses_event_marks_first_output(event: &rs::ResponseStreamEvent) -> bool {
+    use rs::ResponseStreamEvent;
+
+    match event {
+        ResponseStreamEvent::ResponseOutputTextDelta(event) => !event.delta.is_empty(),
+        ResponseStreamEvent::ResponseOutputTextDone(event) => !event.text.is_empty(),
+        ResponseStreamEvent::ResponseRefusalDelta(event) => !event.delta.is_empty(),
+        ResponseStreamEvent::ResponseRefusalDone(event) => !event.refusal.is_empty(),
+        ResponseStreamEvent::ResponseFunctionCallArgumentsDelta(event) => !event.delta.is_empty(),
+        ResponseStreamEvent::ResponseFunctionCallArgumentsDone(event) => {
+            !event.arguments.is_empty() || event.name.as_ref().is_some_and(|name| !name.is_empty())
+        }
+        ResponseStreamEvent::ResponseReasoningSummaryTextDelta(event) => !event.delta.is_empty(),
+        ResponseStreamEvent::ResponseReasoningSummaryTextDone(event) => !event.text.is_empty(),
+        ResponseStreamEvent::ResponseReasoningTextDelta(event) => !event.delta.is_empty(),
+        ResponseStreamEvent::ResponseReasoningTextDone(event) => !event.text.is_empty(),
+        ResponseStreamEvent::ResponseMCPCallArgumentsDelta(event) => !event.delta.is_empty(),
+        ResponseStreamEvent::ResponseMCPCallArgumentsDone(event) => !event.arguments.is_empty(),
+        ResponseStreamEvent::ResponseCodeInterpreterCallCodeDelta(event) => !event.delta.is_empty(),
+        ResponseStreamEvent::ResponseCodeInterpreterCallCodeDone(event) => !event.code.is_empty(),
+        ResponseStreamEvent::ResponseCustomToolCallInputDelta(event) => !event.delta.is_empty(),
+        ResponseStreamEvent::ResponseCustomToolCallInputDone(event) => !event.input.is_empty(),
+        ResponseStreamEvent::ResponseCompleted(event) => !event.response.output.is_empty(),
+        ResponseStreamEvent::ResponseIncomplete(event) => !event.response.output.is_empty(),
+        ResponseStreamEvent::ResponseOutputItemAdded(event) => {
+            matches!(&event.item, rs::OutputItem::FunctionCall(_))
+        }
+        ResponseStreamEvent::ResponseOutputItemDone(_)
+        | ResponseStreamEvent::ResponseFileSearchCallInProgress(_)
+        | ResponseStreamEvent::ResponseFileSearchCallSearching(_)
+        | ResponseStreamEvent::ResponseFileSearchCallCompleted(_)
+        | ResponseStreamEvent::ResponseWebSearchCallInProgress(_)
+        | ResponseStreamEvent::ResponseWebSearchCallSearching(_)
+        | ResponseStreamEvent::ResponseWebSearchCallCompleted(_)
+        | ResponseStreamEvent::ResponseMCPCallInProgress(_)
+        | ResponseStreamEvent::ResponseMCPCallCompleted(_)
+        | ResponseStreamEvent::ResponseMCPCallFailed(_)
+        | ResponseStreamEvent::ResponseMCPListToolsInProgress(_)
+        | ResponseStreamEvent::ResponseMCPListToolsCompleted(_)
+        | ResponseStreamEvent::ResponseMCPListToolsFailed(_)
+        | ResponseStreamEvent::ResponseCodeInterpreterCallInProgress(_)
+        | ResponseStreamEvent::ResponseCodeInterpreterCallInterpreting(_)
+        | ResponseStreamEvent::ResponseCodeInterpreterCallCompleted(_)
+        | ResponseStreamEvent::ResponseImageGenerationCallInProgress(_)
+        | ResponseStreamEvent::ResponseImageGenerationCallGenerating(_)
+        | ResponseStreamEvent::ResponseImageGenerationCallPartialImage(_)
+        | ResponseStreamEvent::ResponseImageGenerationCallCompleted(_) => true,
+        _ => false,
+    }
+}
+
 const MAX_COMPLETED_OUTPUT_ITEMS: usize = 1024;
 const MAX_COMPLETED_OUTPUT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_COMPLETED_OUTPUT_INDEX: u32 = 4096;
@@ -300,6 +351,7 @@ pub(crate) fn stream_responses_tracked<'a>(
         use rs::{ResponseStreamEvent, Status};
 
         let stream_start = Instant::now();
+        let mut first_output_at: Option<Instant> = None;
         let mut chunk_timestamps: Vec<Instant> = Vec::new();
 
         yield SamplingEvent::StreamStarted {
@@ -363,6 +415,9 @@ pub(crate) fn stream_responses_tracked<'a>(
             if responses_event_may_have_output(&event) {
                 output_observed.store(true, Ordering::Relaxed);
             }
+            if responses_event_marks_first_output(&event) {
+                first_output_at.get_or_insert_with(Instant::now);
+            }
 
             // A confident server-detected loop aborts the attempt (dropping
             // the SSE connection) so the retry loop can resample instead of
@@ -391,13 +446,15 @@ pub(crate) fn stream_responses_tracked<'a>(
                 ResponseStreamEvent::ResponseOutputTextDelta(text_delta_event) => {
                     let delta = text_delta_event.delta;
                     if !delta.is_empty() {
+                        let output_at = Instant::now();
+                        first_output_at.get_or_insert(output_at);
                         if !first_token_emitted {
                             first_token_emitted = true;
                             yield SamplingEvent::FirstToken {
                                 request_id: request_id.clone(),
                             };
                         }
-                        chunk_timestamps.push(Instant::now());
+                        chunk_timestamps.push(output_at);
                         chunk_index += 1;
                         message_chunk_count += 1;
                         streamed_text.push_str(&delta);
@@ -413,6 +470,7 @@ pub(crate) fn stream_responses_tracked<'a>(
                 ResponseStreamEvent::ResponseReasoningSummaryTextDelta(summary_event) => {
                     let delta = summary_event.delta;
                     if !delta.is_empty() {
+                        first_output_at.get_or_insert_with(Instant::now);
                         if !first_token_emitted {
                             first_token_emitted = true;
                             yield SamplingEvent::FirstToken {
@@ -432,6 +490,7 @@ pub(crate) fn stream_responses_tracked<'a>(
                 ResponseStreamEvent::ResponseReasoningTextDelta(reasoning_event) => {
                     let delta = reasoning_event.delta;
                     if !delta.is_empty() {
+                        first_output_at.get_or_insert_with(Instant::now);
                         if !first_token_emitted {
                             first_token_emitted = true;
                             yield SamplingEvent::FirstToken {
@@ -453,6 +512,7 @@ pub(crate) fn stream_responses_tracked<'a>(
                 // and remember the output_index → tool_index mapping.
                 ResponseStreamEvent::ResponseOutputItemAdded(added_event) => {
                     if let rs::OutputItem::FunctionCall(fc) = added_event.item {
+                        first_output_at.get_or_insert_with(Instant::now);
                         let tool_index = next_tool_index;
                         next_tool_index += 1;
                         output_to_tool_index.insert(added_event.output_index, tool_index);
@@ -475,6 +535,7 @@ pub(crate) fn stream_responses_tracked<'a>(
                         && let Some(&tool_index) =
                             output_to_tool_index.get(&args_event.output_index)
                     {
+                        first_output_at.get_or_insert_with(Instant::now);
                         yield SamplingEvent::ToolCallDelta {
                             request_id: request_id.clone(),
                             tool_index,
@@ -486,10 +547,16 @@ pub(crate) fn stream_responses_tracked<'a>(
                 }
 
                 ResponseStreamEvent::ResponseCompleted(completed_event) => {
+                    if !completed_event.response.output.is_empty() {
+                        first_output_at.get_or_insert_with(Instant::now);
+                    }
                     final_response = Some(completed_event.response);
                 }
 
                 ResponseStreamEvent::ResponseIncomplete(incomplete_event) => {
+                    if !incomplete_event.response.output.is_empty() {
+                        first_output_at.get_or_insert_with(Instant::now);
+                    }
                     final_response = Some(incomplete_event.response);
                     should_break = true;
                 }
@@ -551,6 +618,7 @@ pub(crate) fn stream_responses_tracked<'a>(
 
                 // Web search
                 ResponseStreamEvent::ResponseWebSearchCallInProgress(ev) => {
+                    first_output_at.get_or_insert_with(Instant::now);
                     yield SamplingEvent::BackendToolCallStarted {
                         request_id: request_id.clone(),
                         call_id: ev.item_id.clone(),
@@ -570,6 +638,7 @@ pub(crate) fn stream_responses_tracked<'a>(
                 // event fires on InProgress; the full payload (code + outputs)
                 // rides ResponseOutputItemDone(CodeInterpreterCall) below.
                 ResponseStreamEvent::ResponseCodeInterpreterCallInProgress(ev) => {
+                    first_output_at.get_or_insert_with(Instant::now);
                     yield SamplingEvent::BackendToolCallStarted {
                         request_id: request_id.clone(),
                         call_id: ev.item_id.clone(),
@@ -585,6 +654,7 @@ pub(crate) fn stream_responses_tracked<'a>(
                 // For WebSearchCall this includes the query and source URLs.
                 // For CustomToolCall this includes x_search results.
                 ResponseStreamEvent::ResponseOutputItemDone(done_event) => {
+                    first_output_at.get_or_insert_with(Instant::now);
                     if !completed_output_overflowed
                         && done_event.output_index <= MAX_COMPLETED_OUTPUT_INDEX
                     {
@@ -661,6 +731,7 @@ pub(crate) fn stream_responses_tracked<'a>(
                 // CustomToolCallInputDelta is x_search in-progress streaming.
                 // Emit a started event on first delta per item_id.
                 ResponseStreamEvent::ResponseCustomToolCallInputDone(ev) => {
+                    first_output_at.get_or_insert_with(Instant::now);
                     yield SamplingEvent::BackendToolCallStarted {
                         request_id: request_id.clone(),
                         call_id: ev.item_id.clone(),
@@ -772,8 +843,12 @@ pub(crate) fn stream_responses_tracked<'a>(
         };
 
         let stream_end = Instant::now();
-        let metrics =
-            InferenceLatencyStats::from_timestamps(stream_start, &chunk_timestamps, stream_end);
+        let metrics = InferenceLatencyStats::from_timestamps(
+            stream_start,
+            first_output_at,
+            &chunk_timestamps,
+            stream_end,
+        );
 
         // Warn-only for now: surface the server-reported triggers once per
         // request (raw labels only — ZDR-safe) and attach them for callers.
@@ -882,6 +957,18 @@ mod tests {
         })
     }
 
+    fn reasoning_summary_delta_event(delta: &str) -> rs::ResponseStreamEvent {
+        serde_json::from_value(serde_json::json!({
+            "type": "response.reasoning_summary_text.delta",
+            "sequence_number": 0,
+            "item_id": "reasoning-1",
+            "output_index": 0,
+            "summary_index": 0,
+            "delta": delta
+        }))
+        .expect("reasoning summary delta event")
+    }
+
     fn message_output_item(id: &str, text: &str) -> rs::OutputItem {
         serde_json::from_value(serde_json::json!({
             "type": "message",
@@ -896,6 +983,16 @@ mod tests {
             }]
         }))
         .expect("message output item")
+    }
+
+    fn function_call_output_item() -> rs::OutputItem {
+        serde_json::from_value(serde_json::json!({
+            "type": "function_call",
+            "call_id": "call_1",
+            "name": "read_file",
+            "arguments": "{\"path\":\"README.md\"}"
+        }))
+        .expect("function call output item")
     }
 
     fn output_item_done_event(output_index: u32, item: rs::OutputItem) -> rs::ResponseStreamEvent {
@@ -945,6 +1042,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn reasoning_only_delta_records_first_output_without_text_chunks() {
+        let raw = stream::iter(vec![
+            Ok(reasoning_summary_delta_event("thinking")),
+            Ok(completed_event()),
+        ])
+        .boxed();
+        let events = collect(stream_responses(
+            raw,
+            None,
+            rid(),
+            Duration::from_secs(60),
+            None,
+        ))
+        .await;
+
+        match events.last().unwrap() {
+            SamplingEvent::Completed { metrics, .. } => {
+                assert!(metrics.time_to_first_token_ms.is_some());
+                assert_eq!(metrics.chunk_count, 0);
+                assert!(metrics.itl_intervals_ms.is_empty());
+            }
+            other => panic!("expected Completed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn output_item_done_restores_empty_terminal_output() {
         let done = output_item_done_event(0, message_output_item("msg_done", "hello"));
         let raw = stream::iter(vec![Ok(done), Ok(completed_event())]).boxed();
@@ -958,8 +1081,37 @@ mod tests {
         .await;
 
         match events.last().unwrap() {
-            SamplingEvent::Completed { response, .. } => {
+            SamplingEvent::Completed {
+                response, metrics, ..
+            } => {
                 assert_eq!(response.assistant().unwrap().content.as_ref(), "hello");
+                assert!(metrics.time_to_first_token_ms.is_some());
+                assert_eq!(metrics.chunk_count, 0);
+            }
+            other => panic!("expected Completed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn output_item_done_tool_call_records_first_output_without_text_chunks() {
+        let done = output_item_done_event(0, function_call_output_item());
+        let raw = stream::iter(vec![Ok(done), Ok(completed_event())]).boxed();
+        let events = collect(stream_responses(
+            raw,
+            None,
+            rid(),
+            Duration::from_secs(60),
+            None,
+        ))
+        .await;
+
+        match events.last().unwrap() {
+            SamplingEvent::Completed {
+                response, metrics, ..
+            } => {
+                assert_eq!(response.tool_calls().len(), 1);
+                assert!(metrics.time_to_first_token_ms.is_some());
+                assert_eq!(metrics.chunk_count, 0);
             }
             other => panic!("expected Completed, got {other:?}"),
         }
@@ -1198,9 +1350,11 @@ mod tests {
         // Text delta with content is meaningful.
         let event = text_delta_event("foo");
         assert!(responses_event_has_meaningful_content(&event));
+        assert!(responses_event_marks_first_output(&event));
         // Empty text delta is not.
         let empty = text_delta_event("");
         assert!(!responses_event_has_meaningful_content(&empty));
+        assert!(!responses_event_marks_first_output(&empty));
         // Completed is meaningful (terminal).
         assert!(responses_event_has_meaningful_content(&completed_event()));
     }

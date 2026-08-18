@@ -135,6 +135,11 @@ jobs:
           shared-key: ${{ runner.os }}-x86_64-release
           cache-on-failure: true
 
+      - name: Test sampler library
+        if: runner.os == 'Linux'
+        shell: bash
+        run: cargo test --locked -p xai-grok-sampler --lib
+
       - name: Build release binary
         shell: bash
         run: cargo build --locked -p xai-grok-pager-bin --release

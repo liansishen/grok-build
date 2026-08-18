@@ -41,6 +41,7 @@ pub fn stream_chat_completions<'a>(
 ) -> impl Stream<Item = SamplingEvent> + Send + 'a {
     async_stream::stream! {
         let stream_start = Instant::now();
+        let mut first_output_at: Option<Instant> = None;
         let mut chunk_timestamps: Vec<Instant> = Vec::new();
 
         // Emit StreamStarted before reading any chunks so subscribers
@@ -155,6 +156,8 @@ pub fn stream_chat_completions<'a>(
                 if let Some(text) = delta.content
                     && !text.is_empty()
                 {
+                    let output_at = Instant::now();
+                    first_output_at.get_or_insert(output_at);
                     if !first_token_emitted {
                         first_token_emitted = true;
                         yield SamplingEvent::FirstToken {
@@ -162,7 +165,7 @@ pub fn stream_chat_completions<'a>(
                         };
                     }
                     chunk_has_content = true;
-                    chunk_timestamps.push(Instant::now());
+                    chunk_timestamps.push(output_at);
                     chunk_index += 1;
                     message_chunk_count += 1;
                     content_acc.push_str(&text);
@@ -177,6 +180,7 @@ pub fn stream_chat_completions<'a>(
                 if let Some(thought) = delta.reasoning_content
                     && !thought.is_empty()
                 {
+                    first_output_at.get_or_insert_with(Instant::now);
                     if !first_token_emitted {
                         first_token_emitted = true;
                         yield SamplingEvent::FirstToken {
@@ -195,6 +199,7 @@ pub fn stream_chat_completions<'a>(
                 }
 
                 for tc_delta in delta.tool_calls.into_iter() {
+                    first_output_at.get_or_insert_with(Instant::now);
                     chunk_has_content = true;
 
                     let entry = tool_call_acc
@@ -281,8 +286,12 @@ pub fn stream_chat_completions<'a>(
         }
 
         let stream_end = Instant::now();
-        let metrics =
-            InferenceLatencyStats::from_timestamps(stream_start, &chunk_timestamps, stream_end);
+        let metrics = InferenceLatencyStats::from_timestamps(
+            stream_start,
+            first_output_at,
+            &chunk_timestamps,
+            stream_end,
+        );
 
         let response = ConversationResponse {
             items,
@@ -481,13 +490,16 @@ mod tests {
         assert!(saw_reasoning && saw_text);
 
         match events.last().unwrap() {
-            SamplingEvent::Completed { response, .. } => {
+            SamplingEvent::Completed {
+                response, metrics, ..
+            } => {
                 let r = response
                     .reasoning_items()
                     .next()
                     .expect("reasoning sibling preserved");
                 let rs::SummaryPart::SummaryText(t) = &r.summary[0];
                 assert_eq!(t.text, "thinking...");
+                assert!(metrics.time_to_first_token_ms.is_some());
             }
             other => panic!("expected Completed, got {other:?}"),
         }
@@ -570,7 +582,9 @@ mod tests {
         assert_eq!(deltas[1].3.as_deref(), Some("1}"));
 
         match events.last().unwrap() {
-            SamplingEvent::Completed { response, .. } => {
+            SamplingEvent::Completed {
+                response, metrics, ..
+            } => {
                 let calls = response.tool_calls();
                 assert_eq!(calls.len(), 1);
                 assert_eq!(calls[0].id.as_ref(), "call_abc");
@@ -578,6 +592,8 @@ mod tests {
                 assert_eq!(calls[0].arguments.as_ref(), "{\"x\":1}");
                 // Tool calls force ToolCalls stop reason.
                 assert_eq!(response.stop_reason, Some(StopReason::ToolCalls));
+                assert!(metrics.time_to_first_token_ms.is_some());
+                assert_eq!(metrics.chunk_count, 0);
             }
             other => panic!("expected Completed, got {other:?}"),
         }

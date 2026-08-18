@@ -88,6 +88,7 @@ pub fn stream_messages<'a>(
         use messages::{ContentBlock, StreamDelta};
 
         let stream_start = Instant::now();
+        let mut first_output_at: Option<Instant> = None;
         let mut chunk_timestamps: Vec<Instant> = Vec::new();
 
         yield SamplingEvent::StreamStarted {
@@ -204,6 +205,7 @@ pub fn stream_messages<'a>(
                         thinking,
                         signature,
                     } => {
+                        first_output_at.get_or_insert_with(Instant::now);
                         blocks.insert(
                             index,
                             BlockState {
@@ -224,6 +226,9 @@ pub fn stream_messages<'a>(
                         }
                     }
                     ContentBlock::Text { text, .. } => {
+                        if !text.is_empty() {
+                            first_output_at.get_or_insert_with(Instant::now);
+                        }
                         blocks.insert(
                             index,
                             BlockState {
@@ -244,6 +249,7 @@ pub fn stream_messages<'a>(
                         }
                     }
                     ContentBlock::ToolUse { id, name, .. } => {
+                        first_output_at.get_or_insert_with(Instant::now);
                         let tool_index = next_tool_index;
                         next_tool_index += 1;
                         block_to_tool_index.insert(index, tool_index);
@@ -295,6 +301,7 @@ pub fn stream_messages<'a>(
                         match delta {
                             StreamDelta::ThinkingDelta { thinking } => {
                                 if !thinking.is_empty() {
+                                    first_output_at.get_or_insert_with(Instant::now);
                                     state.thinking_acc.push_str(&thinking);
                                     if !first_token_emitted {
                                         first_token_emitted = true;
@@ -316,6 +323,8 @@ pub fn stream_messages<'a>(
                             }
                             StreamDelta::TextDelta { text } => {
                                 if !text.is_empty() {
+                                    let output_at = Instant::now();
+                                    first_output_at.get_or_insert(output_at);
                                     state.text_acc.push_str(&text);
                                     if !first_token_emitted {
                                         first_token_emitted = true;
@@ -323,7 +332,7 @@ pub fn stream_messages<'a>(
                                             request_id: request_id.clone(),
                                         };
                                     }
-                                    chunk_timestamps.push(Instant::now());
+                                    chunk_timestamps.push(output_at);
                                     chunk_index += 1;
                                     message_chunk_count += 1;
                                     yield SamplingEvent::ChannelToken {
@@ -335,6 +344,9 @@ pub fn stream_messages<'a>(
                                 }
                             }
                             StreamDelta::InputJsonDelta { partial_json } => {
+                                if !partial_json.is_empty() {
+                                    first_output_at.get_or_insert_with(Instant::now);
+                                }
                                 state.args_acc.push_str(&partial_json);
                                 if let Some(&tool_index) = block_to_tool_index.get(&index) {
                                     yield SamplingEvent::ToolCallDelta {
@@ -569,8 +581,12 @@ pub fn stream_messages<'a>(
         items.push(assistant_item);
 
         let stream_end = Instant::now();
-        let metrics =
-            InferenceLatencyStats::from_timestamps(stream_start, &chunk_timestamps, stream_end);
+        let metrics = InferenceLatencyStats::from_timestamps(
+            stream_start,
+            first_output_at,
+            &chunk_timestamps,
+            stream_end,
+        );
 
         let response = ConversationResponse {
             items,
