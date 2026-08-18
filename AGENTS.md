@@ -4,7 +4,7 @@
 
 Every release must include a written changelog entry in the repository's existing changelog before the release is published.
 
-The authoritative changelog is [`crates/codegen/xai-grok-shell/CHANGELOG.md`](crates/codegen/xai-grok-shell/CHANGELOG.md). New entries must follow its existing format and section names, including the version heading and the applicable `Features`, `Bug Fixes`, `Breaking Changes`, and `Performance` sections. Do not create a separate root-level changelog for fork releases.
+The authoritative changelog is [`crates/codegen/xai-grok-shell/CHANGELOG.md`](crates/codegen/xai-grok-shell/CHANGELOG.md). New fork release entries must follow the established release-notes style used by the previous fork release: use Chinese user-facing prose, explain the behavior and relevant edge cases in detail, record internationalization status, record verification and release assets, and include a full comparison link. Keep the existing version heading and applicable project sections; do not replace the release notes with a short code-only summary.
 
 Each changelog entry must:
 
