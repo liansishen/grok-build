@@ -126,7 +126,7 @@ impl SessionActor {
     /// applied. Second value is the session model before the override.
     async fn sampling_config_for_compact(
         &self,
-    ) -> (xai_grok_sampling_types::SamplingConfig, String) {
+    ) -> (xai_grok_sampler::SamplerConfig, String) {
         let mut cfg = self.reconstruct_full_config().await;
         let user_model = cfg.model.clone();
         let compact_model = self
@@ -135,7 +135,10 @@ impl SessionActor {
             .compaction_policy()
             .compact_model
             .clone();
-        crate::util::config::apply_compact_model_override(&mut cfg, compact_model.as_deref());
+        crate::util::config::apply_compact_model_override(
+            &mut cfg.model,
+            compact_model.as_deref(),
+        );
         (cfg, user_model)
     }
     /// Run one summarization sample over a fully-built two-pass history (the

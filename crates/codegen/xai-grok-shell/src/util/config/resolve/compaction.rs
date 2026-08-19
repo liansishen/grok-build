@@ -47,19 +47,19 @@ pub(crate) fn resolve_compact_model(env: Option<&str>, config: Option<&str>) -> 
     nonempty(env).or_else(|| nonempty(config))
 }
 
-/// Override `cfg.model` when a dedicated compact model is configured.
+/// Override the compact request's model id when a dedicated compact model is configured.
 /// Returns `true` when the model id changed.
 pub(crate) fn apply_compact_model_override(
-    cfg: &mut xai_grok_sampling_types::SamplingConfig,
+    model: &mut String,
     compact_model: Option<&str>,
 ) -> bool {
-    let Some(model) = compact_model.map(str::trim).filter(|s| !s.is_empty()) else {
+    let Some(next) = compact_model.map(str::trim).filter(|s| !s.is_empty()) else {
         return false;
     };
-    if cfg.model == model {
+    if model == next {
         return false;
     }
-    cfg.model = model.to_string();
+    *model = next.to_string();
     true
 }
 /// Env-var override for `auto_compact_threshold_percent`. Parsed as `u8`;
@@ -250,25 +250,6 @@ mod compaction_tool_choice_tests {
 #[cfg(test)]
 mod compact_model_resolve_tests {
     use super::{apply_compact_model_override, resolve_compact_model};
-    use xai_grok_sampling_types::SamplingConfig;
-
-    fn sample_cfg(model: &str) -> SamplingConfig {
-        SamplingConfig {
-            base_url: "http://localhost".into(),
-            model: model.to_string(),
-            max_completion_tokens: None,
-            temperature: None,
-            top_p: None,
-            api_backend: Default::default(),
-            extra_headers: Default::default(),
-            query_params: Default::default(),
-            env_http_headers: Default::default(),
-            context_window: std::num::NonZeroU64::new(256_000).unwrap(),
-            reasoning_effort: None,
-            stream_tool_calls: None,
-        }
-    }
-
     #[test]
     fn blank_or_none_uses_session_model() {
         assert_eq!(resolve_compact_model(None, None), None);
@@ -290,12 +271,12 @@ mod compact_model_resolve_tests {
 
     #[test]
     fn apply_override_swaps_only_when_different() {
-        let mut cfg = sample_cfg("session-model");
-        assert!(!apply_compact_model_override(&mut cfg, None));
-        assert_eq!(cfg.model, "session-model");
-        assert!(!apply_compact_model_override(&mut cfg, Some("  ")));
-        assert!(apply_compact_model_override(&mut cfg, Some("compact-model")));
-        assert_eq!(cfg.model, "compact-model");
-        assert!(!apply_compact_model_override(&mut cfg, Some("compact-model")));
+        let mut model = String::from("session-model");
+        assert!(!apply_compact_model_override(&mut model, None));
+        assert_eq!(model, "session-model");
+        assert!(!apply_compact_model_override(&mut model, Some("  ")));
+        assert!(apply_compact_model_override(&mut model, Some("compact-model")));
+        assert_eq!(model, "compact-model");
+        assert!(!apply_compact_model_override(&mut model, Some("compact-model")));
     }
 }
