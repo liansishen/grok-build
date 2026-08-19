@@ -38,9 +38,9 @@ Or use the alias:
 /m grok-build
 ```
 
-### Model Picker (Ctrl+M)
+### Model Picker (Alt+M)
 
-Press `Ctrl+M` from the prompt or the scrollback pane to open the model picker. It lists all available models, both built-in and custom, and lets you switch with a single keystroke. `/model` and the command palette also open the same picker.
+Press `Alt+M` from the prompt or the scrollback pane to open the model picker. It lists all available models, both built-in and custom, and lets you switch with a single keystroke. `/model` and the command palette also open the same picker. `Ctrl+M` is not used: most terminals deliver it as Enter.
 
 ### Config Default
 

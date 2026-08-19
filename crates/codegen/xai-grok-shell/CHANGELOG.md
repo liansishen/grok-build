@@ -1,5 +1,39 @@
 # Changelog
 
+# 1.0.5-fork.7 — 2026-08-19
+
+## 问题修复
+
+### Alt+M 打开模型选择器
+
+- `Ctrl+M` 在多数终端里就是回车（`\r` / Enter），没有 Kitty 键盘协议时无法与「发送」或「打开块查看器」区分，模型选择器仍然触发不到。
+- 智能体会话的模型选择器改绑为 `Alt+M`，输入框和对话记录都有效；`Ctrl+M` 不再绑定，避免再被当成 Enter。
+- `/model` 和命令面板仍打开同一选择器。Agent Dashboard 的调度框和预览回复仍用 `Ctrl+M` 切换多行。
+- macOS 若未把 Option 设为 Meta，`Option+M` 可能输入 `µ`，请改用 `/model`。Linux 一般可直接用 `Alt+M`。
+
+### 中文瞬时提示完整显示
+
+- 修复输入框上方自动消失提示（例如 Shift+Tab 的「已切换模式：…」）只显示一个汉字「已」和一片空白的问题。
+- 根因是横幅和右下角 toast 按「一个字符一列」定位和落笔。中文占两列，后一个字会盖住前一个字的第二格，宽字符被拆掉后只剩首字。
+- 截断也曾用字节数或字符个数，而不是终端列宽，中文更容易被裁早或顶出右边界。
+- 现在按 `unicode_width` 计算列宽、截断和绘制步进，与欢迎页 toast 同一规则。会话 toast、模式横幅、行查看器和块查看器 toast 一并修正。
+- 本次没有新增用户可见字段、提示或错误文案，无需新增英文或简体中文翻译键。
+
+### 验证
+
+- 单元测试覆盖输入框聚焦时 `Alt+M` 打开模型选择器，以及中文提示按列宽截断、宽字符宽度大于字符个数。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.5-fork.7-linux-x86_64`
+- `grok-1.0.5-fork.7-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.6...v1.0.5-fork.7
+
 # 1.0.5-fork.6 — 2026-08-18
 
 ## 问题修复

@@ -1196,7 +1196,7 @@ mod shift_tab_cycle_mode_tests {
 }
 
 #[cfg(test)]
-mod ctrl_m_model_picker_tests {
+mod alt_m_model_picker_tests {
     use super::*;
     use crate::app::app_view::InputOutcome;
     use crate::views::modal::ActiveModal;
@@ -1204,14 +1204,14 @@ mod ctrl_m_model_picker_tests {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::sync::Arc;
 
-    fn ctrl_m() -> KeyEvent {
-        KeyEvent::new(KeyCode::Char('m'), KeyModifiers::CONTROL)
+    fn alt_m() -> KeyEvent {
+        KeyEvent::new(KeyCode::Char('m'), KeyModifiers::ALT)
     }
 
-    /// Prompt is focused by default. Ctrl+M must open the model picker
-    /// there — not toggle multiline (the previous PromptFocused binding).
+    /// Prompt is focused by default. Alt+M must open the model picker
+    /// there — Ctrl+M is Enter on most terminals and must not steal send.
     #[test]
-    fn prompt_focused_ctrl_m_opens_model_picker() {
+    fn prompt_focused_alt_m_opens_model_picker() {
         let mut agent = super::test_fixtures::make_agent();
         assert_eq!(agent.active_pane, AgentPane::Prompt);
         let id = acp::ModelId::new(Arc::from("test-model"));
@@ -1220,22 +1220,22 @@ mod ctrl_m_model_picker_tests {
             acp::ModelInfo::new(id, "Test Model".to_string()),
         );
 
-        let outcome = agent.handle_prompt_key_for_test(&ctrl_m());
+        let outcome = agent.handle_prompt_key_for_test(&alt_m());
         assert!(
             matches!(outcome, InputOutcome::Changed),
-            "Ctrl+M from the prompt must be consumed, got {outcome:?}"
+            "Alt+M from the prompt must be consumed, got {outcome:?}"
         );
         assert!(
             matches!(
                 agent.active_modal,
                 Some(ActiveModal::ArgPicker { ref command, .. }) if command == "model"
             ),
-            "Ctrl+M from the prompt must open the model picker, got {:?}",
+            "Alt+M from the prompt must open the model picker, got {:?}",
             agent.active_modal
         );
         assert!(
             !agent.multiline_mode,
-            "Ctrl+M must not toggle multiline from the agent prompt"
+            "Alt+M must not toggle multiline from the agent prompt"
         );
     }
 }

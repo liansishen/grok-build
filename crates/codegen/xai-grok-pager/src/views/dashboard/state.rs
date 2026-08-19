@@ -3008,8 +3008,8 @@ impl DashboardState {
             }
         }
 
-        // Ctrl+M: agent sessions use this chord for the model picker;
-        // dashboard dispatch/peek keep it as multiline.
+        // Ctrl+M: agent sessions use Alt+M for the model picker;
+        // dashboard dispatch/peek keep Ctrl+M as multiline.
         if key!('m', CONTROL).matches(key) {
             return Some(InputOutcome::Action(Action::SetMultilineMode(
                 !self.multiline_mode,
@@ -3552,8 +3552,8 @@ impl DashboardState {
             return self.dispatch_send_action(true);
         }
 
-        // Ctrl+M: agent sessions use this chord for the model picker;
-        // dashboard dispatch/peek keep it as multiline.
+        // Ctrl+M: agent sessions use Alt+M for the model picker;
+        // dashboard dispatch/peek keep Ctrl+M as multiline.
         if key!('m', CONTROL).matches(key) && !self.search_mode {
             return InputOutcome::Action(Action::SetMultilineMode(!self.multiline_mode));
         }

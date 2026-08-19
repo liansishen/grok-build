@@ -2624,7 +2624,7 @@ fn multiline_mode_empty_bare_enter_is_newline() {
     }
 }
 
-/// Ctrl+M toggles multiline on the dashboard (agent sessions use it for /model).
+/// Ctrl+M toggles multiline on the dashboard (agent sessions use Alt+M for /model).
 #[test]
 fn ctrl_m_toggles_multiline_mode() {
     use crate::app::actions::Action;

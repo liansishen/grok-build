@@ -914,6 +914,7 @@ mod tests {
         assert_eq!(def.context, When::ScrollbackFocused);
 
         let ctrl_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
+        let alt_m = KeyEvent::new(KeyCode::Char('m'), KeyModifiers::ALT);
         let ctrl_m = KeyEvent::new(KeyCode::Char('m'), KeyModifiers::CONTROL);
         let f9 = KeyEvent::new(KeyCode::F(9), KeyModifiers::NONE);
         let ctrl_shift_m = KeyEvent::new(
@@ -928,13 +929,15 @@ mod tests {
             Some(ActionId::ToggleMouseCapture)
         );
         // Not on agent/prompt contexts (Ctrl+R is deliberately unbound there;
-        // agent keeps the model picker on Ctrl+M, including from the prompt).
+        // agent keeps the model picker on Alt+M, including from the prompt).
         assert_eq!(registry.lookup(&ctrl_r, When::AgentScreen), None);
         assert_eq!(registry.lookup(&ctrl_r, When::PromptFocused), None);
         assert_eq!(
-            registry.lookup(&ctrl_m, When::AgentScreen),
+            registry.lookup(&alt_m, When::AgentScreen),
             Some(ActionId::ModelPicker)
         );
+        assert_eq!(registry.lookup(&ctrl_m, When::AgentScreen), None);
+        assert_eq!(registry.lookup(&alt_m, When::PromptFocused), None);
         assert_eq!(registry.lookup(&ctrl_m, When::PromptFocused), None);
         // Former mouse-toggle dual bindings removed from scrollback.
         assert_eq!(registry.lookup(&f9, When::ScrollbackFocused), None);
@@ -947,7 +950,7 @@ mod tests {
         assert_eq!(registry.lookup(&ctrl_shift_m, When::Always), None);
         // Voice capture is bound to BOTH Ctrl+Space and F8, and is global
         // (`When::Always`) so it resolves on the agent screen and the dashboard
-        // alike (distinct from Ctrl+M model picker). It is not
+        // alike (distinct from Alt+M model picker). It is not
         // agent-scoped, so an exact AgentScreen lookup misses.
         assert_eq!(
             registry.lookup(&ctrl_space, When::Always),
