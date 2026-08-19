@@ -1616,7 +1616,7 @@ mod tests {
         assert_eq!(agent.prompt.text(), "");
         assert_eq!(
             agent.toast.as_ref().map(|(message, _)| message.as_str()),
-            Some(crate::app::queue_edit::STILL_QUEUEING_TOAST),
+            Some(crate::app::queue_edit::still_queueing_toast()),
         );
         assert!(
             agent.pending_effects.is_empty(),

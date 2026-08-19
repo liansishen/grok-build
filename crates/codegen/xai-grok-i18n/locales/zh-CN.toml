@@ -2772,6 +2772,7 @@
 "toast.setting_changed" = "✓ {label}: {value}"
 "toast.setting_save_failed" = "✗ 无法保存 {key}：{error}"
 "toast.sharing_disabled" = "分享已禁用"
+"toast.still_queueing" = "仍在入队，请稍后再试"
 "toast.stop_session_before_delete" = "请先停止会话再删除"
 "toast.subagent_delete_unsupported" = "无法从仪表盘删除子智能体行"
 "toast.switched_fullscreen_mode" = "已切换到全屏模式 · 使用 /minimal 返回"

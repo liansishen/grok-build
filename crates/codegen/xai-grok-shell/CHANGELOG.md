@@ -1,5 +1,69 @@
 # Changelog
 
+# 1.0.5-fork.10 — 2026-08-19
+
+同步上游 monorepo `d92c5b0b` / Source-Revision `9dccd1f0`，产品版本保持 **1.0.5**。
+
+### 上游更新
+
+本次上游同步覆盖输入框 Shift 选区、Goal 模式下队列消息解堵、Windows PowerShell hook 环境变量、子 agent 能力模式、视频生成 ZDR 提示、MCP 图标转发、同意记录上传以及 shell attempt 存储编解码。
+
+#### 输入框 Shift 扩展选区
+
+- 输入框现在支持浏览器式 Shift 扩展选区：`Shift+←/→` 选字符、`Alt+Shift+←/→` 选词、`Cmd+Shift+←/→` 选可视行、`Shift+Home/End` 选逻辑行、`Shift+↑/↓` 选行。
+- 有选区时，键盘输入、`Enter` 和粘贴会替换选中文本；删除和 word-kill 只删选区；方向键把光标收到选区边缘；`Esc` 或 `Tab` 取消高亮但仍执行原来的取消/切换焦点动作。
+- 在 Kitty 协议终端上，有选区时 `Cmd+C` / `Cmd+X` 可复制/剪切。这些快捷键只在**输入框获焦**时做文本选区；对话记录获焦时 `Shift+←/→` 仍然是跳转轮次。
+- Agent Dashboard 的调度框和预览回复也会跟随选区变化重绘；`Cmd+X` 在有选区时不再触发仪表盘的停止/删除。
+
+#### Goal 模式与队列编辑
+
+- Goal 模式进行中时，队列里的用户消息不会再被持续的 Goal 续轮拦住。下一条可运行的用户队列项会插入执行，Goal 在该轮结束后再续上。
+- 队列项还在编辑占用中时不会被提前执行。编辑占用超时后会视为过期，避免断线的编辑器把 Goal 循环整段挂起。
+- 编辑尚未确认入队的乐观队列行时会提示「仍在入队，请稍后再试」，不再静默丢掉按键。
+- 选中的队列行已经不在队列里时会复用既有「排队提示已不在队列中」提示。
+
+#### Hook 与 Windows PowerShell
+
+- 解析 hook 命令时不再把运行时注入的 `$CLAUDE_PROJECT_DIR` / `$GROK_WORKSPACE_ROOT` 等变量用进程环境替换掉。Unix `sh -c` 从子进程环境展开；Windows PowerShell 会把已知 `$VAR` 改写为 `$env:VAR`，避免 `.ps1` hook 因空路径失败。
+- Git Bash 下会把工作区路径里的 `\` 换成 `/`，避免未引号 `$VAR` 把反斜杠当转义。
+
+#### 子 agent 能力模式
+
+- 模型可见的 `task` 工具不再接受 spawn 时的 `capability_mode`。子 agent 的工具集由 agent 类型和角色/定义默认决定；JSON 里若仍传该字段会被忽略。
+- 兼容套件仍可在进程内设置该字段。`general-purpose` 保持完整工具集；`explore` / `plan` 仍可读取、搜索和跑 shell，但不能改文件。
+
+#### 视频生成与同意
+
+- 零数据保留（ZDR）下视频生成的提示改为更直接的启用说明：关闭 `/privacy` 或提供用户托管的存储桶。若 API 返回 `must provide output.upload_url`，也会走同一条 ZDR 错误。
+- 该消息是给模型的工具错误，由模型转述给用户，不走界面国际化目录。
+- MCP 列表会转发协议里的图标字段（`src` / `mimeType` / `sizes` / `theme`），这些是协议数据而不是新的界面文案。
+- 用户接受同意后，客户端会把接受记录上传到代理。本地标记仍是防止重复弹窗的依据；上传失败只记日志，不阻止使用。
+
+#### Shell attempt 存储
+
+- 补全 shell attempt 记录的完成、意图、恢复、回退与会计编解码。这些是内部持久化与对齐路径，不改变既有界面字段。
+
+### 本 Fork
+
+- 保留 `v1.0.5-fork.9` 及之前的 fork 能力：简体中文界面、透明背景、账户计费与 CPA 配额、会话用量与缓存率、次要模型与推理强度、按目录条目配置的压缩模型、逐次请求指标、Responses 终端帧恢复、`Alt+M` 打开模型选择器、中文 toast 按列宽绘制以及 fork 发布更新。
+- 上游新增的队列编辑提示已走国际化：新键 `toast.still_queueing` （英文「Still queueing, try again in a moment」/简体中文「仍在入队，请稍后再试」）；队列行消失复用已有键 `toast.queued_gone`。
+- Shift 选区、Goal 队列解堵、MCP 图标字段、同意上传和 attempt 编解码没有新增界面字段。视频 ZDR 文案是模型侧工具错误，同意上传失败只记日志，不需要新的界面翻译键。
+
+### 验证
+
+- 静态审查覆盖自动合并后的 fork 标记（`Alt+M`、CJK 列宽、次要模型、压缩模型、国际化调用）与新 toast 的英文/简体中文目录一致性。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.5-fork.10-linux-x86_64`
+- `grok-1.0.5-fork.10-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.9...v1.0.5-fork.10
+
 # 1.0.5-fork.9 — 2026-08-19
 
 ## 问题修复

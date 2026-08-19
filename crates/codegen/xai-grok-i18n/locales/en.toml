@@ -2772,6 +2772,7 @@
 "toast.setting_changed" = "✓ {label}: {value}"
 "toast.setting_save_failed" = "✗ Could not save {key}: {error}"
 "toast.sharing_disabled" = "Sharing is disabled"
+"toast.still_queueing" = "Still queueing, try again in a moment"
 "toast.stop_session_before_delete" = "Stop the session before deleting"
 "toast.subagent_delete_unsupported" = "Subagent rows can't be deleted from the dashboard"
 "toast.switched_fullscreen_mode" = "Switched to fullscreen mode · /minimal to go back"

@@ -25,7 +25,9 @@ use super::app_view::InputOutcome;
 
 /// Toast for an edit attempted on an optimistic queue row whose enqueue RPC has not confirmed.
 /// Shared by the keyboard and mouse edit paths, which both funnel through `enter_queue_edit`.
-pub(in crate::app) const STILL_QUEUEING_TOAST: &str = "Still queueing, try again in a moment";
+pub(in crate::app) fn still_queueing_toast() -> &'static str {
+    xai_grok_i18n::t("toast.still_queueing")
+}
 
 /// State of the prompt widget's editing context.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,7 +232,7 @@ impl AgentView {
         if let Some(sid) = row.as_ref().and_then(|r| r.server_id.as_deref())
             && self.optimistic_queue_ids.contains(sid)
         {
-            self.show_toast(STILL_QUEUEING_TOAST);
+            self.show_toast(still_queueing_toast());
             return;
         }
         type QueueEditEntryData = (
@@ -318,7 +320,7 @@ impl AgentView {
             }
         } else {
             // The row left the mirror between selection and keypress, so there is nothing to edit.
-            self.show_toast("Queued prompt is no longer in the queue");
+            self.show_toast(xai_grok_i18n::t("toast.queued_gone"));
         }
     }
 
@@ -760,7 +762,7 @@ mod tests {
         );
         assert_eq!(
             agent.toast.as_ref().map(|(message, _)| message.as_str()),
-            Some(super::STILL_QUEUEING_TOAST),
+            Some(super::still_queueing_toast()),
         );
         assert!(
             agent.pending_effects.is_empty(),
@@ -785,7 +787,7 @@ mod tests {
         );
         assert_eq!(
             agent.toast.as_ref().map(|(message, _)| message.as_str()),
-            Some("Queued prompt is no longer in the queue"),
+            Some(xai_grok_i18n::t("toast.queued_gone")),
         );
     }
 
