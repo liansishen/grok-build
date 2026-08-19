@@ -1,5 +1,37 @@
 # Changelog
 
+# 1.0.5-fork.6 — 2026-08-18
+
+## 问题修复
+
+### Ctrl+M 打开模型选择器
+
+- 修复智能体会话中按 `Ctrl+M` 无法切换模型的问题。默认焦点在输入框时，该键以前被绑成切换多行模式，只有先 `Tab` 到对话记录才会打开模型选择器。
+- 根因是同一按键按焦点分流：输入框里走 `ToggleMultiline`，记录区里才走 `ModelPicker`。日常使用几乎总在输入框，模型选择器实际上触发不到。
+- `Ctrl+M` 现在在输入框和对话记录都会打开模型选择器，与 `/model` 和命令面板同一选择器。选择后影响后续轮次。
+- 多行模式改为 `/multiline`（别名 `/ml`）或 `/settings`。`Enter` 仍发送；换行仍是 `Shift+Enter` / `Alt+Enter`。
+
+### 兼容与边界
+
+- Agent Dashboard 的调度框和预览回复仍用 `Ctrl+M` 切换多行，因为那里没有当前会话模型可选。
+- 没有 Kitty 键盘协议的终端仍可能把 `Ctrl+M` 收成 `Enter`：输入框里会发送，对话记录里会打开块查看器。这是终端限制，请改用 `/model` 或命令面板。Kitty、Ghostty、开启了 `enable_kitty_keyboard` 的 WezTerm 不受影响。
+- 本次没有新增用户可见字段、提示或错误文案，无需新增英文或简体中文翻译键。
+
+### 验证
+
+- 单元测试覆盖输入框聚焦时 `Ctrl+M` 打开模型选择器且不切换多行。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.5-fork.6-linux-x86_64`
+- `grok-1.0.5-fork.6-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.5...v1.0.5-fork.6
+
 # 1.0.5-fork.5 — 2026-08-18
 
 ## 问题修复

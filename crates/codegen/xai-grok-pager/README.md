@@ -45,7 +45,7 @@ src/
 | `Esc` | Turn running | Cancel — in minimal mode or with vim scrollback mode off (the default). Fullscreen vim mode: no-op (use `Ctrl+C`) |
 | `Esc` `Esc` | Idle, non-empty prompt | Clear prompt (within 800ms; first press shows hint) |
 | `Esc` `Esc` | Idle, empty prompt + messages | Open rewind picker (silent first press) |
-| `Ctrl+M` | Prompt | Toggle multiline mode |
+| `Ctrl+M` | Agent screen | Open the model picker / switch model |
 | `Shift+Enter` | Prompt | Insert newline |
 | `/` | Prompt | Start slash command |
 | `@` | Prompt | Start file search |

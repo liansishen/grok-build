@@ -729,7 +729,7 @@ pub struct DashboardState {
     /// Mirror of `AppView::voice_interim` — the live partial transcript.
     pub voice_interim: Option<String>,
     /// Surface-local compose mode for dispatch + peek (not persisted; not
-    /// shared with agent sessions). `/multiline` or Ctrl+M.
+    /// shared with agent sessions). `/multiline` or Ctrl+M (dashboard only).
     pub multiline_mode: bool,
 }
 
@@ -3008,7 +3008,8 @@ impl DashboardState {
             }
         }
 
-        // Ctrl+M: ToggleMultiline is PromptFocused only, so hardcode here.
+        // Ctrl+M: agent sessions use this chord for the model picker;
+        // dashboard dispatch/peek keep it as multiline.
         if key!('m', CONTROL).matches(key) {
             return Some(InputOutcome::Action(Action::SetMultilineMode(
                 !self.multiline_mode,
@@ -3551,7 +3552,8 @@ impl DashboardState {
             return self.dispatch_send_action(true);
         }
 
-        // Ctrl+M: ToggleMultiline is PromptFocused only, so hardcode here.
+        // Ctrl+M: agent sessions use this chord for the model picker;
+        // dashboard dispatch/peek keep it as multiline.
         if key!('m', CONTROL).matches(key) && !self.search_mode {
             return InputOutcome::Action(Action::SetMultilineMode(!self.multiline_mode));
         }

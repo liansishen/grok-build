@@ -203,8 +203,8 @@ Actions that affect the agent session, available from the agent screen.
 |-----|---------|--------|
 | `Ctrl+P` | Agent screen | Open the command palette |
 | `?` (Shift+/) | Agent screen | Open the command palette (alt binding) |
-| `Ctrl+M` | Agent screen | Open the model picker / switch model |
-| `Ctrl+M` | Prompt focused | Toggle multiline input mode |
+| `Ctrl+M` | Agent screen (prompt or scrollback) | Open the model picker / switch model |
+| `/multiline` | Prompt | Toggle multiline input mode |
 | `Ctrl+C` | Agent screen | Cancel the current turn (or clear non-empty draft first; see Escape table) |
 | `Ctrl+O` | Agent screen | Toggle always-approve (YOLO) mode |
 | `Ctrl+S` | Agent screen | Open the session picker (resume a previous session) |
@@ -220,7 +220,7 @@ Actions that affect the agent session, available from the agent screen.
 | `Ctrl+.` (alt: `Ctrl+X`) | Agent screen | Open the keyboard shortcuts help |
 | `F2` (alt: `Ctrl+,` / `Cmd+,`) | Agent screen | Open the settings modal |
 
-**Note:** `Ctrl+M` is context-dependent. When the prompt is focused, it toggles multiline input mode. Otherwise, it opens the model picker.
+**Note:** `Ctrl+M` opens the model picker from the prompt and the scrollback. Multiline mode is toggled with `/multiline` or `/settings`. On the Agent Dashboard, `Ctrl+M` still toggles multiline for the dispatch / peek composer.
 
 **Note:** Minimal-mode external editing resolves `$VISUAL`, then `$EDITOR`, then `vi`. Values may include quoted arguments. Saving replaces only the draft; an empty file clears it. Drafts with pasted/file/image chips must be edited in the composer so attachments are not flattened.
 
@@ -403,7 +403,7 @@ Focus prompt:     i, Tab, or Space
 ```
 Send:             Enter
 Newline:          Shift+Enter or Alt+Enter
-Multiline:        Ctrl+M (toggle)
+Multiline:        /multiline or /settings
 Paste:            Ctrl+V (text, files, screenshots on macOS/Linux)
 Selected text:    Middle click or Shift+Insert (Linux X11/XWayland PRIMARY)
 Paste image:      Alt+V (Windows only — for screenshots / "Copy Image")
@@ -438,7 +438,7 @@ Rewind (idle):    Esc Esc within 800ms (empty prompt + messages)
 
 ```
 Command palette:  Ctrl+P or ?
-Model picker:     Ctrl+M (from scrollback)
+Model picker:     Ctrl+M
 Cancel:           Ctrl+C (see Escape table)
 Always-approve:   Ctrl+O (toggle YOLO)
 New session:      Ctrl+N (press again, then choose normal/worktree)

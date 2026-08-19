@@ -475,7 +475,7 @@ grok --always-approve --prompt "Format all files"
 | ---------------------------- | ------------------------------- |
 | `Enter`                      | Send message                    |
 | `Shift+Enter` or `Alt+Enter` | Insert newline                  |
-| `Ctrl+M`                     | Toggle multiline input mode     |
+| `Ctrl+M`                     | Open the model picker           |
 | `Ctrl+C` or `Esc`            | Cancel current operation        |
 | `Ctrl+D` or `Ctrl+Q`         | Quit (with confirmation)        |
 | `Ctrl+O`                     | Toggle always-approve mode |

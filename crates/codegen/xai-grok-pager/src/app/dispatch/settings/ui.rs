@@ -527,7 +527,7 @@ pub(in crate::app::dispatch) fn dispatch_confirm_reset_setting(
     }
 }
 
-/// Toggle multiline input mode (Ctrl+M keybinding path). Delegates
+/// Toggle multiline input mode (`/multiline` / settings). Delegates
 /// to `set_multiline_mode` (PAGER-OWNED, per-agent ephemeral).
 pub(in crate::app::dispatch) fn dispatch_toggle_multiline(app: &mut AppView) -> Vec<Effect> {
     let ActiveView::Agent(id) = app.active_view else {

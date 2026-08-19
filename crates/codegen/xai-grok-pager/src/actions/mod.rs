@@ -928,17 +928,14 @@ mod tests {
             Some(ActionId::ToggleMouseCapture)
         );
         // Not on agent/prompt contexts (Ctrl+R is deliberately unbound there;
-        // agent keeps the model picker on Ctrl+M).
+        // agent keeps the model picker on Ctrl+M, including from the prompt).
         assert_eq!(registry.lookup(&ctrl_r, When::AgentScreen), None);
         assert_eq!(registry.lookup(&ctrl_r, When::PromptFocused), None);
         assert_eq!(
             registry.lookup(&ctrl_m, When::AgentScreen),
             Some(ActionId::ModelPicker)
         );
-        assert_eq!(
-            registry.lookup(&ctrl_m, When::PromptFocused),
-            Some(ActionId::ToggleMultiline)
-        );
+        assert_eq!(registry.lookup(&ctrl_m, When::PromptFocused), None);
         // Former mouse-toggle dual bindings removed from scrollback.
         assert_eq!(registry.lookup(&f9, When::ScrollbackFocused), None);
         assert_eq!(registry.lookup(&f9, When::AgentScreen), None);
@@ -950,7 +947,7 @@ mod tests {
         assert_eq!(registry.lookup(&ctrl_shift_m, When::Always), None);
         // Voice capture is bound to BOTH Ctrl+Space and F8, and is global
         // (`When::Always`) so it resolves on the agent screen and the dashboard
-        // alike (distinct from Ctrl+M model picker / multiline). It is not
+        // alike (distinct from Ctrl+M model picker). It is not
         // agent-scoped, so an exact AgentScreen lookup misses.
         assert_eq!(
             registry.lookup(&ctrl_space, When::Always),

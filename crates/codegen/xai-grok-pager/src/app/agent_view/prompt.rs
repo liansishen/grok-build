@@ -1196,6 +1196,51 @@ mod shift_tab_cycle_mode_tests {
 }
 
 #[cfg(test)]
+mod ctrl_m_model_picker_tests {
+    use super::*;
+    use crate::app::app_view::InputOutcome;
+    use crate::views::modal::ActiveModal;
+    use agent_client_protocol as acp;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use std::sync::Arc;
+
+    fn ctrl_m() -> KeyEvent {
+        KeyEvent::new(KeyCode::Char('m'), KeyModifiers::CONTROL)
+    }
+
+    /// Prompt is focused by default. Ctrl+M must open the model picker
+    /// there — not toggle multiline (the previous PromptFocused binding).
+    #[test]
+    fn prompt_focused_ctrl_m_opens_model_picker() {
+        let mut agent = super::test_fixtures::make_agent();
+        assert_eq!(agent.active_pane, AgentPane::Prompt);
+        let id = acp::ModelId::new(Arc::from("test-model"));
+        agent.session.models.available.insert(
+            id.clone(),
+            acp::ModelInfo::new(id, "Test Model".to_string()),
+        );
+
+        let outcome = agent.handle_prompt_key_for_test(&ctrl_m());
+        assert!(
+            matches!(outcome, InputOutcome::Changed),
+            "Ctrl+M from the prompt must be consumed, got {outcome:?}"
+        );
+        assert!(
+            matches!(
+                agent.active_modal,
+                Some(ActiveModal::ArgPicker { ref command, .. }) if command == "model"
+            ),
+            "Ctrl+M from the prompt must open the model picker, got {:?}",
+            agent.active_modal
+        );
+        assert!(
+            !agent.multiline_mode,
+            "Ctrl+M must not toggle multiline from the agent prompt"
+        );
+    }
+}
+
+#[cfg(test)]
 mod slash_menu_enter_tests {
     use super::*;
     use crate::app::app_view::InputOutcome;

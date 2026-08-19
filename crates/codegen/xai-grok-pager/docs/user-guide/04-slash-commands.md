@@ -138,7 +138,7 @@ Running one while the other is active switches modes — for example, `/auto` wh
 
 ### `/multiline`
 
-Toggle multiline input. When it's on, `Enter` inserts a newline and `Shift+Enter` (or `Alt+Enter`) sends the message. Mid-turn, a bare `Enter` on an empty composer still force-sends the top queued follow-up. Alias: `/ml`.
+Toggle multiline input. When it's on, `Enter` inserts a newline and `Shift+Enter` (or `Alt+Enter`) sends the message. Mid-turn, a bare `Enter` on an empty composer still force-sends the top queued follow-up. Alias: `/ml`. On the agent screen, `Ctrl+M` opens the model picker instead; use this command or `/settings` to toggle multiline. The Agent Dashboard still uses `Ctrl+M` for multiline on the dispatch / peek composer.
 
 ### `/history`
 

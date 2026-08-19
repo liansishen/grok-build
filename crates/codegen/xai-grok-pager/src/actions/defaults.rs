@@ -705,7 +705,10 @@ pub(super) fn default_actions(
             id: ActionId::ToggleMultiline,
             label: "multiline",
             description: "Toggle multiline",
-            default_key: key!('m', CONTROL),
+            // Unbound: Ctrl+M opens the model picker from the prompt too.
+            // Toggle via `/multiline` or /settings. Dashboard still hardcodes
+            // Ctrl+M for its own dispatch/peek composer.
+            default_key: key!(Null),
             alt_keys: vec![],
             category: Category::Input,
             context: When::PromptFocused,
@@ -713,7 +716,7 @@ pub(super) fn default_actions(
             hint_key_display: None,
             requires_confirmation: false,
             long_help: Some(
-                "Toggles a persistent multi-line prompt so the editor stays expanded for composing longer messages.\nInsert newlines with Shift+Enter or Alt+Enter (or a trailing backslash); bare Enter still sends.\nCtrl+M toggles multiline in the prompt; off the prompt it opens the model picker.",
+                "Toggles a persistent multi-line prompt so the editor stays expanded for composing longer messages.\nInsert newlines with Shift+Enter or Alt+Enter (or a trailing backslash); bare Enter still sends.\nToggle with /multiline or /settings. Ctrl+M opens the model picker.",
             ),
         },
         ActionDef {
@@ -835,7 +838,7 @@ pub(super) fn default_actions(
             hint_key_display: None,
             requires_confirmation: false,
             long_help: Some(
-                "Opens the model picker to switch the model for this session; the choice applies to later turns.\nBound to Ctrl+M, but while the prompt is focused that chord toggles multiline instead.\nReach it from the scrollback or the command palette.",
+                "Opens the model picker to switch the model for this session; the choice applies to later turns.\nBound to Ctrl+M from the prompt and the scrollback (AgentScreen promotion).\nAlso reachable via /model or the command palette.",
             ),
         },
         ActionDef {

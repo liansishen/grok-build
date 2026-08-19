@@ -909,7 +909,7 @@ pub struct AgentView {
     /// Current special prompt input mode (Normal/Bash/Remember).
     pub prompt_input_mode: PromptInputMode,
     /// Multiline input mode: swap Enter (insert newline) and Shift+Enter (send).
-    /// Toggled by `Ctrl+M` or `/multiline`. Not persisted across sessions.
+    /// Toggled by `/multiline` or /settings. Not persisted across sessions.
     pub multiline_mode: bool,
     /// Vim-mode scrollback keybindings. When `false` (default), bare-letter
     /// and Shift+letter scrollback bindings (j/k, h/l, g/G, y/Y, o/O, r,
