@@ -981,6 +981,11 @@ pub struct FeedbackUserConfig {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CompactionConfig {
+    /// Model used to generate the compaction summary.
+    /// `None` or blank = session's current model.
+    /// Env `GROK_COMPACT_MODEL` overrides this at resolve time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     pub memory_flush: Option<crate::config::MemoryFlushSettings>,
     pub pruning: Option<crate::config::PruningSettings>,
 }
@@ -2990,6 +2995,14 @@ impl Config {
             self.remote_settings
                 .as_ref()
                 .and_then(|r| r.compaction_tool_choice.as_deref()),
+        )
+    }
+    /// Precedence: env `GROK_COMPACT_MODEL`, then `[compaction] model`.
+    /// Blank / unset means the session's current model.
+    pub(crate) fn resolve_compact_model(&self) -> Option<String> {
+        crate::util::config::resolve_compact_model(
+            env_string(crate::util::config::ENV_COMPACT_MODEL).as_deref(),
+            self.compaction.model.as_deref(),
         )
     }
     /// Precedence: env `GROK_COMPACTION_DETAIL`, then config

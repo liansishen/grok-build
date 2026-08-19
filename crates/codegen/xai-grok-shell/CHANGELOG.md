@@ -1,5 +1,36 @@
 # Changelog
 
+# 1.0.5-fork.8 — 2026-08-19
+
+## 新功能
+
+### 压缩可指定专用模型
+
+- `/compact` 和自动压缩以前总是用会话当前模型。代码里虽有 `CompactionPolicy.compact_model`，但会话创建时写死为 `None`，压缩请求也不读这个字段。
+- 现在可以单独指定压缩摘要模型：在 `~/.grok/config.toml` 写 `[compaction] model = "grok-3"`，或设置环境变量 `GROK_COMPACT_MODEL`。环境变量优先于 TOML。
+- 未设置或空字符串仍用会话当前模型，默认行为不变。
+- 主会话和子 agent 都会带上该设置。`/compact`、自动压缩和 two-pass 压缩走同一覆盖。
+- 只替换模型 id，请求仍用当前会话的 endpoint、backend 和凭据。请选择当前提供商认识的模型 id；自定义模型的 `base_url` 不会随这个字段切换。
+- 与 `[compaction.memory_flush] flush_model` 独立：前者管压缩摘要，后者管压缩前的 memory flush。
+- 没有设置页，和 `[session] auto_compact_threshold_percent` 一样只走配置文件与环境变量。未设置时不会把 `model` 写回 `config.toml`。
+- 英文用户指南的配置、Memory、Sessions、`/compact` 和 shell README 已补充说明。
+- 本次新增配置键和环境变量名，没有新增界面提示或错误文案，无需新增英文或简体中文翻译键。
+
+### 验证
+
+- 单元测试覆盖 TOML 解析、与 `[compaction.memory_flush]` 共存、环境变量优先于配置、空白回退到会话模型，以及未设置时不序列化 `model`。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.5-fork.8-linux-x86_64`
+- `grok-1.0.5-fork.8-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.7...v1.0.5-fork.8
+
 # 1.0.5-fork.7 — 2026-08-19
 
 ## 问题修复

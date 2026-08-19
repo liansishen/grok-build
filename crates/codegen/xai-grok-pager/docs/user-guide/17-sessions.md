@@ -169,7 +169,7 @@ The optional `context` argument lets you provide additional instructions about w
 
 ### Auto-Compact
 
-Grok automatically compacts the conversation when the context window approaches its limit. You will see a notification when auto-compact triggers. The `context_window` setting on your model configuration controls when this threshold is reached.
+Grok automatically compacts the conversation when the context window approaches its limit. You will see a notification when auto-compact triggers. The `context_window` setting on your model configuration controls when this threshold is reached. Tune the trigger with `[session] auto_compact_threshold_percent`. To generate the compact summary with a different model id than the session, set `[compaction] model` or `GROK_COMPACT_MODEL` (blank or unset uses the session model).
 
 ---
 

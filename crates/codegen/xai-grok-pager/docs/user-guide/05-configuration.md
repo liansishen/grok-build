@@ -96,6 +96,10 @@ remote_fetch = true                    # allow optional online model-catalog fet
 auto_compact_threshold_percent = 85    # auto-compact at this % of context window (default: 85)
 load_envrc = true                      # load .envrc environment variables
 
+[compaction]
+# model = "grok-3"                    # dedicated compact-summary model (unset = session model)
+                                       # env: GROK_COMPACT_MODEL
+
 [tools]
 respect_gitignore = false              # default: false; set true to make every tool skip gitignored files
 
@@ -109,6 +113,17 @@ respect_gitignore = false              # default: false; set true to make every 
 # max_parallel_image_gen_calls = 8
 # max_parallel_video_gen_calls = 4
 ```
+
+#### Compaction model
+
+`/compact` and auto-compact generate a summary with the session's current model by default. To use a different model id for that request only:
+
+```toml
+[compaction]
+model = "grok-3"
+```
+
+`GROK_COMPACT_MODEL` overrides the TOML value for the process. Blank or unset falls back to the session model. Only the model id is swapped: the compact request still uses the session's endpoint, backend, and credentials, so pick an id that provider accepts. This is independent of `[compaction.memory_flush] flush_model`.
 
 #### Input mode
 

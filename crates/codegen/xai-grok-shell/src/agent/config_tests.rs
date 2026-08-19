@@ -1822,6 +1822,41 @@ fn parses_auto_compact_threshold_percent() {
     assert_eq!(cfg.session.auto_compact_threshold_percent, Some(75));
 }
 #[test]
+fn default_compaction_model_is_none() {
+    let cfg = Config::default();
+    assert_eq!(cfg.compaction.model, None);
+}
+#[test]
+fn parses_compaction_model() {
+    let raw_config: toml::Value = toml::from_str(
+        r#"
+            [compaction]
+            model = "grok-3"
+            "#,
+    )
+    .unwrap();
+    let cfg = Config::new_from_toml_cfg(&raw_config).expect("config should parse");
+    assert_eq!(cfg.compaction.model.as_deref(), Some("grok-3"));
+}
+#[test]
+fn compaction_model_coexists_with_memory_flush() {
+    let raw_config: toml::Value = toml::from_str(
+        r#"
+            [compaction]
+            model = "grok-3"
+            [compaction.memory_flush]
+            enabled = false
+            "#,
+    )
+    .unwrap();
+    let cfg = Config::new_from_toml_cfg(&raw_config).expect("config should parse");
+    assert_eq!(cfg.compaction.model.as_deref(), Some("grok-3"));
+    assert_eq!(
+        cfg.compaction.memory_flush.as_ref().and_then(|f| f.enabled),
+        Some(false)
+    );
+}
+#[test]
 fn compaction_mode_precedence_env_over_config_over_remote_over_default() {
     use xai_chat_state::CompactionMode;
     assert_eq!(

@@ -122,6 +122,22 @@ impl SessionActor {
         let agent = self.agent.borrow();
         agent.compaction_policy().two_pass_enabled
     }
+    /// Session sampling config with `[compaction] model` / `GROK_COMPACT_MODEL`
+    /// applied. Second value is the session model before the override.
+    async fn sampling_config_for_compact(
+        &self,
+    ) -> (xai_grok_sampling_types::SamplingConfig, String) {
+        let mut cfg = self.reconstruct_full_config().await;
+        let user_model = cfg.model.clone();
+        let compact_model = self
+            .agent
+            .borrow()
+            .compaction_policy()
+            .compact_model
+            .clone();
+        crate::util::config::apply_compact_model_override(&mut cfg, compact_model.as_deref());
+        (cfg, user_model)
+    }
     /// Run one summarization sample over a fully-built two-pass history (the
     /// prompt is already embedded, so this bypasses the single-pass sampler and
     /// calls `generate_session_compact` directly). Returns `None` on any error
@@ -132,7 +148,7 @@ impl SessionActor {
     /// the turn loop; a long-lived borrow would race with turn/compact/cancel
     /// and panic on double-borrow.
     async fn two_pass_sample(&self, history: Vec<ConversationItem>) -> Option<CompactOutput> {
-        let sampling_config = self.reconstruct_full_config().await;
+        let (sampling_config, _user_model) = self.sampling_config_for_compact().await;
         let client = match self.prepare_chat_completion(false).await {
             Ok(c) => c,
             Err(e) => {
@@ -1016,7 +1032,7 @@ impl SessionActor {
             return Err(acp::Error::internal_error()
                 .data("Compaction failed: no system message in simplified conversation"));
         }
-        let sampling_config = self.reconstruct_full_config().await;
+        let (sampling_config, user_model) = self.sampling_config_for_compact().await;
         let sampling_client = self.prepare_chat_completion(false).await?;
         let backend_search_active = self.backend_search_active();
         let effective_tool_defs: Vec<xai_grok_sampling_types::ToolDefinition> = self
@@ -1038,7 +1054,7 @@ impl SessionActor {
             tool_tokens = compaction_tool_tokens,
             "Running compact with model '{}' (user model: '{}')",
             &sampling_config.model,
-            &sampling_config.model
+            &user_model
         );
         let mut last_error: Option<acp::Error> = None;
         let mut last_failure_outcome = CompactionOutcome::Failed;

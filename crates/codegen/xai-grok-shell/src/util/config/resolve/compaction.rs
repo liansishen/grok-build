@@ -33,6 +33,35 @@ pub(crate) fn resolve_compaction_tool_choice_from(
         .unwrap_or_default()
 }
 
+/// Env-var override for `[compaction] model`. Blank / unset falls through.
+pub(crate) const ENV_COMPACT_MODEL: &str = "GROK_COMPACT_MODEL";
+
+/// Resolve the dedicated compaction-summary model.
+///
+/// Precedence: env `GROK_COMPACT_MODEL` > user TOML `[compaction] model`.
+/// Blank strings are treated as unset (use the session model).
+pub(crate) fn resolve_compact_model(env: Option<&str>, config: Option<&str>) -> Option<String> {
+    fn nonempty(raw: Option<&str>) -> Option<String> {
+        raw.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
+    }
+    nonempty(env).or_else(|| nonempty(config))
+}
+
+/// Override `cfg.model` when a dedicated compact model is configured.
+/// Returns `true` when the model id changed.
+pub(crate) fn apply_compact_model_override(
+    cfg: &mut xai_grok_sampling_types::SamplingConfig,
+    compact_model: Option<&str>,
+) -> bool {
+    let Some(model) = compact_model.map(str::trim).filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    if cfg.model == model {
+        return false;
+    }
+    cfg.model = model.to_string();
+    true
+}
 /// Env-var override for `auto_compact_threshold_percent`. Parsed as `u8`;
 /// out-of-range or unparseable values are ignored.
 pub(crate) const ENV_AUTO_COMPACT_THRESHOLD_PERCENT: &str = "GROK_AUTO_COMPACT_THRESHOLD_PERCENT";
@@ -215,5 +244,58 @@ mod compaction_tool_choice_tests {
         assert_eq!("AUTO".parse(), Ok(CompactionToolChoice::Auto));
         assert_eq!(" None ".parse(), Ok(CompactionToolChoice::None));
         assert!("required".parse::<CompactionToolChoice>().is_err());
+    }
+}
+
+#[cfg(test)]
+mod compact_model_resolve_tests {
+    use super::{apply_compact_model_override, resolve_compact_model};
+    use xai_grok_sampling_types::SamplingConfig;
+
+    fn sample_cfg(model: &str) -> SamplingConfig {
+        SamplingConfig {
+            base_url: "http://localhost".into(),
+            model: model.to_string(),
+            max_completion_tokens: None,
+            temperature: None,
+            top_p: None,
+            api_backend: Default::default(),
+            extra_headers: Default::default(),
+            query_params: Default::default(),
+            env_http_headers: Default::default(),
+            context_window: std::num::NonZeroU64::new(256_000).unwrap(),
+            reasoning_effort: None,
+            stream_tool_calls: None,
+        }
+    }
+
+    #[test]
+    fn blank_or_none_uses_session_model() {
+        assert_eq!(resolve_compact_model(None, None), None);
+        assert_eq!(resolve_compact_model(Some(""), Some("  ")), None);
+        assert_eq!(resolve_compact_model(None, Some("")), None);
+    }
+
+    #[test]
+    fn env_wins_over_config() {
+        assert_eq!(
+            resolve_compact_model(Some("grok-4"), Some("grok-3")).as_deref(),
+            Some("grok-4")
+        );
+        assert_eq!(
+            resolve_compact_model(None, Some(" grok-3 ")).as_deref(),
+            Some("grok-3")
+        );
+    }
+
+    #[test]
+    fn apply_override_swaps_only_when_different() {
+        let mut cfg = sample_cfg("session-model");
+        assert!(!apply_compact_model_override(&mut cfg, None));
+        assert_eq!(cfg.model, "session-model");
+        assert!(!apply_compact_model_override(&mut cfg, Some("  ")));
+        assert!(apply_compact_model_override(&mut cfg, Some("compact-model")));
+        assert_eq!(cfg.model, "compact-model");
+        assert!(!apply_compact_model_override(&mut cfg, Some("compact-model")));
     }
 }
