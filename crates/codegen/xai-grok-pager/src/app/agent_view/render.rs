@@ -2003,18 +2003,11 @@ impl AgentView {
         if let Some(msg) = self.active_toast_message() {
             let sb = layout.scrollback;
             if let Some(toast_text) = fit_toast_text(msg, sb.width) {
-                let w = toast_text.chars().count() as u16;
+                let w = toast_display_width(&toast_text);
                 if sb.height > 0 {
                     let x = sb.right().saturating_sub(w + 1);
                     let y = sb.bottom().saturating_sub(1);
-                    for (i, ch) in toast_text.chars().enumerate() {
-                        if let Some(cell) = buf.cell_mut((x + i as u16, y)) {
-                            cell.set_char(ch);
-                            cell.fg = theme.accent_user;
-                            cell.bg = theme.bg_base;
-                            cell.modifier = ratatui::prelude::Modifier::BOLD;
-                        }
-                    }
+                    paint_toast_text(buf, x, y, &toast_text, &theme);
                     self.frame_occluder_rects.push(Rect {
                         x,
                         y,
@@ -2333,25 +2326,15 @@ impl AgentView {
                 let base_fg = theme.text_secondary;
                 let fg = crate::render::color::blend_color(theme.bg_base, base_fg, opacity)
                     .unwrap_or(base_fg);
-                let text = format!("  {}", msg);
+                let text = format!("  {msg}");
                 let maxw = layout.banner.width.saturating_sub(2) as usize;
-                let display: String = if text.len() > maxw {
-                    text.chars()
-                        .take(maxw.saturating_sub(1))
-                        .collect::<String>()
-                        + "…"
-                } else {
-                    text
-                };
-                let x = layout.banner.x;
-                let y = layout.banner.y;
-                for (i, ch) in display.chars().enumerate() {
-                    if let Some(cell) = buf.cell_mut((x + i as u16, y)) {
-                        cell.set_char(ch);
-                        cell.fg = fg;
-                        cell.bg = bg;
-                    }
-                }
+                let display = truncate_to_display_cols(&text, maxw);
+                buf.set_string_safe(
+                    layout.banner.x,
+                    layout.banner.y,
+                    &display,
+                    Style::default().fg(fg).bg(bg),
+                );
             }
         } else {
             let announcement_banner_owns_slot =
@@ -3559,17 +3542,10 @@ impl AgentView {
                 && toast_area.height > 0
                 && let Some(toast_text) = fit_toast_text(msg, toast_area.width.saturating_sub(1))
             {
-                let w = toast_text.chars().count() as u16;
+                let w = toast_display_width(&toast_text);
                 let tx = toast_area.right().saturating_sub(w + 1);
                 let ty = toast_area.bottom().saturating_sub(1);
-                for (i, ch) in toast_text.chars().enumerate() {
-                    if let Some(cell) = buf.cell_mut((tx + i as u16, ty)) {
-                        cell.set_char(ch);
-                        cell.fg = theme.accent_user;
-                        cell.bg = theme.bg_base;
-                        cell.modifier = ratatui::prelude::Modifier::BOLD;
-                    }
-                }
+                paint_toast_text(buf, tx, ty, &toast_text, &theme);
             }
             let in_plan_approval = self.plan_approval_view.is_some();
             let on_comment = in_plan_approval
@@ -4121,17 +4097,10 @@ impl AgentView {
                 && popup_area.height > 2
                 && let Some(toast_text) = fit_toast_text(msg, popup_area.width.saturating_sub(1))
             {
-                let w = toast_text.chars().count() as u16;
+                let w = toast_display_width(&toast_text);
                 let tx = popup_area.right().saturating_sub(w + 2);
                 let ty = popup_area.bottom().saturating_sub(2);
-                for (i, ch) in toast_text.chars().enumerate() {
-                    if let Some(cell) = buf.cell_mut((tx + i as u16, ty)) {
-                        cell.set_char(ch);
-                        cell.fg = theme.accent_user;
-                        cell.bg = theme.bg_base;
-                        cell.modifier = ratatui::prelude::Modifier::BOLD;
-                    }
-                }
+                paint_toast_text(buf, tx, ty, &toast_text, &theme);
             }
             let hints = viewer.shortcuts_hints();
             ShortcutsBar::new(&hints).render(layout.shortcuts, buf);
@@ -4613,41 +4582,110 @@ fn draw_scroll_arrow(
     }
     hit.set(Some(Rect::new(center_x.saturating_sub(1), y, 3, 1)));
 }
+/// Display columns occupied by `text` (CJK / fullwidth = 2).
+fn toast_display_width(text: &str) -> u16 {
+    unicode_width::UnicodeWidthStr::width(text) as u16
+}
+
+/// Truncate `text` to at most `max_cols` terminal columns, appending `\u{2026}`
+/// when anything is dropped. Does not split a wide character.
+fn truncate_to_display_cols(text: &str, max_cols: usize) -> String {
+    use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+    if UnicodeWidthStr::width(text) <= max_cols {
+        return text.to_string();
+    }
+    let budget = max_cols.saturating_sub(1);
+    let mut out = String::new();
+    let mut used = 0usize;
+    for ch in text.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if used + w > budget {
+            break;
+        }
+        out.push(ch);
+        used += w;
+    }
+    out.push('\u{2026}');
+    out
+}
+
+/// Paint a toast chip, advancing by each character's display width so CJK
+/// glyphs do not overwrite the previous character's second cell.
+fn paint_toast_text(buf: &mut Buffer, x: u16, y: u16, text: &str, theme: &Theme) {
+    use unicode_width::UnicodeWidthChar;
+    let mut col = 0u16;
+    for ch in text.chars() {
+        let ch_w = UnicodeWidthChar::width(ch).unwrap_or(0) as u16;
+        if let Some(cell) = buf.cell_mut((x + col, y)) {
+            cell.set_char(ch);
+            cell.fg = theme.accent_user;
+            cell.bg = theme.bg_base;
+            cell.modifier = ratatui::prelude::Modifier::BOLD;
+        }
+        col = col.saturating_add(ch_w.max(1));
+    }
+}
+
 /// Pad `msg` for the toast slot, truncating with a trailing ellipsis when it
 /// cannot fit in `avail_width` columns (long clipboard toasts embed backup
 /// file paths — dropping the whole toast would hide the copy feedback
 /// entirely). Returns `None` only when the slot is too narrow for any text.
 fn fit_toast_text(msg: &str, avail_width: u16) -> Option<String> {
-    let max_msg_chars = (avail_width as usize).saturating_sub(4);
-    if max_msg_chars == 0 {
+    use unicode_width::UnicodeWidthStr;
+    let max_msg_cols = (avail_width as usize).saturating_sub(4);
+    if max_msg_cols == 0 {
         return None;
     }
-    let msg_chars = msg.chars().count();
-    if msg_chars <= max_msg_chars {
+    if UnicodeWidthStr::width(msg) <= max_msg_cols {
         return Some(format!(" {msg} "));
     }
-    let truncated: String = msg.chars().take(max_msg_chars.saturating_sub(1)).collect();
-    Some(format!(" {}… ", truncated.trim_end()))
+    let truncated = truncate_to_display_cols(msg, max_msg_cols);
+    Some(format!(" {} ", truncated.trim_end()))
 }
 #[cfg(test)]
 mod toast_fit_tests {
-    use super::fit_toast_text;
+    use super::{fit_toast_text, toast_display_width, truncate_to_display_cols};
+    use unicode_width::UnicodeWidthStr;
+
     #[test]
     fn short_message_is_padded_untouched() {
         assert_eq!(fit_toast_text("Copied!", 40).as_deref(), Some(" Copied! "));
     }
+
     #[test]
     fn long_message_truncates_with_ellipsis_instead_of_vanishing() {
         let msg = "Copied via OSC 52 — also saved to /tmp/grok-0/last-copy.txt. If paste fails, hold Shift (or Fn) and drag to select & copy natively.";
         let fitted = fit_toast_text(msg, 60).expect("must render truncated");
-        assert!(fitted.chars().count() <= 58);
-        assert!(fitted.ends_with("… "));
+        assert!(UnicodeWidthStr::width(fitted.as_str()) <= 58);
+        assert!(fitted.ends_with("\u{2026} ") || fitted.ends_with("… "));
         assert!(fitted.contains("also saved to"));
     }
+
     #[test]
     fn zero_width_slot_yields_none() {
         assert_eq!(fit_toast_text("Copied!", 4), None);
         assert_eq!(fit_toast_text("Copied!", 0), None);
+    }
+
+    #[test]
+    fn cjk_mode_banner_keeps_full_phrase_when_width_allows() {
+        let msg = "已切换模式：计划";
+        let fitted = fit_toast_text(msg, 40).expect("CJK toast must fit");
+        assert_eq!(fitted, " 已切换模式：计划 ");
+        assert_eq!(toast_display_width(&fitted), UnicodeWidthStr::width(fitted.as_str()) as u16);
+        assert!(toast_display_width(&fitted) > fitted.chars().count() as u16);
+    }
+
+    #[test]
+    fn cjk_truncation_uses_display_columns_not_char_count() {
+        // 8 CJK chars = 16 columns. A 10-column budget cannot keep all 8
+        // chars; byte/char truncation would keep too many and overflow.
+        let text = "已切换模式：计划";
+        let truncated = truncate_to_display_cols(text, 10);
+        assert!(UnicodeWidthStr::width(truncated.as_str()) <= 10);
+        assert!(truncated.starts_with('已'));
+        assert!(truncated.ends_with('\u{2026}') || truncated.ends_with('…'));
+        assert!(truncated.chars().count() < text.chars().count());
     }
 }
 #[cfg(test)]
