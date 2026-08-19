@@ -706,6 +706,7 @@ mod tests {
                 .collect(),
             context_window: Some(200_000),
             auto_compact_threshold_percent: Some(80),
+            compaction_model: Some("grok-3".into()),
             system_prompt_label: Some("label".into()),
             use_concise: Some(true),
             agent_type: Some("agent".into()),

@@ -122,19 +122,18 @@ impl SessionActor {
         let agent = self.agent.borrow();
         agent.compaction_policy().two_pass_enabled
     }
-    /// Session sampling config with `[compaction] model` / `GROK_COMPACT_MODEL`
-    /// applied. Second value is the session model before the override.
+    /// Session sampling config with the current model's `[model.*] compaction_model`
+    /// applied (same-provider model id only). Second value is the session model.
     async fn sampling_config_for_compact(
         &self,
     ) -> (xai_grok_sampler::SamplerConfig, String) {
         let mut cfg = self.reconstruct_full_config().await;
         let user_model = cfg.model.clone();
-        let compact_model = self
-            .agent
-            .borrow()
-            .compaction_policy()
-            .compact_model
-            .clone();
+        let compact_model = crate::agent::config::find_model_by_id(
+            &self.models_manager.models(),
+            &user_model,
+        )
+        .and_then(|entry| entry.info.compaction_model.clone());
         crate::util::config::apply_compact_model_override(
             &mut cfg.model,
             compact_model.as_deref(),

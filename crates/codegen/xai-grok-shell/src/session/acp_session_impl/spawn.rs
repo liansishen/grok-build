@@ -167,7 +167,6 @@ pub(crate) async fn spawn_session_actor(
     compaction_verbatim_input: bool,
     compaction_tool_choice: crate::util::config::CompactionToolChoice,
     two_pass_enabled: bool,
-    compact_model: Option<String>,
     buffering_settings: Option<BufferingSettings>,
     origin_client: Option<crate::http::OriginClientInfo>,
     codebase_indexes: std::sync::Arc<parking_lot::Mutex<CodebaseIndexManager>>,
@@ -695,7 +694,7 @@ pub(crate) async fn spawn_session_actor(
     let initial_agent_type = Some(initial_agent_name.clone());
     let compaction_policy = xai_grok_agent::CompactionPolicy {
         auto_compact_threshold_percent: auto_compact_threshold_percent as u32,
-        compact_model,
+        compact_model: None,
         memory_flush_enabled: memory_config.as_ref().is_some_and(|mc| mc.flush.enabled),
         wall_clock_budget_secs: crate::util::config::resolve_compaction_wall_clock_budget_secs(
             remote_settings
@@ -2184,7 +2183,6 @@ pub(crate) async fn spawn_session_on_thread(
     compaction_verbatim_input: bool,
     compaction_tool_choice: crate::util::config::CompactionToolChoice,
     two_pass_enabled: bool,
-    compact_model: Option<String>,
     buffering_settings: Option<BufferingSettings>,
     origin_client: Option<crate::http::OriginClientInfo>,
     codebase_indexes: std::sync::Arc<parking_lot::Mutex<CodebaseIndexManager>>,
@@ -2361,7 +2359,6 @@ pub(crate) async fn spawn_session_on_thread(
                         compaction_verbatim_input,
                         compaction_tool_choice,
                         two_pass_enabled,
-                        compact_model,
                         buffering_settings,
                         origin_client,
                         codebase_indexes,

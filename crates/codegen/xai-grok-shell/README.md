@@ -1353,10 +1353,6 @@ codebase_indexing = true               # code graph indexing (true, false, or gl
 auto_compact_threshold_percent = 85    # auto-compact at this % of context window
 load_envrc = true                      # load .envrc environment variables into bash commands
 
-[compaction]
-# model = "grok-3"                    # dedicated compact-summary model (unset = session model)
-                                       # env: GROK_COMPACT_MODEL
-
 [tools]
 respect_gitignore = true               # filter gitignored files from tools (env: GROK_RESPECT_GITIGNORE)
 
@@ -2680,7 +2676,7 @@ If auto-compact triggers too often, lower the threshold to compact earlier and p
 auto_compact_threshold_percent = 70    # default is 85
 ```
 
-To generate the compact summary with a cheaper or faster model than the session, set `[compaction] model` or `GROK_COMPACT_MODEL`. Blank or unset uses the session model.
+To generate the compact summary with a cheaper or faster model from the same provider, set `[model.<id>] compaction_model`. Blank or unset uses the session model.
 
 ---
 

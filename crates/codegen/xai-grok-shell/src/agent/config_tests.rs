@@ -1052,6 +1052,7 @@ fn test_model_entry(
             env_http_headers: IndexMap::new(),
             context_window: NonZeroU64::new(200_000).unwrap(),
             auto_compact_threshold_percent: None,
+            compaction_model: None,
             system_prompt_label: None,
             use_concise: false,
             agent_type: default_agent_type(),
@@ -1824,37 +1825,36 @@ fn parses_auto_compact_threshold_percent() {
 #[test]
 fn default_compaction_model_is_none() {
     let cfg = Config::default();
-    assert_eq!(cfg.compaction.model, None);
+    assert!(cfg.config_models.values().all(|m| m.compaction_model.is_none()));
 }
 #[test]
-fn parses_compaction_model() {
+fn parses_per_model_compaction_model() {
     let raw_config: toml::Value = toml::from_str(
         r#"
-            [compaction]
-            model = "grok-3"
+            [model.gpt-luna]
+            model = "gpt-5.6-luna"
+            base_url = "https://example.com/v1"
+            context_window = 272000
+            compaction_model = "gpt-5.4-mini"
             "#,
     )
     .unwrap();
     let cfg = Config::new_from_toml_cfg(&raw_config).expect("config should parse");
-    assert_eq!(cfg.compaction.model.as_deref(), Some("grok-3"));
-}
-#[test]
-fn compaction_model_coexists_with_memory_flush() {
-    let raw_config: toml::Value = toml::from_str(
-        r#"
-            [compaction]
-            model = "grok-3"
-            [compaction.memory_flush]
-            enabled = false
-            "#,
-    )
-    .unwrap();
-    let cfg = Config::new_from_toml_cfg(&raw_config).expect("config should parse");
-    assert_eq!(cfg.compaction.model.as_deref(), Some("grok-3"));
     assert_eq!(
-        cfg.compaction.memory_flush.as_ref().and_then(|f| f.enabled),
-        Some(false)
+        cfg.config_models
+            .get("gpt-luna")
+            .and_then(|m| m.compaction_model.as_deref()),
+        Some("gpt-5.4-mini")
     );
+}
+#[test]
+fn apply_copies_trimmed_compaction_model() {
+    let ov = ConfigModelOverride {
+        compaction_model: Some("  cheaper  ".into()),
+        ..Default::default()
+    };
+    let entry = ov.apply("gpt-luna", None, &EndpointsConfig::default());
+    assert_eq!(entry.info.compaction_model.as_deref(), Some("cheaper"));
 }
 #[test]
 fn compaction_mode_precedence_env_over_config_over_remote_over_default() {
@@ -2160,6 +2160,7 @@ fn model_info_from_config_propagates_use_concise() {
         extra_headers: IndexMap::new(),
         context_window: NonZeroU64::new(200_000).unwrap(),
         auto_compact_threshold_percent: None,
+        compaction_model: None,
         system_prompt_label: None,
         api_base_url: None,
         use_concise: true,
@@ -2320,6 +2321,7 @@ fn model_info_from_config_propagates_agent_type() {
         extra_headers: IndexMap::new(),
         context_window: NonZeroU64::new(200_000).unwrap(),
         auto_compact_threshold_percent: None,
+        compaction_model: None,
         system_prompt_label: None,
         api_base_url: None,
         use_concise: false,
@@ -2772,6 +2774,7 @@ fn inference_idle_timeout_propagates_to_model_info() {
         extra_headers: IndexMap::new(),
         context_window: NonZeroU64::new(200_000).unwrap(),
         auto_compact_threshold_percent: None,
+        compaction_model: None,
         system_prompt_label: None,
         api_base_url: None,
         use_concise: false,
@@ -6764,6 +6767,7 @@ fn prefetch_model_entry(slug: &str, context_window: u64, api_backend: ApiBackend
             stream_tool_calls: None,
             laziness_detector: LazinessDetectorPerModelConfig::default(),
             auto_compact_threshold_percent: None,
+            compaction_model: None,
             system_prompt_label: None,
         },
         api_key: None,

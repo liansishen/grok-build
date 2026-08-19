@@ -1836,6 +1836,7 @@ fn test_model_entry(model_id: &str) -> crate::agent::config::ModelEntry {
             env_http_headers: Default::default(),
             context_window: std::num::NonZeroU64::new(256_000).unwrap(),
             auto_compact_threshold_percent: None,
+            compaction_model: None,
             system_prompt_label: None,
             use_concise: false,
             agent_type: crate::agent::config::default_agent_type(),

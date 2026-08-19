@@ -981,11 +981,6 @@ pub struct FeedbackUserConfig {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CompactionConfig {
-    /// Model used to generate the compaction summary.
-    /// `None` or blank = session's current model.
-    /// Env `GROK_COMPACT_MODEL` overrides this at resolve time.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
     pub memory_flush: Option<crate::config::MemoryFlushSettings>,
     pub pruning: Option<crate::config::PruningSettings>,
 }
@@ -2997,14 +2992,6 @@ impl Config {
                 .and_then(|r| r.compaction_tool_choice.as_deref()),
         )
     }
-    /// Precedence: env `GROK_COMPACT_MODEL`, then `[compaction] model`.
-    /// Blank / unset means the session's current model.
-    pub(crate) fn resolve_compact_model(&self) -> Option<String> {
-        crate::util::config::resolve_compact_model(
-            env_string(crate::util::config::ENV_COMPACT_MODEL).as_deref(),
-            self.compaction.model.as_deref(),
-        )
-    }
     /// Precedence: env `GROK_COMPACTION_DETAIL`, then config
     /// `features.compaction_detail`, then remote settings
     /// `remote_settings.compaction_detail`, then default (`verbose`). Drives the
@@ -3818,6 +3805,7 @@ fn default_models(endpoints: &EndpointsConfig) -> IndexMap<String, ModelEntryCon
                 description: m.description,
                 context_window,
                 auto_compact_threshold_percent: m.auto_compact_threshold_percent,
+                compaction_model: None,
                 system_prompt_label: m.system_prompt_label,
                 temperature: m.temperature,
                 top_p: m.top_p,
@@ -3911,6 +3899,9 @@ pub struct ModelEntryConfig {
     /// > remote per-model (this field) > remote global > 85.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_compact_threshold_percent: Option<u8>,
+    /// Same-provider model id for compaction summaries. Unset = `model`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compaction_model: Option<String>,
     /// Per-model system-prompt identity label (not UI `name`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub system_prompt_label: Option<String>,
@@ -4025,6 +4016,10 @@ pub struct ConfigModelOverride {
     /// NOT merged into `ModelInfo.auto_compact_threshold_percent` so the
     /// resolver can keep user-per-model distinct from GB-per-model.
     pub auto_compact_threshold_percent: Option<u8>,
+    /// Same-provider model id used for `/compact` and auto-compact.
+    /// Blank / unset = this entry's session model id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compaction_model: Option<String>,
     /// Per-model system-prompt identity; not merged into `ModelInfo` (tiered resolve).
     pub system_prompt_label: Option<String>,
     pub use_concise: Option<bool>,
@@ -4140,6 +4135,14 @@ impl ConfigModelOverride {
         }
         if let Some(cw) = self.context_window.and_then(NonZeroU64::new) {
             entry.info.context_window = cw;
+        }
+        if self.compaction_model.is_some() {
+            entry.info.compaction_model = self
+                .compaction_model
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
         }
         if let Some(v) = self.use_concise {
             entry.info.use_concise = v;
@@ -4288,6 +4291,9 @@ pub struct ModelInfo {
     /// Per-model auto-compact threshold (0-100). `None` defers to the
     /// global / default tiers in `resolve_auto_compact_threshold_percent`.
     pub auto_compact_threshold_percent: Option<u8>,
+    /// Same-provider model id for `/compact` and auto-compact. Unset = `model`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compaction_model: Option<String>,
     /// Per-model system-prompt identity (not UI picker `name`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub system_prompt_label: Option<String>,
@@ -4357,6 +4363,7 @@ impl ModelInfo {
             env_http_headers: IndexMap::new(),
             context_window: NonZeroU64::new(200_000).unwrap(),
             auto_compact_threshold_percent: None,
+            compaction_model: None,
             system_prompt_label: None,
             use_concise: false,
             agent_type: default_agent_type(),
@@ -4396,6 +4403,7 @@ impl ModelInfo {
             env_http_headers: IndexMap::new(),
             context_window: entry.context_window,
             auto_compact_threshold_percent: entry.auto_compact_threshold_percent,
+            compaction_model: entry.compaction_model.clone(),
             system_prompt_label: entry.system_prompt_label.clone(),
             use_concise: entry.use_concise,
             agent_type: entry.agent_type.clone(),
@@ -5170,6 +5178,7 @@ pub(crate) fn resolve_aux_model_sampling_config(
                 env_http_headers: IndexMap::new(),
                 context_window: NonZeroU64::new(200_000).unwrap(),
                 auto_compact_threshold_percent: None,
+                compaction_model: None,
                 system_prompt_label: None,
                 use_concise: false,
                 agent_type: default_agent_type(),
@@ -5408,6 +5417,7 @@ fn resolve_hidden_default_web_search_sampling_config(
             env_http_headers: IndexMap::new(),
             context_window: NonZeroU64::new(200_000).unwrap(),
             auto_compact_threshold_percent: None,
+            compaction_model: None,
             system_prompt_label: None,
             use_concise: false,
             agent_type: default_agent_type(),

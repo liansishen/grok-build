@@ -33,18 +33,9 @@ pub(crate) fn resolve_compaction_tool_choice_from(
         .unwrap_or_default()
 }
 
-/// Env-var override for `[compaction] model`. Blank / unset falls through.
-pub(crate) const ENV_COMPACT_MODEL: &str = "GROK_COMPACT_MODEL";
-
-/// Resolve the dedicated compaction-summary model.
-///
-/// Precedence: env `GROK_COMPACT_MODEL` > user TOML `[compaction] model`.
-/// Blank strings are treated as unset (use the session model).
-pub(crate) fn resolve_compact_model(env: Option<&str>, config: Option<&str>) -> Option<String> {
-    fn nonempty(raw: Option<&str>) -> Option<String> {
-        raw.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
-    }
-    nonempty(env).or_else(|| nonempty(config))
+/// Trim a `[model.*] compaction_model` value. Blank / unset means session model.
+pub(crate) fn catalog_compaction_model(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
 }
 
 /// Override the compact request's model id when a dedicated compact model is configured.
@@ -249,22 +240,19 @@ mod compaction_tool_choice_tests {
 
 #[cfg(test)]
 mod compact_model_resolve_tests {
-    use super::{apply_compact_model_override, resolve_compact_model};
+    use super::{apply_compact_model_override, catalog_compaction_model};
+
     #[test]
     fn blank_or_none_uses_session_model() {
-        assert_eq!(resolve_compact_model(None, None), None);
-        assert_eq!(resolve_compact_model(Some(""), Some("  ")), None);
-        assert_eq!(resolve_compact_model(None, Some("")), None);
+        assert_eq!(catalog_compaction_model(None), None);
+        assert_eq!(catalog_compaction_model(Some("")), None);
+        assert_eq!(catalog_compaction_model(Some("  ")), None);
     }
 
     #[test]
-    fn env_wins_over_config() {
+    fn catalog_value_is_trimmed() {
         assert_eq!(
-            resolve_compact_model(Some("grok-4"), Some("grok-3")).as_deref(),
-            Some("grok-4")
-        );
-        assert_eq!(
-            resolve_compact_model(None, Some(" grok-3 ")).as_deref(),
+            catalog_compaction_model(Some(" grok-3 ")).as_deref(),
             Some("grok-3")
         );
     }

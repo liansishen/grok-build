@@ -1,5 +1,34 @@
 # Changelog
 
+# 1.0.5-fork.9 — 2026-08-19
+
+## 问题修复
+
+### 压缩模型改为按目录条目配置
+
+- `v1.0.5-fork.8` 用全局 `[compaction] model` 和 `GROK_COMPACT_MODEL` 指定压缩摘要模型。会话在 Grok、压缩指定另一家供应商的模型 id 时，请求仍打到会话原来的 endpoint，上游返回 404（模型不存在或当前团队无权访问）。
+- 根因是只替换模型 id，不切换 `base_url`、backend 和凭据。跨供应商压缩本来就不该用这一条配置。
+- 现在改为写在当前会话模型的目录条目上：`[model.<id>] compaction_model = "同一家接口认的模型名"`。未设置或空字符串仍用该条目自己的 `model`。
+- 压缩时只改请求里的模型 id，endpoint、backend 和凭据继续跟会话模型走。会话切到 GPT 时读 `[model.gpt-luna]`，切到 Grok 时读对应 Grok 条目。
+- 已删除 `[compaction] model` 和 `GROK_COMPACT_MODEL`。若在 fork.8 里写过全局项，请改到对应 `[model.<id>]`，否则会回到会话当前模型。
+- `[compaction.memory_flush] flush_model` 不受影响。没有设置页，没有新增界面提示或错误文案，无需新增英文或简体中文翻译键。
+- 英文用户指南的配置、自定义模型、Memory、Sessions、`/compact` 和 shell README 已改为新写法。
+
+### 验证
+
+- 单元测试覆盖 `[model.<id>] compaction_model` 解析、空白在 apply 时回退、只替换模型 id。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.5-fork.9-linux-x86_64`
+- `grok-1.0.5-fork.9-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.8...v1.0.5-fork.9
+
 # 1.0.5-fork.8 — 2026-08-19
 
 ## 新功能

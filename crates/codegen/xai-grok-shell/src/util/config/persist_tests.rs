@@ -266,31 +266,6 @@ fn merge_section_session_explicit_value_does_not_drag_load_envrc() {
         "pre-existing load_envrc must survive a partial settings save"
     );
 }
-/// `[compaction] model` is user-edited TOML, not a settings-write field.
-/// Pin `skip_serializing_if` so a future persist path cannot emit
-/// `model` when it is unset.
-#[test]
-fn compaction_config_default_does_not_serialize_model() {
-    let cfg = crate::agent::config::CompactionConfig::default();
-    let value = serde_json::to_value(&cfg).expect("serialize CompactionConfig");
-    assert!(
-        value.get("model").is_none(),
-        "default compaction.model must not serialize; found: {:?}",
-        value.get("model"),
-    );
-}
-#[test]
-fn compaction_config_explicit_model_serializes() {
-    let cfg = crate::agent::config::CompactionConfig {
-        model: Some("grok-3".into()),
-        ..Default::default()
-    };
-    let value = serde_json::to_value(&cfg).expect("serialize CompactionConfig");
-    assert_eq!(
-        value.get("model").and_then(|v| v.as_str()),
-        Some("grok-3"),
-    );
-}
 /// Follow-on: when the user DOES explicitly set
 /// `load_envrc = false` via TOML, the value round-trips through
 /// `load_config_from_toml` → mutate → `merge_section` correctly.

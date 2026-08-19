@@ -379,13 +379,14 @@ To edit memory from the shell, open the files in your editor directly -- for exa
 | `stale_lock_secs` | `3600` | Seconds before a stale consolidation lock is reclaimed |
 | `check_interval_secs` | `3600` | Periodic Dream-gate check interval in seconds. Set `0` to disable periodic checks. |
 
-### Compaction Model (`[compaction]`)
+### Compaction Model (`[model.<id>] compaction_model`)
 
-You configure the compact-summary model under `[compaction]`, next to flush and pruning.
+You configure the compact-summary model on the **session model's** catalog entry, not under `[compaction]`.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `model` | unset | Model id used to generate the `/compact` and auto-compact summary. When unset or `""`, Grok uses the session's current model. `GROK_COMPACT_MODEL` overrides this for the process. Only the model id changes; the request keeps the session's endpoint, backend, and credentials. |
+| `compaction_model` | unset | Same-provider model id used to generate the `/compact` and auto-compact summary. When unset or `""`, Grok uses that entry's session model. Only the model id changes; the request keeps the session model's endpoint, backend, and credentials. |
+
 
 ### Flush Settings (`[compaction.memory_flush]`)
 

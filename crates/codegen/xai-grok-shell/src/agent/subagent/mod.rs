@@ -400,14 +400,6 @@ impl SubagentSpawnContext {
                 .and_then(|r| r.compaction_tool_choice.as_deref()),
         )
     }
-    pub(crate) fn resolve_compact_model(&self) -> Option<String> {
-        crate::util::config::resolve_compact_model(
-            crate::agent::config::env_string(crate::util::config::ENV_COMPACT_MODEL).as_deref(),
-            self.agent_config
-                .as_ref()
-                .and_then(|c| c.compaction.model.as_deref()),
-        )
-    }
     /// Whether a completed subagent's working copy is saved into the repo as a
     /// git ref and its directory deleted.
     pub(crate) fn resolve_subagent_worktree_snapshot_enabled(&self) -> bool {
