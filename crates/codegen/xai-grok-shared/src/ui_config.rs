@@ -165,6 +165,11 @@ pub struct UiConfig {
     /// cost (server stamp or local price sheet).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub show_session_usage_bar: Option<bool>,
+    /// Compact per-model-request metrics in the scrollback (`首`/`first`,
+    /// generation rate, duration, token counts). `None`/`true` = on (default).
+    /// Written by the pager's settings modal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_request_metrics: Option<bool>,
     /// Fold runs of consecutive non-destructive tool calls (reads, searches,
     /// lists) into one transcript row. `None` = on (client default). Written
     /// by the pager's settings modal.
@@ -338,6 +343,7 @@ impl Default for UiConfig {
             selection_highlight_duration_ms: None,
             show_thinking_blocks: None,
             show_session_usage_bar: None,
+            show_request_metrics: None,
             group_tool_verbs: None,
             collapsed_edit_blocks: None,
             prompt_suggestions: None,
@@ -393,6 +399,14 @@ impl UiConfig {
             return v;
         }
         self.transparent_bg.unwrap_or(Self::TRANSPARENT_BG_DEFAULT)
+    }
+
+    /// Default for [`Self::show_request_metrics`] when unset.
+    pub const SHOW_REQUEST_METRICS_DEFAULT: bool = true;
+
+    pub fn show_request_metrics_enabled(&self) -> bool {
+        self.show_request_metrics
+            .unwrap_or(Self::SHOW_REQUEST_METRICS_DEFAULT)
     }
 
     /// Default for [`Self::confirm_before_rewind`] when unset.
@@ -461,6 +475,16 @@ mod tests {
     fn transparent_bg_deserializes_from_json() {
         let ui: UiConfig = serde_json::from_str(r#"{"transparent_bg": true}"#).unwrap();
         assert_eq!(ui.transparent_bg, Some(true));
+    }
+
+    #[test]
+    fn show_request_metrics_defaults_on() {
+        assert!(UiConfig::default().show_request_metrics_enabled());
+        let off = UiConfig {
+            show_request_metrics: Some(false),
+            ..Default::default()
+        };
+        assert!(!off.show_request_metrics_enabled());
     }
 
     #[test]

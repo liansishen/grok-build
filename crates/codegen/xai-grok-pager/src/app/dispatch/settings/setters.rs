@@ -558,6 +558,42 @@ pub(super) fn set_show_session_usage_bar_inner(app: &mut AppView, new: bool) {
     }
 }
 
+pub(super) fn set_show_request_metrics_inner(app: &mut AppView, new: bool) {
+    app.current_ui.show_request_metrics = Some(new);
+    crate::app::acp_handler::set_show_request_metrics_enabled(new);
+}
+
+/// Toggle compact first-token / generation-rate metrics after each model response.
+pub(in crate::app::dispatch) fn set_show_request_metrics(
+    app: &mut AppView,
+    new: bool,
+) -> Vec<Effect> {
+    let prev = app.current_ui.show_request_metrics_enabled();
+    if prev == new {
+        return vec![];
+    }
+    set_show_request_metrics_inner(app, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "show_request_metrics",
+        value = new,
+        "setting changed",
+    );
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t_or(
+            "settings.show_request_metrics.label",
+            "Per-request metrics in scrollback",
+        ),
+        new,
+    ));
+    vec![Effect::PersistSetting {
+        key: "show_request_metrics",
+        value: crate::settings::SettingValue::Bool(new),
+        rollback_value: crate::settings::SettingValue::Bool(prev),
+    }]
+}
+
 /// Toggle live session tokens/cost left of the model name on the prompt line.
 pub(in crate::app::dispatch) fn set_show_session_usage_bar(
     app: &mut AppView,

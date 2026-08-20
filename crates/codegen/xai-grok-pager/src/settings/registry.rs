@@ -656,6 +656,9 @@ pub fn current_value_for(
         "show_session_usage_bar" => Some(SettingValue::Bool(
             ui.show_session_usage_bar.unwrap_or(false),
         )),
+        "show_request_metrics" => Some(SettingValue::Bool(
+            ui.show_request_metrics_enabled(),
+        )),
         // Live cache (like `show_thinking_blocks`).
         "group_tool_verbs" => Some(SettingValue::Bool(
             crate::appearance::cache::load_group_tool_verbs(),

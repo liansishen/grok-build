@@ -508,6 +508,8 @@ pub enum Action {
     SetShowThinkingBlocks(bool),
     /// Toggle live session token/cost label left of the model name.
     SetShowSessionUsageBar(bool),
+    /// Toggle compact first-token / generation-rate metrics after each model response.
+    SetShowRequestMetrics(bool),
     /// Set whether runs of consecutive non-destructive tool calls and
     /// subagent rows are grouped into one row. SHELL-owned: updates the
     /// process-wide cache mirror and persists to `[ui].group_tool_verbs`

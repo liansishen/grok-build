@@ -2198,6 +2198,8 @@
 "settings.scroll_mode.label" = "Scroll input"
 "settings.scroll_speed.description" = "Mouse-wheel and trackpad scroll speed multiplier (1-100). Higher = faster."
 "settings.scroll_speed.label" = "Scroll speed"
+"settings.show_request_metrics.description" = "After each model response, show first-token time, generation rate, duration, and token counts in the conversation."
+"settings.show_request_metrics.label" = "Per-request metrics in scrollback"
 "settings.show_session_usage_bar.label" = "Live session usage on prompt"
 "settings.show_thinking_blocks.description" = "Show agent thinking/reasoning blocks in the scrollback while streaming."
 "settings.show_thinking_blocks.label" = "Show thinking blocks"

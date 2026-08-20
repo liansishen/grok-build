@@ -51,9 +51,11 @@ transparent_bg = true
 ```toml
 [ui]
 usage_refresh_interval_minutes = 5   # 1–60，默认 5
+show_session_usage_bar = false       # 提示行实时会话 token/费用，默认关
+show_request_metrics = true          # 对话里显示 首/速/耗/词，默认开；设 false 关闭
 ```
 
-设置 UI 中对应项：**用量刷新间隔** / Usage refresh interval。
+设置 UI 中对应项：**用量刷新间隔**、**提示行实时会话用量**、**对话中显示逐次请求指标**。
 
 ### 4. Windows 一键构建与替换
 

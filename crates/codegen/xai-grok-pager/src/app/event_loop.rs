@@ -1477,6 +1477,9 @@ pub(crate) async fn run(
     // Seed app state from disk once at the I/O boundary so dispatch
     // stays sans-IO.
     app.current_ui = load_initial_ui_config();
+    crate::app::acp_handler::set_show_request_metrics_enabled(
+        app.current_ui.show_request_metrics_enabled(),
+    );
     // Keep the process-wide catalog aligned with the language field itself.
     // Read it independently so a malformed unrelated `[ui]` setting cannot
     // make whole-UiConfig fallback reset a valid Chinese preference to auto.

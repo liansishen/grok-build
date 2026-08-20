@@ -1056,6 +1056,31 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+        // SHELL-owned: `[ui].show_request_metrics`. Default ON.
+        SettingMeta {
+            key: "show_request_metrics",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shell,
+            label: "Per-request metrics in scrollback",
+            description: "After each model response, show first-token time, generation \
+                          rate, duration, and token counts in the conversation.",
+            keywords: &[
+                "metrics",
+                "ttft",
+                "tps",
+                "first",
+                "token",
+                "latency",
+                "speed",
+                "request",
+                "usage",
+            ],
+            kind: SettingKind::Bool {
+                default: ui_default.show_request_metrics_enabled(),
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
         // SHELL-owned: `[ui].prompt_suggestions` + process-wide cache. Default ON.
         // The `GROK_PROMPT_SUGGESTIONS` env var overrides at runtime.
         SettingMeta {

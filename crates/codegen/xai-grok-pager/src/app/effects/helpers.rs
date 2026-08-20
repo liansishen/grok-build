@@ -1339,6 +1339,14 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "show_request_metrics" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("show_request_metrics", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_show_request_metrics(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "group_tool_verbs" => {
             let SettingValue::Bool(b) = value else {
                 return Err(kind_mismatch("group_tool_verbs", "Bool", &value));

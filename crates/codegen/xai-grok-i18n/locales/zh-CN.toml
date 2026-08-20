@@ -2198,6 +2198,8 @@
 "settings.scroll_mode.label" = "滚动输入"
 "settings.scroll_speed.description" = "鼠标滚轮与触控板滚动速度倍率（1–100）。越高越快。"
 "settings.scroll_speed.label" = "滚动速度"
+"settings.show_request_metrics.description" = "每次模型回复后，在对话记录中显示首字耗时、生成速度、总耗时和 token 数量。"
+"settings.show_request_metrics.label" = "对话中显示逐次请求指标"
 "settings.show_session_usage_bar.label" = "提示行实时会话用量"
 "settings.show_thinking_blocks.description" = "流式输出时在对话滚动区中显示智能体的思考/推理块。"
 "settings.show_thinking_blocks.label" = "显示思考块"

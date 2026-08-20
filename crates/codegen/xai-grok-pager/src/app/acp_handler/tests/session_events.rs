@@ -125,6 +125,42 @@
     }
 
     #[test]
+    fn response_completed_skips_metrics_when_setting_off() {
+        let mut app = make_app_with_agent("sess-1");
+        app.current_ui.show_request_metrics = Some(false);
+        let changed = handle(
+            make_ext_session_notification(
+                "sess-1",
+                XaiSessionUpdate::ResponseCompleted {
+                    prompt_id: Some("p-1".into()),
+                    message_id: Some("msg-1".into()),
+                    stop_reason: Some("end_turn".into()),
+                    usage: Some(xai_grok_shell::extensions::notification::ResponseUsage {
+                        input_tokens: 440,
+                        output_tokens: 480,
+                        cache_read_input_tokens: 2_650,
+                        ..Default::default()
+                    }),
+                    signature: None,
+                    time_to_first_token_ms: Some(900),
+                    duration_ms: Some(11_900),
+                    stop_sequence: None,
+                },
+            ),
+            &mut app,
+        );
+        assert!(!changed);
+        let agent = app.agents.get(&AgentId(0)).unwrap();
+        assert!(
+            !matches!(
+                agent.scrollback.last().map(|e| &e.block),
+                Some(RenderBlock::RequestMetrics(_)),
+            ),
+            "disabled setting must not append a metrics block",
+        );
+    }
+
+    #[test]
     fn response_completed_for_hidden_prompt_is_invisible() {
         let mut app = make_app_with_agent("sess-1");
         let changed = handle(
