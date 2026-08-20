@@ -662,6 +662,7 @@ impl MvpAgent {
             );
             insert_applied_tool_overrides(obj, applied_tool_overrides.as_ref());
         }
+        self.attach_status_line(&session_id, arguments.meta.as_ref(), init);
         #[cfg(all(feature = "local-workspace", unix))]
         local_ws_reap_guard.disarm();
         Ok(acp::NewSessionResponse::new(session_id)
@@ -874,6 +875,7 @@ impl MvpAgent {
             .await?;
         let initial_session_usage =
             Self::extract_initial_session_usage_from_updates(&updates_file_path);
+        self.attach_status_line(&session_id, request_meta.as_ref(), init);
         let ClientCaps {
             code_nav: client_code_nav_enabled,
             terminal: client_terminal,

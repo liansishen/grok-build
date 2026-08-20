@@ -1548,6 +1548,7 @@
 "permission.option.always_allow_bash" = "是，并不再询问 bash 命令"
 "permission.option.enable_always_approve" = "是，并不再询问任何操作（始终批准模式）"
 "permission.option.reject_always_bash" = "否，并且不再询问此命令"
+"permission.option.reject_always_domain" = "否，永不允许 {domain} 用于本项目"
 "permission.option.reject_once" = "否，并告诉 Grok 该怎么做"
 "permission.option.yes" = "是"
 "permission.option.yes_allow_once" = "是，允许一次"

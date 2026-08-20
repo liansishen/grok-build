@@ -1548,6 +1548,7 @@
 "permission.option.always_allow_bash" = "Yes, and don't ask again for bash commands"
 "permission.option.enable_always_approve" = "Yes, and don't ask again for anything (always-approve mode)"
 "permission.option.reject_always_bash" = "No, and don't ask again for this command"
+"permission.option.reject_always_domain" = "No, never allow {domain} for this project"
 "permission.option.reject_once" = "No, and tell Grok what to do differently"
 "permission.option.yes" = "Yes"
 "permission.option.yes_allow_once" = "Yes, allow once"
