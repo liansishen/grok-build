@@ -1,28 +1,87 @@
 # Changelog
 
-# 1.0.5-fork.11 — 2026-08-19
+# 1.0.6-fork.1 — 2026-08-20
 
-## 功能
+同步上游 monorepo `19d42e35` / Source-Revision `7d67deac`，产品版本升至 **1.0.6**。
 
-### 可关闭对话里的逐次请求指标
+官方 1.0.6 变更里，输入框 Shift 选区、Goal 队列解堵、Windows PowerShell hook 展开、子 agent 不再接受 spawn 时 `capability_mode`、视频 ZDR 提示、MCP 图标字段、同意记录上传、shell attempt 存储编解码，以及 `grok clone` 直接进入投影工作树，已在 `v1.0.5-fork.10`（上游 `d92c5b0b` / Source-Revision `9dccd1f0`）合入，此处不重复展开。
+
+### 上游更新
+
+本次新增覆盖可选状态行、记住工具批准默认开启、权限提示的持久「永不允许」、模型族切换时自动压缩、页翻钉住、邮箱 mailto 链接、子 agent 不再发多选问题、后台任务托盘删除循环、启动连接超时覆盖等。
+
+#### 可选状态行
+
+- 全屏 pager 底部可以显示一行状态，在快捷键栏上方。默认关闭，需要在 `~/.grok/config.toml` 的 `[ui.status_line]` 开启。仓库本地配置和远程推送都不能设置这一项，因为 `command` 模式会在本机跑脚本。
+- 内置模式：`type = "builtin"`，`items` 可选 `cwd`、`model`、`context`、`cost`、`turn-timer`、`session-name`，省略时为 `cwd`、`model`、`context`。
+- 脚本模式：`type = "command"`，`command` 指向脚本，`~/` 会展开为家目录。Grok 把 JSON 写入 stdin，并把 stdout 画在状态行。
+- `refresh_interval` 只对 `command` 生效，单位秒，范围 1–86400。未设置时只在会话状态变化时重跑；设了之后空闲会话也会按间隔重跑脚本。旧键 `refresh_interval_ms` 已废弃，解析到会记为配置问题并提示改用 `refresh_interval`。
+- `padding` 是两侧空白字符数，上限 16。`type = "disabled"`（以及 `off` / `none` / `hidden`）关掉该行。改配置后需重启。
+- 状态行是内置段或脚本输出，不走界面国际化目录，无需新增英文或简体中文翻译键。
+
+#### 记住工具批准默认开启
+
+- 权限提示里的「始终允许」粒度选项现在默认开启，可以把某条命令或工具记住，不再每次都问。
+- 配置：`[ui] remember_tool_approvals = true|false`，环境变量 `GROK_REMEMBER_TOOL_APPROVALS` 优先于配置。`/settings` 里有 **记住工具批准** / Remember tool approvals。改完需重启。
+- 「始终批准」模式仍会跳过全部提示；该开关只影响「询问」和「自动」模式下是否出现持久批准选项。
+
+#### 权限提示：持久「永不允许」
+
+- MCP 工具和 web-fetch 域名现在可以选「永不允许」，拒绝会写进本项目的权限策略，下次不再问同一范围。
+- web-fetch 的持久拒绝按提示里的确切主机名记，不做通配符。选项文案为「否，永不允许 {domain} 用于本项目」。
+- bash 命令同样可以持久拒绝主命令。这些选项仍受 `remember_tool_approvals` 门控；关掉记住批准时不会出现。
+
+#### 模型族切换时压缩
+
+- 切换到不同模型族时，若当前没有进行中的轮次、且历史里已有模型生成的内容，会先跑一次压缩再切换，避免把旧族的对话上下文直接交给新模型。
+- 若正在跑轮次，会跳过这次压缩并记警告。压缩失败不阻挡模型切换。
+
+#### 其它界面与运行时
+
+- 发送后的页翻钉住现在会跟着滚动保留，不会因滚动对话记录而脱钉。仍由既有 `[ui] page_flip_on_send` 控制。
+- 沙箱会话也可以删掉定时循环；后台任务托盘可以直接删除定时循环。
+- pager 里的普通邮箱地址会渲染成 `mailto:` 链接。Git SCP 形式（如 `git@github.com:org/repo`）不会误当邮件地址。
+- 子 agent 不能再向用户发多选问题，只有主 agent 可以用 ask-user 工具。
+- 删除一个 worktree 时不会再误删同级 worktree 的注册记录。
+- 相同工具调用的循环会更早被中断，分两档。
+- 暂停的 workflow 仍会留在任务/工作流界面，不会被当成结束而消失。
+- `/goal` 完成判定更保守：代理自报完成不够，需要供应可验证的交付证据。
+- 启动连接 UI 预算可用 `GROK_CONNECT_UI_TIMEOUT_SECS` 覆盖，默认 30 秒，最小 5 秒；空值、`0` 或无法解析的值仍走默认。
+- 同机另一个 Grok 进程刚刷新的凭据会在争夺认证锁之前被采用，启动路径上的刷新有界，减少并发登录卡住。
+- Bash allow 规则按命令段匹配，并会剥掉已识别的包装命令；这是规则语义和文档更新，不改界面字段。
+
+### 本 Fork
+
+#### 可关闭对话里的逐次请求指标
 
 - 每次模型回复后，对话记录默认仍显示 `首` / `速` / `耗` / `词`。现在可以用配置关掉，不再追加这一行。
 - 配置：`[ui] show_request_metrics = false`。默认 `true`，与现在行为一致。
 - `/settings` 外观里有 **对话中显示逐次请求指标** / Per-request metrics in scrollback。改完立即生效，已写进当前会话的行不会撤回。
-- 英文和简体中文设置标签、说明都已翻译。
+- 英文和简体中文设置标签、说明都已翻译：`settings.show_request_metrics.label` / `.description`。
+- 本 fork 其它用户可见能力对照：界面语言、透明背景、提示行实时会话用量已有开关；周/月限额状态跟计费面走、不是逐次噪声，不另加开关；次要模型和压缩模型是取值配置；`Alt+M`、中文列宽、采样器恢复是修复或键位，不需要开关。
 
-本 fork 其它用户可见能力对照：界面语言、透明背景、提示行实时会话用量已有开关；周/月限额状态跟计费面走、不是逐次噪声，不另加开关；次要模型和压缩模型是取值配置；`Alt+M`、中文列宽、采样器恢复是修复或键位，不需要开关。
+#### 国际化与兼容
+
+- 保留 `v1.0.5-fork.10` 及之前的 fork 能力：简体中文界面、透明背景、账户计费与 CPA 配额、会话用量与缓存率、次要模型与推理强度、按目录条目配置的压缩模型、逐次请求指标、Responses 终端帧恢复、`Alt+M` 打开模型选择器、中文 toast 按列宽绘制以及 fork 发布更新。
+- 上游新增的持久拒绝标签已走国际化：`permission.prefix.never_allow`（英文「Never allow:」/简体中文「永不允许：」）；`permission.option.reject_always_domain`（英文「No, never allow {domain} for this project」/简体中文「否，永不允许 {domain} 用于本项目」）。
+- 设置 **记住工具批准** 的标签和说明也已有英文和简体中文：`settings.remember_tool_approvals.label` / `.description`。改完需重启。
+- 状态行、模型族压缩、页翻钉住、mailto 链接、worktree 注册以及启动超时环境变量没有新增界面字段。`GROK_CONNECT_UI_TIMEOUT_SECS` 是环境变量名，不走界面目录。
 
 ### 验证
 
-- 单元测试覆盖默认开启、配置关闭后不再追加指标块。
-- 静态检查设置键、持久化路径和英文/简体中文目录一致性。
+- 静态审查覆盖上游合并后的 fork 标记（`Alt+M`、CJK 列宽、次要模型、压缩模型、计费轮询、国际化调用）、指标开关的设置键与持久化路径，以及新权限文案的英文/简体中文目录一致性。
+- 单元测试覆盖 `show_request_metrics` 默认开启、配置关闭后不再追加指标块。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
 
 ### 产物
 
-- 本条目随后续正式发布写入 GitHub Release。
+- `grok-1.0.6-fork.1-linux-x86_64`
+- `grok-1.0.6-fork.1-windows-x86_64`
+- `SHA256SUMS`
 
-**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.10...v1.0.5-fork.11
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.10...v1.0.6-fork.1
 
 # 1.0.5-fork.10 — 2026-08-19
 
