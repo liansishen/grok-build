@@ -3758,7 +3758,7 @@ mod tests {
         // Soft-fail only on auto-check issues when running the harness.
         assert!(
             issues.is_empty(),
-            "{} auto-check issue(s) — see stdout above",
+            "{} auto-check issue(s) \u{2014} see stdout above",
             issues.len()
         );
     }

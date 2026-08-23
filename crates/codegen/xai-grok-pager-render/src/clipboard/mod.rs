@@ -2431,7 +2431,7 @@ mod tests {
         };
         assert_eq!(
             unverified.toast_message(),
-            "Copy sent — saved to /tmp/grok-1/last-copy.txt"
+            "Copy sent, saved to /tmp/grok-1/last-copy.txt"
         );
         assert_eq!(unverified.toast_ticks(), 120);
 
@@ -2447,7 +2447,7 @@ mod tests {
         let file_only = CopyDelivery::File { path };
         assert_eq!(
             file_only.toast_message(),
-            "Clipboard unreachable — wrote /tmp/grok-1/last-copy.txt"
+            "Clipboard unreachable: wrote /tmp/grok-1/last-copy.txt"
         );
         assert_eq!(file_only.toast_ticks(), 120);
 

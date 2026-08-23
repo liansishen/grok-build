@@ -486,6 +486,7 @@ pub(in crate::app::dispatch) fn dispatch_new_session_inner_with_id(
         agent_id,
         cwd: effective_cwd,
         model_id,
+        permission_mode_override: None,
         preferred_session_id,
         chat_kind,
     });
@@ -1039,6 +1040,7 @@ pub(in crate::app::dispatch) fn dispatch_new_worktree_session(
         label,
         git_ref,
         model_id,
+        permission_mode_override: None,
         preferred_session_id,
         chat_kind,
     }];
@@ -1158,7 +1160,7 @@ pub(in crate::app::dispatch) fn handle_session_created(
             agent_id,
             silent: true,
             request: None,
-            nonce: 0,
+            nonce: Default::default(),
         });
         if let Some(switch) = deferred {
             effects.push(Effect::SwitchModel {
@@ -1268,7 +1270,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
             agent_id,
             silent: true,
             request: None,
-            nonce: 0,
+            nonce: Default::default(),
         });
         if let Some(switch) = deferred {
             effects.push(Effect::SwitchModel {

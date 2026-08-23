@@ -185,7 +185,8 @@ impl BlockContent for SubagentBlock {
                     .activity_label
                     .as_deref()
                     .filter(|s| !s.is_empty())
-                    .unwrap_or("");
+                    .map(|a| format!(" \u{00b7} {a}"))
+                    .unwrap_or_default();
                 let meta = format_subagent_meta(
                     self.persona.as_deref(),
                     self.role.as_deref(),

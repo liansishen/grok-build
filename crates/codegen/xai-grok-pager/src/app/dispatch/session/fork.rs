@@ -291,6 +291,7 @@ pub(in crate::app::dispatch) fn dispatch_fork_resolved(
             model_id: fork_model_id
                 .as_deref()
                 .map(|s| acp::ModelId::new(s.to_string())),
+            permission_mode_override: None,
             preferred_session_id: None,
             chat_kind: parent_chat_kind,
         }]

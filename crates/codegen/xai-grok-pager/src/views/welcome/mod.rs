@@ -592,7 +592,7 @@ fn render_prompt_and_version(
             width: tip_centered.width.saturating_sub(inset * 2),
             height: tip_centered.height,
         };
-        crate::tips::render::render_tip(tip_inset, buf, tip_text);
+        crate::tips::render::render_tip(tip_inset, buf, tip_text, crate::tips::render::HINT_INSET);
     }
     let prompt_result =
         prompt::render_prompt(prompt_centered, buf, focus, prompt, info, 2, 2, compact);
@@ -1816,9 +1816,9 @@ fn render_welcome_done(
         ];
         &gate_menu
     } else {
-        let (key_w, key_s, key_q, key_i_with_x) = (
+        let (key_w, key_resume, key_q, key_i_with_x) = (
             "ctrl+w",
-            "ctrl+s",
+            "f3",
             if in_vscode_family { "ctrl+d" } else { "ctrl+q" },
             "ctrl+i  [x]",
         );
@@ -1837,7 +1837,7 @@ fn render_welcome_done(
             ));
         }
         items.push((key_w, xai_grok_i18n::t("welcome.new_worktree")));
-        items.push((key_s, xai_grok_i18n::t("welcome.resume_session")));
+        items.push((key_resume, xai_grok_i18n::t("welcome.resume_session")));
         // Changelog above Quit; no shortcut — opened by click (row or block).
         if show_changelog_action {
             items.push(("", xai_grok_i18n::t("welcome.changelog")));
@@ -2851,7 +2851,7 @@ mod tests {
             ),
             (
                 crate::clipboard::ClipboardDelivery::Unverified,
-                "copy sent—verify paste",
+                "copy sent: verify paste",
             ),
             (
                 crate::clipboard::ClipboardDelivery::Failed,

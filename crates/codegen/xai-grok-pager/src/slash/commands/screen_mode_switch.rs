@@ -1,4 +1,5 @@
-//! `/minimal` and `/fullscreen` — session-scoped re-exec of the active session.
+//! `/minimal` and `/fullscreen` — session-scoped in-process screen-mode
+//! switch, performed by the event loop via `app::mode_switch`.
 
 use crate::app::actions::Action;
 use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
@@ -13,13 +14,13 @@ pub struct ScreenModeSwitchCommand {
 
 impl ScreenModeSwitchCommand {
     /// `/minimal`: offered in the full TUI (alt-screen or `--no-alt-screen`
-    /// inline), relaunches with `--minimal`.
+    /// inline), switches this session to scrollback-native rendering.
     pub const fn minimal() -> Self {
         Self { to_minimal: true }
     }
 
-    /// `/fullscreen` (alias `/full`): offered in minimal, relaunches without
-    /// `--minimal`.
+    /// `/fullscreen` (alias `/full`): offered in minimal, switches this
+    /// session to the alt-screen TUI.
     pub const fn fullscreen() -> Self {
         Self { to_minimal: false }
     }

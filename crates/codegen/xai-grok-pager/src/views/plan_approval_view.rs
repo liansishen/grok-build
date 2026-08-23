@@ -396,6 +396,10 @@ mod tests {
     fn plan_approval_labels_and_placeholder_are_nonempty() {
         assert!(!plan_approval_status_label(true).trim().is_empty());
         assert!(!plan_approval_status_label(false).trim().is_empty());
+        assert_eq!(
+            plan_approval_status_label(false),
+            xai_grok_i18n::t("plan.no_plan_approve")
+        );
         // Placeholder must be non-empty so the line viewer accepts it.
         assert!(!empty_plan_placeholder().trim().is_empty());
     }

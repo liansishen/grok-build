@@ -1,5 +1,64 @@
 # Changelog
 
+# 1.0.8-fork.1 — 2026-08-23
+
+同步上游 monorepo `07b2f714` / Source-Revision `956313d4`，产品版本升至 **1.0.8**。
+
+官方 1.0.7 变更里，启动超时 `GROK_CONNECT_UI_TIMEOUT_SECS`、权限提示默认「始终允许 / 永不允许」、状态行 `refresh_interval`、MCP 与 web-fetch 的持久「永不允许」、后台任务托盘删除循环、子 agent 不再发多选问题、工具调用循环更早中断、邮箱 mailto 链接，已在 `v1.0.6-fork.1`（上游 `19d42e35` / Source-Revision `7d67deac`）合入，此处不重复展开。
+
+### 上游更新
+
+本次新增覆盖 MCP 征求表单或 URL 同意、Ctrl+S 暂存草稿、`/workflow` 自动补全与运行过滤、工作流目录页、`/plugin` 别名、队列里向上键跳到排队提示、`/copy` 使用源 Markdown、并发子 agent 不再卡住父会话，以及权限自动模式的交互默认值。
+
+#### MCP 征求（elicitation）
+
+- MCP 服务器可以通过与提问相同的弹窗请求结构化表单输入，或请求打开 URL 的同意。
+- 征求打开时会暂存当前草稿，关闭后再还原。这是客户端交互，不是新的配置键。
+
+#### Ctrl+S 暂存草稿
+
+- `Ctrl+S` 会把当前输入框草稿收起来，方便先发别的内容，之后再还原。与提问、权限、计划批准用的内部暂存是分开的。
+
+#### 工作流命令与目录
+
+- `/workflow` 会自动补全已保存的工作流名称；`pause` / `resume` / `stop` / `save` 只列出当前有效的运行。
+- 扩展模态（Ctrl+L 或 `/plugins`）新增 **工作流** 页，列出已安装工作流的名称、来源和说明。`/workflows` 打开该页；命令面板 Ctrl+P 也有 **工作流** 一行。
+- 裸 `/workflow`（或 `/workflow runs`）列出活动与最近运行的状态和进度，不再只显示用法。工作流智能体行显示当前上下文用量，而不是累计 token。
+- `/plugin` 是 `/plugins` 的别名。
+
+#### 其它界面与运行时
+
+- 有排队提示时，空输入框按向上键会跳到队列最后一行，而不是历史记录。
+- `/copy` 复制源 Markdown，而不是渲染后的纯文本。
+- 等子 agent 或任务时，跟进消息（含 `/btw` 之后）可以立即发出。
+- 仪表盘 peek 里裸 `Esc` 会关掉 peek 回到列表，而不是结束会话。
+- 同时打开大量子 agent 不再卡在加载历史；并发子 agent 启动更快，不再把父会话串行堵住。
+- 只含一个文件的文件夹下载，zip 仍会按文件夹解压。
+- 模型发明的工具调用失败会明确说该工具不存在。
+- 交互式 TUI 的权限模式软默认改为自动；仪表盘 Shift+Tab 循环包含 Auto。仍可用设置改回。
+- 状态行刷新计时命名已统一；刻意隐藏的行不再报刷新错误。
+
+### 本 Fork
+
+- 保留 `v1.0.6-fork.1` 及之前的 fork 能力：简体中文界面、透明背景、账户计费与 CPA 配额、会话用量与缓存率、次要模型与推理强度、按目录条目配置的压缩模型、逐次请求指标开关、Responses 终端帧恢复、`Alt+M` 打开模型选择器、中文 toast 按列宽绘制以及 fork 发布更新。
+- 工作流目录页、命令面板工作流行、插件组标题、被挤掉的 `/feedback` 提示已走国际化：`modal.workflows` / `extensions.tab.workflows`（英文「Workflows」/简体中文「工作流」）；`agents.scope.plugins`（英文「Plugins」/简体中文「插件」）；`feedback.cancelled_displaced`、`feedback.sent_displaced`。工作流运行标题键 `workflow.title` 更新为英文「Workflow Runs」/简体中文「工作流运行」。
+- Ctrl+S 暂存、MCP 征求弹窗、`/plugin` 别名、zip 解压路径、子 agent 并发与启动性能没有新增界面字段。发明工具的错误文案是给模型的工具错误，不走界面目录。
+
+### 验证
+
+- 静态审查覆盖上游合并后的 fork 标记（`Alt+M`、CJK 列宽、次要模型、压缩模型、计费轮询、国际化调用）、指标开关，以及新工作流/反馈文案的英文/简体中文目录一致性。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.8-fork.1-linux-x86_64`
+- `grok-1.0.8-fork.1-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.6-fork.1...v1.0.8-fork.1
+
 # 1.0.6-fork.1 — 2026-08-20
 
 同步上游 monorepo `19d42e35` / Source-Revision `7d67deac`，产品版本升至 **1.0.6**。
@@ -359,6 +418,51 @@
 - `SHA256SUMS`
 
 **Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.3...v1.0.5-fork.4
+
+# 1.0.8 — 2026-08-20
+
+## Features
+
+- MCP servers can now ask for form input or URL consent through the same popup used for questions.
+- Ctrl+S now stashes the current prompt draft so you can send something else and restore it later.
+- ** /workflow** now autocompletes saved workflow names and shows only valid runs for pause/resume/stop/save.
+
+## Bug Fixes
+
+- Downloading a folder that contains only one file now produces a zip that still extracts as a folder.
+- Failed tool calls for tools the model invented now clearly state the tool does not exist.
+- **Status line** refresh timer now uses consistent naming and no longer shows errors on deliberately hidden rows.
+- **Workflow agent rows** now display current context usage instead of cumulative token counts.
+- **Follow-up messages** now send immediately while waiting on a subagent or task, including after using /btw.
+
+## Performance
+
+- Opening many subagents at once no longer freezes the interface while loading their history.
+- **Concurrent subagents** now start much faster and no longer freeze the parent session.
+
+
+# 1.0.7 — 2026-08-19
+
+## Features
+
+- Users hitting startup timeouts can now raise the connect budget with the `GROK_CONNECT_UI_TIMEOUT_SECS` environment variable.
+- Permission prompts now show "Always allow" and "Never allow" options by default.
+- Users can now delete scheduled background loops directly from the tray.
+- **Status line command** scripts can now run on a timer via refresh_interval in config.toml.
+- **Permission prompts** now offer a 'Never allow' choice for MCP tools and web-fetch domains that persists per project.
+- **Workflows tab** added to the extensions modal (Ctrl+L or /plugins) listing installed workflows with name, source, and description.
+- **New /workflows** command opens the Workflows catalog tab; use **/workflow runs** to view live workflow runs.
+- **Bare /workflow** (or /workflow runs) now lists active and recent workflow runs with status and progress instead of usage help.
+- **Workflows** row added to the Ctrl+P command palette, opening the Workflows catalog tab.
+
+## Bug Fixes
+
+- **MCP server connections** in non-interactive sessions no longer incorrectly require authentication for tokenless servers.
+- Fixed startup timeouts caused by concurrent auth refreshes across multiple sessions.
+- **Tool call loops** are interrupted earlier to avoid wasting time on repeated identical actions.
+- **Subagents** no longer receive the ask-user-question tool.
+- Bare email addresses are now turned into clickable mailto links in the pager.
+
 
 # 1.0.6 — 2026-08-18
 

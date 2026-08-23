@@ -589,7 +589,7 @@ pub(super) fn handle_credit_limit_recheck_complete(
         agent_id,
         silent: true,
         request: None,
-        nonce: 0,
+        nonce: Default::default(),
     });
     if billing_refresh_needed {
         drain

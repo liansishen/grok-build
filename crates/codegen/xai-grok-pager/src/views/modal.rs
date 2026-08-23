@@ -526,6 +526,13 @@ pub(crate) fn default_palette_entries(
             ),
         },
         PaletteEntry {
+            label: xai_grok_i18n::t("modal.workflows").into(),
+            shortcut: "/workflows".into(),
+            command: PaletteCommand::OpenExtensionsTab(
+                crate::views::extensions_modal::ExtensionsTab::Workflows,
+            ),
+        },
+        PaletteEntry {
             label: xai_grok_i18n::t("modal.mcp_servers").into(),
             shortcut: "/mcps".into(),
             command: PaletteCommand::OpenExtensionsTab(
@@ -593,8 +600,15 @@ pub(crate) fn default_palette_entries(
         {
             return false;
         }
-        screen_mode.is_minimal() || !matches!(entry.command, PaletteCommand::EditPromptExternal)
+        true
     });
+    if !screen_mode.is_minimal()
+        && let Some(entry) = entries
+            .iter_mut()
+            .find(|entry| matches!(entry.command, PaletteCommand::EditPromptExternal))
+    {
+        entry.shortcut = "/edit-prompt".into();
+    }
     entries
 }
 #[allow(clippy::collapsible_if)]
@@ -1394,6 +1408,23 @@ mod palette_sharing_tests {
         }
     }
     #[test]
+    fn workflows_hub_row_survives_minimal() {
+        for mode in [
+            crate::app::ScreenMode::Minimal,
+            crate::app::ScreenMode::Fullscreen,
+        ] {
+            let entries = default_palette_entries(true, &slash(mode));
+            assert!(
+                entries.iter().any(|e| e.label == "Workflows"),
+                "hub row missing in {mode:?}"
+            );
+            assert!(
+                !entries.iter().any(|e| e.label == "Workflow Runs"),
+                "Workflow Runs must stay off the palette in {mode:?}"
+            );
+        }
+    }
+    #[test]
     fn every_palette_slash_row_resolves_to_a_registered_command() {
         let builtins = crate::slash::commands::builtin_commands();
         for row in slash_rows(crate::app::ScreenMode::Fullscreen) {
@@ -1409,19 +1440,16 @@ mod palette_sharing_tests {
         }
     }
     #[test]
-    fn edit_prompt_palette_entry_is_minimal_only() {
-        let minimal = default_palette_entries(true, &slash(crate::app::ScreenMode::Minimal));
-        assert!(
-            minimal
-                .iter()
-                .any(|entry| matches!(entry.command, PaletteCommand::EditPromptExternal))
-        );
-        let fullscreen = default_palette_entries(true, &slash(crate::app::ScreenMode::Fullscreen));
-        assert!(
-            !fullscreen
-                .iter()
-                .any(|entry| matches!(entry.command, PaletteCommand::EditPromptExternal))
-        );
+    fn edit_prompt_palette_entry_shows_mode_correct_hint() {
+        let hint = |mode| {
+            default_palette_entries(true, &slash(mode))
+                .into_iter()
+                .find(|entry| matches!(entry.command, PaletteCommand::EditPromptExternal))
+                .expect("palette offers the external editor in every mode")
+                .shortcut
+        };
+        assert_eq!(hint(crate::app::ScreenMode::Minimal), "Ctrl+G");
+        assert_eq!(hint(crate::app::ScreenMode::Fullscreen), "/edit-prompt");
     }
     #[test]
     fn default_palette_omits_share_when_disabled() {
@@ -1467,6 +1495,10 @@ mod palette_sharing_tests {
             ),
             (xai_grok_i18n::t("modal.skills"), ExtensionsTab::Skills),
             (
+                xai_grok_i18n::t("modal.workflows"),
+                ExtensionsTab::Workflows,
+            ),
+            (
                 xai_grok_i18n::t("modal.mcp_servers"),
                 ExtensionsTab::McpServers,
             ),
@@ -1483,6 +1515,21 @@ mod palette_sharing_tests {
                 "Tools entry {label:?} dispatches to the wrong tab",
             );
         }
+        let positions: Vec<usize> = ExtensionsTab::ALL
+            .iter()
+            .map(|tab| {
+                entries
+                    .iter()
+                    .position(
+                        |e| matches!(&e.command, PaletteCommand::OpenExtensionsTab(t) if t == tab),
+                    )
+                    .unwrap_or_else(|| panic!("no Tools row opens {tab:?}"))
+            })
+            .collect();
+        assert!(
+            positions.windows(2).all(|pair| pair[0] < pair[1]),
+            "Tools hub rows out of tab order: {positions:?}"
+        );
     }
     #[test]
     fn howto_list_modal_opens_on_first_guide() {

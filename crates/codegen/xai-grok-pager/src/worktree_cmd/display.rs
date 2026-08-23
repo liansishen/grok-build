@@ -1,44 +1,38 @@
+use super::{DbStats, GcReport, RebuildReport};
+use crate::fs_size::{Volume, physical_dir_size};
+use crate::util::{
+    format_age, format_bytes, pad_to_width, truncate_to_width, unix_now,
+};
 use std::io::Write;
 use std::path::Path;
-
 use unicode_width::UnicodeWidthStr;
 use xai_fast_worktree::WorktreeRecord;
 use xai_grok_i18n::{t, t_fmt};
-
-use super::{DbStats, GcReport, RebuildReport};
-use crate::fs_size::{Volume, physical_dir_size};
-use crate::util::{format_bytes, pad_to_width, truncate_to_width, unix_now};
-
 const REPO_WIDTH: usize = 6;
 const BRANCH_WIDTH: usize = 20;
 const AGE_WIDTH: usize = 10;
-
 /// Truncate-then-pad to exactly `width` display columns; headers and data
 /// share it so the two stay aligned.
 fn cell(s: &str, width: usize) -> String {
     pad_to_width(&truncate_to_width(s, width), width)
 }
-
 pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io::Result<()> {
     if records.is_empty() {
         writeln!(out, "{}", t("cli.worktree.none_found"))?;
         return Ok(());
     }
-
     let id_width = records
         .iter()
         .map(|r| UnicodeWidthStr::width(r.id.as_str()))
         .max()
         .unwrap_or(0)
         .max(16);
-
     let label_width = records
         .iter()
         .map(|r| r.label().map_or(0, UnicodeWidthStr::width))
         .max()
         .unwrap_or(0)
         .clamp(5, 24);
-
     let type_header = t("cli.worktree.header.type");
     // Derived, not fixed: `cell` truncates rather than shifting, and
     // `subagent` already fills 8 columns.
@@ -46,7 +40,6 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
         .iter()
         .map(|r| UnicodeWidthStr::width(r.kind.as_str()))
         .fold(UnicodeWidthStr::width(type_header), usize::max);
-
     writeln!(
         out,
         "  {} {} {} {} {} {:<AGE_WIDTH$} {}",
@@ -67,8 +60,6 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
             .unwrap_or_else(|| t("cli.worktree.detached"));
         let label = rec.label().unwrap_or("");
         let path = abbreviate_home(&rec.path);
-        // AGE is ASCII, so format-width padding is width-true; every other
-        // cell pads by display width.
         writeln!(
             out,
             "  {} {} {} {} {} {:<AGE_WIDTH$} {}",
@@ -81,7 +72,6 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
             path,
         )?;
     }
-
     let total = records.len();
     let by_kind: std::collections::BTreeMap<&str, usize> =
         records
@@ -103,12 +93,10 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
         )
     )
 }
-
 pub fn print_json(records: &[WorktreeRecord], out: &mut impl Write) -> std::io::Result<()> {
     let json = serde_json::to_string_pretty(records).unwrap_or_else(|_| "[]".to_string());
     writeln!(out, "{json}")
 }
-
 pub fn print_show(rec: &WorktreeRecord, out: &mut impl Write) -> std::io::Result<()> {
     writeln!(
         out,
@@ -217,10 +205,7 @@ pub fn print_show(rec: &WorktreeRecord, out: &mut impl Write) -> std::io::Result
             t_fmt("cli.worktree.detail.label", &[("value", label)])
         )?;
     }
-
     if rec.path.exists() {
-        // Anchored to the worktree's own volume: one tree, not a share of
-        // some other total.
         let size = physical_dir_size(&rec.path, Volume::of(&rec.path));
         let bytes = size.measure.bytes().unwrap_or_default();
         let mut value = format_bytes(bytes);
@@ -247,7 +232,6 @@ pub fn print_show(rec: &WorktreeRecord, out: &mut impl Write) -> std::io::Result
     }
     Ok(())
 }
-
 pub fn print_stats(stats: &DbStats, out: &mut impl Write) -> std::io::Result<()> {
     writeln!(out, "{}", t("cli.worktree.stats.title"))?;
     writeln!(out, "{}", t("cli.worktree.stats.divider"))?;
@@ -284,7 +268,6 @@ pub fn print_stats(stats: &DbStats, out: &mut impl Write) -> std::io::Result<()>
         )
     )
 }
-
 /// Print a `grok worktree gc` report. Named lines (the ones that exist) are
 /// localized; the layout matches upstream's English output for the en locale.
 pub fn print_gc(report: &GcReport, out: &mut impl Write) -> std::io::Result<()> {
@@ -355,9 +338,6 @@ pub fn print_gc(report: &GcReport, out: &mut impl Write) -> std::io::Result<()> 
                 )
             )?;
         }
-        // Named, so `grok worktree rm <path>` needs no log reading. The
-        // remainder counts from the total: the report itself carries only the
-        // first hundred, and each keep is logged.
         const MAX_KEPT_PRINTED: usize = 20;
         let printed = report.kept.len().min(MAX_KEPT_PRINTED);
         for kept in report.kept.iter().take(MAX_KEPT_PRINTED) {
@@ -429,7 +409,6 @@ pub fn print_gc(report: &GcReport, out: &mut impl Write) -> std::io::Result<()> 
     }
     Ok(())
 }
-
 pub fn print_rebuild(report: &RebuildReport, out: &mut impl Write) -> std::io::Result<()> {
     writeln!(out, "{}", t("cli.worktree.rebuild.title"))?;
     writeln!(
@@ -471,7 +450,6 @@ fn format_age_i18n(created_at: i64, now: i64) -> String {
     };
     t_fmt(key, &[("count", value.to_string().as_str())])
 }
-
 fn format_timestamp(ts: i64) -> String {
     let dt = chrono::DateTime::from_timestamp(ts, 0);
     match dt {
@@ -479,15 +457,12 @@ fn format_timestamp(ts: i64) -> String {
         None => ts.to_string(),
     }
 }
-
 fn abbreviate_home(path: &Path) -> String {
     crate::util::abbreviate_path(&path.to_string_lossy()).into_owned()
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn print_table_never_truncates_long_ids() {
         let long_id = "a".repeat(40);
@@ -496,7 +471,6 @@ mod tests {
         let text = String::from_utf8(out).unwrap();
         assert!(text.contains(&long_id), "full ID must be present: {text}");
     }
-
     fn make_record(id: &str, label: &str) -> WorktreeRecord {
         crate::test_util::make_worktree_record(
             id,
@@ -504,7 +478,15 @@ mod tests {
             label,
         )
     }
-
+    #[test]
+    fn print_show_non_nfs_omits_nfs_block() {
+        let rec = make_record("wt-copy", "c");
+        let mut out = Vec::new();
+        print_show(&rec, &mut out).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(!text.contains("Strategy:       nfs"), "{text}");
+        assert!(!text.contains("clean-artifacts"), "{text}");
+    }
     #[test]
     fn print_table_pads_cjk_labels_by_display_width() {
         let records = vec![
