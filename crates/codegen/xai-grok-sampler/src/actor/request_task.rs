@@ -708,6 +708,7 @@ async fn drive_l2(
                                 error: SamplingError::serialization_message(
                                     "Responses terminal event contained no usable assistant output after visible stream content",
                                 ),
+                                recovery_items: Vec::new(),
                             };
                         }
                         let context = build_empty_context(reason, &response);
@@ -1220,12 +1221,13 @@ mod tests {
             &CancellationToken::new(),
             Arc::new(Mutex::new(None)),
             None,
+            FailedResponseCapture::default(),
             Arc::new(AtomicBool::new(false)),
         )
         .await;
 
         match outcome {
-            AttemptOutcome::Failed { error } => {
+            AttemptOutcome::Failed { error, .. } => {
                 assert!(matches!(&error, SamplingError::Serialization(_)));
                 assert!(!error.is_retryable());
             }
