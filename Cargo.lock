@@ -13802,7 +13802,6 @@ dependencies = [
  "ratatui",
  "regex",
  "reqwest 0.12.24",
- "rustls",
  "serde",
  "serde_json",
  "serial_test",
