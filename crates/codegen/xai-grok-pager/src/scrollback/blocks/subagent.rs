@@ -200,7 +200,7 @@ impl BlockContent for SubagentBlock {
                 };
                 let overhead = xai_grok_i18n::t_fmt(
                     key,
-                    &[("description", ""), ("activity", activity), ("meta", &meta)],
+                    &[("description", ""), ("activity", activity.as_str()), ("meta", &meta)],
                 )
                 .width();
                 let desc = quoted_desc(&self.description, w.saturating_sub(overhead));
@@ -208,7 +208,7 @@ impl BlockContent for SubagentBlock {
                     key,
                     &[
                         ("description", &desc),
-                        ("activity", activity),
+                        ("activity", activity.as_str()),
                         ("meta", &meta),
                     ],
                 )

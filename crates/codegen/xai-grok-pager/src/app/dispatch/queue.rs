@@ -3,8 +3,7 @@
 //! ([`maybe_drain_queue`]), the turn-start shim, and the queue-interject
 //! action arm. Split out of `dispatch.rs` verbatim (pure code motion).
 
-use super::ctx::{NO_SESSION_NOTICE, active_agent_session_id, with_active_agent};
-use super::interject::record_interject_prompt_history;
+use super::ctx::{active_agent_session_id, with_active_agent};
 use crate::acp::meta::user_prompt_meta;
 use crate::app::actions::Effect;
 use crate::app::agent::{AgentCommand, AgentId};

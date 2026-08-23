@@ -1,6 +1,6 @@
 //! Feedback, remember-note, btw, and recap dispatchers.
 
-use super::ctx::{NO_SESSION_NOTICE, with_active_agent};
+use super::ctx::with_active_agent;
 use crate::app::actions::{Effect, FeedbackTraceChoice};
 use crate::app::agent::AgentId;
 use crate::app::agent_view::{AgentView, PromptInputMode};
