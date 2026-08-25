@@ -1274,7 +1274,7 @@ pub(in crate::app::dispatch) fn set_combine_queued_prompts(
     refresh_open_settings_modals(app);
     tracing::info!(target: "settings", key = "combine_queued_prompts", value = new, "setting changed");
     app.show_toast(&save_success_toast(
-        xai_grok_i18n::t("setter.combine_queued_prompts"),
+        xai_grok_i18n::t("settings.combine_queued_prompts.label"),
         new,
     ));
     vec![Effect::PersistSetting {
@@ -1312,11 +1312,17 @@ pub(in crate::app::dispatch) fn set_follow_up_behavior(
         value = new.as_canonical(),
         "setting changed",
     );
-    let label = match new {
-        crate::appearance::FollowUpBehavior::Queue => "Queue",
-        crate::appearance::FollowUpBehavior::Steer => "Steer",
-    };
-    app.show_toast(&format!("\u{2713} Follow-up behavior: {label}"));
+    let value = xai_grok_i18n::t_or(
+        xai_grok_i18n::intern_key(&format!(
+            "settings.follow_up_behavior.choice_{}",
+            new.as_canonical()
+        )),
+        new.as_canonical(),
+    );
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.follow_up_behavior.label"),
+        value,
+    ));
     vec![Effect::PersistSetting {
         key: "follow_up_behavior",
         value: crate::settings::SettingValue::Enum(new.as_canonical()),

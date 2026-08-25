@@ -1,5 +1,45 @@
 # Changelog
 
+# 1.0.8-fork.3 — 2026-08-25
+
+## 问题修复
+
+### 模型用量「Token」改译为「词元」
+
+- 设置 Goal 后，右上角状态条和点击弹出的目标详情把模型用量译成了「令牌」。那是认证凭证的译法，模型上下文应译为「词元」。
+- 已改：`agent_status.tokens` / `tokens_of_budget`（右上角 `{count} 词元`、`{used}/{budget} 词元`）；`goal.tokens_count` / `tokens_of_budget` / `tokens_line` / `detail_tokens`（弹窗里的词元行）。
+- 同类界面一并改掉：`/session-info` 的上下文行、任务用量的输入/输出/总词元、设置里逐次请求指标说明中残留的 `token`。
+- 登录粘贴框 `auth.paste_token_placeholder` 原先误写成「在此粘贴词元...」，这是 OAuth/API 凭证，改回「在此粘贴令牌...」。`auth.device.token_exchange_error`（令牌交换错误）保持不变。
+- 会话用量、工作流用量、对话指标行里本来就已经用「词元」/「词」。`/goal` 帮助里的 `--budget <tokens>` 是参数名，未改。
+- 英文目录未改。简体中文已更新。
+
+### 设置窗口补齐中文标题和说明
+
+- **合并排队提示**（`combine_queued_prompts`）和 **后续消息处理方式**（`follow_up_behavior`）之前只有英文源文案，设置行通过 `settings.<key>.label` / `.description` 回退到英文。现已补中英键。选项「排队 / 引导」本来就有中文。
+- 改完后续消息处理方式时，toast 不再写死 `Follow-up behavior: Queue/Steer`，改为与其它设置相同的 `✓ 后续消息处理方式: 排队/引导`。合并排队提示的 toast 也改走同一套标题键。
+- **提示行实时会话用量** 和 **语音快捷键** 已有中文标题，但缺说明，展开后仍显示英文。现已补说明：前者显示本会话累计词元和配齐价格时的估算费用；后者说明 Ctrl+Space / F8 可关，`/voice` 仍可用。
+- 设置目录 44 项现在都有中英文标题和说明。没有新增设置字段或配置键。
+
+### 用量弹窗复制提示
+
+- 会话信息页的「点击或拖拽复制」提示误写成 `('click or drag to copy', '点击或拖拽复制')` 这种元组，界面会原样显示。英文改为 `click or drag to copy`，简体中文改为「点击或拖拽复制」。
+
+### 验证
+
+- 静态审查覆盖 Goal 状态条与详情、`/session-info`、任务用量、设置标题/说明/toast 的英文/简体中文目录一致性，以及认证「令牌」与模型「词元」的区分。
+- 设置目录 44 项均有 `settings.<key>.label` 与 `.description`。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.8-fork.3-linux-x86_64`
+- `grok-1.0.8-fork.3-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.8-fork.2...v1.0.8-fork.3
+
 # 1.0.8-fork.2 — 2026-08-25
 
 同步上游 monorepo `c2ad97f8` / Source-Revision `437c7c92`，产品版本仍为 **1.0.8**。
