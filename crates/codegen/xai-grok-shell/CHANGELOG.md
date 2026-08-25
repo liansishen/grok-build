@@ -1,5 +1,60 @@
 # Changelog
 
+# 1.0.8-fork.2 — 2026-08-25
+
+同步上游 monorepo `c2ad97f8` / Source-Revision `437c7c92`，产品版本仍为 **1.0.8**。
+
+官方 1.0.8 变更里，MCP 征求、Ctrl+S 暂存草稿、`/workflow` 目录与别名、队列向上键、`/copy` 源 Markdown、并发子 agent 不卡父会话，已在 `v1.0.8-fork.1`（上游 `07b2f714` / Source-Revision `956313d4`）合入，此处不重复展开。
+
+### 上游更新
+
+本次新增覆盖子 agent 采样并发上限、超级模式画状态行、发消息时把前台命令转到后台、提示历史包含已发送的命令与笔记、折叠行不再画强调边条，以及计划模式不再把启动子 agent 当成文件编辑。
+
+#### 子 agent 采样并发上限
+
+- 同一进程里同时进行的子 agent 采样调用会被门控，避免把代理速率限制冲爆。
+- 配置：`[subagents] sampling_limit`，环境变量 `GROK_SUBAGENT_SAMPLING_LIMIT` 优先于 TOML 和远程设置。未设置时跟已解析的 `max_concurrent`（默认 32）；上限夹到 512。没有设置页，无需新增英文或简体中文翻译键。
+
+#### 发消息时保留前台命令
+
+- 前台命令还在跑时再发一条消息，会把该命令转到后台，而不是杀掉。之后仍可用既有的任务工具取输出。`Ctrl+B` 仍是专门的后台快捷键。
+- 这条工具结果是给模型的说明，不走界面国际化目录。
+
+#### 提示历史与暂存
+
+- 向上键回调现在是一条按时间顺序的列表：已发送的提示、shell 命令、斜杠命令和 remember 笔记都会进去，重复条目保留。
+- 双击 `Esc` 清草稿仍进暂存（`Ctrl+S` / `Alt+S` 可还原），但不再写入向上键回调列表。
+- 从历史召回 shell 命令时，输入框会保留 shell 模式。
+
+#### 其它界面与运行时
+
+- 开了 `[ui.status_line]` 时，超级模式也会在提示信息行下面画这一行；不再只出现在全屏 pager。欢迎屏和子 agent 全屏视图仍不画。
+- 对话记录里折叠的行不再画强调边条，列宽仍保留以便对齐。
+- 计划模式不再把启动子 agent 当成文件编辑，不会因此被计划编辑门控拦住。
+- 历史作业不再做完整工作树 checkout，加载更快。
+- 启动、恢复、取消和事件循环拖滞增加了遥测计时；这是遥测字段，不走界面目录。
+
+### 本 Fork
+
+- 保留 `v1.0.8-fork.1` 及之前的 fork 能力：简体中文界面、透明背景、账户计费与 CPA 配额、会话用量与缓存率、次要模型与推理强度、按目录条目配置的压缩模型、逐次请求指标开关、Responses 终端帧恢复、`Alt+M` 打开模型选择器、中文 toast 按列宽绘制以及 fork 发布更新。
+- 启动超时阶段枚举重命名为 `ConfigLoad` / `WorkerSpawn`，界面仍走已有键 `startup.failure.step.load_config` / `startup.failure.step.spawn_worker`（英文与简体中文文案未改）。
+- 子 agent 采样上限、超级模式状态行、发消息转后台命令、提示历史、折叠行边条和计划模式子 agent 判定没有新增界面字段。`GROK_SUBAGENT_SAMPLING_LIMIT` 是环境变量名，不走界面目录。
+
+### 验证
+
+- 静态审查覆盖上游合并后的 fork 标记（`Alt+M`、CJK 列宽、次要模型、压缩模型、计费轮询、国际化调用）、指标开关，以及启动超时阶段文案的英文/简体中文目录一致性。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.8-fork.2-linux-x86_64`
+- `grok-1.0.8-fork.2-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.8-fork.1...v1.0.8-fork.2
+
 # 1.0.8-fork.1 — 2026-08-23
 
 同步上游 monorepo `07b2f714` / Source-Revision `956313d4`，产品版本升至 **1.0.8**。

@@ -184,12 +184,12 @@ impl NextStep {
 fn step_advice(phase: StartupPhase) -> (&'static str, NextStep) {
     use NextStep::{CheckNetworkThenRetry as Network, RestartSharedLeader, Retry};
     match phase {
-        StartupPhase::LoadConfig => (t("startup.failure.step.load_config"), Retry),
+        StartupPhase::ConfigLoad => (t("startup.failure.step.load_config"), Retry),
         StartupPhase::ManagedPolicy => (t("startup.failure.step.managed_policy"), Network),
         StartupPhase::Bootstrap => (t("startup.failure.step.bootstrap"), Network),
         // A disk cache read; the network fetch is the background refresh.
         StartupPhase::ModelCatalog => (t("startup.failure.step.model_catalog"), Retry),
-        StartupPhase::SpawnWorker => (t("startup.failure.step.spawn_worker"), Retry),
+        StartupPhase::WorkerSpawn => (t("startup.failure.step.spawn_worker"), Retry),
         // A Unix socket and a local spawn, never the network.
         StartupPhase::LeaderConnect => (t("startup.failure.step.leader_connect"), RestartSharedLeader),
         StartupPhase::AcpInitialize => (t("startup.failure.step.acp_initialize"), Retry),

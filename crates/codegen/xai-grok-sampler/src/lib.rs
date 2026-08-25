@@ -35,6 +35,7 @@ pub mod types;
 
 // Public re-exports — the API surface consumers see.
 pub use actor::SamplerActor;
+pub use actor::request_task::CompletionResult;
 pub use attribution::{
     Auth401AttributionCallback, BEARER_SUFFIX_LEN, SamplingConsumer, SharedAttributionCallback,
 };
