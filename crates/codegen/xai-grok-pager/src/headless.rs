@@ -554,7 +554,15 @@ async fn open_session(
     }
 
     let new_resp: acp::NewSessionResponse = acp_send(
-        acp::NewSessionRequest::new(cwd.to_path_buf()).mcp_servers(mcp_servers),
+        acp::NewSessionRequest::new(cwd.to_path_buf())
+            .mcp_servers(mcp_servers)
+            // Fresh `-p` sessions persist as headless so `/resume` keeps them
+            // off its default pages; the load path above never restamps.
+            .meta(
+                serde_json::json!({ "sessionKind": "headless" })
+                    .as_object()
+                    .cloned(),
+            ),
         acp_tx,
     )
     .await?;
@@ -578,7 +586,7 @@ async fn open_session_with_id(
         acp::NewSessionRequest::new(cwd.to_path_buf())
             .mcp_servers(mcp_servers)
             .meta(
-                serde_json::json!({ "sessionId": session_id })
+                serde_json::json!({ "sessionId": session_id, "sessionKind": "headless" })
                     .as_object()
                     .cloned(),
             ),
@@ -631,13 +639,16 @@ async fn fork_then_open(
         crate::app::session_startup::effective_fork_secondary_model_id(&ui.fork_secondary_model)
             .map(|s| s.to_string())
     };
-    let payload = fork_session_params(
+    let mut payload = fork_session_params(
         parent_id,
         &write_cwd,
         new_id,
         parent_is_worktree,
         fork_model.as_deref(),
     );
+    // Shared helper stamps `fork` for interactive `/fork`. `-p` children must
+    // stay headless: the load path below never restamps.
+    payload["sessionKind"] = serde_json::Value::String("headless".into());
     let fork_params = serde_json::value::to_raw_value(&payload)
         .map_err(|e| anyhow::anyhow!(xai_grok_i18n::t_fmt("cli.headless.fork_serialize_failed", &[("error", &format!("{e}"))])))?;
     let req = acp::ExtRequest::new("x.ai/session/fork", fork_params.into());
@@ -763,6 +774,7 @@ fn headless_materialize_ctx(
             crate::app::session_startup::TitleResolution::Allowed
         },
         restore_code,
+        recent_session_selection: crate::app::session_startup::RecentSessionSelection::Any,
         restore_progress_on_stdout: false,
     }
 }
@@ -836,6 +848,7 @@ pub async fn run_single_turn(
         options.yolo,
         options.permission_mode_flag.as_deref(),
         None,
+        xai_grok_shell::util::config::PermissionMode::Ask,
     );
 
     apply_agent_flag(&options.agent, &mut agent_config);

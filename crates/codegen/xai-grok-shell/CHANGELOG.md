@@ -1,5 +1,56 @@
 # Changelog
 
+# 1.0.10-fork.1 — 2026-08-26
+
+同步上游 monorepo `77cd7eb6` / Source-Revision `28439e8a`，产品版本升至 **1.0.10**。
+
+官方 1.0.9 变更里，MCP 征求、Ctrl+S 暂存、`/workflow` 与 `/plugin`、状态行超级模式、发消息转后台命令、提示历史含命令与笔记、折叠行边条、计划模式子 agent 判定，以及并发子 agent 采样上限，已在 `v1.0.8-fork.1` / `v1.0.8-fork.2` 合入。官方 1.0.9 曾把交互默认权限改成自动，随后又改回询问；本版与上游一致，新会话默认仍是询问。
+
+### 上游更新
+
+本次新增覆盖无界面会话筛选、`grok clone` 复用本地仓库、父目录信任不再隐含信任之后克隆的仓库、执行面板展开后保持打开、压缩默认两遍/分段，以及 MCP 失败按次提醒。
+
+#### 无界面会话（Headless）
+
+- `grok -p` 一次性会话会单独分类，默认不混进 `/resume` 的 Grok 列表。
+- 会话选择器按 `f` 循环：Grok → 无界面 → 外部 → 全部 → 本地 → 远程。无界面页上若有隐藏的外部会话，会提示按 `f` 显示。
+- 这是界面筛选，不是新配置键。筛选标签已走国际化：`session_picker.filter.headless`（英文「Headless」/简体中文「无界面」）；隐藏提示 `session_picker.external_hidden_one` / `external_hidden_many`。
+
+#### grok clone 与目录信任
+
+- `grok clone` 默认只取所选分支尖端，可用 `--full-history` 做完整克隆；匹配的本地 checkout 会作为关联工作树复用，不必每次从网络拉。
+- 信任某个父目录不再自动信任之后在其下克隆的每个仓库。这是安全边界，没有新界面字段。
+
+#### 其它界面与运行时
+
+- 用户展开的 Execute 面板在进度更新时保持打开。
+- 对话压缩默认改为分段，并默认开启两遍压缩（`features.two_pass_compaction` / `GROK_TWO_PASS_COMPACTION` 仍可关）。没有新设置页。
+- MCP 服务器失败按次宣布一次；远程失败提醒里的文本会做清理和引号处理。
+- 工作流强制只能选一个源；子 agent 不再拿到只能给顶层会话用的 workflow 工具。
+- 召回的 memory 上下文视为参考，需要对照现场来源再信。
+- 交互式权限模式默认仍是询问（官方曾短暂改成自动后又改回）。仍可用设置改成自动。
+- 终端里被 relay 拆碎的 X10 鼠标报告会重新组装，不再当键盘输入。
+
+### 本 Fork
+
+- 保留 `v1.0.8-fork.3` 及之前的 fork 能力：简体中文界面、透明背景、账户计费与 CPA 配额、会话用量与缓存率、次要模型与推理强度、按目录条目配置的压缩模型、逐次请求指标开关、Responses 终端帧恢复、`Alt+M` 打开模型选择器、中文 toast 按列宽绘制、词元/令牌译法，以及 fork 发布更新。
+- 无界面筛选、Execute 面板、目录信任、压缩默认值、MCP 失败提醒没有新增设置字段。`GROK_TWO_PASS_COMPACTION` 是环境变量名，不走界面目录。
+
+### 验证
+
+- 静态审查覆盖上游合并后的 fork 标记（`Alt+M`、CJK 列宽、次要模型、压缩模型、计费轮询、国际化调用）、词元译法，以及新会话筛选文案的英文/简体中文目录一致性。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.10-fork.1-linux-x86_64`
+- `grok-1.0.10-fork.1-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.8-fork.3...v1.0.10-fork.1
+
 # 1.0.8-fork.3 — 2026-08-25
 
 ## 问题修复
@@ -513,6 +564,60 @@
 - `SHA256SUMS`
 
 **Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.3...v1.0.5-fork.4
+# 1.0.10 — 2026-08-24
+
+## Performance
+
+- **grok clone** now reuses matching local checkouts as linked worktrees for faster session creation.
+
+
+# 1.0.9 — 2026-08-24
+
+## Features
+
+- **New sessions in the interactive TUI** now start in auto mode by default for fewer approval prompts.
+- **/feedback now supports attaching images** (screenshots etc.).
+- **The / slash menu** is now ordered by recency and groups skills below commands for easier navigation.
+- **/workflow** now accepts --agent-budget N or an agent_budget JSON field to set child-agent limits.
+- **/workflow** now accepts --effort LEVEL or an effort JSON field to set child reasoning effort.
+- **MCP servers** now receive a grok-cli User-Agent header so providers can attribute traffic.
+- **Dashboard** now lets you start new agents in Auto mode via Shift+Tab.
+- **Workflows** now appear alongside skills in the model prompt so the agent can launch them by name.
+- **`/edit-prompt`** now opens an external editor from the full TUI, not only minimal mode.
+- **Up arrow** on an empty prompt now selects queued follow-ups first instead of opening history.
+- **/plugin** now works as an alias for **/plugins** in the TUI.
+- **Plugin-provided agents** now appear in the **/agents** modal and can be toggled.
+- **/minimal** and **/fullscreen** now switch instantly inside the running session without restarting or losing the current turn.
+- The configurable status line row now appears at the bottom of minimal mode as well as fullscreen.
+- **grok clone** now fetches only the selected branch tip by default, with --full-history for legacy full clones.
+- **grok clone** can now reuse a matching local checkout as a linked worktree instead of always fetching from the network.
+
+## Bug Fixes
+
+- **Subagent tasks** are more resilient to temporary rate limits and will retry instead of failing immediately.
+- **Narrow allow rules for Bash commands** now correctly permit file writes without extra prompts.
+- **Rules** containing markdown headings now render correctly in the prompt.
+- **/new** and **/clear** now preserve the last-chosen reasoning effort instead of resetting to the model default.
+- **Prompt dropdowns** (slash, history, file search) now have consistent left alignment with the composer.
+- **History** now shows every command, slash command, and memory note in the order you typed them.
+- **Collapsed tool-call rows** no longer show a vertical accent line beside the status diamond.
+- **Hint text** above the prompt now lines up with the text you type.
+- **Pressing Esc** while peeking at a conversation from the dashboard now closes open modals instead of leaving the view.
+- **`/copy`** now preserves markdown formatting such as headings and code fences.
+- **Sending a new message** while a shell command is running now moves the command to the background instead of cancelling it.
+- **grok mcp add** now correctly treats bare http(s):// URLs as HTTP servers instead of stdio commands.
+- Plan mode no longer incorrectly blocks subagent spawns as file edits outside plan.md.
+- MCP servers that share a URL but have different names are now kept as separate entries instead of being collapsed.
+- Subagents and workflow-spawned agents no longer receive the workflow tool that only top-level sessions can use.
+- Memory results are now presented as historical context that should be verified against live sources before use.
+- **Interactive grok sessions** now start in ask mode by default again instead of auto.
+- **Minimal mode** no longer truncates subagent wake-turn replies after the first token.
+
+## Performance
+
+- **Concurrent subagents** no longer trigger rate-limit errors during bursts.
+- **MCP server connections** no longer delay session startup when many servers are configured.
+
 
 # 1.0.8 — 2026-08-20
 
@@ -529,6 +634,7 @@
 - **Status line** refresh timer now uses consistent naming and no longer shows errors on deliberately hidden rows.
 - **Workflow agent rows** now display current context usage instead of cumulative token counts.
 - **Follow-up messages** now send immediately while waiting on a subagent or task, including after using /btw.
+- Subagents and workflow-spawned agents no longer see the workflow tool, which can only be launched from a top-level session.
 
 ## Performance
 
