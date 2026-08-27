@@ -390,7 +390,7 @@ pub fn compute_peek_fields(
         }
         // Roster-only rows are not locally hosted — there is no local
         // `AgentView` to peek into.
-        DashboardRowId::Roster { .. } => None,
+        DashboardRowId::Roster { .. } | DashboardRowId::Workspace { .. } => None,
     }
 }
 
@@ -458,7 +458,7 @@ pub fn peek_model_and_mode(
             }
             None => default(),
         },
-        DashboardRowId::Roster { .. } => default(),
+        DashboardRowId::Roster { .. } | DashboardRowId::Workspace { .. } => default(),
     }
 }
 
@@ -1054,6 +1054,9 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
                     ToolCallBlock::UseTool(_) => Some(xai_grok_i18n::t("dashboard.response.tool")),
                     ToolCallBlock::MemorySearch(_) => {
                         Some(xai_grok_i18n::t("dashboard.response.memory"))
+                    }
+                    ToolCallBlock::SentMessage(_) => {
+                        Some(xai_grok_i18n::t("dashboard.response.message"))
                     }
                     ToolCallBlock::Skill(_) => Some(xai_grok_i18n::t("dashboard.response.skill")),
                     ToolCallBlock::Other(_) => Some(xai_grok_i18n::t("dashboard.response.tool")),

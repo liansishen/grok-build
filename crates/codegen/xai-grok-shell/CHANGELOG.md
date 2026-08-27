@@ -1,5 +1,55 @@
 # Changelog
 
+# 1.0.10-fork.2 — 2026-08-27
+
+同步上游 monorepo `9684fa3c` / Source-Revision `70ec060e`，产品版本仍为 **1.0.10**。
+
+官方 1.0.10 变更里，`grok clone` 复用本地仓库、无界面会话筛选、父目录信任、Execute 面板保持打开、压缩默认两遍/分段，已在 `v1.0.10-fork.1` 合入，此处不重复展开。
+
+### 上游更新
+
+本次新增覆盖 UserPromptSubmit 钩子拦截提示并暂停队列、无界面会话默认始终允许权限、自动模式放行 mkdir/touch、仪表盘工作区成员、模型 slug 指向 grok-4.6，以及若干沙箱与鉴权加固。
+
+#### 钩子拦截提示
+
+- `UserPromptSubmit` 钩子可以在提示写入对话之前拦截。被拦截的提示会回到本机队列最前，后面的提示继续排队。
+- 界面弹出卡片，可选编辑、原样重发或丢弃。队列暂停时会有 toast。卡片文案已走国际化：`prompt_blocked.*`、`toast.hook_blocked_queue_paused`、`toast.prompt_blocked_held`。
+- 这是客户端交互，不是新的配置键。托管策略钩子不能被关掉。
+
+#### 权限与无界面会话
+
+- 无界面（`grok -p`）会话默认始终允许权限，避免卡在无法回答的权限提示上。
+- 自动模式把 mkdir/touch 当作安全创建；分类器拦截时，交互客户端仍会询问。
+- 向子代理发消息也走权限描述：`permission.description.agent_message`。
+
+#### 其它界面与运行时
+
+- 仪表盘可读取工作区成员（`GROK_WORKSPACE_DASHBOARD`）；未加载的会话行不能直接重命名，会提示先加载。该提示已国际化。
+- 旧模型 slug 会改指 grok-4.6。粘贴末尾带换行不再自动发送。Linux 上 pw-record 不可用时语音会回退。
+- 项目里未信任的 MCP 服务器受目录信任门控。安装脚本不再把部署密钥当 Bearer 发到可被改写的 URL。
+- 采样器可按请求长度策略抢救被截断的回复。工作流可对 Rhai 脚本做冒烟检查。
+
+### 本 Fork
+
+- 保留 `v1.0.10-fork.1` 及之前的 fork 能力：简体中文界面、透明背景、账户计费与 CPA 配额、会话用量与缓存率、次要模型与推理强度、按目录条目配置的压缩模型、逐次请求指标开关、Responses 终端帧恢复、`Alt+M`、中文 toast 列宽、词元/令牌译法、无界面会话筛选，以及 fork 发布更新。
+- 钩子拦截卡片、仪表盘未加载会话重命名提示、权限描述「向子代理发消息」、扩展里 `[策略]` 徽章已补英文和简体中文。
+- `GROK_WORKSPACE_DASHBOARD` 是功能开关环境变量，不走界面目录。
+
+### 验证
+
+- 静态审查覆盖上游合并后的 fork 标记（`Alt+M`、CJK 列宽、次要模型、压缩模型、计费轮询、国际化调用、词元译法），以及新钩子拦截/权限/仪表盘文案的英文/简体中文目录一致性。
+- GitHub Actions 在 Linux 上完成 Linux x86_64 release 构建和版本校验。
+- GitHub Actions 完成 Windows x86_64 release 构建和版本校验。
+- 发布产物包含 Linux、Windows 二进制及 `SHA256SUMS`。
+
+### 产物
+
+- `grok-1.0.10-fork.2-linux-x86_64`
+- `grok-1.0.10-fork.2-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.10-fork.1...v1.0.10-fork.2
+
 # 1.0.10-fork.1 — 2026-08-26
 
 同步上游 monorepo `77cd7eb6` / Source-Revision `28439e8a`，产品版本升至 **1.0.10**。
