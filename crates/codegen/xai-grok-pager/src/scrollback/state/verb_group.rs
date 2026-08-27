@@ -341,6 +341,14 @@ impl VerbGroupKind {
             (VerbGroupKind::McpCall, "running", _) => "scrollback.verb_group.mcp_call.running_many",
             (VerbGroupKind::McpCall, _, "one") => "scrollback.verb_group.mcp_call.done_one",
             (VerbGroupKind::McpCall, _, _) => "scrollback.verb_group.mcp_call.done_many",
+            (VerbGroupKind::Message, "running", "one") => {
+                "scrollback.verb_group.message.running_one"
+            }
+            (VerbGroupKind::Message, "running", _) => {
+                "scrollback.verb_group.message.running_many"
+            }
+            (VerbGroupKind::Message, _, "one") => "scrollback.verb_group.message.done_one",
+            (VerbGroupKind::Message, _, _) => "scrollback.verb_group.message.done_many",
             (VerbGroupKind::OtherTool, "running", "one") => {
                 "scrollback.verb_group.other_tool.running_one"
             }

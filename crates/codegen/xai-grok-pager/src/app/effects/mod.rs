@@ -4939,10 +4939,8 @@ fn session_info_fields(
         model_display.to_string(),
         true,
     );
-    if xai_grok_shell::session::should_show_model_fingerprint(
-        info.data.show_model_fingerprint,
-        model,
-    ) && let Some(fp) = info.data.model_fingerprint.as_deref()
+    if info.data.show_model_fingerprint
+        && let Some(fp) = info.data.model_fingerprint.as_deref()
     {
         push(
             xai_grok_i18n::t("session_info.label.model_hash"),
