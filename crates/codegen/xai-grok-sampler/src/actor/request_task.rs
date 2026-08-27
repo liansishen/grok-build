@@ -1369,6 +1369,7 @@ mod tests {
             None,
             FailedResponseCapture::default(),
             Arc::new(AtomicBool::new(false)),
+            xai_grok_sampling_types::LengthPolicy::Fail,
         )
         .await;
 

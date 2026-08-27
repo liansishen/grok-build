@@ -568,7 +568,7 @@ impl AcpPrompter {
                 acp::PermissionOptionId::new("reject-once"),
                 acp::PermissionOption::new(
                     "reject-once",
-                    REJECT_ONCE_LABEL.to_owned(),
+                    reject_once_label().to_owned(),
                     acp::PermissionOptionKind::RejectOnce,
                 ),
             ),
