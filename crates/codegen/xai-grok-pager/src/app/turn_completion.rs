@@ -108,7 +108,6 @@ pub(crate) fn terminal_marker(input: TerminalMarkerInput<'_>) -> Option<SessionE
         )),
         }
     }
-}
 
 /// Format a failed terminal turn using its typed wire error kind.
 pub(super) fn failed_turn_event(
