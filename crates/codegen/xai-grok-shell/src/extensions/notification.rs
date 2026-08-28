@@ -1058,6 +1058,11 @@ pub enum SessionUpdate {
         /// Final agent result text, when the turn produced one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         agent_result: Option<String>,
+        /// Typed kind of a failed stop (`SamplingErrorKind::as_str()`, e.g.
+        /// `"max_tokens_truncation"`) for error-specific client copy. `None`
+        /// for successes, unkinded errors, and files from older shells.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_kind: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         usage: Option<PromptUsage>,
         /// Wall-clock turn duration in milliseconds. `None` on old files.
@@ -1174,6 +1179,12 @@ impl From<&crate::session::image_normalize::ImageCompressionInfo> for ImageCompr
 pub const DISK_FULL_ERROR_TYPE: &str = "disk_full";
 pub const DISK_FULL_USER_MESSAGE: &str = "Out of disk space. Free some space and try again.";
 
+/// `x.ai/session/prompt_complete` payload key of a failed stop's typed error
+/// kind, camelCase like its payload siblings (`stopReason`, `cancelTrigger`).
+/// Value: `SamplingErrorKind::as_str()`. The durable twin carries the same
+/// value in [`SessionUpdate::TurnCompleted`]'s typed `error_kind` field.
+pub const PROMPT_COMPLETE_ERROR_KIND_KEY: &str = "errorKind";
+
 /// State of a retry operation or error for visual feedback in the TUI
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", tag = "type")]
@@ -1223,8 +1234,16 @@ pub fn is_reauthable_failure(error_type: Option<&str>, message: &str) -> bool {
     if matches!(error_type, Some("legacy_auth") | Some("auth_transient")) {
         return false;
     }
-    error_type == Some("auth") || message.contains("Unauthorized (401)")
+    error_type == Some("auth") || message.contains(UNAUTHORIZED_NEEDLE)
 }
+
+/// Text fallback for 401s that arrive without a typed `error_type`; messages
+/// lacking this exact literal rely on the typed `error_type == "auth"` alone.
+pub const UNAUTHORIZED_NEEDLE: &str = "Unauthorized (401)";
+
+/// Broader sub-needle of [`UNAUTHORIZED_NEEDLE`]; with a known-401 status the
+/// pager also matches banner-formatted text.
+pub const HTTP_401_NEEDLE: &str = "(401)";
 
 /// Status updates for relay sync (session sharing) feature.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -1483,6 +1502,12 @@ pub struct RecapRequestFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn http_401_needle_is_contained_in_unauthorized_needle() {
+        // Pins the sub-needle doc claim.
+        assert!(UNAUTHORIZED_NEEDLE.contains(HTTP_401_NEEDLE));
+    }
 
     #[test]
     fn recap_request_file_roundtrips() {
@@ -2385,6 +2410,7 @@ mod tests {
             prompt_id: "p-1".into(),
             stop_reason: "end_turn".into(),
             agent_result: Some("done".into()),
+            error_kind: Some("max_tokens_truncation".into()),
             usage: None,
             elapsed_ms: None,
         };
@@ -2393,6 +2419,7 @@ mod tests {
         assert_eq!(json["prompt_id"], "p-1");
         assert_eq!(json["stop_reason"], "end_turn");
         assert_eq!(json["agent_result"], "done");
+        assert_eq!(json["error_kind"], "max_tokens_truncation");
     }
 
     #[test]
@@ -2401,12 +2428,14 @@ mod tests {
             prompt_id: "p-2".into(),
             stop_reason: "cancelled".into(),
             agent_result: None,
+            error_kind: None,
             usage: None,
             elapsed_ms: None,
         };
         let json = serde_json::to_value(&update).unwrap();
         assert_eq!(json["sessionUpdate"], "turn_completed");
         assert!(json.get("agent_result").is_none());
+        assert!(json.get("error_kind").is_none());
         assert!(json.get("elapsed_ms").is_none());
     }
 
@@ -2417,6 +2446,7 @@ mod tests {
                 prompt_id: "p-rt".into(),
                 stop_reason: "end_turn".into(),
                 agent_result: Some("result text".into()),
+                error_kind: Some("max_tokens_truncation".into()),
                 usage: None,
                 elapsed_ms: Some(1234),
             },
@@ -2424,6 +2454,7 @@ mod tests {
                 prompt_id: "p-min".into(),
                 stop_reason: "error".into(),
                 agent_result: None,
+                error_kind: None,
                 usage: None,
                 elapsed_ms: None,
             },
@@ -2445,6 +2476,7 @@ mod tests {
                 prompt_id: "p-old".into(),
                 stop_reason: "end_turn".into(),
                 agent_result: None,
+                error_kind: None,
                 usage: None,
                 elapsed_ms: None,
             }
@@ -2457,6 +2489,7 @@ mod tests {
             prompt_id: "p-ms".into(),
             stop_reason: "end_turn".into(),
             agent_result: None,
+            error_kind: None,
             usage: None,
             elapsed_ms: Some(1234),
         };

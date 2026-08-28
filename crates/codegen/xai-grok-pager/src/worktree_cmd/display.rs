@@ -11,8 +11,7 @@ use xai_grok_i18n::{t, t_fmt};
 const REPO_WIDTH: usize = 6;
 const BRANCH_WIDTH: usize = 20;
 const AGE_WIDTH: usize = 10;
-/// Truncate-then-pad to exactly `width` display columns; headers and data
-/// share it so the two stay aligned.
+/// Truncate-then-pad to exactly `width` display columns; headers and data share it so the two stay aligned.
 fn cell(s: &str, width: usize) -> String {
     pad_to_width(&truncate_to_width(s, width), width)
 }
