@@ -175,6 +175,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out source for release notes
+        uses: actions/checkout@v4
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
@@ -206,8 +208,8 @@ jobs:
         with:
           tag_name: ${{ inputs.release_tag }}
           target_commitish: ${{ github.sha }}
-          name: Grok Build Fork ${{ needs.version.outputs.version }}
-          generate_release_notes: true
+          body_path: crates/codegen/xai-grok-shell/CHANGELOG.md
+          generate_release_notes: false
           prerelease: false
           files: |
             release/grok-${{ needs.version.outputs.version }}-linux-x86_64
