@@ -848,7 +848,7 @@ pub(super) fn dispatch_dashboard_open_shortcuts_help(app: &mut AppView) {
 /// Short display label for a directory in the location picker — the
 /// basename (truncated), or `~` for the home directory itself.
 fn location_picker_label(path: &std::path::Path) -> String {
-    if dirs::home_dir().is_some_and(|h| h == path) {
+    if xai_dirs::home_dir().is_some_and(|h| h == path) {
         return "~".to_string();
     }
     let raw = path.file_name().and_then(|n| n.to_str()).unwrap_or("/");
@@ -868,9 +868,9 @@ pub(super) fn resolve_location_input(
         return None;
     }
     let expanded: std::path::PathBuf = if trimmed == "~" {
-        dirs::home_dir()?
+        xai_dirs::home_dir()?
     } else if let Some(rest) = trimmed.strip_prefix("~/") {
-        dirs::home_dir()?.join(rest)
+        xai_dirs::home_dir()?.join(rest)
     } else {
         std::path::PathBuf::from(trimmed)
     };
@@ -1559,7 +1559,7 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
     };
 
     match result {
-        CommandResult::Handled | CommandResult::HandledNoOp => {
+        CommandResult::Handled => {
             if let Some(d) = app.dashboard.as_mut() {
                 d.dispatch.set_text("");
                 d.error_toast = None;

@@ -7,11 +7,14 @@ use super::actions::{PermissionModePersist, SubagentKillOutcome, TaskResult};
 use super::agent::AgentId;
 use crate::unified_log as ulog;
 use xai_grok_shell::sampling::error::{
-    RATE_LIMITED_ERROR_CODE, error_detail_from_data, format_rate_limited_user_message,
-    http_status_from_error,
+    RATE_LIMITED_ERROR_CODE, error_detail_from_data, error_kind_str_from_error,
+    format_rate_limited_user_message, http_status_from_error,
 };
 use xai_grok_shell::session::ExtMethodResult;
 use xai_grok_shell::session::unified_list::ListScope;
+use xai_grok_shell::session::helpers::session_compact::{
+    COMPACT_CANCELLED_MSG, CompactErrorKind, compact_error_kind,
+};
 /// Floor for the session create/load RPCs.
 const SESSION_RPC_FLOOR: std::time::Duration = std::time::Duration::from_secs(180);
 /// Headroom over the agent-side `.envrc` budget for the rest of session setup.
@@ -150,10 +153,45 @@ pub(super) fn format_acp_error(err: &acp::Error, is_api_key_auth: bool) -> Strin
         .unwrap_or_else(|| err.to_string());
     crate::app::error_display::format_request_failure(
             http_status_from_error(err),
-            None,
+            crate::app::error_display::wire_error_kind(error_kind_str_from_error(err)),
             &raw,
         )
         .message()
+}
+/// Error text for the manual `/compact` result.
+///
+/// Typed compact errors are already normalized by the shell. Older shells may
+/// still return a plain ACP error, which receives the pager's normal cleanup.
+pub(crate) fn compact_error_message(err: &acp::Error) -> String {
+    if compact_error_kind(err).is_some() {
+        return error_data_detail(err).unwrap_or_default();
+    }
+    let raw = if err.data.is_some() {
+        error_data_detail(err).unwrap_or_default()
+    } else {
+        err.to_string()
+    };
+    sanitize_user_error(&raw)
+}
+
+fn error_data_detail(err: &acp::Error) -> Option<String> {
+    err.data.as_ref().and_then(error_detail_from_data)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompactError {
+    pub cancelled: bool,
+    pub message: String,
+}
+
+pub(crate) fn compact_error(err: &acp::Error) -> CompactError {
+    let message = compact_error_message(err);
+    let cancelled = match compact_error_kind(err) {
+        Some(CompactErrorKind::Cancelled) => true,
+        Some(CompactErrorKind::Failed) => false,
+        None => message.contains(COMPACT_CANCELLED_MSG),
+    };
+    CompactError { cancelled, message }
 }
 /// Format a Duration for user-visible restore progress messages.
 pub(super) fn format_restore_elapsed(d: std::time::Duration) -> String {

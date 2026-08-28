@@ -71,6 +71,7 @@ pub(crate) struct TerminalMarkerInput<'a> {
     pub send_now_cancel: bool,
     pub cancellation_category: Option<&'a str>,
     pub error_banner_present: bool,
+    pub error_kind: Option<crate::app::error_display::WireErrorType>,
 }
 
 /// Saturating `Duration` → ms. Missing stays `None`. Shared by every
@@ -100,13 +101,29 @@ pub(crate) fn terminal_marker(input: TerminalMarkerInput<'_>) -> Option<SessionE
         )),
         TurnStopReason::RateLimit => None,
         TurnStopReason::Error if input.error_banner_present => None,
-        TurnStopReason::Error => {
-            let raw = input.agent_result.unwrap_or("unknown error");
-            Some(SessionEvent::TurnFailed {
-                error: crate::app::error_display::format_request_failure(None, None, raw).message(),
-                elapsed,
-            })
+        TurnStopReason::Error => Some(failed_turn_event(
+            input.error_kind,
+            input.agent_result,
+            elapsed,
+        )),
         }
+    }
+}
+
+/// Format a failed terminal turn using its typed wire error kind.
+pub(super) fn failed_turn_event(
+    error_kind: Option<crate::app::error_display::WireErrorType>,
+    agent_result: Option<&str>,
+    elapsed: Option<std::time::Duration>,
+) -> SessionEvent {
+    SessionEvent::TurnFailed {
+        error: crate::app::error_display::format_request_failure(
+            None,
+            error_kind,
+            agent_result.unwrap_or("unknown error"),
+        )
+        .message(),
+        elapsed,
     }
 }
 
@@ -392,6 +409,7 @@ pub(super) struct TerminalSignal<'a> {
     /// (hook name, reason), shown on the blocked-prompt card. Absent on older
     /// shells and non-hook cancels.
     pub cancellation_context: Option<&'a serde_json::Value>,
+    pub error_kind: Option<crate::app::error_display::WireErrorType>,
 }
 
 /// What applying a terminal turn signal did to one agent.
@@ -432,6 +450,7 @@ fn arm_driver_turn_end_reconcile(
         cancellation_category,
         cancellation_context,
     } = signal;
+        error_kind,
     if agent.session.loading_replay {
         return false;
     }
@@ -472,6 +491,7 @@ fn arm_driver_turn_end_reconcile(
             cancel_trigger: cancel_trigger.map(str::to_string),
             cancellation_category: cancellation_category.map(str::to_string),
             cancellation_context: cancellation_context.cloned(),
+            error_kind,
             received_at,
         });
         crate::unified_log::info(
@@ -505,6 +525,7 @@ fn arm_driver_turn_end_reconcile(
         cancel_trigger: cancel_trigger.map(str::to_string),
         cancellation_category: cancellation_category.map(str::to_string),
         cancellation_context: cancellation_context.cloned(),
+        error_kind,
         received_at: std::time::Instant::now(),
     });
     true
@@ -563,6 +584,7 @@ pub(super) fn finalize_turn_from_terminal(
         cancel_trigger,
         cancellation_category,
         cancellation_context,
+        error_kind,
     } = signal;
     if !agent.attached_as_viewer {
         if arm_driver_turn_end_reconcile(agent, session_id, signal) {
@@ -617,6 +639,7 @@ pub(super) fn finalize_turn_from_terminal(
         agent_result,
         send_now_cancel,
         cancellation_category,
+        error_kind,
         error_banner_present: super::dispatch::scrollback_has_recent_error_banner(
             &agent.scrollback,
         ),

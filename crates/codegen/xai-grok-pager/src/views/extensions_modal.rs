@@ -1483,7 +1483,7 @@ pub fn tab_complete_path(partial: &str) -> Option<String> {
 
     // Expand ~ to home directory.
     let expanded = if let Some(rest) = partial.strip_prefix('~') {
-        let home = dirs::home_dir()?;
+        let home = xai_dirs::home_dir()?
         if rest.is_empty() || rest == "/" {
             home.to_string_lossy().to_string() + "/"
         } else {
@@ -2469,7 +2469,7 @@ fn classify_hook_source(source_dir: &str) -> HookSourceMeta {
         let rest_str = rest.to_string_lossy();
         let rest_trimmed = rest_str.strip_prefix('/').unwrap_or(&rest_str);
         format!("{prefix}/{rest_trimmed}")
-    } else if let Some(home) = dirs::home_dir() {
+    } else if let Some(home) = xai_dirs::home_dir() {
         let home_str = home.display().to_string();
         source_dir
             .strip_prefix(&home_str)

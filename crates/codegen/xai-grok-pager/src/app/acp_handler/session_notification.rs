@@ -129,6 +129,22 @@ pub(super) fn advance_reconnect_cursor(agent: &mut AgentView, meta: &mut Notific
 fn terminal_meta_str<'a>(meta: Option<&'a serde_json::Value>, key: &str) -> Option<&'a str> {
     meta.and_then(|v| v.get(key)).and_then(|v| v.as_str())
 }
+
+/// Decode the HTML entities emitted by generated session summaries.
+fn decode_html_entities(s: &str) -> std::borrow::Cow<'_, str> {
+    if !s.contains('&') {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    let mut out = s.to_string();
+    out = out.replace("&amp;", "&");
+    out = out.replace("&lt;", "<");
+    out = out.replace("&gt;", ">");
+    out = out.replace("&quot;", "\"");
+    out = out.replace("&#39;", "'");
+    out = out.replace("&#x27;", "'");
+    out = out.replace("&apos;", "'");
+    std::borrow::Cow::Owned(out)
+}
 /// Display-only end marker for a replayed `TurnCompleted`. Reads cancel
 /// metadata once; chatty rate-limited wakes still paint `TurnFailed`.
 fn synthesize_replay_turn_marker(
@@ -137,6 +153,7 @@ fn synthesize_replay_turn_marker(
     stop_reason: &str,
     agent_result: Option<&str>,
     elapsed_ms: Option<u64>,
+    error_kind: Option<crate::app::error_display::WireErrorType>,
     meta: Option<&serde_json::Value>,
 ) -> Option<crate::scrollback::blocks::SessionEvent> {
     use crate::app::turn_completion::{
@@ -170,6 +187,7 @@ fn synthesize_replay_turn_marker(
             send_now_cancel: cancel_trigger == Some("send_now"),
             cancellation_category,
             error_banner_present: banner,
+            error_kind,
         })
     };
     marker.or_else(|| {
@@ -362,9 +380,11 @@ pub(super) fn handle_session_notification_with_origin(
             prompt_id,
             stop_reason,
             agent_result,
+            error_kind,
             elapsed_ms,
             ..
         } => {
+            let error_kind = crate::app::error_display::wire_error_kind(error_kind.as_deref());
             if agent.session.loading_replay {
                 let first = agent.replayed_terminal_prompts.insert(prompt_id.clone());
                 if first
@@ -375,6 +395,7 @@ pub(super) fn handle_session_notification_with_origin(
                         stop_reason.as_str(),
                         agent_result.as_deref(),
                         elapsed_ms,
+                        error_kind,
                         session_notif.meta.as_ref(),
                     )
                 {
@@ -428,16 +449,19 @@ pub(super) fn handle_session_notification_with_origin(
                     finish_wake_turn(
                         agent,
                         &prompt_id,
-                        &stop_reason,
-                        agent_result.as_deref(),
-                        terminal_meta_str(
-                            session_notif.meta.as_ref(),
-                            super::super::turn_completion::CANCEL_TRIGGER_KEY,
-                        ),
-                        terminal_meta_str(
-                            session_notif.meta.as_ref(),
-                            super::super::turn_completion::CANCELLATION_CATEGORY_KEY,
-                        ),
+                        WakeTerminal {
+                            stop_reason: &stop_reason,
+                            agent_result: agent_result.as_deref(),
+                            cancel_trigger: terminal_meta_str(
+                                session_notif.meta.as_ref(),
+                                super::super::turn_completion::CANCEL_TRIGGER_KEY,
+                            ),
+                            cancellation_category: terminal_meta_str(
+                                session_notif.meta.as_ref(),
+                                super::super::turn_completion::CANCELLATION_CATEGORY_KEY,
+                            ),
+                            error_kind,
+                        },
                     );
                     true
                 }
@@ -473,6 +497,7 @@ pub(super) fn handle_session_notification_with_origin(
                             cancellation_context: session_notif.meta.as_ref().and_then(|m| {
                                 m.get(super::super::turn_completion::CANCELLATION_CONTEXT_KEY)
                             }),
+                            error_kind,
                         },
                     ));
                 false
@@ -1064,7 +1089,7 @@ pub(super) fn handle_session_notification_with_origin(
                     } else {
                         None
                     };
-                    let decoded = crate::util::decode_html_entities(&session_summary);
+                    let decoded = decode_html_entities(&session_summary);
                     if let Some(clean) =
                         xai_grok_shell::session::persistence::sanitize_and_cap_title(&decoded)
                     {
@@ -1782,7 +1807,7 @@ pub(super) fn apply_retry_state(
                 scrollback.push_block(RenderBlock::session_event(
                     crate::app::error_display::format_request_failure(
                         None,
-                        Some(error_type.as_str()),
+                        crate::app::error_display::wire_error_kind(Some(error_type.as_str())),
                         message,
                     )
                     .into_session_event(),

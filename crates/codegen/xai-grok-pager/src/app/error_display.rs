@@ -49,6 +49,28 @@ impl WireErrorType {
     }
 }
 
+/// Parse an optional wire error kind while preserving absence for legacy text recovery.
+pub(crate) fn wire_error_kind(raw: Option<&str>) -> Option<WireErrorType> {
+    raw.map(|s| WireErrorType::parse(Some(s)))
+}
+
+impl From<xai_grok_shell::sampling::error::SamplingErrorKind> for WireErrorType {
+    fn from(kind: xai_grok_shell::sampling::error::SamplingErrorKind) -> Self {
+        use xai_grok_shell::sampling::error::SamplingErrorKind as K;
+        match kind {
+            K::Auth => Self::Auth,
+            K::Http => Self::Http,
+            K::Api => Self::Api,
+            K::Serialization => Self::Serialization,
+            K::IdleTimeout => Self::IdleTimeout,
+            K::RateLimited => Self::RateLimited,
+            K::EmptyResponse => Self::EmptyResponse,
+            K::MaxTokensTruncation => Self::MaxTokensTruncation,
+            K::DoomLoopDetected => Self::Other,
+        }
+    }
+}
+
 /// Clean banner for a terminal request failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FormattedRequestFailure {
@@ -92,10 +114,14 @@ impl FormattedRequestFailure {
 /// A status-level next step is always kept when we have one.
 pub(crate) fn format_request_failure(
     status: Option<u16>,
-    error_type: Option<&str>,
+    error_type: Option<WireErrorType>,
     raw: &str,
 ) -> FormattedRequestFailure {
-    let wire = WireErrorType::parse(error_type);
+    let wire = if truncation_recovered_from_untyped_raw(error_type, raw) {
+        WireErrorType::MaxTokensTruncation
+    } else {
+        error_type.unwrap_or(WireErrorType::Other)
+    };
     // Text-sniffed status must not demote a dedicated wire-type headline to
     // generic status copy (an `auth_transient` message contains
     // "Unauthorized (401)"); only the untyped rails recover it from the text.
@@ -115,6 +141,13 @@ pub(crate) fn format_request_failure(
         headline: class.headline,
         detail,
     }
+}
+
+/// Recover the historical truncation classification from an untyped error.
+fn truncation_recovered_from_untyped_raw(error_type: Option<WireErrorType>, raw: &str) -> bool {
+    error_type.is_none()
+        && parse_http_status(raw).is_none()
+        && raw.contains(xai_grok_shell::sampling::error::MAX_TOKENS_TRUNCATION_MESSAGE)
 }
 
 struct Classified {

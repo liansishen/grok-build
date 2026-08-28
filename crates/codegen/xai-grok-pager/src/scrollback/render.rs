@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use derive_more::{Deref, DerefMut};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use unicode_width::UnicodeWidthStr;
@@ -93,8 +92,22 @@ fn timestamp_reserved_for_block(block: &RenderBlock, appearance: &AppearanceConf
 /// - `resize()` always reallocates when growing (no capacity tracking)
 /// - No efficient `fill()` - could use `vec.fill()` instead of cell-by-cell
 /// - No bulk copy operations
-#[derive(Default, Deref, DerefMut)]
+#[derive(Default)]
 pub struct ScratchBuffer(Buffer);
+
+impl std::ops::Deref for ScratchBuffer {
+    type Target = Buffer;
+
+    fn deref(&self) -> &Buffer {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for ScratchBuffer {
+    fn deref_mut(&mut self) -> &mut Buffer {
+        &mut self.0
+    }
+}
 
 impl ScratchBuffer {
     /// Create a new empty scratch buffer.

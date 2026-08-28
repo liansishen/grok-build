@@ -984,7 +984,7 @@ impl LocationPickerState {
                 if cfg!(windows) && has_windows_drive_prefix(q) && q.len() == 2 {
                     (PathBuf::from(format!("{q}\\")), String::new())
                 } else {
-                    let home = dirs::home_dir().unwrap_or_else(|| self.base_cwd.clone());
+                    let home = xai_dirs::home_dir().unwrap_or_else(|| self.base_cwd.clone());
                     (home, q.trim_start_matches('~').to_string())
                 }
             }
@@ -1098,7 +1098,7 @@ fn resolve_dir_prefix(prefix: &str, base: &Path) -> PathBuf {
         }
     } else if trimmed == "~" || prefix.starts_with("~/") {
         let rest = trimmed.trim_start_matches('~').trim_start_matches('/');
-        let mut home = dirs::home_dir().unwrap_or_else(|| base.to_path_buf());
+        let mut home = xai_dirs::home_dir().unwrap_or_else(|| base.to_path_buf());
         if !rest.is_empty() {
             home.push(rest);
         }
