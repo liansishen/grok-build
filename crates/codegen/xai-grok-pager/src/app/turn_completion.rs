@@ -448,8 +448,8 @@ fn arm_driver_turn_end_reconcile(
         cancel_trigger,
         cancellation_category,
         cancellation_context,
-    } = signal;
         error_kind,
+    } = signal;
     if agent.session.loading_replay {
         return false;
     }

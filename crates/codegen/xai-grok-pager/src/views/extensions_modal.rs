@@ -1483,7 +1483,7 @@ pub fn tab_complete_path(partial: &str) -> Option<String> {
 
     // Expand ~ to home directory.
     let expanded = if let Some(rest) = partial.strip_prefix('~') {
-        let home = xai_dirs::home_dir()?
+        let home = xai_dirs::home_dir()?;
         if rest.is_empty() || rest == "/" {
             home.to_string_lossy().to_string() + "/"
         } else {

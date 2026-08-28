@@ -449,7 +449,7 @@ pub(super) fn handle_session_notification_with_origin(
                     finish_wake_turn(
                         agent,
                         &prompt_id,
-                        WakeTerminal {
+                        super::prompt_origin::WakeTerminal {
                             stop_reason: &stop_reason,
                             agent_result: agent_result.as_deref(),
                             cancel_trigger: terminal_meta_str(

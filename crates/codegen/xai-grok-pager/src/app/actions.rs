@@ -2706,7 +2706,7 @@ pub enum TaskResult {
     /// Manual `/compact` command completed.
     CompactComplete {
         agent_id: AgentId,
-        result: Result<(), String>,
+        result: Result<(), crate::app::effects::CompactError>,
     },
     /// Background task kill result. `outcome` is `None` when the agent
     /// returned an error envelope or an unparseable payload (treated as
