@@ -772,6 +772,7 @@ async fn drive_l2(
                                 error: SamplingError::serialization_message(
                                     "Responses terminal event contained no usable assistant output after visible stream content",
                                 ),
+                                doom_loop_signals: all_triggers,
                                 recovery_items: Vec::new(),
                             };
                         }
