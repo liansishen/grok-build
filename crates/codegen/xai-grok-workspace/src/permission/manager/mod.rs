@@ -31,6 +31,7 @@ use crate::permission::shell_access::{
 use crate::permission::state::{PermissionState, persist_state, replace_state_on_disk};
 use crate::permission::types::{
     AccessKind, ClientType, Decision, EditPolicy, PermissionCommand, PermissionEvent,
+    PermissionRequest,
     PermissionResolution, PromptPolicy, RequestPathContext,
 };
 use xai_grok_mcp::servers::parse_mcp_qualified_name;
@@ -1184,13 +1185,16 @@ impl PermissionHandle {
                 let _in_flight_guard = InFlightGuard::new(in_flight);
                 let (tx, rx) = oneshot::channel::<PermissionResolution>();
                 let msg = PermissionCommand::Request {
-                    access,
-                    tool_call_update,
-                    path_context,
+                    request: PermissionRequest {
+                        access,
+                        tool_call_update,
+                        path_context,
+                        session_id,
+                        subagent_type,
+                        subagent_description,
+                        hook_ask: None,
+                    },
                     respond_to: tx,
-                    session_id,
-                    subagent_type,
-                    subagent_description,
                 };
                 if let Err(e) = cmd_tx.send(msg) {
                     tracing::error!(?e, "failed to send permission request");
@@ -1701,13 +1705,17 @@ fn spawn_permission_manager_with_pin(
                     );
                 }
                 PermissionCommand::Request {
-                    access,
-                    tool_call_update,
-                    path_context,
+                    request:
+                        PermissionRequest {
+                            access,
+                            tool_call_update,
+                            path_context,
+                            session_id: request_session_id,
+                            subagent_type: request_subagent_type,
+                            subagent_description: request_subagent_description,
+                            hook_ask,
+                        },
                     mut respond_to,
-                    session_id: request_session_id,
-                    subagent_type: request_subagent_type,
-                    subagent_description: request_subagent_description,
                 } => {
                     // wait_ms timer; starts at dequeue so it excludes time queued behind others.
                     let request_received = std::time::Instant::now();
@@ -2660,7 +2668,7 @@ fn spawn_permission_manager_with_pin(
                             // (e.g. `curl … && sh` must not become two separate
                             // prompts for `curl …` then `sh`).
                             let prompt_outcome = tokio::select! {
-                                outcome = prompter.request(&access, &tool_call_update, protected_edit) => outcome,
+                                outcome = prompter.request(&access, &tool_call_update, protected_edit, hook_ask.as_ref()) => outcome,
                                 _ = respond_to.closed() => PromptOutcome::Cancelled,
                             };
 
@@ -2754,7 +2762,7 @@ fn spawn_permission_manager_with_pin(
                         _ => {
                             // Non-bash access kinds keep the single-prompt flow.
                             let prompt_outcome = tokio::select! {
-                                outcome = prompter.request(&access, &tool_call_update, protected_edit) => outcome,
+                                outcome = prompter.request(&access, &tool_call_update, protected_edit, hook_ask.as_ref()) => outcome,
                                 _ = respond_to.closed() => PromptOutcome::Cancelled,
                             };
                             let prompt_outcome =
