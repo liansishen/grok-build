@@ -1602,7 +1602,7 @@ impl SessionActor {
                         crate::session::pending_interaction::PendingKind::Permission,
                     );
                 self.permissions
-                    .request(PermissionRequest {
+                    .request_permission(PermissionRequest {
                         path_context,
                         session_id: Some(self.session_info.id.0.to_string()),
                         hook_ask,

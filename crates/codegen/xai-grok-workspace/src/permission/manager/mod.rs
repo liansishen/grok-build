@@ -1157,43 +1157,28 @@ impl PermissionHandle {
         .decision
     }
 
-    /// Like [`Self::request_with_path_context`], but returns the full
-    /// [`PermissionResolution`]: the decision plus the authoritative manager
-    /// [`PermissionEvent`] (the identical event the manager sent to its trace
-    /// receiver). `event` is `None` for event-less paths (`AllowAll`, or a
-    /// channel send/receive failure); the caller must omit manager-only analytics
-    /// fields rather than fabricate them, and must never re-enqueue the event.
-    pub async fn request_with_path_context_resolved(
-        &self,
-        access: AccessKind,
-        tool_call_update: acp::ToolCallUpdate,
-        path_context: Option<RequestPathContext>,
-        session_id: Option<String>,
-        subagent_type: Option<String>,
-        subagent_description: Option<String>,
-    ) -> PermissionResolution {
+    /// Request permission from an aggregate request and return its decision event.
+    pub async fn request_permission(&self, request: PermissionRequest) -> PermissionResolution {
         match self {
-            PermissionHandle::AllowAll => PermissionResolution {
-                decision: Decision::Allow,
-                event: None,
-            },
+            PermissionHandle::AllowAll => {
+                if let Some(ask) = &request.hook_ask {
+                    tracing::debug!(
+                        hook_name = %ask.hook_name,
+                        "hook ask dropped: this permission handle cannot prompt"
+                    );
+                }
+                PermissionResolution {
+                    decision: Decision::Allow,
+                    event: None,
+                }
+            }
             PermissionHandle::Actor {
                 cmd_tx, in_flight, ..
             } => {
-                // Count as in-flight before sending, so the actor's emit-time
-                // snapshot includes this request.
                 let _in_flight_guard = InFlightGuard::new(in_flight);
                 let (tx, rx) = oneshot::channel::<PermissionResolution>();
                 let msg = PermissionCommand::Request {
-                    request: PermissionRequest {
-                        access,
-                        tool_call_update,
-                        path_context,
-                        session_id,
-                        subagent_type,
-                        subagent_description,
-                        hook_ask: None,
-                    },
+                    request,
                     respond_to: tx,
                 };
                 if let Err(e) = cmd_tx.send(msg) {
@@ -1218,6 +1203,33 @@ impl PermissionHandle {
                 }
             }
         }
+    }
+
+    /// Like [`Self::request_with_path_context`], but returns the full
+    /// [`PermissionResolution`]: the decision plus the authoritative manager
+    /// [`PermissionEvent`] (the identical event the manager sent to its trace
+    /// receiver). `event` is `None` for event-less paths (`AllowAll`, or a
+    /// channel send/receive failure); the caller must omit manager-only analytics
+    /// fields rather than fabricate them, and must never re-enqueue the event.
+    pub async fn request_with_path_context_resolved(
+        &self,
+        access: AccessKind,
+        tool_call_update: acp::ToolCallUpdate,
+        path_context: Option<RequestPathContext>,
+        session_id: Option<String>,
+        subagent_type: Option<String>,
+        subagent_description: Option<String>,
+    ) -> PermissionResolution {
+        self.request_permission(PermissionRequest {
+            access,
+            tool_call_update,
+            path_context,
+            session_id,
+            subagent_type,
+            subagent_description,
+            hook_ask: None,
+        })
+        .await
     }
 }
 
