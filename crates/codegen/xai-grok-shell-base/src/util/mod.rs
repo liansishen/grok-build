@@ -86,29 +86,14 @@ pub fn is_xai_api_url(url: &str) -> bool {
 /// Like [`is_xai_api_url`], but requires `https` on every arm, so a session bearer is never attached to a cleartext endpoint, including loopback.
 /// A co-located process could otherwise read a token sent to `http://localhost`.
 pub fn is_xai_api_bearer_url(url: &str) -> bool {
-    if is_trusted_xai_https_url(url) {
-        return true;
-    }
-    false
+    xai_grok_config::is_xai_api_bearer_url(url)
 }
+
 /// True for trusted first-party xAI HTTPS routes, excluding arbitrary loopback URLs.
 pub fn is_trusted_xai_https_url(url: &str) -> bool {
-    let Ok(parsed) = reqwest::Url::parse(url) else {
-        return false;
-    };
-    if parsed.scheme() != "https" {
-        return false;
-    }
-    if is_loopback_host(&parsed) {
-        return false;
-    }
-    if is_trusted_cli_chat_proxy_url(url) {
-        return true;
-    }
-    parsed
-        .host_str()
-        .is_some_and(|host| host == "x.ai" || host.ends_with(".x.ai"))
+    xai_grok_config::is_xai_api_bearer_url(url)
 }
+
 fn is_xai_api_url_impl(url: &str, require_https: bool) -> bool {
     if require_https {
         return is_xai_api_bearer_url(url);
@@ -120,14 +105,6 @@ fn is_xai_api_url_impl(url: &str, require_https: bool) -> bool {
         .ok()
         .and_then(|url| url.host_str().map(str::to_owned))
         .is_some_and(|host| host == "x.ai" || host.ends_with(".x.ai"))
-}
-fn is_loopback_host(parsed: &reqwest::Url) -> bool {
-    match parsed.host() {
-        Some(url::Host::Domain(host)) => host == "localhost",
-        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
-        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
-        None => false,
-    }
 }
 /// Truncate a string to at most `max_chars` characters.
 /// Slices at char boundaries so multi-byte UTF-8 never panics.

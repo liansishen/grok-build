@@ -49,7 +49,7 @@ impl WebSearchClient {
                 "Cannot create WebSearchClient from disabled config".to_string(),
             ));
         };
-        let use_dynamic_bearer = xai_grok_shell_base::util::is_xai_api_bearer_url(base_url);
+        let use_dynamic_bearer = xai_grok_config::is_xai_api_bearer_url(base_url);
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers.insert(

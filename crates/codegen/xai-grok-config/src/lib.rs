@@ -28,6 +28,7 @@ pub mod shell;
 pub mod signed_policy;
 mod validation;
 pub mod version_overrides;
+pub mod url;
 
 // Only the cross-crate campaign surface is re-exported at the root; the rest stays
 // reachable via the `pub mod` paths for in-crate use without widening the API.
@@ -81,6 +82,7 @@ pub use validation::{
     requirements_layers, validate_requirements,
 };
 pub use version_overrides::{VersionOverrideError, apply_version_overrides};
+pub use url::is_xai_api_bearer_url;
 
 /// Parse an env var as a boolean. `None` if unset or unrecognized.
 pub fn env_bool(name: &str) -> Option<bool> {
