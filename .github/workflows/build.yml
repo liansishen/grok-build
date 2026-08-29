@@ -177,6 +177,21 @@ jobs:
     steps:
       - name: Check out source for release notes
         uses: actions/checkout@v4
+      - name: Extract current release notes
+        shell: bash
+        env:
+          CHANGELOG_PATH: crates/codegen/xai-grok-shell/CHANGELOG.md
+          RELEASE_NOTES_PATH: ${{ runner.temp }}/release-notes.md
+        run: |
+          awk '
+            /^# Changelog$/ { next }
+            /^# [0-9]/ {
+              if (found) exit
+              found = 1
+            }
+            found { print }
+          ' "$CHANGELOG_PATH" > "$RELEASE_NOTES_PATH"
+          test -s "$RELEASE_NOTES_PATH"
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
@@ -208,7 +223,7 @@ jobs:
         with:
           tag_name: ${{ inputs.release_tag }}
           target_commitish: ${{ github.sha }}
-          body_path: crates/codegen/xai-grok-shell/CHANGELOG.md
+          body_path: ${{ runner.temp }}/release-notes.md
           generate_release_notes: false
           prerelease: false
           files: |
