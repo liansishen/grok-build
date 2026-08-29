@@ -608,6 +608,11 @@ pub enum Action {
     /// Active session's model is unchanged; next session resolves
     /// via the shell's default-resolution chain.
     ClearDefaultModel,
+    /// Commit the independent `[models].web_search` override. Payload is a
+    /// resolved `ModelId`; this never changes the active chat model.
+    SetWebSearchModel(acp::ModelId),
+    /// Clear the persisted Web Search model override.
+    ClearWebSearchModel,
     /// Commit the max-thoughts-width (column budget for the thoughts panel).
     /// Payload is `i64`; clamped to `u16` at the shell helper boundary.
     SetMaxThoughtsWidth(i64),

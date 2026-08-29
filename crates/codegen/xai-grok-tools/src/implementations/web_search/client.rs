@@ -20,6 +20,7 @@ pub struct WebSearchClient {
     /// `allowed_domains`. Mutually exclusive with `default_allowed_domains`.
     default_excluded_domains: Option<Vec<String>>,
     api_key_provider: Option<SharedApiKeyProvider>,
+    use_dynamic_bearer: bool,
     /// Optional 401-attribution hook. Callers can wire this so a 401
     /// from the Responses API emits an `auth_401_attribution` event
     /// with `consumer == "WebSearch"`.
@@ -48,6 +49,7 @@ impl WebSearchClient {
                 "Cannot create WebSearchClient from disabled config".to_string(),
             ));
         };
+        let use_dynamic_bearer = xai_grok_shell_base::util::is_xai_api_bearer_url(base_url);
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers.insert(
@@ -94,6 +96,7 @@ impl WebSearchClient {
             default_allowed_domains: allowed_domains.clone(),
             default_excluded_domains: excluded_domains.clone(),
             api_key_provider,
+            use_dynamic_bearer,
             attribution_callback: None,
         })
     }
@@ -190,6 +193,9 @@ impl WebSearchClient {
         self
     }
     async fn current_bearer(&self) -> Option<String> {
+        if !self.use_dynamic_bearer {
+            return None;
+        }
         crate::types::api_key_provider::resolve_bearer(self.api_key_provider.as_ref()).await
     }
     fn record_401_attribution(&self, sent_bearer: Option<&str>) {
@@ -815,9 +821,9 @@ mod tests {
             .expect("search must succeed with static key fallback");
         assert_eq!(content, "search result");
     }
-    /// When the provider returns a fresh key, it overrides the static one.
+    /// A provider key must not replace the static key for a third-party endpoint.
     #[tokio::test]
-    async fn provider_key_overrides_static_key() {
+    async fn third_party_endpoint_keeps_static_key_when_provider_returns_fresh() {
         use wiremock::matchers::{header, method, path};
         use wiremock::{Mock, MockServer, ResponseTemplate};
         struct FreshProvider;
@@ -829,7 +835,7 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/responses"))
-            .and(header("Authorization", "Bearer fresh-key-from-provider"))
+            .and(header("Authorization", "Bearer stale-static-key"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "resp_test",
                 "object": "response",
@@ -843,7 +849,7 @@ mod tests {
                     "role": "assistant",
                     "content": [{
                         "type": "output_text",
-                        "text": "fresh result",
+                        "text": "static result",
                         "annotations": []
                     }]
                 }]
@@ -864,8 +870,8 @@ mod tests {
         let (content, _citations) = client
             .search("test query", None)
             .await
-            .expect("search must succeed with provider key");
-        assert_eq!(content, "fresh result");
+            .expect("search must succeed with the static key");
+        assert_eq!(content, "static result");
     }
     #[test]
     fn test_extract_citations_no_annotations() {

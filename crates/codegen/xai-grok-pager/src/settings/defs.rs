@@ -967,6 +967,23 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+        // SHELL-owned. Independent from the active chat model; an empty value
+        // means the Web Search default-resolution chain remains in control.
+        SettingMeta {
+            key: "web_search_model",
+            category: SettingCategory::Models,
+            owner: SettingOwner::Shell,
+            label: "Web Search model",
+            description: "Model used by Web Search. This is independent from the active chat model. Pick `(no override)` to use the configured default. Restart required to apply.",
+            keywords: &["web", "search", "model", "tool", "research"],
+            kind: SettingKind::DynamicEnum {
+                default: "",
+                source: DynamicEnumSource::ActiveModelCatalog,
+                supports_preview: false,
+            },
+            restart_required: true,
+            hidden_in_minimal: false,
+        },
         // SHARED. `u16` in UiConfig, widened to `i64` for registry.
         // Width changes apply on the next render frame.
         SettingMeta {

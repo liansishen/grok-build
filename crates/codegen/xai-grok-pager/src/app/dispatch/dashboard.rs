@@ -1534,6 +1534,7 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
                 auto_mode: app.current_ui.permission_mode.as_deref() == Some("auto")
                     && !app.default_yolo,
                 current_model_name: app.models.current_model_name(),
+                web_search_model_name: app.web_search_model.clone(),
                 available_models: app
                     .models
                     .available

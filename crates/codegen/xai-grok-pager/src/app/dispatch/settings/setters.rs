@@ -2350,9 +2350,66 @@ pub(in crate::app::dispatch) fn clear_fork_secondary_reasoning_effort(
     }]
 }
 
-// `web_search_model`, `session_summary_model`, and
-// `default_reasoning_effort` setters were removed alongside their
-// registry entries. Mirror fields and TOML schema stay for compat.
+/// State-only mutation for the independent `[models].web_search` setting.
+pub(super) fn set_web_search_model_inner(app: &mut AppView, value: String) {
+    app.web_search_model = value;
+}
+
+/// Set and persist the Web Search model without changing the active chat model.
+pub(in crate::app::dispatch) fn set_web_search_model(
+    app: &mut AppView,
+    new_id: acp::ModelId,
+) -> Vec<Effect> {
+    let new_id_str = new_id.0.to_string();
+    let prev_id_str = app.web_search_model.clone();
+    if prev_id_str == new_id_str {
+        return vec![];
+    }
+
+    let display = app.models.display_name_for(&new_id);
+    set_web_search_model_inner(app, new_id_str.clone());
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "web_search_model",
+        value = %display,
+        "setting changed",
+    );
+    app.show_toast(&save_value_toast(
+        xai_grok_i18n::t("settings.web_search_model.label"),
+        &display,
+    ));
+    vec![Effect::PersistSetting {
+        key: "web_search_model",
+        value: crate::settings::SettingValue::String(new_id_str),
+        rollback_value: crate::settings::SettingValue::String(prev_id_str),
+    }]
+}
+
+/// Clear the persisted Web Search model override.
+pub(in crate::app::dispatch) fn clear_web_search_model(app: &mut AppView) -> Vec<Effect> {
+    let prev_id_str = app.web_search_model.clone();
+    if prev_id_str.is_empty() {
+        app.show_toast(xai_grok_i18n::t("toast.web_search_model_default"));
+        return vec![];
+    }
+
+    set_web_search_model_inner(app, String::new());
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "web_search_model",
+        value = "<cleared>",
+        prev_id = %prev_id_str,
+        "setting changed",
+    );
+    app.show_toast(xai_grok_i18n::t("toast.web_search_model_cleared"));
+    vec![Effect::PersistSetting {
+        key: "web_search_model",
+        value: crate::settings::SettingValue::String(String::new()),
+        rollback_value: crate::settings::SettingValue::String(prev_id_str),
+    }]
+}
 
 // ---------------------------------------------------------------------------
 // max_thoughts_width — Int-valued setting. Registry surface is `i64`;

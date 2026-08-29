@@ -15,7 +15,7 @@ impl SlashCommand for SettingsCommand {
     }
 
     fn aliases(&self) -> &[&str] {
-        &["config", "preferences", "prefs"]
+        &["config", "setting", "preferences", "prefs"]
     }
 
     fn description(&self) -> &str {
@@ -95,6 +95,6 @@ mod tests {
     fn aliases_are_registered() {
         let cmd = SettingsCommand;
         assert_eq!(cmd.name(), "settings");
-        assert_eq!(cmd.aliases(), &["config", "preferences", "prefs"]);
+        assert_eq!(cmd.aliases(), &["config", "setting", "preferences", "prefs"]);
     }
 }

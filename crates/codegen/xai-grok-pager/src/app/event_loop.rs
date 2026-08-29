@@ -1657,6 +1657,11 @@ pub(crate) async fn run(
     // Seed app state from disk once at the I/O boundary so dispatch
     // stays sans-IO.
     app.current_ui = load_initial_ui_config();
+    app.web_search_model = effective_config
+        .as_ref()
+        .and_then(|root| root.get("models")?.get("web_search")?.as_str())
+        .unwrap_or_default()
+        .to_string();
     crate::app::acp_handler::set_show_request_metrics_enabled(
         app.current_ui.show_request_metrics_enabled(),
     );

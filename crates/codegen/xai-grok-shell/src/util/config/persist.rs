@@ -20,7 +20,7 @@ pub(crate) fn parse_existing_config_toml(s: &str) -> Result<TomlValue, toml::de:
 /// [`save_config`] body; caller must hold [`SAVE_LOCK`].
 async fn save_config_locked(config: &Config) -> Result<()> {
     let path = user_config_path();
-    let mut root: TomlValue = match tokio::fs::read_to_string(&path).await {
+    let root: TomlValue = match tokio::fs::read_to_string(&path).await {
         Ok(s) => match parse_existing_config_toml(&s) {
             Ok(v) => v,
             Err(parse_err) => {
@@ -34,6 +34,13 @@ async fn save_config_locked(config: &Config) -> Result<()> {
         },
         Err(_) => TomlValue::Table(TomlMap::new()),
     };
+    save_config_root_locked(config, root).await
+}
+
+/// Serialize and atomically replace the config using an already-loaded root.
+/// The caller must hold [`SAVE_LOCK`].
+async fn save_config_root_locked(config: &Config, mut root: TomlValue) -> Result<()> {
+    let path = user_config_path();
     if !matches!(root, TomlValue::Table(_)) {
         root = TomlValue::Table(TomlMap::new());
     }
@@ -222,6 +229,20 @@ where
     let mut cfg = load_config_from_toml(&root);
     f(&mut cfg);
     save_config_locked(&cfg).await
+}
+
+/// Update settings while allowing a caller to remove an explicitly persisted key.
+/// The caller must remove the raw key before the serialized config is merged back.
+pub(crate) async fn update_config_with_root<F>(f: F) -> Result<()>
+where
+    F: FnOnce(&mut TomlValue, &mut Config),
+{
+    let _guard = SAVE_LOCK.lock().await;
+    let mut root: TomlValue =
+        crate::config::load_from_disk().unwrap_or_else(|_| TomlValue::Table(TomlMap::new()));
+    let mut cfg = load_config_from_toml(&root);
+    f(&mut root, &mut cfg);
+    save_config_root_locked(&cfg, root).await
 }
 #[cfg(test)]
 #[path = "persist_tests.rs"]

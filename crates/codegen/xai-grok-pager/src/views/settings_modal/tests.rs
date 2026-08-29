@@ -400,6 +400,16 @@ fn every_dynamic_enum_setting_has_action_for_string_arm() {
                      SetDefaultModel(_), got {nonempty_action:?}",
                 );
             }
+            "web_search_model" => {
+                assert!(
+                    matches!(empty_action, Some(Action::ClearWebSearchModel)),
+                    "web_search_model empty canonical must produce ClearWebSearchModel, got {empty_action:?}",
+                );
+                assert!(
+                    matches!(nonempty_action, Some(Action::SetWebSearchModel(_))),
+                    "web_search_model non-empty canonical must produce SetWebSearchModel(_), got {nonempty_action:?}",
+                );
+            }
             "fork_secondary_model" => {
                 assert!(
                     matches!(empty_action, Some(Action::ClearForkSecondaryModel)),
@@ -532,8 +542,8 @@ fn render_setting_row_shows_full_label_when_one_line_fits() {
 
 /// The default registry contains Appearance settings (3 bools + 3 enums + 1 int = 7 entries).
 /// It also holds the Editor entry `multiline_mode`, the Agent entries `permission_mode` and `plan_mode`, and the Privacy entry `coding_data_sharing`.
-/// The Models entry `default_model` and the Advanced entries `show_tips` and `auto_update` complete the list.
-/// `default_reasoning_effort` and `auto_compact_threshold_percent` are not exposed in the modal.
+/// The Models entries `default_model`, `web_search_model`, and `fork_secondary_model`, plus the Advanced entries `show_tips` and `auto_update`, complete the list.
+/// `default_reasoning_effort`, `session_summary_model`, and `auto_compact_threshold_percent` are not exposed in the modal.
 #[test]
 fn rows_contain_categories_and_settings_through_pr_14() {
     let prev_voice = crate::app::voice_mode_enabled();
@@ -637,7 +647,8 @@ fn rows_contain_categories_and_settings_through_pr_14() {
             "coding_data_sharing",
             // SHELL-owned default_model (Models category).
             "default_model",
-            // Models category. `default_reasoning_effort`, `web_search_model`, and `session_summary_model` are not exposed in the modal.
+            "web_search_model",
+            // Models category. `default_reasoning_effort` and `session_summary_model` are not exposed in the modal.
             "fork_secondary_model",
             // `auto_compact_threshold_percent` (Session category) is not exposed in the modal
             // Advanced category.

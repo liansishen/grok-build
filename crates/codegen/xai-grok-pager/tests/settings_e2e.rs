@@ -48,6 +48,7 @@ const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "multiline_mode",
     "permission_mode",
     "default_model",
+    "web_search_model",
     "max_thoughts_width",
     "scroll_speed",
     "scroll_mode",
@@ -1951,14 +1952,14 @@ fn registry_kind_membership_through_pr_14() {
     let string_keys = by_kind.remove("String").unwrap_or_default();
     assert!(
         string_keys.is_empty(),
-        "no String-kind settings should remain — `default_model` + `fork_secondary_model` \
+        "no String-kind settings should remain — `default_model`, `fork_secondary_model`, and `web_search_model` \
          migrated to DynamicEnum; got: {string_keys:?}",
     );
 
     let dynamic_enum_keys = by_kind.remove("DynamicEnum").unwrap_or_default();
     assert_eq!(
         dynamic_enum_keys,
-        vec!["default_model", "fork_secondary_model",],
+        vec!["default_model", "fork_secondary_model", "web_search_model",],
         "DynamicEnum kind membership drift",
     );
 
@@ -2070,6 +2071,7 @@ fn defaults_round_trip_through_registry() {
             "multiline_mode" => SettingValue::Bool(false),
             "permission_mode" => SettingValue::Enum("ask"),
             "default_model" => SettingValue::String(String::new()),
+            "web_search_model" => SettingValue::String(String::new()),
             "max_thoughts_width" => SettingValue::Int(120),
             "scroll_speed" => SettingValue::Int(50),
             "scroll_mode" => SettingValue::Enum("auto"),

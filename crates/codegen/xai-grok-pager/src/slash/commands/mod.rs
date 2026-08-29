@@ -66,6 +66,7 @@ pub mod view_plan;
 pub mod vim_mode;
 pub mod voice;
 pub mod workflow;
+pub mod web_search_model;
 pub mod workflows;
 use super::command::SlashCommand;
 use std::sync::Arc;
@@ -86,6 +87,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         // Per turn.
         Arc::new(effort::EffortCommand),
         Arc::new(model::ModelCommand),
+        Arc::new(web_search_model::WebSearchModelCommand),
         Arc::new(context::ContextCommand),
         Arc::new(compact::CompactCommand),
         Arc::new(fork::ForkCommand),

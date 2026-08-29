@@ -1359,6 +1359,67 @@ fn set_default_model_resolves_known_name() {
     ));
     assert_eq!(app.agents[&agent_id].session.models.current, Some(id));
 }
+
+/// Setting the Web Search model only updates its independent override and
+/// persists it; the active chat model and model-switch effects are unchanged.
+#[test]
+fn set_web_search_model_updates_only_independent_state_and_persists() {
+    use agent_client_protocol as acp;
+    use std::sync::Arc;
+
+    let mut app = test_app_with_agent();
+    let chat_id = acp::ModelId::new(Arc::from("chat-model"));
+    let web_search_id = acp::ModelId::new(Arc::from("web-search-model"));
+    let agent_id = AgentId(0);
+    let chat_info = acp::ModelInfo::new(chat_id.clone(), "Chat Model".to_string());
+    app.agents
+        .get_mut(&agent_id)
+        .unwrap()
+        .session
+        .models
+        .available
+        .insert(chat_id.clone(), chat_info);
+    app.agents
+        .get_mut(&agent_id)
+        .unwrap()
+        .session
+        .models
+        .set_current(chat_id.clone(), None);
+    app.web_search_model = "old-web-search-model".to_string();
+
+    let effects = dispatch(Action::SetWebSearchModel(web_search_id), &mut app);
+
+    assert!(matches!(
+        effects.as_slice(),
+        [Effect::PersistSetting {
+            key: "web_search_model",
+            value: crate::settings::SettingValue::String(value),
+            rollback_value: crate::settings::SettingValue::String(previous),
+        }] if value == "web-search-model" && previous == "old-web-search-model"
+    ));
+    assert_eq!(app.web_search_model, "web-search-model");
+    assert_eq!(
+        app.agents[&agent_id].session.models.current,
+        Some(chat_id),
+        "setting Web Search model must not change the active chat model",
+    );
+    assert!(
+        !effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::SwitchModel { .. })),
+        "setting Web Search model must not emit SwitchModel: {effects:?}",
+    );
+    assert!(
+        !effects.iter().any(|effect| matches!(
+            effect,
+            Effect::PersistSetting {
+                key: "default_model",
+                ..
+            }
+        )),
+        "setting Web Search model must not persist default_model: {effects:?}",
+    );
+}
 /// Re-dispatching the same model
 /// id is idempotent — no PersistSetting, no SwitchModel, no
 /// reasoning_effort reset.
@@ -1625,6 +1686,12 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
                 agent.session.models.available.insert(id.clone(), info);
                 agent.session.models.set_current(id, None);
             }
+        }
+        "web_search_model" => {
+            use agent_client_protocol as acp;
+            use std::sync::Arc;
+            let id = acp::ModelId::new(Arc::from("test-web-search-move"));
+            let _ = dispatch(Action::SetWebSearchModel(id), app);
         }
         "max_thoughts_width" => {
             let _ = dispatch(Action::SetMaxThoughtsWidth(200), app);

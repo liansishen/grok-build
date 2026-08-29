@@ -317,6 +317,8 @@ pub struct PagerLocalSnapshot {
     /// Currently-selected model's display name, or `None` if no catalog
     /// has loaded yet.
     pub current_model_name: Option<String>,
+    /// Persisted `[models].web_search` override, or empty when unset.
+    pub web_search_model_name: String,
     /// `(display_name, ModelId)` pairs from the active session's catalog.
     /// Cloned into the snapshot so the modal's validator/resolver is
     /// self-contained (the modal outlives the borrow on `app.agents`).
@@ -374,6 +376,7 @@ impl Default for PagerLocalSnapshot {
             yolo_mode: false,
             auto_mode: false,
             current_model_name: None,
+            web_search_model_name: String::new(),
             available_models: Vec::new(),
             coding_data_sharing_opt_out: true,
             coding_data_sharing_lock: None,
@@ -772,6 +775,19 @@ pub fn current_value_for(
         "default_model" => Some(SettingValue::String(
             pager.current_model_name.clone().unwrap_or_default(),
         )),
+        "web_search_model" => Some(SettingValue::String({
+            let raw = pager.web_search_model_name.as_str();
+            if raw.is_empty() {
+                String::new()
+            } else {
+                pager
+                    .available_models
+                    .iter()
+                    .find(|(name, id)| id.0.as_ref() == raw || name == raw)
+                    .map(|(name, _)| name.clone())
+                    .unwrap_or_else(|| raw.to_owned())
+            }
+        })),
         // max_thoughts_width: `u16` widened to `i64`.
         "max_thoughts_width" => Some(SettingValue::Int(ui.max_thoughts_width as i64)),
         "usage_refresh_interval_minutes" => Some(SettingValue::Int(

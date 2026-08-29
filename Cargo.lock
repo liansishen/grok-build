@@ -14570,6 +14570,7 @@ dependencies = [
  "xai-grok-env",
  "xai-grok-extra-ca",
  "xai-grok-sandbox",
+ "xai-grok-shell-base",
  "xai-grok-test-support",
  "xai-grok-tools-api",
  "xai-grok-version",

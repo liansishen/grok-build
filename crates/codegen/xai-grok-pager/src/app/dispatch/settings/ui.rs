@@ -5,6 +5,7 @@ use super::setters::{
     set_auto_light_theme_inner, set_auto_update_inner, set_collapsed_edit_blocks_inner,
     set_combine_queued_prompts_inner, set_compact_mode, set_compact_mode_inner,
     set_confirm_before_rewind_inner, set_contextual_hint_inner, set_default_model_inner,
+    set_web_search_model_inner,
     set_default_selected_permission_inner, set_display_refresh_auto_cadence_inner,
     set_follow_up_behavior_inner, set_fork_secondary_model_inner,
     set_fork_secondary_reasoning_effort_inner, set_group_tool_verbs_inner,
@@ -98,6 +99,7 @@ pub(crate) fn refresh_open_settings_modals(app: &mut AppView) {
                 yolo_mode: agent.session.is_yolo(),
                 auto_mode: agent.session.is_auto(),
                 current_model_name: agent.session.models.current_model_name(),
+                web_search_model_name: app.web_search_model.clone(),
                 available_models: agent
                     .session
                     .models
@@ -274,6 +276,7 @@ pub(in crate::app::dispatch) fn dispatch_open_settings(
         yolo_mode: agent.session.is_yolo(),
         auto_mode: agent.session.is_auto(),
         current_model_name: agent.session.models.current_model_name(),
+        web_search_model_name: app.web_search_model.clone(),
         available_models: agent
             .session
             .models
@@ -840,6 +843,7 @@ pub(crate) fn build_pager_snapshot(app: &AppView) -> crate::settings::PagerLocal
         yolo_mode: agent_yolo_mode(app),
         auto_mode: agent_auto_mode(app),
         current_model_name: agent_current_model_name(app),
+        web_search_model_name: app.web_search_model.clone(),
         available_models: agent_available_models(app),
         coding_data_sharing_opt_out: app.coding_data_retention_opt_out,
         coding_data_sharing_lock: app.coding_data_sharing_lock(),
@@ -996,6 +1000,19 @@ pub(in crate::app::dispatch) fn action_for_reset(
                 None
             }
         }
+        // web_search_model: empty string -> clear override; non-empty is a skew guard.
+        ("web_search_model", SettingValue::String(s)) => {
+            if s.is_empty() {
+                Some(Action::ClearWebSearchModel)
+            } else {
+                tracing::error!(
+                    target: "settings",
+                    value = %s,
+                    "action_for_reset(web_search_model) received non-empty default — registry/dispatch skew",
+                );
+                None
+            }
+        },
         // max_thoughts_width: direct round-trip.
         ("max_thoughts_width", SettingValue::Int(i)) => Some(Action::SetMaxThoughtsWidth(*i)),
         ("usage_refresh_interval_minutes", SettingValue::Int(i)) => {
@@ -1247,6 +1264,10 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
                     }
                 }
             }
+        }
+        // web_search_model has no session side effect; restore only its pager mirror.
+        ("web_search_model", SettingValue::String(s)) => {
+            set_web_search_model_inner(app, s.to_owned());
         }
         // max_thoughts_width: direct inner call.
         ("max_thoughts_width", SettingValue::Int(i)) => set_max_thoughts_width_inner(app, *i),

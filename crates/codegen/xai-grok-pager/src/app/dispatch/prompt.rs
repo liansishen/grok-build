@@ -524,6 +524,7 @@ pub(super) fn dispatch_send_prompt_inner(
                     yolo_mode: agent.session.is_yolo(),
                     auto_mode: agent.session.is_auto(),
                     current_model_name: agent.session.models.current_model_name(),
+                    web_search_model_name: app.web_search_model.clone(),
                     available_models: agent
                         .session
                         .models

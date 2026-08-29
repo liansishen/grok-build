@@ -1020,6 +1020,15 @@ pub(super) fn action_for_string(
                     .map(Action::SetDefaultModel)
             }
         }
+        "web_search_model" => {
+            if value.is_empty() {
+                Some(Action::ClearWebSearchModel)
+            } else {
+                snapshot
+                    .resolve_model_name(&value)
+                    .map(Action::SetWebSearchModel)
+            }
+        }
         "fork_secondary_model" => {
             if value.is_empty() {
                 Some(Action::ClearForkSecondaryModel)

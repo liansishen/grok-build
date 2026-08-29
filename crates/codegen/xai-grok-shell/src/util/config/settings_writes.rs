@@ -2,10 +2,11 @@ use super::persist::update_config;
 use anyhow::Result;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
+use toml::Value as TomlValue;
 
 // ---------------------------------------------------------------------------
 // Settings helpers — typed disk-write wrappers for each setting.
-// All route through `update_config` → `merge_section` → `save_config`.
+// All route through the shared config persistence helpers and preserve unrelated fields.
 // ---------------------------------------------------------------------------
 
 // Process-wide cache for `[ui].follow_up_behavior == "steer"`.
@@ -204,6 +205,32 @@ pub async fn set_default_model(value: String) -> Result<()> {
         if value.is_empty() { None } else { Some(value) },
         None,
     )
+    .await
+}
+fn clear_web_search_model_override(root: &mut TomlValue) {
+    if let Some(models) = root.get_mut("models").and_then(|v| v.as_table_mut()) {
+        models.remove("web_search");
+    }
+}
+
+/// Persist `[models].web_search` via the config persistence helpers.
+/// Empty string clears the override and restores the Web Search default chain.
+/// Length over [`MAX_DEFAULT_MODEL_LEN`] returns `Err`.
+pub async fn set_web_search_model(value: String) -> Result<()> {
+    if value.len() > MAX_DEFAULT_MODEL_LEN {
+        anyhow::bail!(
+            "web_search model name too long ({} > {} bytes)",
+            value.len(),
+            MAX_DEFAULT_MODEL_LEN
+        );
+    }
+    let clear = value.is_empty();
+    super::persist::update_config_with_root(move |root, cfg| {
+        cfg.models.web_search = if clear { None } else { Some(value) };
+        if clear {
+            clear_web_search_model_override(root);
+        }
+    })
     .await
 }
 
@@ -458,4 +485,41 @@ pub async fn set_show_tips(value: bool) -> Result<()> {
 /// Restart-required: auto-update check fires once on startup.
 pub async fn set_auto_update(value: bool) -> Result<()> {
     update_config(|cfg| cfg.cli.auto_update = Some(value)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clear_web_search_model_override_preserves_other_config() {
+        let mut root: TomlValue = toml::from_str(
+            r#"
+[models]
+default = "chat-model"
+web_search = "old-search"
+custom_model = "keep-me"
+
+[ui]
+theme = "dark"
+"#,
+        )
+        .unwrap();
+
+        clear_web_search_model_override(&mut root);
+
+        let models = root.get("models").and_then(|value| value.as_table()).unwrap();
+        assert!(!models.contains_key("web_search"));
+        assert_eq!(models.get("default").and_then(|value| value.as_str()), Some("chat-model"));
+        assert_eq!(
+            models.get("custom_model").and_then(|value| value.as_str()),
+            Some("keep-me")
+        );
+        assert_eq!(
+            root.get("ui")
+                .and_then(|value| value.get("theme"))
+                .and_then(|value| value.as_str()),
+            Some("dark")
+        );
+    }
 }
