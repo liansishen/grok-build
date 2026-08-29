@@ -1,5 +1,42 @@
 # Changelog
 
+# 1.0.12-fork.2 — 2026-08-29
+
+本版为 Fork 功能与问题修复更新，产品版本仍为 **1.0.12**，不包含新的上游同步。
+
+### 问题修复
+
+- 修复 Web Search 使用第三方 endpoint 时的鉴权错误。只有受信任的 HTTPS xAI endpoint 使用动态 session bearer；第三方 endpoint、本地 HTTP endpoint 和其它非 HTTPS endpoint 使用配置中的静态 API key，不再被动态 bearer 覆盖。
+- 将 xAI endpoint 信任判断放入配置 crate，并移除 Web Search 相关依赖环，保持现有 xAI URL 安全边界和兼容路径不变。
+- 修复 Web Search 模型设置日志字段的跨平台编译错误，避免 release 构建失败。
+
+### 本 Fork
+
+- 将配置中的 `[models].web_search` 加入 `/settings`，并提供 `/setting` 别名。设置项显示当前活动模型目录中的可用模型，写入配置后保留其它 `[models]` 字段和未知配置字段。
+- 新增 `/web-search-model <name>` 命令及 `/wsm <name>` 别名，支持按模型名称或模型 ID 快速选择，并提供活动模型目录建议。缺少参数或模型不存在时显示本地化错误。
+- Web Search 模型设置独立于聊天模型。选择或清除 Web Search 模型不会触发 `SetDefaultModel` 或 `SwitchModel`，也不会改变当前聊天模型。
+- 清空 Web Search 模型设置会删除 `[models].web_search` 的覆盖值，恢复默认模型解析链；设置项按现有配置生命周期标记为需要重启后生效。
+- 发布工作流只提取当前版本的 changelog 条目作为 GitHub Release notes，不再把历史版本说明重复发布。
+
+### 国际化
+
+- 新增的设置名称、提示、命令帮助和错误消息已补齐英文与简体中文文案。
+- 本版未扩展其它语种翻译，其它语种继续使用现有回退机制。
+
+### 验证
+
+- 已复核上一版 `v1.0.12-fork.1` 到本版提交范围内的全部 4 个提交。
+- GitHub Actions 运行 `33274947317` 已通过 Linux x86_64 和 Windows x86_64 的采样器测试、release 构建、版本校验及产物上传。
+- 静态检查通过，工作树在发布前保持干净。
+
+### 产物
+
+- `grok-1.0.12-fork.2-linux-x86_64`
+- `grok-1.0.12-fork.2-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.12-fork.1...v1.0.12-fork.2
+
 # 1.0.12-fork.1 — 2026-08-27
 
 同步上游 monorepo `bc7f02ed` / Source-Revision `d5a0335a`，产品版本升至 **1.0.12**。
