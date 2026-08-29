@@ -2366,18 +2366,18 @@ pub(in crate::app::dispatch) fn set_web_search_model(
         return vec![];
     }
 
-    let display = app.models.display_name_for(&new_id);
+    let display_name = app.models.display_name_for(&new_id);
     set_web_search_model_inner(app, new_id_str.clone());
     refresh_open_settings_modals(app);
     tracing::info!(
         target: "settings",
         key = "web_search_model",
-        value = %display,
+        value = %display_name,
         "setting changed",
     );
     app.show_toast(&save_value_toast(
         xai_grok_i18n::t("settings.web_search_model.label"),
-        &display,
+        &display_name,
     ));
     vec![Effect::PersistSetting {
         key: "web_search_model",
