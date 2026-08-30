@@ -78,6 +78,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         // The rows the dropdown shows before it scrolls.
         Arc::new(tutorial::TutorialCommand),
         Arc::new(settings_cmd::SettingsCommand),
+        Arc::new(web_search_model::WebSearchModelCommand),
         Arc::new(dashboard::DashboardCommand),
         Arc::new(workflows::WorkflowsCommand),
         Arc::new(plugin::PluginsCommand),
@@ -87,7 +88,6 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         // Per turn.
         Arc::new(effort::EffortCommand),
         Arc::new(model::ModelCommand),
-        Arc::new(web_search_model::WebSearchModelCommand),
         Arc::new(context::ContextCommand),
         Arc::new(compact::CompactCommand),
         Arc::new(fork::ForkCommand),
@@ -257,6 +257,7 @@ mod tests {
         assert!(reg.get("clear").is_some());
         assert!(reg.get("m").is_some());
         assert!(reg.get("welcome").is_some());
+        assert!(reg.get("web_search_model").is_some());
         assert!(reg.get("show-plan").is_some());
         assert!(reg.get("plan-view").is_some());
         assert!(reg.get("undo").is_some());

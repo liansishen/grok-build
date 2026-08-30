@@ -1,4 +1,4 @@
-//! `/web-search-model` (alias `/wsm`) -- choose the model used by Web Search.
+//! `/web-search-model` (aliases `/wsm` and `/web_search_model`) -- choose the model used by Web Search.
 
 use agent_client_protocol as acp;
 
@@ -15,7 +15,7 @@ impl SlashCommand for WebSearchModelCommand {
     }
 
     fn aliases(&self) -> &[&str] {
-        &["wsm"]
+        &["wsm", "web_search_model"]
     }
 
     fn description(&self) -> &str {
@@ -114,7 +114,7 @@ mod tests {
     fn metadata_uses_web_search_alias() {
         let command = WebSearchModelCommand;
         assert_eq!(command.name(), "web-search-model");
-        assert_eq!(command.aliases(), &["wsm"]);
+        assert_eq!(command.aliases(), &["wsm", "web_search_model"]);
         assert!(!command.session_scoped());
     }
 

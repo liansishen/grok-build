@@ -1436,6 +1436,23 @@ mod tests {
         }
     }
 
+    #[test]
+    fn web_search_model_is_registered_in_models_category() {
+        let reg = SettingsRegistry::defaults();
+        let meta = reg
+            .find("web_search_model")
+            .expect("Web Search model setting should be registered");
+
+        assert_eq!(meta.category, SettingCategory::Models);
+        assert!(matches!(
+            &meta.kind,
+            SettingKind::DynamicEnum {
+                source: DynamicEnumSource::ActiveModelCatalog,
+                ..
+            }
+        ));
+    }
+
     /// Unregistered keys return `None`.
     #[test]
     fn unmapped_key_returns_none() {
