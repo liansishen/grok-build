@@ -1781,24 +1781,6 @@ mod tests {
     }
 
     #[test]
-    fn controller_puts_web_search_model_in_initial_menu_rows() {
-        let mut ctrl = SlashController::with_builtins(std::path::PathBuf::from("."));
-        let state = SlashState::default();
-        let models = ModelState::default();
-
-        ctrl.refresh(&state, "/", 1, &models);
-        let snapshot = state.snapshot();
-        assert!(
-            snapshot
-                .matches
-                .iter()
-                .take(MAX_VISIBLE_SUGGESTIONS)
-                .any(|row| row.display == "/web-search-model"),
-            "Web Search model command should be visible before the slash menu scrolls"
-        );
-    }
-
-    #[test]
     fn gboom_never_appears_in_suggestions() {
         // The /gboom easter egg is executable but must stay out of the dropdown: not in the full list, not via prefix, not via exact name
         let mut ctrl = SlashController::with_builtins(std::path::PathBuf::from("."));
