@@ -43,6 +43,7 @@ pub fn truncate_line(line: &str, max_chars: usize) -> Cow<'_, str> {
         "tool.output.line_truncated",
         &[("text", &line[..end_byte]), ("count", &count)],
     ))
+}
 
 /// Soft-wrap a long line by inserting newlines every `wrap_width` characters.
 /// **All content is preserved** — nothing is discarded.
