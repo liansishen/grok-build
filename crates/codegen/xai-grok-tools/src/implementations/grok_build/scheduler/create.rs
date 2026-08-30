@@ -4,6 +4,7 @@ use crate::types::tool::{ToolKind, ToolNamespace};
 
 use super::interval::{interval_to_human, parse_interval};
 use super::types::{ScheduledTask, SchedulerCommand, SchedulerHandle, scheduler_tool_error};
+use xai_grok_i18n::{t, t_fmt};
 
 // Canonical /loop wording lives in the light API crate so other consumers can
 // link it without the tools implementation crate; re-exported to keep paths stable.
@@ -107,27 +108,10 @@ impl crate::types::tool_metadata::ToolMetadata for SchedulerCreateTool {
         // Formatted once so the TTL copy is derived from RECURRING_TASK_TTL_DAYS instead of
         // being pinned by a duplicate literal.
         static DESCRIPTION: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-            format!(
-                r#"Create a scheduled task that runs a prompt on a recurring interval, or update an existing one in place.
-
-Use this tool when a user asks you to loop, repeat, or schedule a prompt or a task.
-
-Set fire_immediately: true to also fire once on creation; by default the first run waits for the interval.
-
-To change an existing task, pass its task_id: provided fields replace old values, omitted ones are unchanged, and the schedule keeps its phase. An unknown id errors.
-
-Usage notes:
-- Interval format: "5m" (minutes), "2h" (hours), "1d" (days), "60s" (seconds, min 60)
-- Maximum 50 scheduled tasks at once
-- Tasks auto-expire after {} days
-- For one-time delayed work, run a background terminal command (e.g. `sleep 1800 && <command>`) instead; its completion notifies you"#,
-                super::types::RECURRING_TASK_TTL_DAYS
-            )
+            let ttl = super::types::RECURRING_TASK_TTL_DAYS.to_string();
+            t_fmt("tool.scheduler.description.create", &[("ttl", &ttl)])
         });
         &DESCRIPTION
-        // TODO: scheduler tools share ToolKind::Other so they can't be template-ized
-        // via ${{ tools.by_kind.* }}. If tool name randomization is needed, add
-        // dedicated ToolKind variants (SchedulerCreate, SchedulerDelete, SchedulerList).
     }
 
     fn emitted_notifications(&self) -> &'static [&'static str] {
@@ -183,7 +167,7 @@ impl xai_tool_runtime::Tool for SchedulerCreateTool {
             .as_deref()
             .map(parse_interval)
             .transpose()
-            .map_err(|e| xai_tool_runtime::ToolError::invalid_arguments(e.to_string()))?;
+            .map_err(|e| xai_tool_runtime::ToolError::invalid_arguments(e.localized_message()))?
 
         let sender = {
             let res = resources.lock().await;
@@ -200,14 +184,14 @@ impl xai_tool_runtime::Tool for SchedulerCreateTool {
             Result<ScheduledTask, super::types::SchedulerError>,
         >| async move {
             sender.send(cmd).map_err(|_| {
-                xai_tool_runtime::ToolError::custom("process_manager", "Scheduler actor stopped")
+                xai_tool_runtime::ToolError::custom("process_manager", t("scheduler.error.actor_stopped"))
             })?;
             reply_rx
                 .await
                 .map_err(|_| {
                     xai_tool_runtime::ToolError::custom(
                         "process_manager",
-                        "Scheduler actor dropped reply",
+                        t("scheduler.error.reply_dropped"),
                     )
                 })?
                 .map_err(scheduler_tool_error)
@@ -216,7 +200,7 @@ impl xai_tool_runtime::Tool for SchedulerCreateTool {
         if let Some(task_id) = input.task_id {
             if input.prompt.is_none() && interval_secs.is_none() {
                 return Err(xai_tool_runtime::ToolError::invalid_arguments(
-                    "nothing to update: provide interval and/or prompt alongside task_id",
+                    t("scheduler.error.nothing_to_update"),
                 ));
             }
             let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
@@ -240,19 +224,18 @@ impl xai_tool_runtime::Tool for SchedulerCreateTool {
 
         if !input.recurring {
             return Err(xai_tool_runtime::ToolError::invalid_arguments(
-                "one-shot tasks are not supported; run a background terminal command instead \
-                 (`sleep <secs> && <command>`, background: true) or do the work now",
+                t("scheduler.error.one_shot_unsupported"),
             ));
         }
 
         let interval_secs = interval_secs.ok_or_else(|| {
             xai_tool_runtime::ToolError::invalid_arguments(
-                "interval is required when creating a task",
+                t("scheduler.error.interval_required"),
             )
         })?;
         let prompt = input.prompt.ok_or_else(|| {
             xai_tool_runtime::ToolError::invalid_arguments(
-                "prompt is required when creating a task",
+                t("scheduler.error.prompt_required"),
             )
         })?;
 

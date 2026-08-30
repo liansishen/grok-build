@@ -158,8 +158,10 @@ impl HashlineSchemeParams {
         param_map: &std::collections::HashMap<String, String>,
         input_schema: &serde_json::Value,
     ) -> crate::types::definition::ToolDefinition {
-        let raw = description_override.unwrap_or(template);
-        let with_examples = self.render_description(raw);
+        let raw = description_override
+            .map(str::to_owned)
+            .unwrap_or_else(|| crate::types::localization::localized_description(template));
+        let with_examples = self.render_description(&raw);
         let description = renderer.render(&with_examples).unwrap_or(with_examples);
         let schema = if param_map.is_empty() {
             input_schema.clone()

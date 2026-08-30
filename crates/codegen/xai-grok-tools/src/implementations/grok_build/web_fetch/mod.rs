@@ -103,8 +103,8 @@ Usage notes:
                 tracing::warn!("Failed to deserialize WebFetchParams: {e}");
                 WebFetchParams::default()
             });
-        let raw_desc = description_override.unwrap_or_else(|| {
-            crate::types::tool_metadata::ToolMetadata::description_template(self)
+        let raw_desc = description_override.map(str::to_owned).unwrap_or_else(|| {
+            crate::types::tool_metadata::ToolMetadata::localized_description_template(self)
         });
         let extras = serde_json::json!({
             "proxy_enabled": params.proxy_endpoint.is_some(),

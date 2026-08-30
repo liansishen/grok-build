@@ -24,6 +24,7 @@ use crate::types::tool::{ToolKind, ToolNamespace};
 use xai_tool_types::{
     MultiTaskOutputResult, TaskOutputOutput, TaskOutputResult, TaskOutputToolInput,
 };
+use xai_grok_i18n::{t, t_fmt};
 
 /// Default wait budget when a caller is already in wait mode but omitted
 /// `timeout_ms` (legacy `wait_tasks` / internal `capped_wait_timeout`). On
@@ -75,8 +76,8 @@ pub(crate) enum WaitSubject {
 impl WaitSubject {
     fn noun(self) -> &'static str {
         match self {
-            WaitSubject::Task => "task",
-            WaitSubject::Subagent => "subagent",
+            WaitSubject::Task => t("task_output.subject.task"),
+            WaitSubject::Subagent => t("task_output.subject.subagent"),
         }
     }
 }
@@ -88,20 +89,29 @@ fn still_running_wait_hint(hint: WaitHint, subject: WaitSubject) -> String {
             let waited_label = format_waited_duration(waited);
             if requested > waited {
                 let requested_label = format_waited_duration(requested);
-                format!(
-                    "Waited {waited_label}, the per-call maximum, of the {requested_label} you requested; \
-                     the {noun} is still running. You do not need to call this again."
+                t_fmt(
+                    "task_output.wait.per_call_max",
+                    &[
+                        ("waited", &waited_label),
+                        ("requested", &requested_label),
+                        ("subject", noun),
+                    ],
                 )
             } else {
-                format!("Waited the requested {waited_label}; the {noun} is still running.")
+                t_fmt(
+                    "task_output.wait.requested",
+                    &[("waited", &waited_label), ("subject", noun)],
+                )
             }
         }
-        WaitHint::ReturnedEarly => {
-            format!("Wait returned early because another finished; this {noun} is still running.")
-        }
-        WaitHint::NotRequested => "Use timeout_ms to wait for completion.".to_string(),
+        WaitHint::ReturnedEarly => t_fmt(
+            "task_output.wait.returned_early",
+            &[("subject", noun)],
+        ),
+        WaitHint::NotRequested => t("task_output.wait.not_requested").to_string(),
     };
-    format!("{lead} You will be notified automatically when the {noun} completes.")
+    let notify = t_fmt("task_output.wait.auto_notify", &[("subject", noun)]);
+    format!("{lead} {notify}")
 }
 
 fn format_waited_duration(d: Duration) -> String {
@@ -264,22 +274,23 @@ impl TaskOutputTool {
 
         // Neither found
         {
-            let msg = if is_legacy {
-                render_legacy_task_output_not_found(task_id)
+        let msg = if is_legacy {
+            render_legacy_task_output_not_found(task_id)
+        } else {
+            let known = terminal.list_tasks().await;
+            if known.is_empty() {
+                t_fmt(
+                    "task_output.not_found.none",
+                    &[("task_id", task_id)],
+                )
             } else {
-                let known = terminal.list_tasks().await;
-                if known.is_empty() {
-                    format!(
-                        "Task {task_id} not found. No background tasks or subagents exist in this session.",
-                    )
-                } else {
-                    let ids: Vec<&str> = known.iter().map(|t| t.task_id.as_str()).collect();
-                    format!(
-                        "Task {task_id} not found. Known task IDs: [{}]",
-                        ids.join(", ")
-                    )
-                }
-            };
+                let ids: Vec<&str> = known.iter().map(|t| t.task_id.as_str()).collect();
+                t_fmt(
+                    "task_output.not_found.known",
+                    &[("task_id", task_id), ("ids", &ids.join(", "))],
+                )
+            }
+        };
             Ok(TaskOutputOutput::TaskNotFound(msg))
         }
     }
@@ -355,7 +366,19 @@ impl TaskOutputTool {
             .count();
         let total = results.len();
         let mode_str = if waits { "wait_all" } else { "poll" };
-        let summary = format!("{completed_count}/{total} tasks completed ({mode_str})");
+        let mode_label = if waits {
+            t("task_output.mode.wait_all")
+        } else {
+            t("task_output.mode.poll")
+        };
+        let summary = t_fmt(
+            "task_output.multi.summary",
+            &[
+                ("completed", &completed_count.to_string()),
+                ("total", &total.to_string()),
+                ("mode", mode_label),
+            ],
+        );
 
         Ok(TaskOutputOutput::MultiResult(MultiTaskOutputResult {
             mode: mode_str.to_string(),
@@ -382,7 +405,7 @@ pub(crate) fn not_found_result(task_id: &str) -> TaskOutputResult {
         started: String::new(),
         ended: None,
         duration_secs: 0.0,
-        output: format!("Task {task_id} not found."),
+        output: t_fmt("task_output.not_found.short", &[("task_id", task_id)]),
         output_file: String::new(),
         truncated: false,
         truncation_hint: String::new(),
@@ -627,12 +650,13 @@ fn format_subagent_snapshot(snap: &SubagentSnapshot, wait_hint: WaitHint) -> Tas
         SubagentSnapshotStatus::Initializing => {
             let duration_secs = snap.duration_ms as f64 / 1000.0;
             // Measure body only — wait-hint is harness advisory, not task output.
-            let body = format!(
-                "Subagent is initializing (creating worktree, resolving config).\n\
-                 Type: {}\n\
-                 Description: {}\n\
-                 Elapsed: {duration_secs:.1}s",
-                snap.subagent_type, snap.description,
+            let body = t_fmt(
+                "task_output.subagent.initializing",
+                &[
+                    ("type", snap.subagent_type.as_str()),
+                    ("description", snap.description.as_str()),
+                    ("elapsed", &format!("{duration_secs:.1}")),
+                ],
             );
             let raw_output_bytes = body.len();
             let output = with_still_running_wait_hint(body, wait_hint, WaitSubject::Subagent);
@@ -661,25 +685,27 @@ fn format_subagent_snapshot(snap: &SubagentSnapshot, wait_hint: WaitHint) -> Tas
             error_count,
         } => {
             let tools_str = if tools_used.is_empty() {
-                "none yet".to_string()
+                t("task_output.subagent.no_tools").to_string()
             } else {
                 tools_used.join(", ")
             };
             let tokens_k = tokens_used / 1000;
             let capacity_k = context_window_tokens / 1000;
-            // Measure body only — wait-hint is harness advisory, not task output.
-            let body = format!(
-                "Subagent is still running.\n\
-                 Type: {}\n\
-                 Description: {}\n\
-                 Elapsed: {:.1}s\n\
-                 Progress: turn {turn_count}, {tool_call_count} tool calls, \
-                 {tokens_k}K/{capacity_k}K tokens ({context_usage_pct}% context)\n\
-                 Tools used: {tools_str}\n\
-                 Errors: {error_count}",
-                snap.subagent_type,
-                snap.description,
-                snap.duration_ms as f64 / 1000.0,
+            let elapsed = format!("{:.1}", snap.duration_ms as f64 / 1000.0);
+            let body = t_fmt(
+                "task_output.subagent.running",
+                &[
+                    ("type", snap.subagent_type.as_str()),
+                    ("description", snap.description.as_str()),
+                    ("elapsed", &elapsed),
+                    ("turns", &turn_count.to_string()),
+                    ("tool_calls", &tool_call_count.to_string()),
+                    ("tokens", &tokens_k.to_string()),
+                    ("capacity", &capacity_k.to_string()),
+                    ("context", &context_usage_pct.to_string()),
+                    ("tools", &tools_str),
+                    ("errors", &error_count.to_string()),
+                ],
             );
             let raw_output_bytes = body.len();
             let output = with_still_running_wait_hint(body, wait_hint, WaitSubject::Subagent);
@@ -758,7 +784,7 @@ fn format_subagent_snapshot(snap: &SubagentSnapshot, wait_hint: WaitHint) -> Tas
         SubagentSnapshotStatus::Cancelled { reason } => {
             let output = reason
                 .clone()
-                .unwrap_or_else(|| "Subagent was cancelled".to_string());
+                .unwrap_or_else(|| t("subagent.error.cancelled").to_string());
             let raw_output_bytes = output.len();
             TaskOutputOutput::Result(TaskOutputResult {
                 task_id: snap.subagent_id.clone(),
@@ -924,12 +950,13 @@ impl xai_tool_runtime::Tool for TaskOutputTool {
         let ids = input.resolved_task_ids();
         if ids.is_empty() {
             return Err(xai_tool_runtime::ToolError::invalid_arguments(
-                "Provide a non-empty task_ids list.".to_string(),
+                t("task_output.invalid_args.empty_ids").to_string(),
             ));
         }
         if ids.len() > MAX_MULTI_WAIT_IDS {
-            return Err(xai_tool_runtime::ToolError::invalid_arguments(format!(
-                "task_ids exceeds maximum of {MAX_MULTI_WAIT_IDS} entries."
+            return Err(xai_tool_runtime::ToolError::invalid_arguments(t_fmt(
+                "task_output.invalid_args.too_many_ids",
+                &[("max", &MAX_MULTI_WAIT_IDS.to_string())],
             )));
         }
 

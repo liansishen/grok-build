@@ -3,6 +3,7 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use xai_grok_i18n::{t, t_fmt};
 
 // ───────────────────────────────────────────────────────────────────────────
 // `task` (spawn) tool — Input
@@ -259,8 +260,9 @@ impl SubagentCompletedOutput {
 /// wrappers and can make UIs hide the whole spawn result as a reminder block.
 /// Harness-owned reminders go through `format_with_reminders` with
 /// `system_reminder_tag`.
-pub const BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK: &str =
-    "Do not only poll the child. Continue unfinished parent work now.";
+pub fn background_subagent_continue_parent_work() -> String {
+    t("tool.task.continue_parent_work").to_owned()
+}
 
 /// How many asks *before* the latest one may still count as leftover parent
 /// exec. Older implement/fix history after the user switched to review-only
@@ -402,8 +404,14 @@ fn background_result_line(subagent_id: &str, naming: &BackgroundNoticeNaming) ->
         task_ids_param,
         timeout_ms_param,
     } = *naming;
-    format!(
-        "When you need its result, use {task_output_tool} with {task_ids_param}=[\"{subagent_id}\"] and a positive {timeout_ms_param}."
+    t_fmt(
+        "tool.task.background_result_line",
+        &[
+            ("task_output_tool", task_output_tool),
+            ("task_ids_param", task_ids_param),
+            ("subagent_id", subagent_id),
+            ("timeout_ms_param", timeout_ms_param),
+        ],
     )
 }
 
@@ -419,16 +427,18 @@ pub fn format_subagent_started_background(
     continue_parent_work: bool,
 ) -> String {
     let result_line = background_result_line(subagent_id, naming);
-    let mut text = format!(
-        "Subagent started in background.\n\
-         subagent_id: {subagent_id}\n\
-         type: {subagent_type}\n\
-         description: {description}\n\n\
-         {result_line}"
+    let mut text = t_fmt(
+        "tool.task.started_background",
+        &[
+            ("subagent_id", subagent_id),
+            ("subagent_type", subagent_type),
+            ("description", description),
+            ("result_line", &result_line),
+        ],
     );
     if continue_parent_work {
         text.push_str("\n\n");
-        text.push_str(BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK);
+        text.push_str(&background_subagent_continue_parent_work());
     }
     text
 }
@@ -447,22 +457,24 @@ pub fn format_subagent_auto_backgrounded(
     continue_parent_work: bool,
 ) -> String {
     let notify_clause = if notified_on_completion {
-        " — you will be notified when it completes"
+        t("tool.task.auto_backgrounded.notify_clause")
     } else {
         ""
     };
     let result_line = background_result_line(subagent_id, naming);
-    let mut text = format!(
-        "Subagent took longer than the foreground budget and was moved to the \
-         background to keep the conversation responsive. It is still running{notify_clause}.\n\
-         subagent_id: {subagent_id}\n\
-         type: {subagent_type}\n\
-         description: {description}\n\n\
-         {result_line}"
+    let mut text = t_fmt(
+        "tool.task.auto_backgrounded",
+        &[
+            ("subagent_id", subagent_id),
+            ("subagent_type", subagent_type),
+            ("description", description),
+            ("notify_clause", notify_clause),
+            ("result_line", &result_line),
+        ],
     );
     if continue_parent_work {
         text.push_str("\n\n");
-        text.push_str(BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK);
+        text.push_str(&background_subagent_continue_parent_work());
     }
     text
 }
@@ -480,10 +492,17 @@ pub fn format_subagent_completed(
     persona: Option<&str>,
 ) -> String {
     let footer = format_resume_footer(subagent_id, subagent_type, persona);
-    format!(
-        "{output}\n\n<subagent_meta>id={subagent_id}, type={subagent_type}, \
-         tool_calls={tool_calls}, turns={turns}, duration_ms={duration_ms}</subagent_meta>\n\n\
-         {footer}"
+    t_fmt(
+        "tool.task.completed",
+        &[
+            ("output", output),
+            ("subagent_id", subagent_id),
+            ("subagent_type", subagent_type),
+            ("tool_calls", &tool_calls.to_string()),
+            ("turns", &turns.to_string()),
+            ("duration_ms", &duration_ms.to_string()),
+            ("footer", &footer),
+        ],
     )
 }
 
@@ -494,18 +513,17 @@ pub fn format_resume_footer(
     subagent_type: &str,
     persona: Option<&str>,
 ) -> String {
-    let mut footer = format!(
-        "<subagent_result>\n\
-         subagent_id: {subagent_id}\n\
-         subagent_type: {subagent_type}\n\
-         To continue this subagent's conversation, use resume_from=\"{subagent_id}\"."
+    let mut footer = t_fmt(
+        "tool.task.resume_footer",
+        &[("subagent_id", subagent_id), ("subagent_type", subagent_type)],
     );
     if let Some(persona) = persona {
-        footer.push_str(&format!(
-            "\nThe subagent used persona=\"{persona}\". Pass the same persona when resuming."
+        footer.push_str(&t_fmt(
+            "tool.task.resume_persona",
+            &[("persona", persona), ("subagent_id", subagent_id)],
         ));
     }
-    footer.push_str("\n</subagent_result>");
+    footer.push_str(t("tool.task.resume_footer_end"));
     footer
 }
 
@@ -606,10 +624,19 @@ pub fn max_wait_block_ms() -> u64 {
 /// figure beside it. Both branches round *down*: a cap must never read as
 /// longer than it is.
 pub fn format_wait_cap_ms(ms: u64) -> String {
+    let value = ms.to_string();
     if ms < 60_000 {
-        format!("{ms} (~{} s)", ms / 1_000)
+        let seconds = (ms / 1_000).to_string();
+        t_fmt(
+            "tool.description.lifecycle.wait_cap.seconds",
+            &[("ms", &value), ("seconds", &seconds)],
+        )
     } else {
-        format!("{ms} (~{} min)", ms / 60_000)
+        let minutes = (ms / 60_000).to_string();
+        t_fmt(
+            "tool.description.lifecycle.wait_cap.minutes",
+            &[("ms", &value), ("minutes", &minutes)],
+        )
     }
 }
 
@@ -1096,9 +1123,12 @@ pub struct TaskToolNaming<'a> {
 pub fn build_task_description(subagents: &[SubagentDescriptor], naming: &TaskToolNaming) -> String {
     let agent_lines = subagents
         .iter()
-        .map(|s| match &s.tools {
-            Some(tools) => format!("- **{}**: {} {}", s.name, s.description, tools),
-            None => format!("- **{}**: {}", s.name, s.description),
+        .map(|s| {
+            let description = localized_subagent_description(s);
+            match localized_subagent_tools(s) {
+                Some(tools) => format!("- **{}**: {} {}", s.name, description, tools),
+                None => format!("- **{}**: {}", s.name, description),
+            }
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -1112,47 +1142,98 @@ pub fn build_task_description(subagents: &[SubagentDescriptor], naming: &TaskToo
         isolation_param,
     } = *naming;
 
-    let out = format!(
-        "Start a subagent that works on a task independently and reports back.\n\n\
-         Agent types:\n\n\
-         {agent_lines}\n\n\
-         ## Usage notes\n\
-         - When the agent is done, it returns a single message with its agent ID. Use that ID to resume the agent later for follow-up work.\n\
-         - {run_in_background_param}: Returns immediately with a subagent_id. Use {background_retrieval_tool} to retrieve results. This is set to true by default.\n\
-         - Subagents receive a compacted version of project instructions (AGENTS.md). If the task requires detailed conventions (e.g., build rules, testing patterns), include the relevant rules directly in the prompt.\n\
-         - When using the {task_tool} tool, you must specify a {subagent_type_param} parameter to select which agent type to use.\n\
-         - When launching independent subagents, you MUST incorporate the results into the task based on requirements BEFORE concluding.\n\n\
-         Resuming a previous agent (resume_from):\n\
-         - Use {resume_from_param} to continue a previously completed subagent's conversation. Pass the subagent_id returned by a prior {task_tool} call. A resumed agent keeps its full transcript and tool state, so you only need to describe what changed since the last run — don't re-explain the original task.\n\
-         - The resumed agent must use the same subagent_type as the source.\n\n\
-         Isolation mode:\n\
-         - Use {isolation_param} to control the child's execution environment. With \"worktree\", the child runs in an isolated git worktree whose edits don't affect the parent workspace; the worktree is preserved after completion and its path is returned in the output."
-    );
+    t_fmt(
+        "tool.description.task",
+        &[
+            ("agent_lines", &agent_lines),
+            ("run_in_background_param", run_in_background_param),
+            ("background_retrieval_tool", background_retrieval_tool),
+            ("task_tool", task_tool),
+            ("subagent_type_param", subagent_type_param),
+            ("resume_from_param", resume_from_param),
+            ("isolation_param", isolation_param),
+        ],
+    )
+}
 
-    out
+fn localized_subagent_description(subagent: &SubagentDescriptor) -> String {
+    let Some(builtin) = builtin_subagent_by_name(&subagent.name) else {
+        return subagent.description.clone();
+    };
+    if builtin.description != subagent.description {
+        return subagent.description.clone();
+    }
+    let key = match builtin.name {
+        "general-purpose" => "tool.description.subagent.general_purpose",
+        "explore" => "tool.description.subagent.explore",
+        "plan" => "tool.description.subagent.plan",
+        _ => return subagent.description.clone(),
+    };
+    t(key).to_owned()
+}
+
+fn localized_subagent_tools(subagent: &SubagentDescriptor) -> Option<String> {
+    let Some(builtin) = builtin_subagent_by_name(&subagent.name) else {
+        return subagent.tools.clone();
+    };
+    if builtin.description != subagent.description || subagent.tools.is_none() {
+        return subagent.tools.clone();
+    }
+    let key = match builtin.name {
+        "general-purpose" => "tool.description.subagent_tools.general_purpose",
+        "explore" => "tool.description.subagent_tools.explore",
+        "plan" => "tool.description.subagent_tools.plan",
+        _ => return subagent.tools.clone(),
+    };
+    Some(t(key).to_owned())
 }
 
 /// Shared `background task or subagent`-style target suffix used by the
 /// `kill_task` / `get_task_output` opening line.
-fn lifecycle_target_suffix(monitor_present: bool, subagent_present: bool) -> &'static str {
-    match (monitor_present, subagent_present) {
-        (true, true) => ", monitor, or subagent",
-        (true, false) => " or monitor",
-        (false, true) => " or subagent",
-        (false, false) => "",
+fn lifecycle_target_suffix(monitor_present: bool, subagent_present: bool) -> String {
+    let key = match (monitor_present, subagent_present) {
+        (true, true) => "tool.description.lifecycle.target_suffix.monitor_subagent",
+        (true, false) => "tool.description.lifecycle.target_suffix.monitor",
+        (false, true) => "tool.description.lifecycle.target_suffix.subagent",
+        (false, false) => "tool.description.lifecycle.target_suffix.none",
+    };
+    t(key).to_owned()
+}
+
+/// Optional monitor id clause using the model-facing parameter names.
+fn monitor_task_id_note(monitor_tool: Option<&str>, id_name: &str) -> String {
+    match monitor_tool {
+        Some(monitor) => t_fmt(
+            "tool.description.lifecycle.monitor_task_id_note",
+            &[("id_name", id_name), ("monitor", monitor)],
+        ),
+        None => String::new(),
     }
 }
 
-/// Optional "(a monitor's {id_name} is returned by {monitor})" clause.
-///
-/// `id_name` is the model-facing singular id name — kill_task's `task_id`
-/// input (tracks renames). get_task_output's `task_ids` array is plural and
-/// must not be used here; both tools share this wording so randomization
-/// cannot disagree across kill vs get-output docs.
-fn monitor_task_id_note(monitor_tool: Option<&str>, id_name: &str) -> String {
-    match monitor_tool {
-        Some(m) => format!(" (a monitor's {id_name} is returned by {m})"),
-        None => String::new(),
+fn lifecycle_sources(
+    bash_background_param: Option<&str>,
+    subagent_background_param: Option<&str>,
+) -> String {
+    match (bash_background_param, subagent_background_param) {
+        // Both params share one client-facing name: don't repeat it.
+        (Some(bash), Some(subagent)) if bash == subagent => t_fmt(
+            "tool.description.lifecycle.sources.same_param",
+            &[("param", bash)],
+        ),
+        (Some(bash), Some(subagent)) => t_fmt(
+            "tool.description.lifecycle.sources.commands_and_subagents",
+            &[("bash_param", bash), ("subagent_param", subagent)],
+        ),
+        (Some(bash), None) => t_fmt(
+            "tool.description.lifecycle.sources.commands",
+            &[("bash_param", bash)],
+        ),
+        (None, Some(subagent)) => t_fmt(
+            "tool.description.lifecycle.sources.subagents",
+            &[("subagent_param", subagent)],
+        ),
+        (None, None) => t("tool.description.lifecycle.sources.background_tasks").to_owned(),
     }
 }
 
@@ -1184,35 +1265,49 @@ pub fn build_kill_task_description(naming: &KillTaskToolNaming) -> String {
 
     let target_suffix = lifecycle_target_suffix(monitor_present, subagent_present);
     let monitor_note = monitor_task_id_note(monitor_tool, task_id_param);
-
-    let verb = if is_windows {
-        "Terminates the Job Object of"
+    let verb = t(if is_windows {
+        "tool.description.lifecycle.kill_verb.windows"
     } else {
-        "Sends SIGTERM/SIGKILL to"
-    };
+        "tool.description.lifecycle.kill_verb.posix"
+    });
     let action = if bash_present {
-        let mut s = format!("{verb} a bash task");
-        if monitor_present {
-            s.push_str(" or monitor");
-        }
-        if subagent_present {
-            s.push_str("; sends Cancel+Shutdown to a subagent");
-        }
-        s
+        let monitor_clause = if monitor_present {
+            t("tool.description.lifecycle.kill_action.monitor_clause")
+        } else {
+            ""
+        };
+        let subagent_clause = if subagent_present {
+            t("tool.description.lifecycle.kill_action.subagent_clause")
+        } else {
+            ""
+        };
+        t_fmt(
+            "tool.description.lifecycle.kill_action.bash",
+            &[
+                ("verb", verb),
+                ("monitor_clause", monitor_clause),
+                ("subagent_clause", subagent_clause),
+            ],
+        )
     } else if subagent_present {
-        "Sends Cancel+Shutdown to a subagent".to_string()
+        t("tool.description.lifecycle.kill_action.subagent").to_owned()
     } else if monitor_present {
-        format!("{verb} a monitor")
+        t_fmt(
+            "tool.description.lifecycle.kill_action.monitor",
+            &[("verb", verb)],
+        )
     } else {
         String::new()
     };
 
-    format!(
-        "Terminate a running background task{target_suffix}.\n\n\
-         Usage notes:\n\
-         - Pass its {task_id_param}{monitor_note}.\n\
-         - {action}.\n\
-         - Returns success if the task was killed or had already exited."
+    t_fmt(
+        "tool.description.lifecycle.kill_task",
+        &[
+            ("target_suffix", &target_suffix),
+            ("task_id_param", task_id_param),
+            ("monitor_note", &monitor_note),
+            ("action", &action),
+        ],
     )
 }
 
@@ -1251,29 +1346,28 @@ pub fn build_task_output_description(naming: &TaskOutputToolNaming) -> String {
     let subagent_present = subagent_background_param.is_some();
 
     let target_suffix = lifecycle_target_suffix(monitor_present, subagent_present);
-
-    let sources = match (bash_background_param, subagent_background_param) {
-        // Both params share one client-facing name: don't repeat it.
-        (Some(b), Some(s)) if b == s => format!("{b}=true commands or subagents"),
-        (Some(b), Some(s)) => format!("{b}=true commands or {s}=true subagents"),
-        (Some(b), None) => format!("{b}=true commands"),
-        (None, Some(s)) => format!("{s}=true subagents"),
-        (None, None) => "background tasks".to_string(),
-    };
-
+    let sources = lifecycle_sources(bash_background_param, subagent_background_param);
     let monitor_note = monitor_task_id_note(monitor_tool, task_id_param);
     let read_note = match read_tool {
-        Some(r) => format!("\n- If output is large, use {r} on the output_file path"),
+        Some(read_tool) => t_fmt(
+            "tool.description.lifecycle.read_note",
+            &[("read_tool", read_tool)],
+        ),
         None => String::new(),
     };
     let wait_cap = MAX_WAIT_MS_PLACEHOLDER;
 
-    format!(
-        "Get output and status from a background task{target_suffix}.\n\n\
-         Usage notes:\n\
-         - Pass {task_ids_param} with one or more ids from {sources}{monitor_note}; for a single task use a one-element array. Multiple ids with a positive {timeout_ms_param} wait until all complete\n\
-         - Omit {timeout_ms_param} or pass 0 for a non-blocking status snapshot; set a positive {timeout_ms_param} to wait up to that many milliseconds, capped at {wait_cap}\n\
-         - Returns current output, status, and exit code if completed{read_note}"
+    t_fmt(
+        "tool.description.lifecycle.task_output",
+        &[
+            ("target_suffix", &target_suffix),
+            ("task_ids_param", task_ids_param),
+            ("sources", &sources),
+            ("monitor_note", &monitor_note),
+            ("timeout_ms_param", timeout_ms_param),
+            ("wait_cap", wait_cap),
+            ("read_note", &read_note),
+        ],
     )
 }
 
@@ -1296,24 +1390,16 @@ pub fn build_wait_tasks_description(naming: &WaitTasksToolNaming) -> String {
         subagent_background_param,
     } = *naming;
 
-    let sources = match (bash_background_param, subagent_background_param) {
-        // Both params share one client-facing name: don't repeat it.
-        (Some(b), Some(s)) if b == s => format!("{b}=true commands or subagents"),
-        (Some(b), Some(s)) => format!("{b}=true commands or {s}=true subagents"),
-        (Some(b), None) => format!("{b}=true commands"),
-        (None, Some(s)) => format!("{s}=true subagents"),
-        (None, None) => "background tasks".to_string(),
-    };
-
+    let sources = lifecycle_sources(bash_background_param, subagent_background_param);
     let wait_cap = MAX_WAIT_MS_PLACEHOLDER;
 
-    format!(
-        "Wait for multiple background tasks or subagents to complete.\n\n\
-         Prefer {background_retrieval_tool} with task_ids and a positive timeout_ms. This tool is kept for compatibility.\n\n\
-         Usage notes:\n\
-         - task_ids: list of task IDs from {sources}\n\
-         - mode: 'wait_all' or 'wait_any'\n\
-         - timeout_ms: optional max wait, default 30s, capped at {wait_cap}"
+    t_fmt(
+        "tool.description.lifecycle.wait_tasks",
+        &[
+            ("background_retrieval_tool", background_retrieval_tool),
+            ("sources", &sources),
+            ("wait_cap", wait_cap),
+        ],
     )
 }
 
@@ -1947,7 +2033,7 @@ mod tests {
             "shared spawn text must not hardcode either reminder tag: {with_cta}"
         );
         assert!(
-            with_cta.contains(BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK),
+            with_cta.contains(&background_subagent_continue_parent_work()),
             "open parent work must get the continue-parent CTA: {with_cta}"
         );
 
@@ -1960,7 +2046,7 @@ mod tests {
         );
         assert!(
             poll_only.contains("timeout_ms")
-                && !poll_only.contains(BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK),
+                && !poll_only.contains(&background_subagent_continue_parent_work()),
             "no leftover parent work must not get the CTA: {poll_only}"
         );
     }
@@ -1995,7 +2081,7 @@ mod tests {
             "auto-bg notice must share the renamed retrieval line: {auto}"
         );
         assert!(
-            auto.contains(BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK),
+            auto.contains(&background_subagent_continue_parent_work()),
             "auto-bg notice must carry the CTA when parent work remains: {auto}"
         );
 

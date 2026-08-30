@@ -1,18 +1,19 @@
 //! ptyctl CLI — headless PTY controller.
 
-use clap::Parser;
 
 mod cli;
 mod commands;
 mod registry;
 
-use cli::{Cli, Commands};
+use cli::Commands;
+use xai_grok_i18n::{apply_from_config, t, t_fmt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
+    apply_from_config(None);
 
-    let cli = Cli::parse();
+    let cli = cli::parse_localized();
 
     match cli.command {
         Commands::Run {
@@ -101,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
             let url = match target.to_url() {
                 Ok(url) => url,
                 Err(e) => {
-                    eprintln!("Error: {e:#}");
+                    eprintln!("{}", t_fmt("ptyctl.error", &[("error", &format!("{e:#}"))]));
                     exit(2);
                 }
             };
@@ -118,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
                 Ok(true) => {}
                 Ok(false) => exit(1),
                 Err(e) => {
-                    eprintln!("Error: {e:#}");
+                    eprintln!("{}", t_fmt("ptyctl.error", &[("error", &format!("{e:#}"))]));
                     exit(2);
                 }
             }
@@ -140,11 +141,15 @@ async fn main() -> anyhow::Result<()> {
                 }
                 println!("{}", serde_json::to_string_pretty(&items)?);
             } else if sessions.is_empty() {
-                println!("No active sessions");
+                println!("{}", t("ptyctl.sessions.none"));
             } else {
                 println!(
-                    "{:<16} {:<8} {:<8} {:<8} COMMAND",
-                    "NAME", "PORT", "PID", "SERVER"
+                    "{:<16} {:<8} {:<8} {:<8} {}",
+                    t("ptyctl.table.name"),
+                    t("ptyctl.table.port"),
+                    t("ptyctl.table.pid"),
+                    t("ptyctl.table.server"),
+                    t("ptyctl.table.command"),
                 );
                 println!("{}", "-".repeat(60));
                 for (name, info) in &sessions {
@@ -153,9 +158,9 @@ async fn main() -> anyhow::Result<()> {
                         .map(|p| p.to_string())
                         .unwrap_or_else(|| "?".into());
                     let server = if registry::server_alive(info.port).await {
-                        "live"
+                        t("ptyctl.status.live")
                     } else {
-                        "dead"
+                        t("ptyctl.status.dead")
                     };
                     println!(
                         "{:<16} {:<8} {:<8} {:<8} {}",

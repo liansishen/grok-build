@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use xai_tool_runtime::ToolCallContext;
+use xai_grok_i18n::t_fmt;
 
 use crate::types::output::{MCPOutputDetails, ToolOutput};
 use crate::types::tool::ToolKind;
@@ -115,23 +116,27 @@ impl McpDumpKind {
 
     pub(crate) fn steer(self, shell: &str, tools: QueryTools) -> String {
         match self {
-            Self::LongLineJson => format!(
-                " The full output is valid JSON with a very long line, so \
-                 grep/read_file are ineffective on it — use `{shell}` to query the \
-                 saved file{eg}.",
-                eg = examples_clause(&tools.json_tools()),
-            ),
-            Self::Json => format!(
-                " The full output is valid JSON saved to the file above; use \
-                 `{shell}` to query it{eg}.",
-                eg = examples_clause(&tools.json_tools()),
-            ),
-            Self::LongLineText => format!(
-                " The full output has a very long line, so grep/read_file are \
-                 ineffective on it — use `{shell}` to slice/search the saved \
-                 file{eg}.",
-                eg = examples_clause(&tools.text_tools()),
-            ),
+            Self::LongLineJson => {
+                let examples = examples_clause(&tools.json_tools());
+                t_fmt(
+                    "tool.mcp.hint.long_line_json",
+                    &[("shell", shell), ("examples", &examples)],
+                )
+            }
+            Self::Json => {
+                let examples = examples_clause(&tools.json_tools());
+                t_fmt(
+                    "tool.mcp.hint.json",
+                    &[("shell", shell), ("examples", &examples)],
+                )
+            }
+            Self::LongLineText => {
+                let examples = examples_clause(&tools.text_tools());
+                t_fmt(
+                    "tool.mcp.hint.long_line_text",
+                    &[("shell", shell), ("examples", &examples)],
+                )
+            }
             Self::Other => String::new(),
         }
     }
@@ -220,7 +225,10 @@ async fn truncate_mcp_text(text: &mut String, trunc_ctx: &McpTruncateContext) {
             let _ = tokio::fs::create_dir_all(parent).await;
         }
         match tokio::fs::write(path, text.as_bytes()).await {
-            Ok(()) => format!(" Full output written to: {}.", path.to_string_lossy()),
+            Ok(()) => {
+                let path = path.to_string_lossy().to_string();
+                t_fmt("tool.mcp.full_output_written", &[("path", &path)])
+            }
             Err(e) => {
                 tracing::warn!(
                     path = %path.display(),
@@ -241,13 +249,16 @@ async fn truncate_mcp_text(text: &mut String, trunc_ctx: &McpTruncateContext) {
     } else {
         kind.steer(&trunc_ctx.shell_tool, QueryTools::detect())
     };
-    *text = format!(
-        "{}\n\n[MCP output truncated: showing first {} of {}.{}{}]",
-        truncated,
-        format_bytes(trunc_ctx.max_output_bytes as u64),
-        format_bytes(total_bytes as u64),
-        file_hint,
-        steer,
+    let shown = format_bytes(trunc_ctx.max_output_bytes as u64);
+    let total = format_bytes(total_bytes as u64);
+    *text = t_fmt(
+        "tool.mcp.output_truncated",
+        &[
+            ("shown", &shown),
+            ("total", &total),
+            ("file_hint", &file_hint),
+            ("steer", &steer),
+        ],
     );
 }
 

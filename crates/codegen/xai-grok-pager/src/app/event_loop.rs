@@ -961,7 +961,7 @@ fn run_pending_mode_switch(
                     crate::app::mode_switch::push_block_behind_live_stream(
                         &mut agent.scrollback,
                         crate::scrollback::block::RenderBlock::system(
-                            "Switched to minimal mode · /fullscreen to go back",
+                            xai_grok_i18n::t("screen_mode.switched_minimal"),
                         ),
                     );
                 }
@@ -977,7 +977,7 @@ fn run_pending_mode_switch(
                 if let ActiveView::Agent(id) = app.active_view
                     && let Some(agent) = app.agents.get_mut(&id)
                 {
-                    agent.show_toast("Switched to fullscreen mode · /minimal to go back");
+                    agent.show_toast(xai_grok_i18n::t("screen_mode.switched_fullscreen"));
                 }
             }
             tracing::info!(
@@ -996,9 +996,9 @@ fn run_pending_mode_switch(
                 // An abort can land mid-turn in minimal too; same stream hazard.
                 crate::app::mode_switch::push_block_behind_live_stream(
                     &mut agent.scrollback,
-                    crate::scrollback::block::RenderBlock::system(format!(
-                        "Couldn't switch to {} mode: {reason}",
-                        target.meta_label()
+                    crate::scrollback::block::RenderBlock::system(xai_grok_i18n::t_fmt(
+                        "screen_mode.switch_failed",
+                        &[("mode", target.meta_label()), ("reason", &reason)],
                     )),
                 );
             }

@@ -210,8 +210,11 @@ impl CommandProvenance {
     /// Shell commands render as `built-in` too: the badge only has to separate a skill from whoever kept the bare name.
     pub fn badge(&self) -> std::borrow::Cow<'static, str> {
         match self {
-            Self::Builtin | Self::Shell => std::borrow::Cow::Borrowed("built-in"),
-            Self::Skill { source } => std::borrow::Cow::Owned(format!("skill · {source}")),
+            Self::Builtin | Self::Shell => std::borrow::Cow::Borrowed(xai_grok_i18n::t("command.provenance.builtin")),
+            Self::Skill { source } => std::borrow::Cow::Owned(xai_grok_i18n::t_fmt(
+                "command.provenance.skill",
+                &[("source", source)],
+            )),
         }
     }
 }

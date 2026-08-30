@@ -1,4 +1,5 @@
 use super::types::SchedulerError;
+use xai_grok_i18n::{t, t_fmt};
 
 const MINIMUM_INTERVAL_SECS: u64 = 60;
 
@@ -8,20 +9,22 @@ pub fn parse_interval(s: &str) -> Result<u64, SchedulerError> {
     let s = s.trim();
     if s.is_empty() {
         return Err(SchedulerError::InvalidInterval(
-            "interval cannot be empty".into(),
+            t("scheduler.interval.empty").to_owned(),
         ));
     }
 
     let (digits, suffix) = s.split_at(s.len() - 1);
     let value: u64 = digits.parse().map_err(|_| {
-        SchedulerError::InvalidInterval(format!(
-            "invalid interval format: {s:?} (expected e.g. 5m, 2h, 1d)"
+        let value = format!("{s:?}");
+        SchedulerError::InvalidInterval(t_fmt(
+            "scheduler.interval.invalid_format",
+            &[("value", &value)],
         ))
     })?;
 
     if value == 0 {
         return Err(SchedulerError::InvalidInterval(
-            "interval value must be greater than 0".into(),
+            t("scheduler.interval.value_positive").to_owned(),
         ));
     }
 
@@ -31,15 +34,21 @@ pub fn parse_interval(s: &str) -> Result<u64, SchedulerError> {
         "h" => 3600,
         "d" => 86400,
         _ => {
-            return Err(SchedulerError::InvalidInterval(format!(
-                "invalid interval suffix: {suffix:?} (expected s, m, h, or d)"
+            let suffix = format!("{suffix:?}");
+            return Err(SchedulerError::InvalidInterval(t_fmt(
+                "scheduler.interval.invalid_suffix",
+                &[("suffix", &suffix)],
             )));
         }
     };
 
-    let secs = value
-        .checked_mul(unit_secs)
-        .ok_or_else(|| SchedulerError::InvalidInterval(format!("interval too large: {s:?}")))?;
+    let secs = value.checked_mul(unit_secs).ok_or_else(|| {
+        let value = format!("{s:?}");
+        SchedulerError::InvalidInterval(t_fmt(
+            "scheduler.interval.too_large",
+            &[("value", &value)],
+        ))
+    })?;
 
     Ok(secs.max(MINIMUM_INTERVAL_SECS))
 }
@@ -50,28 +59,32 @@ pub fn interval_to_human(secs: u64) -> String {
     if secs.is_multiple_of(86400) {
         let n = secs / 86400;
         if n == 1 {
-            "every 1 day".into()
+            t("scheduler.interval.every_day").to_owned()
         } else {
-            format!("every {n} days")
+            let n = n.to_string();
+            t_fmt("scheduler.interval.every_days", &[("n", &n)])
         }
     } else if secs.is_multiple_of(3600) {
         let n = secs / 3600;
         if n == 1 {
-            "every 1 hour".into()
+            t("scheduler.interval.every_hour").to_owned()
         } else {
-            format!("every {n} hours")
+            let n = n.to_string();
+            t_fmt("scheduler.interval.every_hours", &[("n", &n)])
         }
     } else if secs.is_multiple_of(60) {
         let n = secs / 60;
         if n == 1 {
-            "every 1 minute".into()
+            t("scheduler.interval.every_minute").to_owned()
         } else {
-            format!("every {n} minutes")
+            let n = n.to_string();
+            t_fmt("scheduler.interval.every_minutes", &[("n", &n)])
         }
     } else if secs == 1 {
-        "every 1 second".into()
+        t("scheduler.interval.every_second").to_owned()
     } else {
-        format!("every {secs} seconds")
+        let n = secs.to_string();
+        t_fmt("scheduler.interval.every_seconds", &[("n", &n)])
     }
 }
 

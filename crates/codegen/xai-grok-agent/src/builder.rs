@@ -15,6 +15,7 @@ use xai_grok_tools::computer::types::{AsyncFileSystem, TerminalBackend};
 use xai_grok_tools::notification::ToolNotificationHandle;
 use xai_grok_tools::registry::types::SessionContext;
 use xai_grok_tools::types::tool::ToolKind;
+use xai_grok_i18n::{t, t_fmt};
 /// The Grok [`ToolKind`] a vendor-compat `tools:` allowlist entry resolves to, so
 /// a plugin's upstream allowlist still binds. Backed by the shared vendor-to-Grok
 /// tool registry in `xai-grok-tools` (also used by the hook matcher).
@@ -1318,9 +1319,9 @@ fn task_model_guidance(model_slugs: &[String]) -> String {
     model_slugs.sort_unstable();
     model_slugs.dedup();
     if model_slugs.is_empty() {
-        return format!(
-            "\n\nNo explicit model slugs are currently available. \
-             Omit `{TASK_MODEL_PARAM}` to inherit the parent model."
+        return t_fmt(
+            "tool.description.task.model_guidance.none",
+            &[("model_param", TASK_MODEL_PARAM)],
         );
     }
     let model_list = model_slugs
@@ -1328,10 +1329,12 @@ fn task_model_guidance(model_slugs: &[String]) -> String {
         .map(|slug| format!("- {slug}"))
         .collect::<Vec<_>>()
         .join("\n");
-    format!(
-        "\n\nIf the user explicitly asks for the model of a subagent/task, you may ONLY use model slugs from this list:\n\
-         {model_list}\n\n\
-         If the user does not explicitly request a model, omit `{TASK_MODEL_PARAM}` to inherit the parent model."
+    t_fmt(
+        "tool.description.task.model_guidance.available",
+        &[
+            ("model_list", &model_list),
+            ("model_param", TASK_MODEL_PARAM),
+        ],
     )
 }
 /// Build the Task tool description with the effective subagent list.

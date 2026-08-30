@@ -3512,3 +3512,979 @@
 "consent.save_failed" = "✗ Could not save your answer, so this notice returns next launch"
 "session_picker.field.recap" = "Recap"
 "session_picker.field.last_turn" = "Last turn"
+
+# Full-audit additions
+"slash.usage.unavailable" = "/usage is not available."
+"slash.workflow.flag.agent_budget" = "Set the cumulative child-agent cap (1–1,024)"
+"slash.workflow.op.runs" = "Show workflow runs (dashboard; text overview in minimal)"
+"slash.workflow.op.pause" = "Pause a running workflow"
+"slash.workflow.op.resume" = "Resume a paused workflow"
+"slash.workflow.op.stop" = "Stop a workflow run"
+"slash.workflow.op.save" = "Save a run's script as a named workflow"
+"slash.workflow.description" = "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)"
+"command.provenance.builtin" = "built-in"
+"command.provenance.skill" = "skill · {source}"
+"prompt_blocked.replaced" = "The blocked-prompt card was replaced by another question. Your prompt is still held at the front of the queue."
+"prompt_blocked.choose_action" = "Your prompt is blocked — choose Edit, Resend, or Discard"
+"permission.local_workspace.suffix" = "(on your machine)"
+"error.effects.acp_timeout" = "{action} timed out after {seconds}s. It may still finish in the background; retrying right away can run into the same delay."
+"task_result.workspace_load_failed" = "Could not load dashboard workspace: {error}"
+"task_result.workspace_refreshing" = "Dashboard workspace changed; refreshing"
+"task_result.workspace_sync_failed_one" = "Could not sync 1 dashboard session"
+"task_result.workspace_sync_failed_many" = "Could not sync {count} dashboard sessions"
+"task_result.workspace_read_only" = "Dashboard workspace is read-only in this Grok version"
+"task_result.workspace_writer_failed" = "Dashboard workspace writer failed; reopening"
+"startup.failure.slow_machine_hint" = "On a slow machine or network filesystem, a larger startup budget can help. Set it with the command below."
+"screen_mode.switched_minimal" = "Switched to minimal mode · /fullscreen to go back"
+"screen_mode.switched_fullscreen" = "Switched to fullscreen mode · /minimal to go back"
+"screen_mode.switch_failed" = "Couldn't switch to {mode} mode: {reason}"
+
+"tool.media.action.image_generated" = "Image generated"
+"tool.media.action.video_generated" = "Video generated"
+"tool.media.action.image_edited" = "Image edited"
+"tool.media.uploaded" = "{action} and uploaded to {url}. The file is not available locally — reference it by this URL. Do not read or re-display it, and do not describe how it appears to the user."
+"tool.media.saved" = "{action} and saved to {path}. Do not read or re-display it, and do not describe how it appears to the user."
+"tool.mcp.hint.long_line_json" = " The full output is valid JSON with a very long line, so grep/read_file are ineffective on it — use `{shell}` to query the saved file{examples}."
+"tool.mcp.hint.json" = " The full output is valid JSON saved to the file above; use `{shell}` to query it{examples}."
+"tool.mcp.hint.long_line_text" = " The full output has a very long line, so grep/read_file are ineffective on it — use `{shell}` to slice/search the saved file{examples}."
+"tool.mcp.full_output_written" = " Full output written to: {path}."
+"tool.mcp.output_truncated" = "[MCP output truncated: showing first {shown} of {total}.{file_hint}{steer}]"
+"tool.output.line_truncated" = "{text} [... truncated ({count} chars total)]"
+"tool.output.truncated_with_hint" = "[Output truncated - {total_bytes} bytes total. {hint}]"
+"tool.output.truncated" = "[Output truncated - {total_bytes} bytes total]"
+"path_suggestions.did_you_mean" = " Did you mean {path}?"
+"path_suggestions.similar_parent" = "\nSimilar entries in parent directory: {entries}"
+"path_suggestions.cwd_note" = "Note: your current working directory is {path}"
+"path_suggestions.not_exist" = "Error: {path} does not exist."
+"task_completion.killed_notice" = "This task was killed by the user — do not restart it.\n"
+"task_completion.status.signal" = "terminated by signal {signal}"
+"task_completion.status.exit" = "exit code: {code}"
+"task_completion.status.unknown" = "unknown"
+"task_completion.background" = "Background task \"{id}\" completed ({status}).\nCommand: {command} | Duration: {duration}s\n{notice}"
+"task_completion.short_command_note" = "Note: this is much shorter than expected for a backgrounded command. The wrapper bash may have been killed by signal (e.g. `pkill -f <pat>` matching its own argv) before the inner command ran. Re-check the command for self-matching kill patterns, signals sent by the script itself, or upstream sources of SIGTERM/SIGHUP.\n"
+"task_completion.full_content" = "Use {tool} on {path} for full content"
+"task_completion.monitor_reason_signal" = "killed by signal {signal}"
+"task_completion.monitor_reason_exit" = "exited (code {code})"
+"task_completion.monitor_reason_ended" = "ended"
+"task_completion.monitor" = "Monitor \"{id}\" ended: [monitor ended: {reason}].\nDescription: {description}\nCommand: {command}\nDuration: {duration}s\nUse {tool}(\"{id}\") for full output.\n{notice}"
+"task_completion.running_one" = "Note: 1 other background task is still running:\n"
+"task_completion.running_many" = "Note: {count} other background tasks are still running:\n"
+"task_completion.running_item" = "- \"{id}\" (running for {duration}s): {command}\n"
+"task_completion.duplicate_hint" = "Consider killing duplicate tasks with {tool} before launching new ones."
+"ptyctl.error" = "Error: {error}"
+"ptyctl.sessions.none" = "No active sessions"
+"ptyctl.table.name" = "NAME"
+"ptyctl.table.port" = "PORT"
+"ptyctl.table.pid" = "PID"
+"ptyctl.table.server" = "SERVER"
+"ptyctl.table.command" = "COMMAND"
+"ptyctl.status.live" = "live"
+"ptyctl.status.dead" = "dead"
+"ptyctl.server.command" = "Command: {command}"
+"ptyctl.server.pid" = "PID: {pid}"
+"ptyctl.server.listening" = "Server listening on port: {port}"
+"ptyctl.error.client_build" = "failed to build HTTP client"
+"ptyctl.error.send" = "send failed: {body}"
+"ptyctl.error.screen_query" = "screen query failed: {body}"
+"ptyctl.error.failed_screen_query" = "failed to query screen"
+"ptyctl.error.invalid_size" = "invalid size format, expected COLSxROWS (e.g. 120x40)"
+"ptyctl.error.invalid_cols" = "invalid cols"
+"ptyctl.error.invalid_rows" = "invalid rows"
+"ptyctl.error.resize" = "failed to resize"
+"ptyctl.error.resize_failed" = "resize failed: {body}"
+"ptyctl.resize.success" = "Resized to {cols}x{rows}"
+"ptyctl.error.wait" = "failed to call wait"
+"ptyctl.error.wait_failed" = "wait failed: {body}"
+"ptyctl.error.invalid_wait_response" = "invalid wait response"
+"ptyctl.error.stop" = "failed to stop session"
+"ptyctl.error.stop_failed" = "stop failed: {body}"
+"ptyctl.session.stopped" = "Session stopped"
+"ptyctl.run.already_running" = "session '{name}' is already running on port {port} (use --force to replace it)"
+"ptyctl.error.bind" = "failed to bind TCP listener"
+"ptyctl.error.server" = "HTTP server error"
+"task_completion.poll_full_output" = "Use {tool}(\"{id}\") to see the full output."
+"task_completion.response" = "response:\n{output}"
+"task_completion.subagent_status.success" = "successfully"
+"task_completion.subagent_status.failure" = "with failure"
+"task_completion.subagent" = "Background subagent \"{id}\" (\"{type}\": \"{description}\") completed {status}.\nDuration: {duration}s | Tool calls: {tool_calls} | Turns: {turns}"
+"task_completion.scheduler_cleanup" = "If the monitored work is complete, call `{tool}(\"{id}\")` to stop the monitor."
+"task_completion.between_turn.subagent_one" = "While you were idle, 1 background subagent completed:\n"
+"task_completion.between_turn.subagent_many" = "While you were idle, {count} background subagents completed:\n"
+"task_completion.between_turn.subagent_item" = "- [{type}] {description} — {status} ({duration}s, {tool_calls} tool calls)\n  subagent_id: {id}"
+"task_completion.between_turn.status.success" = "completed successfully"
+"task_completion.between_turn.status.failure" = "failed"
+"task_completion.between_turn.task_one" = "While you were idle, 1 background task completed:\n"
+"task_completion.between_turn.task_many" = "While you were idle, {count} background tasks completed:\n"
+"task_completion.monitor_description_default" = "monitor"
+"task_completion.monitor_events.header" = "{events} monitor events from {groups} {monitor_label} (use {tool} to identify each monitor):"
+"task_completion.monitor_events.monitor_one" = "monitor"
+"task_completion.monitor_events.monitor_many" = "monitors"
+"task_completion.monitor_events.event_default" = "event"
+"ptyctl.error.send_keys" = "failed to send keys"
+"ptyctl.error.cursor_query" = "failed to query cursor"
+"ptyctl.error.status_query" = "failed to query status"
+"ptyctl.registry.create_dir" = "failed to create session registry directory"
+"ptyctl.registry.write" = "failed to write session file"
+"ptyctl.registry.rename" = "failed to rename session file"
+"ptyctl.registry.read" = "failed to read session file"
+"ptyctl.registry.parse" = "failed to parse session file"
+"ptyctl.registry.remove" = "failed to remove session file"
+"ptyctl.registry.state_dir" = "cannot determine state directory"
+"ptyctl.registry.not_found" = "session '{name}' not found"
+"ptyctl.registry.read_dir" = "failed to read session directory"
+
+# Full-audit continuation: tools, task output, plan mode, and ptyctl help
+"media_gen.conjunction" = "and"
+"media_gen.limit_separator" = " and the max limit for "
+"media_gen.max_limit" = "{names} is {max}"
+"media_gen.resample_reminder" = "Consider the user message carefully for your future responses and tool calls. If you are considering making {names} calls, the max limit for {limits} in one parallel set of calls. Larger requests will be rejected."
+"media_gen.rejected" = "Rejected: at most {max} `{name}` tool calls are allowed in a single model step (this batch had {total}). This extra call was skipped. If you still need more, make a new step with at most {max} `{name}` call(s)."
+
+"tool.web_fetch.recovery_footer" = " showing first {shown_bytes} of {total_bytes} bytes.{file_hint}"
+"tool.web_fetch.full_content_saved" = "Full content saved to: {path}."
+"tool.web_fetch.read_chunks" = " Use `{read_tool}` with offsets and limits to read it in chunks."
+"tool.web_fetch.long_line_json" = " The saved file is valid JSON with a very long line, so line-oriented read and search tools are ineffective on it — use `{execute}` to {action} it{examples}."
+"tool.web_fetch.long_line_json_lines" = " The saved file is JSON Lines with a very long line, so line-oriented read and search tools are ineffective on it — use `{execute}` to {action} it{examples}."
+"tool.web_fetch.long_line_markdown" = " The saved file is Markdown with a very long line, so line-oriented read and search tools are ineffective on it — use `{execute}` to {action} it{examples}."
+"tool.web_fetch.long_line_text" = " The saved file is text with a very long line, so line-oriented read and search tools are ineffective on it — use `{execute}` to {action} it{examples}."
+"tool.web_fetch.json" = " The saved file is valid JSON; use `{execute}` to query it{examples}."
+"tool.web_fetch.json_lines" = " The saved file is JSON Lines; use `{execute}` to query it{examples}."
+"tool.web_fetch.inspect" = " Use `{execute}` to inspect it{examples}."
+"tool.fs.unicode_filename_fallback" = "The specified filename did not exist exactly as given. A file was found by normalizing Unicode characters{chars} to their ASCII equivalents. The actual filename is: {matched_name}\nFor shell commands referencing this file, use glob patterns to avoid the mismatch."
+
+"tool.read.file_empty" = "File is empty."
+"tool.read.no_lines_past_end" = "(no lines returned: the requested window is past the end of the file; the file has {total_lines} lines)"
+"tool.read.no_lines" = "(no lines returned)"
+"tool.read.image_inline" = "[Image content of type: {mime_type} is included inline in this tool result]"
+"tool.read.pdf_summary" = "[Read PDF: {rendered} pages rendered (pages {pages}). Total document: {total_pages} pages, {size_kb} KB]"
+"tool.web_search.results_for" = "Web search results for: \"{query}\"\n\n{content}"
+"tool.mcp.call_failed" = "Failed to call {tool}: {error}"
+
+"task_output.subject.task" = "task"
+"task_output.subject.subagent" = "subagent"
+"task_output.wait.per_call_max" = "Waited {waited}, the per-call maximum, of the {requested} you requested; the {subject} is still running. You do not need to call this again."
+"task_output.wait.requested" = "Waited the requested {waited}; the {subject} is still running."
+"task_output.wait.returned_early" = "Wait returned early because another finished; this {subject} is still running."
+"task_output.wait.not_requested" = "Use timeout_ms to wait for completion."
+"task_output.wait.auto_notify" = "You will be notified automatically when the {subject} completes."
+"task_output.not_found.none" = "Task {task_id} not found. No background tasks or subagents exist in this session."
+"task_output.not_found.known" = "Task {task_id} not found. Known task IDs: [{ids}]"
+"task_output.not_found.short" = "Task {task_id} not found."
+"task_output.mode.wait_all" = "wait_all"
+"task_output.mode.poll" = "poll"
+"task_output.multi.summary" = "{completed}/{total} tasks completed ({mode})"
+"task_output.subagent.initializing" = "Subagent is initializing (creating worktree, resolving config).\nType: {type}\nDescription: {description}\nElapsed: {elapsed}s"
+"task_output.subagent.no_tools" = "none yet"
+"task_output.subagent.running" = "Subagent is still running.\nType: {type}\nDescription: {description}\nElapsed: {elapsed}s\nProgress: turn {turns}, {tool_calls} tool calls, {tokens}K/{capacity}K tokens ({context}% context)\nTools used: {tools}\nErrors: {errors}"
+"task_output.result.title" = "=== Task {task_id} ==="
+"task_output.result.command" = "Command: {command}"
+"task_output.result.status" = "Status: {status}"
+"task_output.result.duration" = "Duration: {duration}s"
+"task_output.result.exit_code" = "Exit Code: {code}"
+"task_output.result.output_file" = "Output File: {path}"
+"task_output.result.output_header" = "=== Output ==="
+"task_output.result.no_output_yet" = "(no output yet)"
+"task_output.result.no_output" = "(no output)"
+"task_output.multi.title" = "=== Multi-wait ({mode}) ==="
+"task_output.multi.task" = "--- Task {task_id} [{status}] ---\nCommand: {command}\nDuration: {duration}s"
+"task_output.multi.exit_code" = "Exit Code: {code}"
+
+"plan_mode.task_hint" = "\n     You can use the {tool} tool with subagent_type=\"explore\" to parallelize codebase exploration without filling your context window."
+"plan_mode.file.empty" = "Write your plan to {path}. The file exists and is empty."
+"plan_mode.file.non_empty" = "Write your plan to {path}. The file exists but is not empty."
+"plan_mode.file.not_created" = "The file has not yet been created."
+"plan_mode.file.not_a_file" = "A directory already exists at that path."
+"plan_mode.file.inaccessible" = "The file could not be accessed."
+"plan_mode.file.unavailable" = "The plan file location is unavailable."
+"plan_mode.file.missing" = "Write your plan to {path}. {detail}"
+"plan_mode.instructions" = "{message}\n\n{plan_status}\n\nIn plan mode, you should:\n1. Thoroughly explore the codebase to understand existing patterns{task_hint}\n2. Identify similar features, codebase architecture, and understand trade-offs\n3. Use {ask_user} if you need to clarify the approach\n4. Design a concrete implementation strategy\n5. Write your plan to the plan file above\n6. When ready, use {exit_plan} to present your plan to the user."
+"plan_mode.exit.saved" = "{message}\n\nYour plan has been saved at: {path}\n\n## Plan:\n{content}"
+"tool.monitor.persistent" = "Monitor started (task {task}, persistent -- runs until {kill_tool} or session end).\nYou will be notified on each event. Keep working -- do not poll or sleep.\nEvents may arrive while you are waiting for the user -- an event is not their reply."
+"tool.monitor.timeout" = "Monitor started (task {task}, timeout {timeout_ms}ms).\nYou will be notified on each event. Keep working -- do not poll or sleep.\nEvents may arrive while you are waiting for the user -- an event is not their reply."
+"tool.scheduler.created" = "Scheduled task created (ID: {id}, {schedule})."
+"tool.scheduler.updated" = "Scheduled task updated (ID: {id}, {schedule})."
+"tool.scheduler.none" = "No scheduled tasks."
+"tool.scheduler.deleted" = "Scheduled task {id} cancelled."
+"tool.scheduler.not_found" = "No scheduled task with ID {id} found. Use scheduler_list to see active tasks."
+
+"ptyctl.cli.about" = "Run commands in PTY and control them via HTTP"
+"ptyctl.command.run" = "Spawn a command in a PTY and start an HTTP control server"
+"ptyctl.command.send" = "Send keystrokes to a running session"
+"ptyctl.command.screen" = "Query terminal screen content"
+"ptyctl.command.status" = "Query process status"
+"ptyctl.command.stop" = "Stop a running session"
+"ptyctl.command.resize" = "Resize terminal dimensions"
+"ptyctl.command.cursor" = "Query cursor position"
+"ptyctl.command.wait" = "Wait for a screen condition (event-driven, no polling). Exit codes: 0 matched, 1 timeout (failure JSON on stdout), 2 usage/connection error"
+"ptyctl.command.list" = "List registered sessions"
+"ptyctl.arg.command" = "Command to run (use -- before command)"
+"ptyctl.arg.width" = "Terminal width in columns"
+"ptyctl.arg.height" = "Terminal height in rows"
+"ptyctl.arg.cwd" = "Working directory"
+"ptyctl.arg.env" = "Environment variable (KEY=VAL, repeatable)"
+"ptyctl.arg.port" = "TCP port to listen on (0 = auto-assign)"
+"ptyctl.arg.name" = "Session name (registers in ~/.local/state/ptyctl/sessions/)"
+"ptyctl.arg.force" = "Take over an existing session name (replaces the registration; does not stop the old server)"
+"ptyctl.arg.timeout" = "Shutdown after N seconds"
+"ptyctl.arg.linger" = "Keep server running after process exits"
+"ptyctl.arg.quiet" = "Suppress output (just print port number)"
+"ptyctl.arg.keys" = "Keys to send (vim notation)"
+"ptyctl.arg.enter" = "Append Enter (<CR>) after keys"
+"ptyctl.arg.rows" = "Row range, 1-indexed (e.g. \"1:5\")"
+"ptyctl.arg.cols" = "Column range, 1-indexed"
+"ptyctl.arg.json" = "Output as JSON"
+"ptyctl.arg.cursor" = "Show cursor position with this character"
+"ptyctl.arg.ansi" = "Include ANSI escape codes"
+"ptyctl.arg.styled" = "Output as styled JSON (LLM-friendly)"
+"ptyctl.arg.html" = "Output as HTML"
+"ptyctl.arg.full" = "Include trailing empty lines"
+"ptyctl.arg.line_numbers" = "Show line numbers"
+"ptyctl.arg.size" = "New size as COLSxROWS (e.g. \"120x40\")"
+"ptyctl.arg.wait_text" = "Wait until this text appears on screen"
+"ptyctl.arg.wait_regex" = "Wait until this regex matches the screen text"
+"ptyctl.arg.wait_gone" = "Wait until this text is absent from the screen"
+"ptyctl.arg.stable_ms" = "Wait until the screen has been unchanged for this many milliseconds"
+"ptyctl.arg.wait_timeout" = "Timeout in seconds (server caps at 120)"
+"ptyctl.arg.host" = "Remote host address (e.g. 127.0.0.1:8080)"
+"ptyctl.arg.target_port" = "Local server port"
+"ptyctl.arg.target_name" = "Session name (from registry)"
+"ptyctl.error.no_target" = "no target specified"
+
+"tool.web_fetch.action.query" = "query"
+"tool.web_fetch.action.slice_or_search" = "slice or search"
+"task_output.invalid_args.empty_ids" = "Provide a non-empty task_ids list."
+"task_output.invalid_args.too_many_ids" = "task_ids exceeds maximum of {max} entries."
+
+"tool.description.task" = "Start a subagent that works on a task independently and reports back.\n\nAgent types:\n\n{agent_lines}\n\n## Usage notes\n- When the agent is done, it returns a single message with its agent ID. Use that ID to resume the agent later for follow-up work.\n- {run_in_background_param}: Returns immediately with a subagent_id. Use {background_retrieval_tool} to retrieve results. This is set to true by default.\n- Subagents receive a compacted version of project instructions (AGENTS.md). If the task requires detailed conventions (e.g., build rules, testing patterns), include the relevant rules directly in the prompt.\n- When using the {task_tool} tool, you must specify a {subagent_type_param} parameter to select which agent type to use.\n- When launching independent subagents, you MUST incorporate the results into the task based on requirements BEFORE concluding.\n\nResuming a previous agent (resume_from):\n- Use {resume_from_param} to continue a previously completed subagent's conversation. Pass the subagent_id returned by a prior {task_tool} call. A resumed agent keeps its full transcript and tool state, so you only need to describe what changed since the last run -- don't re-explain the original task.\n- The resumed agent must use the same subagent_type as the source.\n\nIsolation mode:\n- Use {isolation_param} to control the child's execution environment. With 'worktree', the child runs in an isolated git worktree whose edits don't affect the parent workspace; the worktree is preserved after completion and its path is returned in the output."
+"tool.description.subagent.general_purpose" = "General purpose agent for multi-step tasks."
+"tool.description.subagent.explore" = "Fast, read-only agent specialized for codebase exploration."
+"tool.description.subagent.plan" = "Software architect for planning implementation strategies."
+"tool.description.subagent_tools.general_purpose" = "Has access to: ${{ tools.by_kind.execute }}, ${{ tools.by_kind.read }}, ${{ tools.by_kind.edit }}, ${{ tools.by_kind.list }}, ${{ tools.by_kind.search }}, ${{ tools.by_kind.web_search }}, and ${{ tools.by_kind.plan }}."
+"tool.description.subagent_tools.explore" = "Read-only -- has access to: ${{ tools.by_kind.read }}, ${{ tools.by_kind.list }}, ${{ tools.by_kind.search }}."
+"tool.description.subagent_tools.plan" = "Read-only -- has access to: ${{ tools.by_kind.read }}, ${{ tools.by_kind.list }}, ${{ tools.by_kind.search }}, ${{ tools.by_kind.web_search }}, and ${{ tools.by_kind.plan }}. File editing and command execution are not available."
+"tool.description.lifecycle.target_suffix.monitor_subagent" = " or monitor or subagent"
+"tool.description.lifecycle.target_suffix.monitor" = " or monitor"
+"tool.description.lifecycle.target_suffix.subagent" = " or subagent"
+"tool.description.lifecycle.target_suffix.none" = ""
+"tool.description.lifecycle.monitor_task_id_note" = " (a monitor's {id_name} is returned by {monitor})"
+"tool.description.lifecycle.sources.same_param" = "{param}=true commands or subagents"
+"tool.description.lifecycle.sources.commands_and_subagents" = "{bash_param}=true commands or {subagent_param}=true subagents"
+"tool.description.lifecycle.sources.commands" = "{bash_param}=true commands"
+"tool.description.lifecycle.sources.subagents" = "{subagent_param}=true subagents"
+"tool.description.lifecycle.sources.background_tasks" = "background tasks"
+"tool.description.lifecycle.kill_verb.windows" = "Terminates the Job Object of"
+"tool.description.lifecycle.kill_verb.posix" = "Sends SIGTERM/SIGKILL to"
+"tool.description.lifecycle.kill_action.monitor_clause" = " or monitor"
+"tool.description.lifecycle.kill_action.subagent_clause" = "; sends Cancel+Shutdown to a subagent"
+"tool.description.lifecycle.kill_action.bash" = "{verb} a bash task{monitor_clause}{subagent_clause}"
+"tool.description.lifecycle.kill_action.subagent" = "Sends Cancel+Shutdown to a subagent"
+"tool.description.lifecycle.kill_action.monitor" = "{verb} a monitor"
+"tool.description.lifecycle.kill_task" = "Terminate a running background task{target_suffix}.\n\nUsage notes:\n- Pass its {task_id_param}{monitor_note}.\n- {action}.\n- Returns success if the task was killed or had already exited."
+"tool.description.lifecycle.read_note" = "\n- If output is large, use {read_tool} on the output_file path"
+"tool.description.lifecycle.task_output" = "Get output and status from a background task{target_suffix}.\n\nUsage notes:\n- Pass {task_ids_param} with one or more ids from {sources}{monitor_note}; for a single task use a one-element array. Multiple ids with a positive {timeout_ms_param} wait until all complete\n- Omit {timeout_ms_param} or pass 0 for a non-blocking status snapshot; set a positive {timeout_ms_param} to wait up to that many milliseconds, capped at {wait_cap}\n- Returns current output, status, and exit code if completed{read_note}"
+"tool.description.lifecycle.wait_tasks" = "Wait for multiple background tasks or subagents to complete.\n\nPrefer {background_retrieval_tool} with task_ids and a positive timeout_ms. This tool is kept for compatibility.\n\nUsage notes:\n- task_ids: list of task IDs from {sources}\n- mode: 'wait_all' or 'wait_any'\n- timeout_ms: optional max wait, default 30s, capped at {wait_cap}"
+"tool.scheduler.description.create" = "Create a scheduled task that runs a prompt on a recurring interval, or update an existing one in place.\n\nUse this tool when a user asks you to loop, repeat, or schedule a prompt or a task.\n\nSet fire_immediately: true to also fire once on creation; by default the first run waits for the interval.\n\nTo change an existing task, pass its task_id: provided fields replace old fields, omitted ones are unchanged, and the schedule keeps its phase. An unknown id errors.\n\nUsage notes:\n- Interval format: '5m' (minutes), '2h' (hours), '1d' (days), '60s' (seconds, min 60)\n- Maximum 50 scheduled tasks at once\n- Tasks auto-expire after {ttl} days\n- For one-time delayed work, run a background terminal command (e.g. `sleep 1800 && <command>`) instead; its completion notifies you"
+"tool.description.list_all_active_scheduled_tasks_with_their_ids_prompts_intervals_and_next_fire_times" = "List all active scheduled tasks with their IDs, prompts, intervals, and next fire times."
+"tool.description.cancel_a_scheduled_task_by_id" = "Cancel a scheduled task by ID.\n\nReturns success: true if the task was found and removed, false if no task with that ID exists."
+"scheduler.error.invalid_interval" = "invalid interval: {detail}"
+"scheduler.error.task_limit_reached" = "maximum of {max} scheduled tasks reached"
+"scheduler.error.task_not_found" = "no scheduled task with id {id}; call scheduler_list to see active task ids"
+"scheduler.error.persistence" = "failed to persist scheduler resources: {error}"
+"scheduler.error.notification" = "failed to publish scheduler tombstone: {error}"
+"scheduler.error.no_durable_notification_consumer" = "durable scheduler removal requires an acknowledging notification consumer"
+"scheduler.error.removal_pending" = "scheduler removal for {id} is pending"
+"scheduler.error.cancelled" = "scheduler removal cancelled"
+"scheduler.error.timeout" = "scheduler removal timed out"
+"scheduler.interval.empty" = "interval cannot be empty"
+"scheduler.interval.invalid_format" = "invalid interval format: {value} (expected e.g. 5m, 2h, 1d)"
+"scheduler.interval.value_positive" = "interval value must be greater than 0"
+"scheduler.interval.invalid_suffix" = "invalid interval suffix: {suffix} (expected s, m, h, or d)"
+"scheduler.interval.too_large" = "interval too large: {value}"
+"scheduler.interval.every_day" = "every 1 day"
+"scheduler.interval.every_days" = "every {n} days"
+"scheduler.interval.every_hour" = "every 1 hour"
+"scheduler.interval.every_hours" = "every {n} hours"
+"scheduler.interval.every_minute" = "every 1 minute"
+"scheduler.interval.every_minutes" = "every {n} minutes"
+"scheduler.interval.every_second" = "every 1 second"
+"scheduler.interval.every_seconds" = "every {n} seconds"
+
+"scheduler.error.nothing_to_update" = "nothing to update: provide interval and/or prompt alongside task_id"
+"scheduler.error.one_shot_unsupported" = "one-shot tasks are not supported; run a background terminal command instead (`sleep <secs> && <command>`, background: true) or do the work now"
+"scheduler.error.interval_required" = "interval is required when creating a task"
+"scheduler.error.prompt_required" = "prompt is required when creating a task"
+"scheduler.error.actor_stopped" = "Scheduler actor stopped"
+"scheduler.error.reply_dropped" = "Scheduler actor dropped reply"
+"scheduler.error.missing_dependency" = "missing dependency: SchedulerHandle"
+"tool.schema.id_of_an_existing_task_to_update_in_place_provided_fields_replace_old_values_omitted_ones_are_unchanged_the_schedule_keeps_its_phase_and_an_unknown_id_errors_omit_to_create_a_task" = "Id of an existing task to update in place: provided fields replace old values, omitted ones are unchanged, the schedule keeps its phase, and an unknown id errors. Omit to create a task."
+"tool.schema.interval_between_executions_e_g_5m_2h_1d_required_to_create_optional_with_task_id" = "Interval between executions, e.g. \"5m\", \"2h\", \"1d\". Required to create; optional with task_id"
+"tool.schema.the_prompt_text_to_execute_on_each_scheduled_fire_required_to_create_optional_with_task_id" = "The prompt text to execute on each scheduled fire. Required to create; optional with task_id"
+"tool.schema.whether_the_task_persists_across_sessions_default_false_create_only_ignored_with_task_id" = "Whether the task persists across sessions. Default: false. Create-only: ignored with task_id"
+"tool.schema.run_each_fire_as_a_main_conversation_turn_instead_of_a_background_subagent_set_true_only_when_runs_need_the_conversation_s_context_default_false_create_only_ignored_with_task_id" = "Run each fire as a main-conversation turn instead of a background subagent; set true only when runs need the conversation's context. Default: false. Create-only: ignored with task_id"
+"tool.schema.whether_to_fire_immediately_on_creation_true_or_wait_for_the_first_interval_false_default_false_create_only_ignored_with_task_id" = "Whether to fire immediately on creation (true) or wait for the first interval (false). Default: false. Create-only: ignored with task_id"
+"tool.schema.the_task_id_to_cancel_from_scheduler_create_output" = "The task ID to cancel (from scheduler_create output)"
+"tool.schema.task_ids_to_get_output_from_pass_one_or_more_for_a_single_task_use_a_one_element_array_with_a_positive_timeout_ms_multiple_ids_wait_until_all_complete_omit_timeout_ms_or_pass_0_for_a_non_blocking_snapshot" = "Task IDs to get output from. Pass one or more; for a single task use a one-element array. With a positive timeout_ms, multiple ids wait until all complete. Omit timeout_ms or pass 0 for a non-blocking snapshot."
+"tool.schema.max_wait_time_in_milliseconds_up_to_max_wait_ms_a_positive_value_waits_for_completion_omit_or_pass_0_for_a_non_blocking_status_poll" = "Max wait time in milliseconds, up to {max_wait_ms}. A positive value waits for completion; omit or pass 0 for a non-blocking status poll."
+
+"tool.task.continue_parent_work" = "Do not only poll the child. Continue unfinished parent work now."
+"tool.task.background_result_line" = "When you need its result, use {task_output_tool} with {task_ids_param}=[\"{subagent_id}\"] and a positive {timeout_ms_param}."
+"tool.task.started_background" = "Subagent started in background.\nsubagent_id: {subagent_id}\ntype: {subagent_type}\ndescription: {description}\n\n{result_line}"
+"tool.task.auto_backgrounded.notify_clause" = " -- you will be notified when it completes"
+"tool.task.auto_backgrounded" = "Subagent took longer than the foreground budget and was moved to the background to keep the conversation responsive. It is still running{notify_clause}.\nsubagent_id: {subagent_id}\ntype: {subagent_type}\ndescription: {description}\n\n{result_line}"
+"tool.task.completed" = "{output}\n\n<subagent_meta>id={subagent_id}, type={subagent_type}, tool_calls={tool_calls}, turns={turns}, duration_ms={duration_ms}</subagent_meta>\n\n{footer}"
+"tool.task.resume_footer" = "<subagent_result>\nsubagent_id: {subagent_id}\nsubagent_type: {subagent_type}\nTo continue this subagent's conversation, use resume_from=\"{subagent_id}\"."
+"tool.task.resume_persona" = "\nThe subagent used persona=\"{persona}\". Pass the same persona when resuming."
+"tool.task.resume_footer_end" = "\n</subagent_result>"
+"tool.description.lifecycle.wait_cap.seconds" = "{ms} (~{seconds} s)"
+"tool.description.lifecycle.wait_cap.minutes" = "{ms} (~{minutes} min)"
+"tool.description.task.model_guidance.none" = "\n\nNo explicit model slugs are currently available. Omit `{model_param}` to inherit the parent model."
+"tool.description.task.model_guidance.available" = "\n\nIf the user explicitly asks for the model of a subagent/task, you may ONLY use model slugs from this list:\n{model_list}\n\nIf the user does not explicitly request a model, omit `{model_param}` to inherit the parent model."
+
+"tool.schema.the_full_task_prompt_for_the_subagent_to_execute" = "The full task prompt for the subagent to execute."
+"tool.schema.short_description_of_the_task_3_5_words" = "Short description of the task (3-5 words)."
+"tool.schema.name_of_the_subagent_type_to_launch_built_in_types_general_purpose_explore_plan_additional_user_defined_types_may_also_be_available" = "Name of the subagent type to launch. Built-in types: \"general-purpose\", \"explore\", \"plan\". Additional user-defined types may also be available."
+"tool.schema.returns_immediately_with_a_subagent_id_use_the_task_output_tool_to_retrieve_results_this_is_set_to_true_by_default" = "Returns immediately with a subagent_id. Use the task output tool to retrieve results. This is set to true by default."
+"tool.schema.isolation_mode_none_default_shared_workspace_or_worktree_isolated_git_worktree_worktree_mode_prevents_the_child_s_edits_from_affecting_the_parent_workspace_until_explicitly_merged" = "Isolation mode: \"none\" (default, shared workspace) or \"worktree\" (isolated git worktree). Worktree mode prevents the child's edits from affecting the parent workspace until explicitly merged."
+"tool.schema.resume_from_a_previously_completed_subagent_s_conversation_pass_the_subagent_id_returned_by_a_prior_task_call_the_new_subagent_continues_the_previous_one_s_raw_transcript_with_the_new_task_prompt_appended_the_source_must_be_completed_not_running_belong_to_the_current_session_and_use_the_same_subagent_type" = "Resume from a previously completed subagent's conversation. Pass the subagent_id returned by a prior task call. The new subagent continues the previous one's raw transcript with the new task prompt appended. The source must be completed (not running), belong to the current session, and use the same subagent_type."
+"tool.schema.explicit_working_directory_for_the_subagent_the_path_must_exist_and_be_a_directory_mutually_exclusive_with_isolation_worktree_ignored_when_resume_from_is_set_the_resumed_child_inherits_its_source_s_cwd_worktree" = "Explicit working directory for the subagent. The path must exist and be a directory. Mutually exclusive with isolation=\"worktree\". Ignored when resume_from is set (the resumed child inherits its source's cwd/worktree)."
+"tool.schema.optional_model_slug_for_this_agent_if_provided_it_must_resolve_to_one_of_the_available_model_slugs_if_omitted_the_subagent_uses_the_same_model_as_the_parent_agent_do_not_pass_if_resume_from_is_set_prior_model_will_be_used_only_choose_an_explicit_model_when_the_user_directly_requests_it" = "Optional model slug for this agent. If provided, it must resolve to one of the available model slugs. If omitted, the subagent uses the same model as the parent agent. Do not pass if resume_from is set (prior model will be used). Only choose an explicit model when the user directly requests it."
+"tool.schema.task_ids_to_wait_for" = "Task IDs to wait for"
+"tool.schema.wait_mode_wait_any_return_when_first_completes_or_wait_all_wait_for_all" = "Wait mode: 'wait_any' (return when first completes) or 'wait_all' (wait for all)"
+"tool.schema.max_wait_time_in_milliseconds_up_to_max_wait_ms" = "Max wait time in milliseconds, up to {max_wait_ms}"
+"tool.schema.the_task_id_to_terminate" = "The task ID to terminate"
+
+"tool.schema.the_url_to_fetch_content_from" = "The URL to fetch content from."
+"tool.schema.the_search_query_to_perform" = "The search query to perform."
+"tool.schema.optional_list_of_domains_to_restrict_search_to" = "Optional list of domains to restrict search to."
+"tool.schema.path_to_directory_to_list_contents_of_relative_to_the_workspace_root_or_absolute" = "Path to directory to list contents of, relative to the workspace root or absolute."
+"tool.schema.the_regular_expression_pattern_to_search_for_in_file_contents_rg_regexp" = "The regular expression pattern to search for in file contents (rg --regexp)"
+"tool.schema.file_or_directory_to_search_in_rg_pattern_path_defaults_to_workspace_path" = "File or directory to search in (rg pattern -- PATH). Defaults to workspace path."
+"tool.schema.glob_pattern_rg_glob_glob_path_to_filter_files_e_g_js_ts_tsx" = "Glob pattern (rg --glob GLOB -- PATH) to filter files (e.g. \"*.js\", \"*.{ts,tsx}\")."
+"tool.schema.number_of_lines_to_show_before_each_match_rg_b" = "Number of lines to show before each match (rg -B)."
+"tool.schema.number_of_lines_to_show_after_each_match_rg_a" = "Number of lines to show after each match (rg -A)."
+"tool.schema.number_of_lines_to_show_before_and_after_each_match_rg_c" = "Number of lines to show before and after each match (rg -C)."
+"tool.schema.case_insensitive_search_rg_i" = "Case insensitive search (rg -i)."
+"tool.schema.file_type_to_search_rg_type_common_types_js_py_rust_go_java_etc_more_efficient_than_glob_for_standard_file_types" = "File type to search (rg --type). Common types: js, py, rust, go, java, etc. More efficient than glob for standard file types."
+"tool.schema.limit_output_to_first_n_lines_entries_equivalent_to_head_n_defaults_to_200_lines_or_500_entries" = "Limit output to first N lines/entries, equivalent to \"| head -N\". Defaults to 200 lines or 500 entries."
+"tool.schema.enable_multiline_mode_where_matches_newlines_and_patterns_can_span_lines_rg_u_multiline_dotall" = "Enable multiline mode where . matches newlines and patterns can span lines (rg -U --multiline-dotall)."
+"tool.schema.unique_identifier_for_the_todo_item" = "Unique identifier for the todo item"
+"tool.schema.the_description_content_of_the_todo_item" = "The description/content of the todo item"
+"tool.schema.the_status_of_the_todo_item_pending_in_progress_completed_or_cancelled" = "The status of the todo item: pending, in_progress, completed, or cancelled"
+"tool.schema.optional_when_true_default_merges_the_provided_todos_into_the_existing_list_by_id_send_only_the_items_you_are_changing_and_to_flip_status_without_changing_content_send_just_id_status_when_false_the_provided_todos_replace_the_existing_list" = "Optional. When true (default), merges the provided todos into the existing list by id — send only the items you are changing, and to flip status without changing content send just id + status. When false, the provided todos replace the existing list."
+"tool.schema.array_of_todo_items_to_write_to_the_workspace" = "Array of todo items to write to the workspace"
+"tool.schema.option_text_shown_to_the_user_a_few_words_at_most" = "Option text shown to the user. A few words at most."
+"tool.schema.what_picking_this_option_means_or_implies" = "What picking this option means or implies."
+"tool.schema.optional_content_shown_while_the_option_is_focused_mockups_code_snippets_anything_the_user_should_compare_single_select_questions_only" = "Optional content shown while the option is focused — mockups, code snippets, anything the user should compare. Single-select questions only."
+"tool.schema.the_question_to_ask_phrased_as_a_full_question" = "The question to ask, phrased as a full question."
+"tool.schema.the_choices_for_this_question" = "The choices for this question."
+"tool.schema.let_the_user_pick_more_than_one_option_default_false" = "Let the user pick more than one option (default false)."
+"tool.schema.the_questions_to_ask_each_with_its_own_options" = "The questions to ask, each with its own options."
+"tool.schema.the_bash_command_to_run" = "The bash command to run."
+"tool.schema.the_command_to_run" = "The command to run."
+"tool.schema.optional_timeout_in_milliseconds_max_300000_default_120000_2_minutes_enforced_for_foreground_commands_only" = "Optional timeout in milliseconds (max 300000). Default: 120000 (2 minutes), enforced for foreground commands only."
+"tool.schema.one_sentence_explanation_as_to_why_this_command_needs_to_be_run_and_how_it_contributes_to_the_goal" = "One sentence explanation as to why this command needs to be run and how it contributes to the goal."
+"tool.schema.set_to_true_for_long_running_commands_that_should_run_in_the_background_e_g_dev_servers_long_builds_returns_a_task_id_immediately_while_the_command_keeps_running_in_the_background_if_system_reminders_enabled_you_are_notified_on_completion_so_do_not_poll_or_sleep_wait_for_it_elif_tools_by_kind_background_task_action_check_on_it_later_with_the_tools_by_kind_background_task_action_tool_endif" = "Set to true for long-running commands that should run in the background (e.g., dev servers, long builds). Returns a task id immediately while the command keeps running in the background${%- if system_reminders_enabled %}; you are notified on completion, so do not poll or sleep-wait for it${%- elif tools.by_kind.background_task_action %}; check on it later with the ${{ tools.by_kind.background_task_action }} tool${%- endif }."
+
+"tool.schema.a_text_description_of_the_desired_edit_or_transformation_describe_what_the_output_image_should_look_like_referencing_the_input_image_s" = "A text description of the desired edit or transformation. Describe what the output image should look like, referencing the input image(s)."
+"tool.schema.reference_image_s_to_condition_the_edit_on_each_is_one_reference_in_priority_order_1_a_user_attachment_its_placeholder_token_e_g_image_1_attachments_have_no_path_you_can_see_so_never_invent_one_2_an_absolute_filesystem_path_the_user_gave_you_3_a_data_image_base64_url" = "Reference image(s) to condition the edit on. Each is one reference, in priority order: (1) a user attachment — its placeholder token, e.g. \"[Image #1]\" (attachments have no path you can see, so never invent one); (2) an absolute filesystem path the user gave you; (3) a `data:image/...;base64,...` URL."
+"tool.schema.the_aspect_ratio_of_the_output_image_for_single_image_edits_this_is_ignored_the_output_matches_the_input_image_s_aspect_ratio_for_multi_image_edits_defaults_to_auto_supported_values_1_1_16_9_9_16_4_3_3_4_3_2_2_3_2_1_1_2_19_5_9_9_19_5_20_9_9_20_auto" = "The aspect ratio of the output image. For single-image edits this is ignored — the output matches the input image's aspect ratio. For multi-image edits, defaults to 'auto'. Supported values: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 2:1, 1:2, 19.5:9, 9:19.5, 20:9, 9:20, auto."
+"tool.schema.text_description_of_the_image_to_generate" = "Text description of the image to generate."
+"tool.schema.aspect_ratio_of_the_generated_image_decide_it_based_on_the_user_s_request_defaults_to_auto_1_1_for_square_icons_profiles_16_9_for_wide_landscapes_cinematic_9_16_for_tall_phone_wallpapers_stories_3_2_for_horizontal_photos_2_3_for_vertical_portraits_posters" = "Aspect ratio of the generated image, decide it based on the user's request. Defaults to 'auto'. 1:1 for square (icons, profiles), 16:9 for wide (landscapes, cinematic), 9:16 for tall (phone wallpapers, stories), 3:2 for horizontal photos, 2:3 for vertical (portraits, posters)."
+"tool.schema.optional_prompt_to_guide_the_video_generation_model_if_omitted_a_natural_animation_applies_automatically" = "Optional prompt to guide the video generation model. If omitted, a natural animation applies automatically."
+"tool.schema.source_image_to_animate_provide_an_absolute_filesystem_path_https_url_or_data_image_base64_url" = "Source image to animate. Provide an absolute filesystem path, HTTPS URL, or `data:image/...;base64,...` URL."
+"tool.schema.duration_of_the_video_generation_either_6_or_10_seconds_default_to_6_unless_the_user_requests_longer" = "Duration of the video generation, either 6 or 10 seconds. Default to 6 unless the user requests longer."
+"tool.schema.resolution_name_of_the_video_generation_only_specify_it_when_user_asks_for_a_specific_resolution_either_480p_or_720p_defaults_to_480p_unless_the_user_specifically_requests_for_higher_quality" = "Resolution name of the video generation, only specify it when user asks for a specific resolution, either 480p or 720p. Defaults to 480p unless the user specifically requests for higher quality."
+"tool.schema.prompt_to_guide_the_video_generation_model_describe_the_desired_video" = "Prompt to guide the video generation model. Describe the desired video."
+"tool.schema.reference_images_up_to_7_entries_the_images_are_used_as_style_content_references_for_the_generated_video_people_objects_clothing_settings_each_entry_may_be_an_absolute_filesystem_path_https_url_or_data_image_base64_url_reference_them_in_the_prompt_as_image_0_image_1_may_be_empty_when_voices_is_provided" = "Reference images, up to 7 entries; the images are used as style/content references for the generated video (people, objects, clothing, settings). Each entry may be an absolute filesystem path, HTTPS URL, or `data:image/...;base64,...` URL. Reference them in the prompt as <IMAGE_0>, <IMAGE_1>, ... May be empty when `voices` is provided."
+"tool.schema.optional_preset_voices_the_subject_s_speak_in_up_to_3_entries_each_a_voice_identifier_from_the_built_in_roster_e_g_ara_eve_leo_rex_same_voices_as_the_xai_text_to_speech_api_an_unknown_identifier_fails_with_the_list_of_available_voices_reference_them_in_the_prompt_as_audio_0_audio_1_audio_2_usable_alongside_images_or_on_their_own" = "Optional preset voices the subject(s) speak in, up to 3 entries, each a voice identifier from the built-in roster (e.g. \"ara\", \"eve\", \"leo\", \"rex\"; same voices as the xAI text-to-speech API; an unknown identifier fails with the list of available voices). Reference them in the prompt as <AUDIO_0>, <AUDIO_1>, <AUDIO_2>. Usable alongside `images` or on their own."
+"tool.schema.aspect_ratio_of_the_generated_video_decide_it_based_on_the_user_s_request_1_1_for_square_icons_profiles_16_9_for_wide_landscapes_cinematic_9_16_for_tall_phone_wallpapers_stories_4_3_or_3_2_for_horizontal_photos_3_4_or_2_3_for_vertical_portraits_posters" = "Aspect ratio of the generated video, decide it based on the user's request. 1:1 for square (icons, profiles), 16:9 for wide (landscapes, cinematic), 9:16 for tall (phone wallpapers, stories), 4:3 or 3:2 for horizontal photos, 3:4 or 2:3 for vertical (portraits, posters)."
+"tool.schema.duration_of_the_video_in_seconds_between_1_and_15_defaults_to_6" = "Duration of the video in seconds, between 1 and 15. Defaults to 6."
+"tool.schema.resolution_name_of_the_video_generation_only_specify_it_when_user_asks_for_a_specific_resolution_either_480p_or_720p_defaults_to_480p" = "Resolution name of the video generation, only specify it when user asks for a specific resolution, either 480p or 720p. Defaults to 480p."
+"tool.schema.set_to_true_only_when_the_goal_is_fully_achieved_this_ends_goal_mode_use_together_with_message_to_include_a_completion_summary" = "Set to true ONLY when the goal is fully achieved. This ends goal mode. Use together with `message` to include a completion summary."
+"tool.schema.optional_short_message_logged_as_progress_visible_in_tool_response_not_surfaced_to_the_pager_dashboard_use_with_completed_true_for_a_completion_summary" = "Optional short message logged as progress (visible in tool response, not surfaced to the pager dashboard). Use with `completed: true` for a completion summary."
+"tool.schema.set_only_when_truly_stuck_after_3_consecutive_failed_attempts_at_the_same_problem_if_set_the_goal_is_paused_as_blocked_this_is_a_failure_signal_never_put_success_text_here_for_success_use_completed_true_with_message" = "Set only when truly stuck after 3+ consecutive failed attempts at the same problem. If set, the goal is paused as blocked. This is a FAILURE signal — never put success text here. For success, use `completed: true` with `message`."
+"tool.schema.shell_command_or_script_each_stdout_line_is_an_event_exit_ends_the_watch" = "Shell command or script. Each stdout line is an event; exit ends the watch."
+"tool.schema.short_human_readable_description_of_what_you_are_monitoring_shown_in_every_notification" = "Short human-readable description of what you are monitoring (shown in every notification)."
+"tool.schema.kill_the_monitor_after_this_deadline_ms_default_36000000_10_hr_max_36000000_10_hr" = "Kill the monitor after this deadline (ms). Default: 36000000 (10 hr). Max: 36000000 (10 hr)."
+"tool.schema.run_for_the_lifetime_of_the_session_no_timeout_if_tools_by_kind_kill_task_action_stop_with_tools_by_kind_kill_task_action_endif" = "Run for the lifetime of the session (no timeout).${%- if tools.by_kind.kill_task_action %} Stop with ${{ tools.by_kind.kill_task_action }}.${%- endif %}"
+"tool.schema.the_lsp_operation_to_perform" = "The LSP operation to perform."
+"tool.schema.absolute_path_to_the_file" = "Absolute path to the file."
+"tool.schema.0_indexed_line_number" = "0-indexed line number."
+"tool.schema.0_indexed_column_number" = "0-indexed column number."
+"tool.schema.symbol_name_or_partial_name_workspacesymbol_only" = "Symbol name or partial name (workspaceSymbol only)."
+"tool.schema.the_path_of_the_file_to_edit" = "The path of the file to edit."
+
+"tool.schema.name_of_a_registered_workflow_built_in_or_discovered_from_the_project_grok_workflows_or_user_grok_workflows" = "Name of a registered workflow (built-in, or discovered from the project `.grok/workflows/` or user `~/.grok/workflows/`)."
+"tool.schema.inline_rhai_workflow_script_it_must_start_with_a_pure_literal_let_meta_name_description_map_before_authoring_read_the_create_workflow_skill_s_skill_md_run_the_path_specific_validate_only_smoke_check_with_representative_args" = "Inline Rhai workflow script. It must start with a pure-literal `let meta = #{ name: ..., description: ... };` map. Before authoring, read the `create-workflow` skill's SKILL.md. Run the path-specific `validate_only` smoke check with representative args."
+"tool.schema.path_to_a_rhai_workflow_script_on_disk" = "Path to a .rhai workflow script on disk."
+"tool.schema.resume_a_same_process_paused_run_continuing_its_original_immutable_source_and_args_a_budget_limited_run_resumes_only_when_agent_budget_is_passed_with_a_higher_cap_process_restart_interruptions_are_terminal" = "Resume a same-process paused run, continuing its original immutable source and args. A budget-limited run resumes only when `agent_budget` is passed with a higher cap. Process-restart interruptions are terminal."
+"tool.schema.exactly_one_workflow_source_the_type_tag_selects_a_registered_name_inline_script_script_path_or_same_process_resume" = "Exactly one workflow source. The `type` tag selects a registered name, inline script, script path, or same-process resume."
+"tool.schema.absolute_cumulative_cap_on_logical_child_agent_calls_for_this_run_every_agent_and_every_parallel_item_consumes_one_slot_schema_retries_do_not_defaults_to_128_and_may_be_set_from_1_through_1_024_a_panel_that_would_exceed_the_remaining_budget_is_rejected_before_any_of_its_children_launch" = "Absolute cumulative cap on logical child-agent calls for this run. Every agent() and every parallel() item consumes one slot; schema retries do not. Defaults to 128 and may be set from 1 through 1,024. A panel that would exceed the remaining budget is rejected before any of its children launch."
+"tool.schema.json_value_bound_to_the_script_s_args_global_use_an_object_for_named_arguments" = "JSON value bound to the script's `args` global. Use an object for named arguments."
+"tool.schema.run_a_path_specific_smoke_check_without_launching_validate_metadata_compile_the_full_script_and_execute_the_single_path_selected_by_the_supplied_args_and_canned_host_results_it_does_not_exercise_every_branch_or_prove_live_tools_and_agent_outputs_work" = "Run a path-specific smoke check without launching: validate metadata, compile the full script, and execute the single path selected by the supplied args and canned host results. It does not exercise every branch or prove live tools and agent outputs work."
+"tool.schema.alias_of_run_id_workflow_runs_are_not_background_tasks_do_not_pass_to_task_output_wait_tasks_completion_notifies_automatically" = "Alias of run_id; workflow runs are not background tasks — do not pass to task_output/wait_tasks. Completion notifies automatically."
+"tool.schema.the_session_unique_display_handle_for_this_run_such_as_review_changes_or_review_changes_2_use_it_in_user_facing_status_and_workflow_management_keep_run_id_internal" = "The session-unique display handle for this run, such as review-changes or review-changes-2. Use it in user-facing status and /workflow management; keep run_id internal."
+
+"tool.schema.array_of_todo_items_the_complete_updated_todo_list_replaces_all_existing_todos" = "Array of todo items — the complete updated todo list. Replaces all existing todos."
+"tool.schema.brief_description_of_the_task" = "Brief description of the task"
+"tool.schema.priority_level_high_medium_or_low" = "Priority level: high, medium, or low"
+"tool.schema.the_current_status_of_the_todo_item_pending_in_progress_completed_or_cancelled" = "The current status of the todo item: pending, in_progress, completed, or cancelled"
+"tool.schema.optional_arguments_to_pass_to_the_skill" = "Optional arguments to pass to the skill"
+"tool.schema.the_name_of_the_skill_to_invoke" = "The name of the skill to invoke"
+"tool.schema.optional_timeout_in_milliseconds" = "Optional timeout in milliseconds."
+"tool.schema.optional_working_directory_defaults_to_the_session_working_directory" = "Optional working directory. Defaults to the session working directory."
+"tool.schema.output_format_for_pdf_files_image_default_renders_pages_as_images_text_extracts_text_content_ignored_for_non_pdf_files" = "Output format for PDF files. 'image' (default) renders pages as images. 'text' extracts text content. Ignored for non-PDF files."
+"tool.schema.page_range_for_pdf_files_e_g_1_5_3_10_required_for_pdfs_with_more_than_10_pages_max_20_pages_per_call_ignored_for_non_pdf_files" = "Page range for PDF files (e.g. '1-5', '3', '10-'). Required for PDFs with more than 10 pages. Max 20 pages per call. Ignored for non-PDF files."
+"tool.schema.the_line_number_to_start_reading_from_only_provide_if_the_file_is_too_large_to_read_at_once" = "The line number to start reading from. Only provide if the file is too large to read at once."
+"tool.schema.the_number_of_lines_to_read_only_provide_if_the_file_is_too_large_to_read_at_once" = "The number of lines to read. Only provide if the file is too large to read at once."
+"tool.schema.the_path_of_the_file_to_read_you_can_use_either_a_relative_path_in_the_workspace_or_an_absolute_path_if_an_absolute_path_is_provided_it_will_be_preserved_as_is" = "The path of the file to read. You can use either a relative path in the workspace or an absolute path. If an absolute path is provided, it will be preserved as is."
+"tool.schema.the_path_to_the_file_to_modify_you_can_use_either_a_relative_path_in_the_workspace_or_an_absolute_path" = "The path to the file to modify. You can use either a relative path in the workspace or an absolute path."
+"tool.schema.the_text_to_replace" = "The text to replace"
+"tool.schema.the_text_to_replace_it_with_must_be_different_from_params_edit_old_string" = "The text to replace it with (must be different from ${{ params.edit.old_string }})"
+"tool.schema.replace_all_occurrences_of_params_edit_old_string_default_false" = "Replace all occurrences of ${{ params.edit.old_string }} (default false)"
+"tool.schema.the_path_to_the_file_to_modify" = "The path to the file to modify."
+"tool.schema.the_text_to_replace_it_with_must_be_different_from_params_edit_oldstring" = "The text to replace it with (must be different from ${{ params.edit.oldString }})"
+"tool.schema.replace_all_occurrences_of_params_edit_oldstring" = "Replace all occurrences of ${{ params.edit.oldString }}"
+
+# Built-in tool descriptions
+
+'tool.description.use_this_tool_to_edit_files' = '''Use this tool to edit files.
+Your patch language is a stripped‑down, file‑oriented diff format designed to be easy to parse and safe to apply. You can think of it as a high‑level envelope:
+
+*** Begin Patch
+[ one or more file sections ]
+*** End Patch
+
+Within that envelope, you get a sequence of file operations.
+You MUST include a header to specify the action you are taking.
+Each operation starts with one of three headers:
+
+*** Add File: <path> - create a new file. Every following line is a + line (the initial contents).
+*** Delete File: <path> - remove an existing file. No hunks follow this header.
+*** Update File: <path> - patch an existing file in place (optionally with a rename).
+
+May be immediately followed by *** Move to: <new path> if you want to rename the file.
+Then one or more “hunks”, each introduced by @@ (optionally followed by a hunk header).
+Within a hunk each line starts with:
++ for inserted text,
+- for removed text, or
+  (a space) for unchanged context.
+
+For instructions on [context_before] and [context_after]:
+- By default, show 3 lines of code immediately above and 3 lines immediately below each change. If a change is within 3 lines of a previous change, do NOT duplicate the first change’s [context_after] lines in the second change’s [context_before] lines.
+- If 3 lines of context is insufficient to uniquely identify the snippet of code within the file, use the @@ operator to indicate the class or function to which the snippet belongs. For instance, we might have:
+@@ class BaseClass
+[3 lines of pre-context]
+- [old_code]
++ [new_code]
+[3 lines of post-context]
+
+- If a code block is repeated so many times in a class or function such that even a single @@ statement and 3 lines of context cannot uniquely identify the snippet of code, you can use multiple @@ statements to jump to the right context. For instance:
+
+@@ class BaseClass
+@@ 	 def method():
+[3 lines of pre-context]
+- [old_code]
++ [new_code]
+[3 lines of post-context]
+
+The full grammar definition is below:
+Patch := Begin { FileOp } End
+Begin := "*** Begin Patch" NEWLINE
+End := "*** End Patch" NEWLINE
+FileOp := AddFile | DeleteFile | UpdateFile
+AddFile := "*** Add File: " path NEWLINE { "+" line NEWLINE }
+DeleteFile := "*** Delete File: " path NEWLINE
+UpdateFile := "*** Update File: " path NEWLINE [ MoveTo ] { Hunk }
+MoveTo := "*** Move to: " newPath NEWLINE
+Hunk := "@@" [ header ] NEWLINE { HunkLine } [ "*** End of File" NEWLINE ]
+HunkLine := (" " | "-" | "+") text NEWLINE
+
+A full patch can combine several operations:
+
+*** Begin Patch
+*** Add File: hello.txt
++Hello world
+*** Update File: src/app.py
+*** Move to: src/main.py
+@@ def greet():
+-print("Hi")
++print("Hello, world!")
+*** Delete File: obsolete.txt
+*** End Patch
+
+It is important to remember:
+
+- Every patch MUST start with *** Begin Patch and end with *** End Patch, including delete-only patches
+- You must include a header with your intended action (Add/Delete/Update)
+- You must prefix new lines with `+` even when creating a new file
+'''
+'tool.description.finds_files_whose_contents_match_the_params_search_pattern_and_lists_them_by_modification_time' = '''Finds files whose contents match the ${{ params.search.pattern }} and lists them by modification time.'''
+'tool.description.lists_entries_in_a_local_directory_with_1_indexed_entry_numbers_and_simple_type_labels' = '''Lists entries in a local directory with 1-indexed entry numbers and simple type labels.'''
+'tool.description.reads_a_local_file_with_1_indexed_line_numbers_supporting_slice_and_indentation_aware_block_modes' = '''Reads a local file with 1-indexed line numbers, supporting slice and indentation-aware block modes.'''
+'tool.description.reads_a_file_from_the_computer_s_filesystem_you_can_access_any_file_directly_by_using_this_tool' = '''Reads a file from the computer's filesystem. You can access any file directly by using this tool.
+It is okay to read a file that does not exist; an error will be returned.
+
+Usage:
+- You can optionally specify ${{ params.read.offset }} and ${{ params.read.limit }} (especially handy for long files).
+- Lines in the output are numbered starting at 1, using following format: LINE_NUMBER→LINE_CONTENT.
+- You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch that are potentially useful.'''
+'tool.description.grok_build_concise.performs_exact_string_replacements_in_files' = '''Replace an exact string in a file.
+
+- Do not include the "LINE_NUMBER→" prefixes from file reads in ${{ params.edit.old_string }} or ${{ params.edit.new_string }}; keep the exact indentation.
+- ${{ params.edit.old_string }} must match exactly one place in the file. If it appears more than once, add surrounding lines to make it unique, or set ${{ params.edit.replace_all }} to change every occurrence (handy for renaming an identifier).
+- To create a new file, set ${{ params.edit.old_string }} to an empty string.'''
+'tool.description.edit_a_file_using_anchors_if_tools_by_kind_read_and_tools_by_kind_search_from_tools_by_kind_read_or_tools_by_kind_search_elif_tools_by_kind_read_from_tools_by_kind_read_elif_tools_by_kind_search_from_tools_by_kind_search_endif' = '''Edit a file using anchors${%- if tools.by_kind.read and tools.by_kind.search %} from ${{ tools.by_kind.read }} or ${{ tools.by_kind.search }}${%- elif tools.by_kind.read %} from ${{ tools.by_kind.read }}${%- elif tools.by_kind.search %} from ${{ tools.by_kind.search }}${%- endif %}.
+
+Operations (use the "op" field):
+
+  "replace" — Replace one line or a range with new content.
+    { "op": "replace", "anchor": "{example_anchor}", "content": "    let x = 42;" }
+    Range: add "end_anchor" to replace from anchor through end_anchor (INCLUSIVE —
+    both the anchor line and end_anchor line are replaced along with everything
+    between them). If the anchor or end_anchor line contains a closing delimiter
+    like `}` that must be preserved, include it in "content".
+    Delete one line: { "op": "replace", "anchor": "{example_anchor}", "content": "" }
+    Delete a range: { "op": "replace", "anchor": "{example_anchor}", "end_anchor": "...", "content": "" }
+
+  "insert_after" — Insert new lines after the anchored line.
+    { "op": "insert_after", "anchor": "{example_anchor}", "content": "    let y = 1;" }
+    Add a blank line: { "op": "insert_after", "anchor": "{example_anchor}", "content": "" }
+    Multi-line insert: content with newlines adds multiple lines.
+    Beginning of file: use "0:" as anchor.
+    End of file: use "EOF" as anchor.
+    Existing lines below the anchor are preserved — only include new content.
+    Prefer insert_after over replace when adding lines without removing existing ones.
+
+  "write" — Replace entire file content (no anchors needed).
+    { "op": "write", "content": "full file content here" }
+
+Batch edits: pass multiple operations in "${{ params.edit.edits }}". They are validated against the
+pre-edit snapshot and applied atomically bottom-up — if any anchor fails
+validation, ALL edits in the batch are rejected (none are applied).
+Overlapping ranges are also rejected.
+
+Range safety:
+- Multi-line edits may return caution warnings, especially for broader rewrites.
+- Larger rewrites are allowed, but use them when you are confident about the target range.
+- For very large rewrites (most of the file), prefer a single "write" op over many replace ops.
+
+Follow-up edits:
+- On success, the tool returns a snippet with fresh anchors around the edited region.
+- On stale-anchor errors, the tool returns fresh anchors around the target line.
+  Use these anchors to immediately retry your edit — do not re-read the file.
+- The anchor is the full "LINE:HASH" or "LINE:HASH:HASH" before the → separator
+  (e.g. "{example_anchor}"). Always include the line number. Do NOT include → or
+  the line content after it.
+- Never fabricate or modify anchors — only use exact anchors as returned by
+  previous tool outputs.'''
+'tool.description.search_file_contents_with_anchor_annotated_results_if_tools_by_kind_edit_for_use_with_tools_by_kind_edit_endif' = '''Search file contents with anchor-annotated results${%- if tools.by_kind.edit %} for use with ${{ tools.by_kind.edit }}${%- endif %}.
+
+Match lines include anchors${%- if tools.by_kind.edit %} you can pass directly to ${{ tools.by_kind.edit }}${%- if tools.by_kind.read %} without needing to ${{ tools.by_kind.read }} the file first${%- endif %}${%- endif %}. This grep format keeps grep-style separators after the anchor: `:` for
+match lines and `-` for context lines.
+
+Content output format:
+
+  {grep_match}    ← match (:)
+  {grep_context}    ← context (-)
+
+Usage:
+- ${{ params.search.pattern }} is a regex: `log.*Error`, `function\s+\w+`, `TODO`
+- Default output is anchored content matches (no output-mode selector)
+- Use -A, -B, -C for context lines around matches
+- Only use '${{ params.search.type }}' or '${{ params.search.glob }}' when certain of the file type
+- Results are capped; truncated results show "at least" counts'''
+'tool.description.read_a_file_with_line_anchored_output_if_tools_by_kind_edit_for_use_with_tools_by_kind_edit_endif' = '''Read a file with line-anchored output${%- if tools.by_kind.edit %} for use with ${{ tools.by_kind.edit }}${%- endif %}.
+
+Each line is formatted as ANCHOR→CONTENT, for example:
+{example_line1}
+{example_line2}
+
+This read format uses `→` between the anchor and content.${%- if tools.by_kind.search %} By contrast,
+${{ tools.by_kind.search }} keeps grep-style separators after the anchor: `:` for
+match lines and `-` for context lines.${%- endif %}
+
+The ANCHOR (e.g. "{example_anchor}") is a compact fingerprint of the line's content
+and surrounding context.${%- if tools.by_kind.edit %} Pass anchors to ${{ tools.by_kind.edit }} to make edits —
+they verify the targeted location still matches the snapshot you saw.
+Anchors are valid only for the file state at read time — after any edit,
+use the fresh anchors returned by ${{ tools.by_kind.edit }} or re-read the file.${%- endif %}
+
+Usage:
+- The ${{ params.read.target_file }} parameter accepts either a relative path in the workspace or an absolute path
+- By default reads up to {max_lines_read} lines from the beginning
+- Optionally specify ${{ params.read.offset }} and ${{ params.read.limit }} for large files
+- Can read images (PNG, JPG, etc.) and PDF files (each page rendered as an image; use ${{ params.read.pages }} for PDFs with more than 10 pages, max 20 per call)
+- You can call multiple tools in a single response
+- If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents.'''
+'tool.description.read_a_file' = '''Read a file.
+
+Usage:
+- The ${{ params.read.target_file }} parameter can be a relative path in the workspace or an absolute path
+- By default, it reads up to {max_lines_read} lines starting from the beginning of the file
+- Line numbers (1-based) appear as anchors in the format LINE_NUMBER→LINE_CONTENT on the first returned line and on every 10th line of the file; the lines in between show content only. Count from the nearest anchor when referring to a specific line
+- This tool can read PDF files (.pdf), PowerPoint files (.pptx), Jupyter notebooks (.ipynb files), and image files (e.g. PNG, JPG, etc).
+- When reading an image file the contents are presented visually as this tool uses multimodal LLMs.'''
+'tool.description.grok_build.performs_exact_string_replacements_in_files' = '''Replace an exact string in a file.
+
+${% if tools.by_kind.read -%}
+- `${{ tools.by_kind.read }}` prefixes each line with "LINE_NUMBER→". That prefix is not part of the file: match only what comes after the →, with its exact indentation.
+${% endif -%}
+- `${{ params.edit.old_string }}` must match exactly one place in the file. If it appears more than once, add surrounding lines to make it unique, or set `${{ params.edit.replace_all }}` to change every occurrence (handy for renaming an identifier).
+- To create a new file, set `${{ params.edit.old_string }}` to an empty string. An empty `${{ params.edit.old_string }}` cannot overwrite an existing non-empty file.'''
+'tool.description.fast_file_pattern_matching_tool_that_works_with_any_codebase_size' = '''Fast file pattern matching tool that works with any codebase size.
+
+- Supports glob patterns like "**/*.js" or "src/**/*.ts" via the required ${{ params.list.pattern }} parameter
+- Optionally set ${{ params.list.path }} to pick the directory to search in (defaults to the current working directory)
+- Returns matching file paths sorted by modification time (most recent first), capped at 100 results
+- Hidden (dot) files are included; .gitignore patterns are respected for paths the pattern does not explicitly match
+- Use this tool when you need to find files by name patterns
+- You can call multiple tools in a single response. It is always better to speculatively perform multiple searches as a batch that are potentially useful.'''
+'tool.description.a_powerful_search_tool_built_on_ripgrep' = '''A powerful search tool built on ripgrep
+
+Usage:
+- Prefer ${{ tools.by_kind.search }} for exact symbol/string searches. Whenever possible, use this instead of terminal grep/rg. This tool is faster and respects .gitignore
+- Supports full regex syntax, e.g. `log.*Error`, `function\s+\w+`. Ensure you escape special chars to get exact matches, e.g. `functionCall\(`
+- Avoid overly broad glob patterns (e.g., '--glob *') as they bypass .gitignore rules and may be slow
+- The ${{ params.search.pattern }} field is a raw regex string: do NOT wrap it in quotes or add trailing quote characters unnecessarily
+- Only use '${{ params.search.include }}' when certain of the file type needed. Note: import paths may not match source file types (.js vs .ts)
+- Results are capped for responsiveness; truncated results show "at least" counts.
+- Filter files by pattern with the ${{ params.search.include }} parameter (e.g. "*.js", "*.{ts,tsx}")
+- Returns file paths and line numbers with at least one match sorted by modification time
+- Use this tool when you need to find files containing specific patterns'''
+'tool.description.create_or_overwrite_a_file' = '''Create or overwrite a file.
+
+- Writing to an existing path replaces the file${%- if tools.by_kind.read %} — read it first with the ${{ tools.by_kind.read }} tool${%- endif %}.
+- Parent directories are created for you.'''
+'tool.description.reads_a_file_or_directory_from_the_local_filesystem_you_can_access_any_file_directly_by_using_this_tool' = '''Reads a file or directory from the local filesystem. You can access any file directly by using this tool.
+Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
+
+Usage:
+- The ${{ params.read.filePath }} parameter must be an absolute path, not a relative path
+- By default, it reads up to 2000 lines starting from the beginning of the file
+- You can optionally specify ${{ params.read.offset }} and ${{ params.read.limit }} (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
+- Any lines longer than {max_chars_per_line} characters will be truncated
+- Contents are returned with each line prefixed by its line number as `LINE_NUMBER: LINE_CONTENT`, with line numbers starting at 1. For example, if the file has contents "foo\n", you will receive "1: foo"
+- For directories, entries are returned one per line (without line numbers) with a trailing `/` for subdirectories
+- This tool can read images (eg PNG, JPG, etc). When reading an image file the contents are presented visually as this tool uses multimodal LLMs.
+- This tool can read PDF files (.pdf). PDFs are presented visually to the multimodal LLM as attachments.
+- You can call multiple tools in a single response. It is always better to speculatively read multiple potentially useful files in parallel.
+- You will regularly be asked to read screenshots. If the user provides a path to a screenshot, ALWAYS use this tool to view the file at the path. This tool will work with all temporary file paths.
+- If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents.'''
+'tool.description.load_a_specialized_skill_that_provides_domain_specific_instructions_and_workflows' = '''Load a specialized skill that provides domain-specific instructions and workflows.
+
+When you recognize that a task matches one of the available skills listed below, use this tool to load the full skill instructions.
+
+The skill will inject detailed instructions, workflows, and access to bundled resources into the conversation via a `<skill_content name="...">` block with the loaded content.
+
+The following skills provide specialized sets of instructions for particular tasks.
+Invoke this tool to load a skill when a task matches one of the available skills listed below:
+
+<available_skills>
+${%- if skills %}
+${%- for skill in skills %}
+  <skill>
+    <name>${{ skill.name }}</name>
+    <description>${{ skill.description|e }}</description>
+    <location>${{ skill.location }}</location>
+  </skill>
+${%- endfor %}
+${%- else %}
+(No skills available. Skills can be added in ~/.grok/skills/ or .grok/skills/)
+${%- endif %}
+</available_skills>'''
+'tool.description.opencode.performs_exact_string_replacements_in_files' = '''Performs exact string replacements in files.
+
+Usage:${%- if tools.by_kind.read %}
+- When editing text from ${{ tools.by_kind.read }} tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: line number + ": ". Everything after that ": " separator is the actual file content to match. Never include any part of the line number prefix in the ${{ params.edit.oldString }} or ${{ params.edit.newString }}.${%- endif %}
+- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
+- The edit will FAIL if `${{ params.edit.oldString }}` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use `${{ params.edit.replaceAll }}` to change every instance of `${{ params.edit.oldString }}`.
+- Use `${{ params.edit.replaceAll }}` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance.
+- To create a new file, set ${{ params.edit.oldString }} to an empty string.
+- Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.'''
+'tool.description.executes_a_given_bash_command_in_a_shell_session_with_optional_timeout_ensuring_proper_handling_and_security_measures_each_command_runs_in_a_fresh_shell_working_directory_changes_and_environment_variables_do_not_persist_between_calls' = '''Executes a given bash command in a shell session with optional timeout, ensuring proper handling and security measures. Each command runs in a fresh shell: working directory changes and environment variables do not persist between calls.
+IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.
+
+Before executing the command, please follow these steps:
+
+1. Directory Verification:
+   - If the command will create new directories or files, first use `ls` to verify the parent directory exists and is the correct location
+   - For example, before running "mkdir foo/bar", first use `ls foo` to check that "foo" exists and is the intended parent directory
+
+2. Command Execution:
+   - Always quote file paths that contain spaces with double quotes (e.g., rm "path with spaces/file.txt")
+   - Examples of proper quoting:
+     - mkdir "/Users/name/My Documents" (correct)
+     - mkdir /Users/name/My Documents (incorrect - will fail)
+     - python "/path/with spaces/script.py" (correct)
+     - python /path/with spaces/script.py (incorrect - will fail)
+   - After ensuring proper quoting, execute the command.
+   - Capture the output of the command.
+
+Usage notes:
+  - The ${{ params.execute.command }} argument is required.
+  - You can specify an optional ${{ params.execute.timeout }} in milliseconds. If not specified, commands will use the default timeout.
+  - It is very helpful if you write a clear, concise description of what this command does in 5-10 words.
+  - If the output exceeds {max_output_bytes} characters, output will be truncated before being returned to you.
+${%- if tools.by_kind.list or tools.by_kind.search or tools.by_kind.read or tools.by_kind.edit or tools.by_kind.write %}
+${%- if has_unix_utilities %}
+  - Avoid using this tool with the `find`, `grep`, `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or when these commands are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:${%- if tools.by_kind.list %}
+    - File search: Use the ${{ tools.by_kind.list }} tool (NOT the `find` or `ls` shell commands)${%- endif %}${%- if tools.by_kind.search %}
+    - Content search: Use the ${{ tools.by_kind.search }} tool (NOT the `grep` or `rg` shell commands)${%- endif %}${%- if tools.by_kind.read %}
+    - Read files: Use ${{ tools.by_kind.read }} (NOT cat/head/tail)${%- endif %}${%- if tools.by_kind.edit %}
+    - Edit files: Use ${{ tools.by_kind.edit }} (NOT sed/awk)${%- endif %}${%- if tools.by_kind.write %}
+    - Write files: Use ${{ tools.by_kind.write }} (NOT echo >/cat <<EOF)${%- endif %}
+    - Communication: Output text directly (NOT echo/printf)
+${%- else %}
+  - The Unix utilities `grep`, `head`, `tail`, `sed`, `awk`, and `find` are NOT available in this shell — they will fail with `'<name>' is not recognized` (PowerShell adds `as a cmdlet`; cmd.exe adds `as an internal or external command`). Never invoke them. Use the dedicated tools instead:${%- if tools.by_kind.list %}
+    - File search: Use the ${{ tools.by_kind.list }} (NOT `Get-ChildItem` / `gci` / `dir` / `ls`)${%- endif %}${%- if tools.by_kind.search %}
+    - Content search: Use the ${{ tools.by_kind.search }} (NOT `Select-String` / `sls`)${%- endif %}${%- if tools.by_kind.read %}
+    - Read files: Use the ${{ tools.by_kind.read }} (NOT `Get-Content` / `gc` / `cat`)${%- endif %}${%- if tools.by_kind.edit %}
+    - Edit files: Use the ${{ tools.by_kind.edit }} (NOT `(Get-Content ...) -replace ... | Set-Content`; `sed` and `awk` are unavailable)${%- endif %}${%- if tools.by_kind.write %}
+    - Write files: Use the ${{ tools.by_kind.write }} (NOT `Set-Content` / `Out-File` / `echo >`)${%- endif %}
+    - Communication: Output text directly (NOT `Write-Output` / `echo`)
+${%- endif %}
+${%- endif %}
+  - When issuing multiple commands:
+    - If the commands are independent and can run in parallel, make multiple calls to this tool in a single message. For example, if you need to run "git status" and "git diff", send a single message with two tool calls in parallel.
+    - If the commands depend on each other and must run sequentially, use a single call with '&&' to chain them together (e.g., `git add . && git commit -m "message" && git push`).${%- if tools.by_kind.edit %} For instance, if one operation must complete before another starts (like mkdir before cp, ${{ tools.by_kind.edit }} before this tool for git operations, or git add before git commit), run these operations sequentially instead.${%- endif %}
+    - Use ';' only when you need to run commands sequentially but don't care if earlier commands fail
+    - DO NOT use newlines to separate commands (newlines are ok in quoted strings)
+  - Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of `cd`. You may use `cd` if the User explicitly requests it.
+
+# Committing changes with git
+
+Only create commits when requested by the user. If unclear, ask first. When the user asks you to create a new git commit, follow these steps carefully:
+
+Git Safety Protocol:
+- NEVER update the git config
+- NEVER run destructive/irreversible git commands (like push --force, hard reset, etc) unless the user explicitly requests it
+- NEVER skip hooks (--no-verify, --no-gpg-sign, etc) unless the user explicitly requests it
+- NEVER use force push to main/master; warn the user if they request it
+- Avoid git commit --amend. ONLY use --amend when ALL conditions are met:
+  (1) User explicitly requested amend, OR commit SUCCEEDED but pre-commit hook auto-modified files that need including
+  (2) HEAD commit was created by you in this conversation (verify: git log -1 --format='%an %ae')
+  (3) Commit has NOT been pushed to remote (verify: git status shows "Your branch is ahead")
+- CRITICAL: If commit FAILED or was REJECTED by hook, NEVER amend - fix the issue and create a NEW commit
+- CRITICAL: If you already pushed to remote, NEVER amend unless user explicitly requests it (requires force push)
+- NEVER commit changes unless the user explicitly asks you to. It is VERY important to only commit files when requested by the user.
+
+1. You can call multiple tools in a single response. When multiple independent pieces of information are requested and all commands are likely to succeed, send the following bash commands in parallel:
+  - Run a git status command to see all untracked files.
+  - Run a git diff command to see both staged and unstaged changes that will be committed.
+  - Run a git log command to see recent commit messages, so that you can follow this repository's commit message style.
+2. Analyze all staged changes (both previously staged and newly added) and draft a commit message:
+  - Summarize the nature of the changes and their purpose.
+  - Do not commit files that likely contain secrets (.env, credentials.json, etc.). Warn the user if they specifically request those files.
+  - Draft a concise commit message that focuses on the reason for the changes.
+  - Ensure it accurately reflects the changes and their purpose.
+3. You can call multiple tools in a single response. When multiple independent pieces of information are requested and all commands are likely to succeed, send the following commands:
+   - Add relevant untracked files to the staging area.
+   - Create the commit with a message.
+   - Run git status after the commit completes to verify success.
+   Note: git status depends on the commit completing, so run it sequentially after the commit.
+4. If the commit fails due to a pre-commit hook, fix the issue and create a NEW commit.
+
+Important notes:
+- NEVER run additional commands to read or explore code, besides git bash commands
+- DO NOT push to the remote repository unless the user explicitly asks you to do so
+- IMPORTANT: Never use git commands with the -i flag since they require interactive input which is not supported.
+- If there are no changes to commit (i.e., no untracked files and no modifications), do not create an empty commit
+
+# Creating pull requests
+Use the gh command via this tool for ALL GitHub-related tasks including working with issues, pull requests, checks, and releases. If given a GitHub URL use the gh command to get the information needed.
+
+IMPORTANT: When the user asks you to create a pull request, follow these steps carefully:
+
+1. You can call multiple tools in a single response. When multiple independent pieces of information are requested and all commands are likely to succeed, run the following commands in parallel using this tool, in order to understand the current state of the branch since it diverged from the main branch:
+   - Run a git status command to see all untracked files
+   - Run a git diff command to see both staged and unstaged changes that will be committed
+   - Check if the current branch tracks a remote branch and is up to date with the remote, so you know if you need to push to the remote
+   - Run a git log command and `git diff [base-branch]...HEAD` to understand the full commit history of the branch
+2. Analyze all changes that will be included in the pull request and draft a pull request summary.
+3. Create the PR with `gh pr create` and return its URL.
+'''
+'tool.description.todowrite' = '''Use this tool to create and manage a structured task list for your current coding session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
+It also helps the user understand the progress of the task and overall progress of their requests.
+
+## When to Use This Tool
+Use this tool proactively in these scenarios:
+
+1. Complex multistep tasks - When a task requires 3 or more distinct steps or actions
+2. Non-trivial and complex tasks - Tasks that require careful planning or multiple operations
+3. User explicitly requests todo list - When the user directly asks you to use the todo list
+4. User provides multiple tasks - When users provide a list of things to be done (numbered or comma-separated)
+5. After receiving new instructions - Immediately capture user requirements as todos. Feel free to edit the todo list based on new information.
+6. After completing a task - Mark it complete and add any new follow-up tasks
+7. When you start working on a new task, mark the todo as in_progress. Ideally you should only have one todo as in_progress at a time. Complete existing tasks before starting new ones.
+
+## When NOT to Use This Tool
+
+Skip using this tool when:
+1. There is only a single, straightforward task
+2. The task is trivial and tracking it provides no organizational benefit
+3. The task can be completed in less than 3 trivial steps
+4. The task is purely conversational or informational
+
+NOTE that you should not use this tool if there is only one trivial task to do. In this case you are better off just doing the task directly.
+
+## Examples of When to Use the Todo List
+
+<example>
+User: I want to add a dark mode toggle to the application settings. Make sure you run the tests and build when you're done!
+Assistant: I'll help add a dark mode toggle to your application settings. Let me create a todo list to track this implementation.
+*Creates todo list with the following items:*
+1. Create dark mode toggle component in Settings page
+2. Add dark mode state management (context/store)
+3. Implement CSS-in-JS styles for dark theme
+4. Update existing components to support theme switching
+5. Run tests and build process, addressing any failures or errors that occur
+*Begins working on the first task*
+
+<reasoning>
+The assistant used the todo list because:
+1. Adding dark mode is a multi-step feature requiring UI, state management, and styling changes
+2. The user explicitly requested tests and build be run afterward
+3. The assistant inferred that tests and build need to pass by adding "Ensure tests and build succeed" as the final task
+</reasoning>
+</example>
+
+<example>
+User: Help me rename the function getCwd to getCurrentWorkingDirectory across my project
+Assistant: Let me first search through your codebase to find all occurrences of 'getCwd'.
+*Uses grep or search tools to locate all instances of getCwd in the codebase*
+Assistant: I've found 15 instances of 'getCwd' across 8 different files. Let me create a todo list to track this implementation.
+*Creates todo list with specific items for each file that needs updating*
+
+<reasoning>
+The assistant used the todo list because:
+1. First, the assistant searched to understand the scope of the task
+2. Upon finding multiple occurrences across different files, it determined this was a complex task requiring multiple steps
+3. The todo list helps ensure every instance is tracked and systematically addressed
+4. This approach prevents missing any occurrence and maintains code consistency
+</reasoning>
+</example>
+
+<example>
+User: I need to implement these features for my e-commerce site: user registration, product catalog, shopping cart, and checkout flow.
+Assistant: I'll help implement these features. First, let's add all the features to the todo list.
+*Creates a todo list breaking down each feature into specific tasks based on the project architecture*
+Assistant: Let's start with user registration. This will involve creating database models, API endpoints, and frontend forms that integrate with your existing authentication system.
+
+<reasoning>
+The assistant used the todo list because:
+1. The user provided multiple complex features to implement in a comma separated list
+2. The todo list helps organize these large features into manageable tasks
+3. This approach allows for tracking these large features in manageable steps
+</reasoning>
+</example>
+
+<example>
+User: Can you help optimize my React application? It's rendering slowly and has performance issues.</user>
+Assistant: I'll help optimize your React application. First, let me examine your codebase to identify potential performance bottlenecks.
+*Reviews component structure, render patterns, state management, and data fetching*
+Assistant: After analyzing my codebase, I've identified several performance issues. Let me create a todo list to track our optimization efforts.
+*Creates a todo list with items like: 1) Implement memoization for expensive calculations in ProductList, 2) Add virtualization for long lists in Dashboard, 3) Optimize image loading in Gallery, 4) Fix state update loops in ShoppingCart, 5) Review bundle size and implement code splitting*
+Let's start by implementing memoization for the expensive calculations in your ProductList component.</assistant>
+
+<reasoning>
+The assistant used the todo list because:
+1. First, the assistant examined the codebase to identify specific performance issues
+2. Based on that analysis, it identified multiple optimization opportunities
+3. Performance optimization is a non-trivial task requiring multiple steps
+4. The todo list helps methodically track improvements across different components
+5. This systematic approach ensures all performance bottlenecks are addressed
+</reasoning>
+</example>
+
+## Examples of When NOT to Use the Todo List
+
+<example>
+User: How do I print 'Hello World' in Python?
+Assistant: In Python, you can print "Hello World" with this simple code:
+
+python
+print("Hello World")
+
+This will output the text "Hello World" to the console when executed.</assistant>
+
+<reasoning>
+The assistant did not use the todo list because this is a single, trivial task that can be completed in one step. There's no need to track multiple tasks or steps for such a straightforward request.
+</reasoning>
+</example>
+
+<example>
+User: What does the git status command do?
+Assistant: The git status command shows the current state of your working directory and staging area. It displays which changes have been staged, which haven't, and which files aren't being tracked by Git. This is a fundamental command for understanding the current state of your repository before making commits.
+
+<reasoning>
+The assistant did not use the todo list because this is an informational request with no actual coding task to complete. The user is simply asking for an explanation, not for the assistant to perform multiple steps or tasks.
+</reasoning>
+</example>
+
+<example>
+User: Can you add a comment to the calculateTotal function to explain what it does?
+Assistant: Sure, let me add a comment to the calculateTotal function to explain what it does.
+* Uses the Edit tool to add a comment to the calculateTotal function *
+
+<reasoning>
+The assistant did not use the todo list because this is a single, straightforward task confined to one location in the code. Adding a comment doesn't require tracking multiple steps or systematic organization.
+</reasoning>
+</example>
+
+<example>
+User: Run npm install for me and tell me what happens.
+Assistant: I'll run the npm install command for you.
+
+*Executes: npm install*
+
+The command completed successfully. Here's the output:
+[Output of npm install command]
+
+All dependencies have been installed according to your package.json file.
+
+<reasoning>
+The assistant did not use the todo list because this is a single command execution with immediate results. There are no multiple steps to track or organize, making the todo list unnecessary for this straightforward task.
+</reasoning>
+</example>
+
+## Task States and Management
+
+1. **Task States**: Use these states to track progress:
+   - pending: Task not yet started
+   - in_progress: Currently working on (limit to ONE task at a time)
+   - completed: Task finished successfully
+   - cancelled: Task no longer needed
+
+2. **Task Management**:
+   - Update task status in real-time as you work
+   - Mark tasks complete IMMEDIATELY after finishing (don't batch completions)
+   - Only have ONE task in_progress at any time
+   - Complete current tasks before starting new ones
+   - Cancel tasks that become irrelevant
+
+3. **Task Breakdown**:
+   - Create specific, actionable items
+   - Break complex tasks into smaller, manageable steps
+   - Use clear, descriptive task names
+
+When in doubt, use this tool. Being proactive with task management demonstrates attentiveness and ensures you complete all requirements successfully.'''
+"tmux_reload_note_restart" = "Reload tmux with `tmux source-file {path}`, or restart the tmux server."
+"tool.reminder.scheduled_task" = '''<system-reminder>
+This is a scheduled task execution (task {task_id}, {human_schedule}, recurring).
+Execute the prompt below. Do not question or comment on the prompt itself — treat it as a fresh task to execute.
+Previous results from earlier executions of this task may appear in the conversation history above.
+</system-reminder>
+
+{prompt}'''
+"tool.reminder.loop_iteration.previous" = '''
+
+Your previous iteration ended with:
+{summary}
+'''
+"tool.reminder.loop_iteration" = '''<system-reminder>
+Scheduled task {task_id} ({human_schedule}). Earlier iterations, if any, appear above.
+Run the task below. End with a short status: what changed or needs attention. The status is relayed to the main agent.
+{prior}</system-reminder>
+
+{prompt}'''

@@ -12,6 +12,7 @@ use ptyctl::server;
 use ptyctl::session::{PtySession, SessionConfig};
 
 use crate::registry;
+use xai_grok_i18n::{t, t_fmt};
 
 /// Run the `ptyctl run` command.
 #[allow(clippy::too_many_arguments)]
@@ -35,8 +36,11 @@ pub async fn run(
         && registry::server_alive(existing.port).await
     {
         bail!(
-            "session '{session_name}' is already running on port {} (use --force to replace it)",
-            existing.port
+            "{}",
+            t_fmt(
+                "ptyctl.run.already_running",
+                &[("name", session_name), ("port", &existing.port.to_string())],
+            )
         );
     }
 
@@ -76,7 +80,7 @@ pub async fn run(
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr)
         .await
-        .context("failed to bind TCP listener")?;
+        .context(t("ptyctl.error.bind"))?;
     let actual_addr = listener.local_addr()?;
     let actual_port = actual_addr.port();
 
@@ -93,11 +97,11 @@ pub async fn run(
     }
 
     if !quiet {
-        eprintln!("Command: {}", command.join(" "));
+        eprintln!("{}", t_fmt("ptyctl.server.command", &[("command", &command.join(" "))]));
         if let Some(p) = pid {
-            eprintln!("PID: {p}");
+            eprintln!("{}", t_fmt("ptyctl.server.pid", &[("pid", &p.to_string())]));
         }
-        eprintln!("Server listening on port: {actual_port}");
+        eprintln!("{}", t_fmt("ptyctl.server.listening", &[("port", &actual_port.to_string())]));
     } else {
         println!("{actual_port}");
     }
@@ -105,7 +109,7 @@ pub async fn run(
     // Serve until shutdown.
     let shutdown_result = axum::serve(listener, router)
         .await
-        .context("HTTP server error");
+        .context(t("ptyctl.error.server"));
 
     // Clean up only a registration that still points at this server; a --force takeover may have replaced it.
     if let Some(ref session_name) = name

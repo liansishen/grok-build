@@ -34,10 +34,22 @@ fn first_phase_items(ctx: &AppCtx) -> Vec<ArgItem> {
             display: op.to_string(),
             match_text: op.to_string(),
             insert_text,
-            description: description.to_string(),
+            description: localized_workflow_op_description(op, description).to_string(),
         }
     }));
     items
+}
+
+fn localized_workflow_op_description(op: &str, fallback: &'static str) -> &'static str {
+    let key = match op {
+        "runs" => "slash.workflow.op.runs",
+        "pause" => "slash.workflow.op.pause",
+        "resume" => "slash.workflow.op.resume",
+        "stop" => "slash.workflow.op.stop",
+        "save" => "slash.workflow.op.save",
+        _ => return fallback,
+    };
+    xai_grok_i18n::t_or(key, fallback)
 }
 
 fn is_manage_op(op: &str) -> bool {
@@ -138,7 +150,11 @@ impl LaunchFlagSpec {
                 display: self.name.to_string(),
                 match_text: format!("{base} {}", self.name),
                 insert_text: format!("{base} {} ", self.name),
-                description: self.description.to_string(),
+                description: xai_grok_i18n::t_or(
+                    "slash.workflow.flag.agent_budget",
+                    self.description,
+                )
+                .to_string(),
             }],
             LaunchValueProvider::ReasoningEffort => ctx
                 .models
@@ -350,7 +366,10 @@ impl SlashCommand for WorkflowCommand {
     slash_meta! {
         name: "workflow",
         // Mirrors the shell builtin this command shadows.
-        description: "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+        description: xai_grok_i18n::t_or(
+            "slash.workflow.description",
+            "Launch a saved workflow, list runs, or manage a run (pause, resume, stop, save)",
+        ),
         usage: "/workflow",
         // Shadows ACP `/workflow` (`has_args: true`); false drops the placeholder and highlighted op rows.
         takes_args: true,

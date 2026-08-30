@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches};
+use xai_grok_i18n::t;
 
 #[derive(Parser)]
 #[command(name = "ptyctl")]
@@ -222,6 +224,94 @@ impl Target {
             let info = crate::registry::lookup_session(n)?;
             return Ok(format!("http://127.0.0.1:{}", info.port));
         }
-        anyhow::bail!("no target specified")
+        anyhow::bail!("{}", t("ptyctl.error.no_target"))
     }
+}
+
+/// Parse arguments after replacing clap's derive-time prose with the active locale.
+pub fn parse_localized() -> Cli {
+    let matches = localized_command().get_matches();
+    Cli::from_arg_matches(&matches).unwrap_or_else(|error| error.exit())
+}
+
+fn localized_command() -> clap::Command {
+    let mut command = Cli::command().about(t("ptyctl.cli.about"));
+
+    command = command.mut_subcommand("run", |subcommand| {
+        subcommand
+            .about(t("ptyctl.command.run"))
+            .mut_arg("command", |arg| arg.help(t("ptyctl.arg.command")))
+            .mut_arg("width", |arg| arg.help(t("ptyctl.arg.width")))
+            .mut_arg("height", |arg| arg.help(t("ptyctl.arg.height")))
+            .mut_arg("cwd", |arg| arg.help(t("ptyctl.arg.cwd")))
+            .mut_arg("env", |arg| arg.help(t("ptyctl.arg.env")))
+            .mut_arg("port", |arg| arg.help(t("ptyctl.arg.port")))
+            .mut_arg("name", |arg| arg.help(t("ptyctl.arg.name")))
+            .mut_arg("force", |arg| arg.help(t("ptyctl.arg.force")))
+            .mut_arg("timeout", |arg| arg.help(t("ptyctl.arg.timeout")))
+            .mut_arg("linger", |arg| arg.help(t("ptyctl.arg.linger")))
+            .mut_arg("quiet", |arg| arg.help(t("ptyctl.arg.quiet")))
+    });
+    command = command.mut_subcommand("send", |subcommand| {
+        localize_target_args(
+            subcommand
+                .about(t("ptyctl.command.send"))
+                .mut_arg("keys", |arg| arg.help(t("ptyctl.arg.keys")))
+                .mut_arg("enter", |arg| arg.help(t("ptyctl.arg.enter"))),
+        )
+    });
+    command = command.mut_subcommand("screen", |subcommand| {
+        localize_target_args(
+            subcommand
+                .about(t("ptyctl.command.screen"))
+                .mut_arg("rows", |arg| arg.help(t("ptyctl.arg.rows")))
+                .mut_arg("cols", |arg| arg.help(t("ptyctl.arg.cols")))
+                .mut_arg("json", |arg| arg.help(t("ptyctl.arg.json")))
+                .mut_arg("cursor", |arg| arg.help(t("ptyctl.arg.cursor")))
+                .mut_arg("ansi", |arg| arg.help(t("ptyctl.arg.ansi")))
+                .mut_arg("styled", |arg| arg.help(t("ptyctl.arg.styled")))
+                .mut_arg("html", |arg| arg.help(t("ptyctl.arg.html")))
+                .mut_arg("full", |arg| arg.help(t("ptyctl.arg.full")))
+                .mut_arg("line_numbers", |arg| arg.help(t("ptyctl.arg.line_numbers"))),
+        )
+    });
+    command = command.mut_subcommand("status", |subcommand| {
+        localize_target_args(subcommand.about(t("ptyctl.command.status")))
+    });
+    command = command.mut_subcommand("stop", |subcommand| {
+        localize_target_args(subcommand.about(t("ptyctl.command.stop")))
+    });
+    command = command.mut_subcommand("resize", |subcommand| {
+        localize_target_args(
+            subcommand
+                .about(t("ptyctl.command.resize"))
+                .mut_arg("size", |arg| arg.help(t("ptyctl.arg.size"))),
+        )
+    });
+    command = command.mut_subcommand("cursor", |subcommand| {
+        localize_target_args(subcommand.about(t("ptyctl.command.cursor")))
+    });
+    command = command.mut_subcommand("wait", |subcommand| {
+        localize_target_args(
+            subcommand
+                .about(t("ptyctl.command.wait"))
+                .mut_arg("text", |arg| arg.help(t("ptyctl.arg.wait_text")))
+                .mut_arg("regex", |arg| arg.help(t("ptyctl.arg.wait_regex")))
+                .mut_arg("gone", |arg| arg.help(t("ptyctl.arg.wait_gone")))
+                .mut_arg("stable_ms", |arg| arg.help(t("ptyctl.arg.stable_ms")))
+                .mut_arg("timeout", |arg| arg.help(t("ptyctl.arg.wait_timeout"))),
+        )
+    });
+    command.mut_subcommand("list", |subcommand| {
+        subcommand
+            .about(t("ptyctl.command.list"))
+            .mut_arg("json", |arg| arg.help(t("ptyctl.arg.json")))
+    })
+}
+
+fn localize_target_args(command: clap::Command) -> clap::Command {
+    command
+        .mut_arg("host", |arg| arg.help(t("ptyctl.arg.host")))
+        .mut_arg("port", |arg| arg.help(t("ptyctl.arg.target_port")))
+        .mut_arg("name", |arg| arg.help(t("ptyctl.arg.target_name")))
 }

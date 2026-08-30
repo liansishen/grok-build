@@ -4,6 +4,7 @@ use crate::types::tool::{ToolKind, ToolNamespace};
 
 use super::interval::interval_to_human;
 use super::types::{SchedulerCommand, SchedulerHandle};
+use xai_grok_i18n::t;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct SchedulerListInput {}
@@ -94,7 +95,7 @@ impl xai_tool_runtime::Tool for SchedulerListTool {
                 .ok_or_else(|| {
                     xai_tool_runtime::ToolError::custom(
                         "missing_dependency",
-                        "missing dependency: SchedulerHandle",
+                        t("scheduler.error.missing_dependency"),
                     )
                 })?
                 .0
@@ -107,14 +108,14 @@ impl xai_tool_runtime::Tool for SchedulerListTool {
             .map_err(|_| {
                 xai_tool_runtime::ToolError::execution(
                     xai_tool_protocol::ToolId::new("scheduler_list").expect("valid"),
-                    "Scheduler actor stopped",
+                    t("scheduler.error.actor_stopped"),
                 )
             })?;
 
         let snapshot = reply_rx.await.map_err(|_| {
             xai_tool_runtime::ToolError::execution(
                 xai_tool_protocol::ToolId::new("scheduler_list").expect("valid"),
-                "Scheduler actor dropped reply",
+                t("scheduler.error.reply_dropped"),
             )
         })?;
 

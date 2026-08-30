@@ -3,6 +3,7 @@ use crate::types::requirements::{Expr, ToolRequirement};
 use crate::types::tool::{ToolKind, ToolNamespace};
 
 use super::types::{SchedulerCommand, SchedulerHandle, scheduler_tool_error};
+use xai_grok_i18n::{t, t_fmt};
 
 /// Canonical tool name advertised by `SchedulerDeleteTool::id()`.
 /// See note on `SCHEDULER_CREATE_TOOL_NAME`.
@@ -99,7 +100,10 @@ impl xai_tool_runtime::Tool for SchedulerDeleteTool {
             let res = resources.lock().await;
             res.get::<SchedulerHandle>()
                 .ok_or_else(|| {
-                    xai_tool_runtime::ToolError::custom("missing_resource", "SchedulerHandle")
+                    xai_tool_runtime::ToolError::custom(
+                        "missing_resource",
+                        t("scheduler.error.missing_dependency"),
+                    )
                 })?
                 .0
                 .clone()
@@ -112,7 +116,10 @@ impl xai_tool_runtime::Tool for SchedulerDeleteTool {
                 reply: reply_tx,
             })
             .map_err(|_| {
-                xai_tool_runtime::ToolError::custom("process_manager", "Scheduler actor stopped")
+                xai_tool_runtime::ToolError::custom(
+                    "process_manager",
+                    t("scheduler.error.actor_stopped"),
+                )
             })?;
 
         let removed = reply_rx
@@ -120,7 +127,7 @@ impl xai_tool_runtime::Tool for SchedulerDeleteTool {
             .map_err(|_| {
                 xai_tool_runtime::ToolError::custom(
                     "process_manager",
-                    "Scheduler actor dropped reply",
+                    t("scheduler.error.reply_dropped"),
                 )
             })?
             .map_err(scheduler_tool_error)?;
@@ -128,14 +135,14 @@ impl xai_tool_runtime::Tool for SchedulerDeleteTool {
         if removed {
             Ok(SchedulerDeleteOutput {
                 success: true,
-                message: format!("Scheduled task {} cancelled.", input.id),
+                message: t_fmt("tool.scheduler.deleted", &[("id", &input.id)]),
             })
         } else {
             Ok(SchedulerDeleteOutput {
                 success: false,
-                message: format!(
-                    "No scheduled task with ID {} found. Use scheduler_list to see active tasks.",
-                    input.id
+                message: t_fmt(
+                    "tool.scheduler.not_found",
+                    &[("id", &input.id)],
                 ),
             })
         }

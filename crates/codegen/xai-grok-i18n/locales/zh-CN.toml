@@ -3512,3 +3512,969 @@
 "consent.save_failed" = "✗ 无法保存你的回答，下次启动时会再次显示此通知"
 "session_picker.field.recap" = "回顾"
 "session_picker.field.last_turn" = "上一回合"
+
+# 全量检查新增文案
+"slash.usage.unavailable" = "/usage 当前不可用。"
+"slash.workflow.flag.agent_budget" = "设置子代理累计上限（1–1,024）"
+"slash.workflow.op.runs" = "显示工作流运行记录（仪表盘；最简模式显示文本概览）"
+"slash.workflow.op.pause" = "暂停正在运行的工作流"
+"slash.workflow.op.resume" = "恢复已暂停的工作流"
+"slash.workflow.op.stop" = "停止一次工作流运行"
+"slash.workflow.op.save" = "将运行脚本保存为命名工作流"
+"slash.workflow.description" = "启动已保存的工作流、列出运行记录，或管理运行（暂停、恢复、停止、保存）"
+"command.provenance.builtin" = "内置"
+"command.provenance.skill" = "技能 · {source}"
+"prompt_blocked.replaced" = "阻止提示卡片已被另一个问题替换。你的提示仍保留在队列最前端。"
+"prompt_blocked.choose_action" = "你的提示已被阻止，请选择编辑、重新发送或丢弃"
+"permission.local_workspace.suffix" = "（你的计算机上）"
+"error.effects.acp_timeout" = "{action} 在 {seconds} 秒后超时。它可能仍会在后台完成；立即重试可能遇到同样的延迟。"
+"task_result.workspace_load_failed" = "无法加载仪表盘工作区：{error}"
+"task_result.workspace_refreshing" = "仪表盘工作区已更改，正在刷新"
+"task_result.workspace_sync_failed_one" = "无法同步 1 个仪表盘会话"
+"task_result.workspace_sync_failed_many" = "无法同步 {count} 个仪表盘会话"
+"task_result.workspace_read_only" = "当前 Grok 版本中的仪表盘工作区为只读"
+"task_result.workspace_writer_failed" = "仪表盘工作区写入器失败，正在重新打开"
+"startup.failure.slow_machine_hint" = "在运行缓慢的计算机或网络文件系统上，增加启动预算可能会有帮助。请使用下面的命令进行设置。"
+"screen_mode.switched_minimal" = "已切换到最简模式 · 使用 /fullscreen 返回"
+"screen_mode.switched_fullscreen" = "已切换到全屏模式 · 使用 /minimal 返回"
+"screen_mode.switch_failed" = "无法切换到 {mode} 模式：{reason}"
+
+# 全量检查新增文案：工具、任务提醒和 ptyctl
+"tool.media.action.image_generated" = "图像已生成"
+"tool.media.action.video_generated" = "视频已生成"
+"tool.media.action.image_edited" = "图像已编辑"
+"tool.media.uploaded" = "{action}，并已上传到 {url}。文件不在本地，请通过此 URL 引用。不要读取或重新显示它，也不要描述它对用户的呈现效果。"
+"tool.media.saved" = "{action}，并已保存到 {path}。不要读取或重新显示它，也不要描述它对用户的呈现效果。"
+"tool.mcp.hint.long_line_json" = " 完整输出是包含超长行的有效 JSON，因此 grep/read_file 无法有效处理；请使用 `{shell}` 查询已保存的文件{examples}。"
+"tool.mcp.hint.json" = " 完整输出是已保存到上方文件中的有效 JSON；请使用 `{shell}` 查询它{examples}。"
+"tool.mcp.hint.long_line_text" = " 完整输出包含超长行，因此 grep/read_file 无法有效处理；请使用 `{shell}` 对已保存的文件进行切片或搜索{examples}。"
+"tool.mcp.full_output_written" = " 完整输出已写入：{path}。"
+"tool.mcp.output_truncated" = "[MCP 输出已截断：显示前 {shown}（共 {total}）。{file_hint}{steer}]"
+"tool.output.line_truncated" = "{text} [... 已截断（共 {count} 个字符）]"
+"tool.output.truncated_with_hint" = "[输出已截断，共 {total_bytes} 字节。{hint}]"
+"tool.output.truncated" = "[输出已截断，共 {total_bytes} 字节]"
+"path_suggestions.did_you_mean" = " 你是想输入 {path} 吗？"
+"path_suggestions.similar_parent" = "\n父目录中的相似项：{entries}"
+"path_suggestions.cwd_note" = "注意：你的当前工作目录是 {path}"
+"path_suggestions.not_exist" = "错误：{path} 不存在。"
+"task_completion.killed_notice" = "此任务已被用户终止，不要重新启动它。\n"
+"task_completion.status.signal" = "被信号 {signal} 终止"
+"task_completion.status.exit" = "退出代码：{code}"
+"task_completion.status.unknown" = "未知"
+"task_completion.background" = "后台任务“{id}”已完成（{status}）。\n命令：{command} | 时长：{duration} 秒\n{notice}"
+"task_completion.short_command_note" = "注意：这比后台命令的预期时长短得多。包装用 bash 可能在内部命令运行前被信号终止（例如 `pkill -f <pat>` 匹配到了它自己的 argv）。请检查命令中是否存在会匹配自身的终止模式、脚本自身发送的信号，或上游 SIGTERM/SIGHUP 来源。\n"
+"task_completion.full_content" = "使用 {tool} 读取 {path} 以获取完整内容"
+"task_completion.monitor_reason_signal" = "被信号 {signal} 终止"
+"task_completion.monitor_reason_exit" = "已退出（代码 {code}）"
+"task_completion.monitor_reason_ended" = "已结束"
+"task_completion.monitor" = "监视器“{id}”已结束：[监视器已结束：{reason}]。\n描述：{description}\n命令：{command}\n时长：{duration} 秒\n使用 {tool}(“{id}”) 获取完整输出。\n{notice}"
+"task_completion.running_one" = "注意：还有 1 个后台任务正在运行：\n"
+"task_completion.running_many" = "注意：还有 {count} 个后台任务正在运行：\n"
+"task_completion.running_item" = "- “{id}”（已运行 {duration} 秒）：{command}\n"
+"task_completion.duplicate_hint" = "在启动新任务前，可以使用 {tool} 终止重复任务。"
+"ptyctl.error" = "错误：{error}"
+"ptyctl.sessions.none" = "没有活动会话"
+"ptyctl.table.name" = "名称"
+"ptyctl.table.port" = "端口"
+"ptyctl.table.pid" = "PID"
+"ptyctl.table.server" = "服务器"
+"ptyctl.table.command" = "命令"
+"ptyctl.status.live" = "运行中"
+"ptyctl.status.dead" = "已停止"
+"ptyctl.server.command" = "命令：{command}"
+"ptyctl.server.pid" = "PID：{pid}"
+"ptyctl.server.listening" = "服务器正在端口 {port} 上监听"
+"ptyctl.error.client_build" = "无法构建 HTTP 客户端"
+"ptyctl.error.send" = "发送失败：{body}"
+"ptyctl.error.screen_query" = "屏幕查询失败：{body}"
+"ptyctl.error.failed_screen_query" = "查询屏幕失败"
+"ptyctl.error.invalid_size" = "尺寸格式无效，应为 COLSxROWS（例如 120x40）"
+"ptyctl.error.invalid_cols" = "列数无效"
+"ptyctl.error.invalid_rows" = "行数无效"
+"ptyctl.error.resize" = "调整大小失败"
+"ptyctl.error.resize_failed" = "调整大小失败：{body}"
+"ptyctl.resize.success" = "已调整为 {cols}x{rows}"
+"ptyctl.error.wait" = "调用 wait 失败"
+"ptyctl.error.wait_failed" = "等待失败：{body}"
+"ptyctl.error.invalid_wait_response" = "wait 响应无效"
+"ptyctl.error.stop" = "停止会话失败"
+"ptyctl.error.stop_failed" = "停止失败：{body}"
+"ptyctl.session.stopped" = "会话已停止"
+"ptyctl.run.already_running" = "会话“{name}”已在端口 {port} 上运行（使用 --force 替换它）"
+"ptyctl.error.bind" = "无法绑定 TCP 监听器"
+"ptyctl.error.server" = "HTTP 服务器错误"
+"task_completion.poll_full_output" = "使用 {tool}(\"{id}\") 获取完整输出。"
+"task_completion.response" = "响应：\n{output}"
+"task_completion.subagent_status.success" = "成功"
+"task_completion.subagent_status.failure" = "失败"
+"task_completion.subagent" = "后台子代理“{id}”（“{type}”：“{description}”）已完成，结果为{status}。\n时长：{duration} 秒 | 工具调用：{tool_calls} 次 | 回合：{turns}"
+"task_completion.scheduler_cleanup" = "如果监视的工作已完成，请调用 `{tool}(\"{id}\")` 停止监视器。"
+"task_completion.between_turn.subagent_one" = "你空闲期间，1 个后台子代理已完成：\n"
+"task_completion.between_turn.subagent_many" = "你空闲期间，{count} 个后台子代理已完成：\n"
+"task_completion.between_turn.subagent_item" = "- [{type}] {description} — {status}（{duration} 秒，{tool_calls} 次工具调用）\n  subagent_id：{id}"
+"task_completion.between_turn.status.success" = "已成功完成"
+"task_completion.between_turn.status.failure" = "失败"
+"task_completion.between_turn.task_one" = "你空闲期间，1 个后台任务已完成：\n"
+"task_completion.between_turn.task_many" = "你空闲期间，{count} 个后台任务已完成：\n"
+"task_completion.monitor_description_default" = "监视器"
+"task_completion.monitor_events.header" = "来自 {groups} 个{monitor_label}的 {events} 个监视器事件（使用 {tool} 识别每个监视器）："
+"task_completion.monitor_events.monitor_one" = "监视器"
+"task_completion.monitor_events.monitor_many" = "监视器"
+"task_completion.monitor_events.event_default" = "事件"
+"ptyctl.error.send_keys" = "发送按键失败"
+"ptyctl.error.cursor_query" = "查询光标失败"
+"ptyctl.error.status_query" = "查询状态失败"
+"ptyctl.registry.create_dir" = "无法创建会话注册目录"
+"ptyctl.registry.write" = "无法写入会话文件"
+"ptyctl.registry.rename" = "无法重命名会话文件"
+"ptyctl.registry.read" = "无法读取会话文件"
+"ptyctl.registry.parse" = "无法解析会话文件"
+"ptyctl.registry.remove" = "无法删除会话文件"
+"ptyctl.registry.state_dir" = "无法确定状态目录"
+"ptyctl.registry.not_found" = "找不到会话“{name}”"
+"ptyctl.registry.read_dir" = "无法读取会话目录"
+
+# 全量检查续补：工具、任务输出、计划模式和 ptyctl 帮助
+"media_gen.conjunction" = "和"
+"media_gen.limit_separator" = "；上限为 "
+"media_gen.max_limit" = "{names}上限为 {max}"
+"media_gen.resample_reminder" = "请仔细考虑用户消息，再生成后续回复和工具调用。如果要进行 {names} 调用，请在一次并行调用集合中遵守{limits}。更大的请求将被拒绝。"
+"media_gen.rejected" = "已拒绝：单个模型步骤最多允许 {max} 次 `{name}` 工具调用（本批次有 {total} 次）。这次额外调用已跳过。如果仍需更多调用，请在新步骤中最多进行 {max} 次 `{name}` 调用。"
+
+"tool.web_fetch.recovery_footer" = " 显示前 {shown_bytes} / {total_bytes} 字节。{file_hint}"
+"tool.web_fetch.full_content_saved" = "完整内容已保存到：{path}。"
+"tool.web_fetch.read_chunks" = " 请使用 `{read_tool}` 配合偏移量和限制分块读取。"
+"tool.web_fetch.long_line_json" = "保存的文件是包含超长行的有效 JSON，因此按行读取和搜索工具无法有效处理；请使用 `{execute}` 对它执行{action}{examples}。"
+"tool.web_fetch.long_line_json_lines" = "保存的文件是包含超长行的 JSON Lines，因此按行读取和搜索工具无法有效处理；请使用 `{execute}` 对它执行{action}{examples}。"
+"tool.web_fetch.long_line_markdown" = "保存的文件是包含超长行的 Markdown，因此按行读取和搜索工具无法有效处理；请使用 `{execute}` 对它执行{action}{examples}。"
+"tool.web_fetch.long_line_text" = "保存的文件是包含超长行的文本，因此按行读取和搜索工具无法有效处理；请使用 `{execute}` 对它执行{action}{examples}。"
+"tool.web_fetch.json" = "保存的文件是有效 JSON；请使用 `{execute}` 查询它{examples}。"
+"tool.web_fetch.json_lines" = "保存的文件是 JSON Lines；请使用 `{execute}` 查询它{examples}。"
+"tool.web_fetch.inspect" = "请使用 `{execute}` 检查它{examples}。"
+"tool.fs.unicode_filename_fallback" = "指定的文件名并非以给定形式精确存在。通过将 Unicode 字符{chars}规范化为 ASCII 等价字符，找到了一个文件。实际文件名为：{matched_name}\n对于引用此文件的 shell 命令，请使用 glob 模式以避免不匹配。"
+
+"tool.read.file_empty" = "文件为空。"
+"tool.read.no_lines_past_end" = "（未返回任何行：请求窗口超出文件末尾；文件共有 {total_lines} 行）"
+"tool.read.no_lines" = "（未返回任何行）"
+"tool.read.image_inline" = "[此工具结果中已内联包含 {mime_type} 类型的图像内容]"
+"tool.read.pdf_summary" = "[读取 PDF：已渲染 {rendered} 页（页面 {pages}）。文档共 {total_pages} 页，大小为 {size_kb} KB]"
+"tool.web_search.results_for" = "Web 搜索结果（查询：\"{query}\"）\n\n{content}"
+"tool.mcp.call_failed" = "调用 {tool} 失败：{error}"
+
+"task_output.subject.task" = "任务"
+"task_output.subject.subagent" = "子代理"
+"task_output.wait.per_call_max" = "已等待 {waited}，达到单次调用上限（你请求的等待时间为 {requested}）；{subject}仍在运行。无需再次调用。"
+"task_output.wait.requested" = "已等待请求的 {waited}；{subject}仍在运行。"
+"task_output.wait.returned_early" = "由于另一个任务已完成，等待提前返回；此{subject}仍在运行。"
+"task_output.wait.not_requested" = "请使用 timeout_ms 等待完成。"
+"task_output.wait.auto_notify" = "{subject}完成后会自动通知你。"
+"task_output.not_found.none" = "找不到任务 {task_id}。此会话中不存在后台任务或子代理。"
+"task_output.not_found.known" = "找不到任务 {task_id}。已知任务 ID：[{ids}]"
+"task_output.not_found.short" = "找不到任务 {task_id}。"
+"task_output.mode.wait_all" = "wait_all"
+"task_output.mode.poll" = "poll"
+"task_output.multi.summary" = "已完成 {completed}/{total} 个任务（{mode}）"
+"task_output.subagent.initializing" = "子代理正在初始化（创建工作树、解析配置）。\n类型：{type}\n描述：{description}\n已用时：{elapsed} 秒"
+"task_output.subagent.no_tools" = "暂未使用"
+"task_output.subagent.running" = "子代理仍在运行。\n类型：{type}\n描述：{description}\n已用时：{elapsed} 秒\n进度：第 {turns} 回合，调用工具 {tool_calls} 次，已用 {tokens}K/{capacity}K token（上下文 {context}%）\n使用的工具：{tools}\n错误数：{errors}"
+"task_output.result.title" = "=== 任务 {task_id} ==="
+"task_output.result.command" = "命令：{command}"
+"task_output.result.status" = "状态：{status}"
+"task_output.result.duration" = "时长：{duration} 秒"
+"task_output.result.exit_code" = "退出代码：{code}"
+"task_output.result.output_file" = "输出文件：{path}"
+"task_output.result.output_header" = "=== 输出 ==="
+"task_output.result.no_output_yet" = "（暂无输出）"
+"task_output.result.no_output" = "（无输出）"
+"task_output.multi.title" = "=== 多任务等待（{mode}）==="
+"task_output.multi.task" = "--- 任务 {task_id} [{status}] ---\n命令：{command}\n时长：{duration} 秒"
+"task_output.multi.exit_code" = "退出代码：{code}"
+
+"plan_mode.task_hint" = "\n     你可以使用 {tool} 工具并设置 subagent_type=\"explore\"，在不占满上下文的情况下并行探索代码库。"
+"plan_mode.file.empty" = "请将计划写入 {path}。该文件存在且为空。"
+"plan_mode.file.non_empty" = "请将计划写入 {path}。该文件已存在且不为空。"
+"plan_mode.file.not_created" = "文件尚未创建。"
+"plan_mode.file.not_a_file" = "该路径上已经存在一个目录。"
+"plan_mode.file.inaccessible" = "无法访问该文件。"
+"plan_mode.file.unavailable" = "计划文件位置不可用。"
+"plan_mode.file.missing" = "请将计划写入 {path}。{detail}"
+"plan_mode.instructions" = "{message}\n\n{plan_status}\n\n在计划模式下，你应该：\n1. 彻底探索代码库，了解现有模式{task_hint}\n2. 找出相似功能和代码库架构，并理解其中的权衡\n3. 如果需要澄清方案，请使用 {ask_user}\n4. 设计具体的实现策略\n5. 将计划写入上面的计划文件\n6. 准备好后，使用 {exit_plan} 向用户展示计划。"
+"plan_mode.exit.saved" = "{message}\n\n你的计划已保存到：{path}\n\n## 计划：\n{content}"
+"tool.monitor.persistent" = "监视器已启动（任务 {task}，持久运行，直到 {kill_tool} 或会话结束）。\n每个事件到达时都会通知你。请继续工作，不要轮询或休眠等待。\n你等待用户期间也可能收到事件；事件不是用户的回复。"
+"tool.monitor.timeout" = "监视器已启动（任务 {task}，超时 {timeout_ms} 毫秒）。\n每个事件到达时都会通知你。请继续工作，不要轮询或休眠等待。\n你等待用户期间也可能收到事件；事件不是用户的回复。"
+"tool.scheduler.created" = "已创建计划任务（ID：{id}，{schedule}）。"
+"tool.scheduler.updated" = "已更新计划任务（ID：{id}，{schedule}）。"
+"tool.scheduler.none" = "没有计划任务。"
+"tool.scheduler.deleted" = "已取消计划任务 {id}。"
+"tool.scheduler.not_found" = "未找到 ID 为 {id} 的计划任务。请使用 scheduler_list 查看活动任务。"
+
+"ptyctl.cli.about" = "在 PTY 中运行命令，并通过 HTTP 控制它们"
+"ptyctl.command.run" = "在 PTY 中启动命令并启动 HTTP 控制服务器"
+"ptyctl.command.send" = "向运行中的会话发送按键"
+"ptyctl.command.screen" = "查询终端屏幕内容"
+"ptyctl.command.status" = "查询进程状态"
+"ptyctl.command.stop" = "停止运行中的会话"
+"ptyctl.command.resize" = "调整终端尺寸"
+"ptyctl.command.cursor" = "查询光标位置"
+"ptyctl.command.wait" = "等待屏幕条件（事件驱动，不轮询）。退出代码：0 表示匹配，1 表示超时（stdout 上输出失败 JSON），2 表示用法或连接错误"
+"ptyctl.command.list" = "列出已注册会话"
+"ptyctl.arg.command" = "要运行的命令（在命令前使用 --）"
+"ptyctl.arg.width" = "终端列数"
+"ptyctl.arg.height" = "终端行数"
+"ptyctl.arg.cwd" = "工作目录"
+"ptyctl.arg.env" = "环境变量（KEY=VAL，可重复）"
+"ptyctl.arg.port" = "监听的 TCP 端口（0 = 自动分配）"
+"ptyctl.arg.name" = "会话名称（注册到 ~/.local/state/ptyctl/sessions/）"
+"ptyctl.arg.force" = "接管已有会话名称（替换注册信息，但不会停止旧服务器）"
+"ptyctl.arg.timeout" = "在 N 秒后关闭"
+"ptyctl.arg.linger" = "进程退出后保持服务器运行"
+"ptyctl.arg.quiet" = "抑制输出（仅打印端口号）"
+"ptyctl.arg.keys" = "要发送的按键（vim 表示法）"
+"ptyctl.arg.enter" = "在按键后追加 Enter（<CR>）"
+"ptyctl.arg.rows" = "行范围，从 1 开始计数（例如 \"1:5\"）"
+"ptyctl.arg.cols" = "列范围，从 1 开始计数"
+"ptyctl.arg.json" = "以 JSON 输出"
+"ptyctl.arg.cursor" = "使用此字符显示光标位置"
+"ptyctl.arg.ansi" = "包含 ANSI 转义码"
+"ptyctl.arg.styled" = "以带样式 JSON 输出（适合 LLM）"
+"ptyctl.arg.html" = "以 HTML 输出"
+"ptyctl.arg.full" = "包含末尾空行"
+"ptyctl.arg.line_numbers" = "显示行号"
+"ptyctl.arg.size" = "新尺寸，格式为 COLSxROWS（例如 \"120x40\"）"
+"ptyctl.arg.wait_text" = "等待此文本出现在屏幕上"
+"ptyctl.arg.wait_regex" = "等待此正则表达式匹配屏幕文本"
+"ptyctl.arg.wait_gone" = "等待此文本从屏幕上消失"
+"ptyctl.arg.stable_ms" = "等待屏幕在指定毫秒数内保持不变"
+"ptyctl.arg.wait_timeout" = "超时秒数（服务器上限为 120）"
+"ptyctl.arg.host" = "远程主机地址（例如 127.0.0.1:8080）"
+"ptyctl.arg.target_port" = "本地服务器端口"
+"ptyctl.arg.target_name" = "会话名称（来自注册表）"
+"ptyctl.error.no_target" = "未指定目标"
+
+"tool.web_fetch.action.query" = "查询"
+"tool.web_fetch.action.slice_or_search" = "切片或搜索"
+"task_output.invalid_args.empty_ids" = "请提供非空的 task_ids 列表。"
+"task_output.invalid_args.too_many_ids" = "task_ids 超过最大条目数 {max}。"
+
+"tool.description.task" = "启动一个独立处理任务并返回结果的子代理。\n\n代理类型：\n\n{agent_lines}\n\n## 使用说明\n- 代理完成后会返回一条包含其代理 ID 的消息。使用该 ID 可在之后继续代理对话。\n- {run_in_background_param}：立即返回 subagent_id。使用 {background_retrieval_tool} 获取结果。该值默认为 true。\n- 子代理会接收一份压缩后的项目说明（AGENTS.md）。如果任务需要详细约定（例如构建规则、测试模式），请在提示中直接包含相关规则。\n- 使用 {task_tool} 工具时，必须指定 {subagent_type_param} 参数来选择代理类型。\n- 启动相互独立的子代理时，必须在结束前根据要求将结果纳入任务。\n\n继续之前的代理（resume_from）：\n- 使用 {resume_from_param} 继续之前已完成的子代理对话。传入之前调用 {task_tool} 返回的 subagent_id。继续的代理会保留完整对话记录和工具状态，因此只需描述发生了什么变化，无需重新解释原始任务。\n- 继续的代理必须与源代理使用相同的 subagent_type。\n\n隔离模式：\n- 使用 {isolation_param} 控制子代理的执行环境。使用 'worktree' 时，子代理在隔离的工作树中运行，其编辑不会影响父工作区；子代理完成后会保留该工作树，路径会在结果中返回。"
+"tool.description.subagent.general_purpose" = "用于多步骤任务的通用代理。"
+"tool.description.subagent.explore" = "专用于探索代码库的快速只读代理。"
+"tool.description.subagent.plan" = "负责制定实现策略的软件架构师。"
+"tool.description.subagent_tools.general_purpose" = "可使用：${{ tools.by_kind.execute }}、${{ tools.by_kind.read }}、${{ tools.by_kind.edit }}、${{ tools.by_kind.list }}、${{ tools.by_kind.search }}、${{ tools.by_kind.web_search }} 和 ${{ tools.by_kind.plan }}。"
+"tool.description.subagent_tools.explore" = "只读代理，可使用：${{ tools.by_kind.read }}、${{ tools.by_kind.list }}、${{ tools.by_kind.search }}。"
+"tool.description.subagent_tools.plan" = "只读代理，可使用：${{ tools.by_kind.read }}、${{ tools.by_kind.list }}、${{ tools.by_kind.search }}、${{ tools.by_kind.web_search }} 和 ${{ tools.by_kind.plan }}。无法执行文件编辑和命令执行。"
+"tool.description.lifecycle.target_suffix.monitor_subagent" = "、监视器或子代理"
+"tool.description.lifecycle.target_suffix.monitor" = "或监视器"
+"tool.description.lifecycle.target_suffix.subagent" = "或子代理"
+"tool.description.lifecycle.target_suffix.none" = ""
+"tool.description.lifecycle.monitor_task_id_note" = "（监视器的 {id_name} 由 {monitor} 返回）"
+"tool.description.lifecycle.sources.same_param" = "{param}=true 的命令或子代理"
+"tool.description.lifecycle.sources.commands_and_subagents" = "{bash_param}=true 的命令或 {subagent_param}=true 的子代理"
+"tool.description.lifecycle.sources.commands" = "{bash_param}=true 的命令"
+"tool.description.lifecycle.sources.subagents" = "{subagent_param}=true 的子代理"
+"tool.description.lifecycle.sources.background_tasks" = "后台任务"
+"tool.description.lifecycle.kill_verb.windows" = "终止"
+"tool.description.lifecycle.kill_verb.posix" = "向其发送 SIGTERM/SIGKILL"
+"tool.description.lifecycle.kill_action.monitor_clause" = "或监视器"
+"tool.description.lifecycle.kill_action.subagent_clause" = "；向子代理发送 Cancel+Shutdown"
+"tool.description.lifecycle.kill_action.bash" = "{verb} bash 任务{monitor_clause}{subagent_clause}"
+"tool.description.lifecycle.kill_action.subagent" = "向子代理发送 Cancel+Shutdown"
+"tool.description.lifecycle.kill_action.monitor" = "{verb}监视器"
+"tool.description.lifecycle.kill_task" = "终止正在运行的后台任务{target_suffix}。\n\n使用说明：\n- 传入其 {task_id_param}{monitor_note}。\n- {action}。\n- 如果任务已被终止或已经退出，则返回成功。"
+"tool.description.lifecycle.read_note" = "\n- 如果输出较大，请在 output_file 路径上使用 {read_tool}"
+"tool.description.lifecycle.task_output" = "获取后台任务{target_suffix}的输出和状态。\n\n使用说明：\n- 传入包含一个或多个 ID 的 {task_ids_param}，来源为{sources}{monitor_note}；单个任务使用只有一个元素的数组。传入正数 {timeout_ms_param} 时，多个 ID 会等待全部完成\n- 省略 {timeout_ms_param} 或传入 0 可进行非阻塞状态快照；传入正数 {timeout_ms_param} 时最多等待指定毫秒数，上限为 {wait_cap}\n- 如果任务已完成，则返回当前输出、状态和退出代码{read_note}"
+"tool.description.lifecycle.wait_tasks" = "等待多个后台任务或子代理完成。\n\n优先使用带有 task_ids 和正数 timeout_ms 的 {background_retrieval_tool}。此工具仅为兼容性保留。\n\n使用说明：\n- task_ids：来源为{sources}的任务 ID 列表\n- mode：'wait_all' 或 'wait_any'\n- timeout_ms：可选的最长等待时间，默认为 30 秒，上限为 {wait_cap}"
+"tool.scheduler.description.create" = "创建一个按固定间隔运行提示的计划任务，或就地更新已有任务。\n\n当用户要求循环、重复执行或安排提示或任务时使用此工具。\n\n设置 fire_immediately: true 可在创建时额外执行一次；默认首次执行会等待一个间隔。\n\n要修改已有任务，请传入 task_id：提供的字段会替换原字段，省略的字段保持不变，计划会保持其阶段。未知 ID 会报错。\n\n使用说明：\n- 间隔格式：'5m'（分钟）、'2h'（小时）、'1d'（天）、'60s'（秒，最小 60）\n- 同时最多 50 个计划任务\n- 计划任务会在 {ttl} 天后自动过期\n- 对于一次性的延迟工作，请运行后台终端命令（例如 `sleep 1800 && <command>`）；完成后会通知你"
+"tool.description.list_all_active_scheduled_tasks_with_their_ids_prompts_intervals_and_next_fire_times" = "列出所有活动计划任务及其 ID、提示、间隔和下次执行时间。"
+"tool.description.cancel_a_scheduled_task_by_id" = "按 ID 取消计划任务。\n\n如果找到并删除了任务，则返回 success: true；如果没有该 ID 的任务，则返回 false。"
+"scheduler.error.invalid_interval" = "间隔无效：{detail}"
+"scheduler.error.task_limit_reached" = "已达到计划任务上限 {max}"
+"scheduler.error.task_not_found" = "找不到 ID 为 {id} 的计划任务；请调用 scheduler_list 查看活动任务 ID"
+"scheduler.error.persistence" = "保存计划任务资源失败：{error}"
+"scheduler.error.notification" = "发布计划任务墓碑通知失败：{error}"
+"scheduler.error.no_durable_notification_consumer" = "持久计划任务删除需要一个会确认的通知消费者"
+"scheduler.error.removal_pending" = "计划任务 {id} 的删除正在等待处理"
+"scheduler.error.cancelled" = "计划任务删除已取消"
+"scheduler.error.timeout" = "计划任务删除超时"
+"scheduler.interval.empty" = "间隔不能为空"
+"scheduler.interval.invalid_format" = "间隔格式无效：{value}（例如 5m、2h、1d）"
+"scheduler.interval.value_positive" = "间隔值必须大于 0"
+"scheduler.interval.invalid_suffix" = "间隔后缀无效：{suffix}（应为 s、m、h 或 d）"
+"scheduler.interval.too_large" = "间隔过大：{value}"
+"scheduler.interval.every_day" = "每 1 天"
+"scheduler.interval.every_days" = "每 {n} 天"
+"scheduler.interval.every_hour" = "每 1 小时"
+"scheduler.interval.every_hours" = "每 {n} 小时"
+"scheduler.interval.every_minute" = "每 1 分钟"
+"scheduler.interval.every_minutes" = "每 {n} 分钟"
+"scheduler.interval.every_second" = "每 1 秒"
+"scheduler.interval.every_seconds" = "每 {n} 秒"
+
+"scheduler.error.nothing_to_update" = "没有可更新的内容：请在 task_id 旁提供 interval 和/或 prompt"
+"scheduler.error.one_shot_unsupported" = "不支持一次性任务；请改为运行后台终端命令（`sleep <secs> && <command>`，background: true），或立即执行工作"
+"scheduler.error.interval_required" = "创建任务时必须提供 interval"
+"scheduler.error.prompt_required" = "创建任务时必须提供 prompt"
+"scheduler.error.actor_stopped" = "计划任务 actor 已停止"
+"scheduler.error.reply_dropped" = "计划任务 actor 已丢弃回复"
+"scheduler.error.missing_dependency" = "缺少依赖：SchedulerHandle"
+"tool.schema.id_of_an_existing_task_to_update_in_place_provided_fields_replace_old_values_omitted_ones_are_unchanged_the_schedule_keeps_its_phase_and_an_unknown_id_errors_omit_to_create_a_task" = "要就地更新的已有任务 ID：提供的字段会替换原字段，省略的字段保持不变，计划会保持其阶段，未知 ID 会报错。创建任务时省略。"
+"tool.schema.interval_between_executions_e_g_5m_2h_1d_required_to_create_optional_with_task_id" = "执行间隔，例如 \"5m\"、\"2h\"、\"1d\"。创建时必填；传入 task_id 时可选"
+"tool.schema.the_prompt_text_to_execute_on_each_scheduled_fire_required_to_create_optional_with_task_id" = "每次计划执行时要运行的提示文本。创建时必填；传入 task_id 时可选"
+"tool.schema.whether_the_task_persists_across_sessions_default_false_create_only_ignored_with_task_id" = "任务是否跨会话持久化。默认值：false。仅创建时有效：传入 task_id 时忽略"
+"tool.schema.run_each_fire_as_a_main_conversation_turn_instead_of_a_background_subagent_set_true_only_when_runs_need_the_conversation_s_context_default_false_create_only_ignored_with_task_id" = "每次执行都作为主对话回合运行，而不是后台子代理；只有需要当前对话上下文时才设为 true。默认值：false。仅创建时有效：传入 task_id 时忽略"
+"tool.schema.whether_to_fire_immediately_on_creation_true_or_wait_for_the_first_interval_false_default_false_create_only_ignored_with_task_id" = "创建时是否立即执行（true），还是等待第一个间隔（false）。默认值：false。仅创建时有效：传入 task_id 时忽略"
+"tool.schema.the_task_id_to_cancel_from_scheduler_create_output" = "要取消的任务 ID（来自 scheduler_create 输出）"
+"tool.schema.task_ids_to_get_output_from_pass_one_or_more_for_a_single_task_use_a_one_element_array_with_a_positive_timeout_ms_multiple_ids_wait_until_all_complete_omit_timeout_ms_or_pass_0_for_a_non_blocking_snapshot" = "要获取输出的任务 ID。传入一个或多个；单个任务使用只有一个元素的数组。传入正数 timeout_ms 时，多个 ID 会等待全部完成。省略 timeout_ms 或传入 0 可进行非阻塞快照。"
+"tool.schema.max_wait_time_in_milliseconds_up_to_max_wait_ms_a_positive_value_waits_for_completion_omit_or_pass_0_for_a_non_blocking_status_poll" = "最长等待时间，单位为毫秒，上限为 {max_wait_ms}。传入正数会等待完成；省略或传入 0 可进行非阻塞状态轮询。"
+
+"tool.task.continue_parent_work" = "不要只轮询子代理。现在继续完成父任务中尚未完成的工作。"
+"tool.task.background_result_line" = "需要结果时，请使用 {task_output_tool}，传入 {task_ids_param}=[\"{subagent_id}\"] 和正数 {timeout_ms_param}。"
+"tool.task.started_background" = "子代理已在后台启动。\nsubagent_id: {subagent_id}\ntype: {subagent_type}\ndescription: {description}\n\n{result_line}"
+"tool.task.auto_backgrounded.notify_clause" = "，完成后会通知你"
+"tool.task.auto_backgrounded" = "子代理运行时间超过前台等待预算，已移至后台以保持对话响应。它仍在运行{notify_clause}。\nsubagent_id: {subagent_id}\ntype: {subagent_type}\ndescription: {description}\n\n{result_line}"
+"tool.task.completed" = "{output}\n\n<subagent_meta>id={subagent_id}, type={subagent_type}, tool_calls={tool_calls}, turns={turns}, duration_ms={duration_ms}</subagent_meta>\n\n{footer}"
+"tool.task.resume_footer" = "<subagent_result>\nsubagent_id: {subagent_id}\nsubagent_type: {subagent_type}\n要继续此子代理的对话，请使用 resume_from=\"{subagent_id}\"。"
+"tool.task.resume_persona" = "\n该子代理使用了 persona=\"{persona}\"。恢复时请传入相同的 persona。"
+"tool.task.resume_footer_end" = "\n</subagent_result>"
+"tool.description.lifecycle.wait_cap.seconds" = "{ms}（约 {seconds} 秒）"
+"tool.description.lifecycle.wait_cap.minutes" = "{ms}（约 {minutes} 分钟）"
+"tool.description.task.model_guidance.none" = "\n\n当前没有可用的显式模型 slug。省略 `{model_param}` 以继承父代理模型。"
+"tool.description.task.model_guidance.available" = "\n\n如果用户明确要求指定子代理或任务使用的模型，则只能从以下模型 slug 列表中选择：\n{model_list}\n\n如果用户没有明确要求指定模型，请省略 `{model_param}` 以继承父代理模型。"
+
+"tool.schema.the_full_task_prompt_for_the_subagent_to_execute" = "要由子代理执行的完整任务提示。"
+"tool.schema.short_description_of_the_task_3_5_words" = "任务的简短描述（3-5 个词）。"
+"tool.schema.name_of_the_subagent_type_to_launch_built_in_types_general_purpose_explore_plan_additional_user_defined_types_may_also_be_available" = "要启动的子代理类型名称。内置类型：\"general-purpose\"、\"explore\"、\"plan\"。也可能提供其他用户定义的类型。"
+"tool.schema.returns_immediately_with_a_subagent_id_use_the_task_output_tool_to_retrieve_results_this_is_set_to_true_by_default" = "立即返回 subagent_id。使用任务输出工具获取结果。此值默认为 true。"
+"tool.schema.isolation_mode_none_default_shared_workspace_or_worktree_isolated_git_worktree_worktree_mode_prevents_the_child_s_edits_from_affecting_the_parent_workspace_until_explicitly_merged" = "隔离模式：\"none\"（默认，共享工作区）或 \"worktree\"（隔离的 Git 工作树）。工作树模式会阻止子代理的编辑在明确合并前影响父工作区。"
+"tool.schema.resume_from_a_previously_completed_subagent_s_conversation_pass_the_subagent_id_returned_by_a_prior_task_call_the_new_subagent_continues_the_previous_one_s_raw_transcript_with_the_new_task_prompt_appended_the_source_must_be_completed_not_running_belong_to_the_current_session_and_use_the_same_subagent_type" = "从之前已完成的子代理对话继续。传入之前调用 task 返回的 subagent_id。新的子代理会继续之前的原始对话记录，并追加新的任务提示。源子代理必须已完成（不能正在运行）、属于同一父会话，并使用相同的 subagent_type。"
+"tool.schema.explicit_working_directory_for_the_subagent_the_path_must_exist_and_be_a_directory_mutually_exclusive_with_isolation_worktree_ignored_when_resume_from_is_set_the_resumed_child_inherits_its_source_s_cwd_worktree" = "子代理的显式工作目录。路径必须存在且为目录。与 isolation=\"worktree\" 互斥。设置 resume_from 时会忽略此项（恢复的子代理继承源子代理的 cwd/worktree）。"
+"tool.schema.optional_model_slug_for_this_agent_if_provided_it_must_resolve_to_one_of_the_available_model_slugs_if_omitted_the_subagent_uses_the_same_model_as_the_parent_agent_do_not_pass_if_resume_from_is_set_prior_model_will_be_used_only_choose_an_explicit_model_when_the_user_directly_requests_it" = "此代理可选的模型 slug。如果提供，必须解析为可用模型 slug 之一。如果省略，子代理使用父代理的相同模型。设置 resume_from 时不要传入（会使用之前的模型）。只有用户直接要求时才选择显式模型。"
+"tool.schema.task_ids_to_wait_for" = "要等待的任务 ID"
+"tool.schema.wait_mode_wait_any_return_when_first_completes_or_wait_all_wait_for_all" = "等待模式：'wait_any'（第一个完成时返回）或 'wait_all'（等待全部完成）"
+"tool.schema.max_wait_time_in_milliseconds_up_to_max_wait_ms" = "最长等待时间（毫秒），上限为 {max_wait_ms}"
+"tool.schema.the_task_id_to_terminate" = "要终止的任务 ID"
+
+"tool.schema.the_url_to_fetch_content_from" = "要获取内容的 URL。"
+"tool.schema.the_search_query_to_perform" = "要执行的搜索查询。"
+"tool.schema.optional_list_of_domains_to_restrict_search_to" = "可选的域名限制列表。"
+"tool.schema.path_to_directory_to_list_contents_of_relative_to_the_workspace_root_or_absolute" = "要列出内容的目录路径，可以是相对于工作区根目录的路径或绝对路径。"
+"tool.schema.the_regular_expression_pattern_to_search_for_in_file_contents_rg_regexp" = "要在文件内容中搜索的正则表达式模式（rg --regexp）"
+"tool.schema.file_or_directory_to_search_in_rg_pattern_path_defaults_to_workspace_path" = "要搜索的文件或目录（rg pattern -- PATH）。默认为工作区路径。"
+"tool.schema.glob_pattern_rg_glob_glob_path_to_filter_files_e_g_js_ts_tsx" = "用于筛选文件的 Glob 模式（rg --glob GLOB -- PATH）（例如 \"*.js\"、\"*.{ts,tsx}\"）。"
+"tool.schema.number_of_lines_to_show_before_each_match_rg_b" = "每个匹配项前显示的行数（rg -B）。"
+"tool.schema.number_of_lines_to_show_after_each_match_rg_a" = "每个匹配项后显示的行数（rg -A）。"
+"tool.schema.number_of_lines_to_show_before_and_after_each_match_rg_c" = "每个匹配项前后显示的行数（rg -C）。"
+"tool.schema.case_insensitive_search_rg_i" = "不区分大小写的搜索（rg -i）。"
+"tool.schema.file_type_to_search_rg_type_common_types_js_py_rust_go_java_etc_more_efficient_than_glob_for_standard_file_types" = "要搜索的文件类型（rg --type）。常见类型：js、py、rust、go、java 等。对于标准文件类型，比 glob 更高效。"
+"tool.schema.limit_output_to_first_n_lines_entries_equivalent_to_head_n_defaults_to_200_lines_or_500_entries" = "将输出限制为前 N 行或条目，相当于 \"| head -N\"。默认为 200 行或 500 个条目。"
+"tool.schema.enable_multiline_mode_where_matches_newlines_and_patterns_can_span_lines_rg_u_multiline_dotall" = "启用多行模式，使 . 可以匹配换行符，模式可以跨行匹配（rg -U --multiline-dotall）。"
+"tool.schema.unique_identifier_for_the_todo_item" = "待办事项的唯一标识符"
+"tool.schema.the_description_content_of_the_todo_item" = "待办事项的描述或内容"
+"tool.schema.the_status_of_the_todo_item_pending_in_progress_completed_or_cancelled" = "待办事项的状态：pending、in_progress、completed 或 cancelled"
+"tool.schema.optional_when_true_default_merges_the_provided_todos_into_the_existing_list_by_id_send_only_the_items_you_are_changing_and_to_flip_status_without_changing_content_send_just_id_status_when_false_the_provided_todos_replace_the_existing_list" = "可选项。为 true（默认）时，按 id 将提供的待办项合并到现有列表；只发送正在修改的项目，如需仅切换状态而不改变内容，只发送 id + status。为 false 时，提供的待办项会替换现有列表。"
+"tool.schema.array_of_todo_items_to_write_to_the_workspace" = "要写入工作区的待办事项数组"
+"tool.schema.option_text_shown_to_the_user_a_few_words_at_most" = "向用户显示的选项文本，最多几个词。"
+"tool.schema.what_picking_this_option_means_or_implies" = "选择此选项的含义或影响。"
+"tool.schema.optional_content_shown_while_the_option_is_focused_mockups_code_snippets_anything_the_user_should_compare_single_select_questions_only" = "聚焦选项时显示的可选内容，例如模型图、代码片段或任何应供用户比较的内容。仅适用于单选问题。"
+"tool.schema.the_question_to_ask_phrased_as_a_full_question" = "要提出的问题，需完整表述为一个问题。"
+"tool.schema.the_choices_for_this_question" = "此问题的选项。"
+"tool.schema.let_the_user_pick_more_than_one_option_default_false" = "允许用户选择多个选项（默认为 false）。"
+"tool.schema.the_questions_to_ask_each_with_its_own_options" = "要提出的问题，每个问题包含自己的选项。"
+"tool.schema.the_bash_command_to_run" = "要运行的 bash 命令。"
+"tool.schema.the_command_to_run" = "要运行的命令。"
+"tool.schema.optional_timeout_in_milliseconds_max_300000_default_120000_2_minutes_enforced_for_foreground_commands_only" = "可选超时时间，单位为毫秒（最大 300000）。默认为 120000（2 分钟），仅对前台命令强制执行。"
+"tool.schema.one_sentence_explanation_as_to_why_this_command_needs_to_be_run_and_how_it_contributes_to_the_goal" = "用一句话说明为何需要运行此命令，以及它如何有助于实现目标。"
+"tool.schema.set_to_true_for_long_running_commands_that_should_run_in_the_background_e_g_dev_servers_long_builds_returns_a_task_id_immediately_while_the_command_keeps_running_in_the_background_if_system_reminders_enabled_you_are_notified_on_completion_so_do_not_poll_or_sleep_wait_for_it_elif_tools_by_kind_background_task_action_check_on_it_later_with_the_tools_by_kind_background_task_action_tool_endif" = "对于应在后台运行的长时间命令（例如开发服务器、长时间构建），设置为 true。命令在后台继续运行时会立即返回任务 ID${%- if system_reminders_enabled %}；完成后会通知你，因此不要轮询或休眠等待${%- elif tools.by_kind.background_task_action %}；稍后使用 ${{ tools.by_kind.background_task_action }} 工具检查${%- endif }。"
+
+"tool.schema.a_text_description_of_the_desired_edit_or_transformation_describe_what_the_output_image_should_look_like_referencing_the_input_image_s" = "所需编辑或转换的文本描述。请描述输出图像应呈现的样子，并引用输入图像。"
+"tool.schema.reference_image_s_to_condition_the_edit_on_each_is_one_reference_in_priority_order_1_a_user_attachment_its_placeholder_token_e_g_image_1_attachments_have_no_path_you_can_see_so_never_invent_one_2_an_absolute_filesystem_path_the_user_gave_you_3_a_data_image_base64_url" = "用于控制编辑效果的参考图像。每一项都是一个参考，按优先级排列：(1) 用户附件及其占位符令牌，例如 \"[Image #1]\"（附件没有可见路径，因此不要自行编造）；(2) 用户提供的绝对文件系统路径；(3) `data:image/...;base64,...` URL。"
+"tool.schema.the_aspect_ratio_of_the_output_image_for_single_image_edits_this_is_ignored_the_output_matches_the_input_image_s_aspect_ratio_for_multi_image_edits_defaults_to_auto_supported_values_1_1_16_9_9_16_4_3_3_4_3_2_2_3_2_1_1_2_19_5_9_9_19_5_20_9_9_20_auto" = "输出图像的宽高比。单图编辑时会忽略此项，输出会匹配输入图像的宽高比。多图编辑时默认为 'auto'。支持的值：1:1、16:9、9:16、4:3、3:4、3:2、2:3、2:1、1:2、19.5:9、9:19.5、20:9、9:20、auto。"
+"tool.schema.text_description_of_the_image_to_generate" = "要生成的图像的文本描述。"
+"tool.schema.aspect_ratio_of_the_generated_image_decide_it_based_on_the_user_s_request_defaults_to_auto_1_1_for_square_icons_profiles_16_9_for_wide_landscapes_cinematic_9_16_for_tall_phone_wallpapers_stories_3_2_for_horizontal_photos_2_3_for_vertical_portraits_posters" = "生成图像的宽高比，请根据用户请求决定。默认为 'auto'。1:1 用于方形图标或头像，16:9 用于宽幅风景或电影画面，9:16 用于高幅手机壁纸或故事，3:2 用于横向照片，2:3 用于竖向人像或海报。"
+"tool.schema.optional_prompt_to_guide_the_video_generation_model_if_omitted_a_natural_animation_applies_automatically" = "用于引导视频生成模型的可选提示。如果省略，会自动应用自然动画。"
+"tool.schema.source_image_to_animate_provide_an_absolute_filesystem_path_https_url_or_data_image_base64_url" = "要制作动画的源图像。请提供绝对文件系统路径、HTTPS URL 或 `data:image/...;base64,...` URL。"
+"tool.schema.duration_of_the_video_generation_either_6_or_10_seconds_default_to_6_unless_the_user_requests_longer" = "视频生成时长，可以是 6 秒或 10 秒。除非用户要求更长时长，否则默认为 6 秒。"
+"tool.schema.resolution_name_of_the_video_generation_only_specify_it_when_user_asks_for_a_specific_resolution_either_480p_or_720p_defaults_to_480p_unless_the_user_specifically_requests_for_higher_quality" = "视频生成的分辨率名称。仅当用户要求特定分辨率时指定，可选 480p 或 720p。除非用户明确要求更高质量，否则默认为 480p。"
+"tool.schema.prompt_to_guide_the_video_generation_model_describe_the_desired_video" = "用于引导视频生成模型的提示。请描述所需视频。"
+"tool.schema.reference_images_up_to_7_entries_the_images_are_used_as_style_content_references_for_the_generated_video_people_objects_clothing_settings_each_entry_may_be_an_absolute_filesystem_path_https_url_or_data_image_base64_url_reference_them_in_the_prompt_as_image_0_image_1_may_be_empty_when_voices_is_provided" = "参考图像，最多 7 项；这些图像会作为生成视频的风格或内容参考（人物、物体、服装、场景）。每项可以是绝对文件系统路径、HTTPS URL 或 `data:image/...;base64,...` URL。在提示中使用 <IMAGE_0>、<IMAGE_1> 等引用。提供 voices 时可以为空。"
+"tool.schema.optional_preset_voices_the_subject_s_speak_in_up_to_3_entries_each_a_voice_identifier_from_the_built_in_roster_e_g_ara_eve_leo_rex_same_voices_as_the_xai_text_to_speech_api_an_unknown_identifier_fails_with_the_list_of_available_voices_reference_them_in_the_prompt_as_audio_0_audio_1_audio_2_usable_alongside_images_or_on_their_own" = "主体使用的可选预设声音，最多 3 项；每项是内置声音列表中的标识符（例如 \"ara\"、\"eve\"、\"leo\"、\"rex\"；与 xAI 文本转语音 API 使用相同声音；未知标识符会失败并返回可用声音列表）。在提示中使用 <AUDIO_0>、<AUDIO_1>、<AUDIO_2> 引用。可以与 `images` 一起使用，也可以单独使用。"
+"tool.schema.aspect_ratio_of_the_generated_video_decide_it_based_on_the_user_s_request_1_1_for_square_icons_profiles_16_9_for_wide_landscapes_cinematic_9_16_for_tall_phone_wallpapers_stories_4_3_or_3_2_for_horizontal_photos_3_4_or_2_3_for_vertical_portraits_posters" = "生成视频的宽高比，请根据用户请求决定。1:1 用于方形图标或头像，16:9 用于宽幅风景或电影画面，9:16 用于高幅手机壁纸或故事，4:3 或 3:2 用于横向照片，3:4 或 2:3 用于竖向人像或海报。"
+"tool.schema.duration_of_the_video_in_seconds_between_1_and_15_defaults_to_6" = "视频时长，范围为 1 到 15 秒，默认为 6 秒。"
+"tool.schema.resolution_name_of_the_video_generation_only_specify_it_when_user_asks_for_a_specific_resolution_either_480p_or_720p_defaults_to_480p" = "视频生成的分辨率名称。仅当用户要求特定分辨率时指定，可选 480p 或 720p。默认为 480p。"
+"tool.schema.set_to_true_only_when_the_goal_is_fully_achieved_this_ends_goal_mode_use_together_with_message_to_include_a_completion_summary" = "仅当目标已完全实现时设置为 true。这会结束目标模式。与 `message` 一起使用以包含完成摘要。"
+"tool.schema.optional_short_message_logged_as_progress_visible_in_tool_response_not_surfaced_to_the_pager_dashboard_use_with_completed_true_for_a_completion_summary" = "记录为进度的可选简短消息（在工具响应中可见，不会显示在 pager 面板上）。与 `completed: true` 一起使用以提供完成摘要。"
+"tool.schema.set_only_when_truly_stuck_after_3_consecutive_failed_attempts_at_the_same_problem_if_set_the_goal_is_paused_as_blocked_this_is_a_failure_signal_never_put_success_text_here_for_success_use_completed_true_with_message" = "仅当同一问题连续失败尝试 3 次以上且确实卡住时设置。如果设置，目标会暂停并标记为阻塞。这是失败信号，不要在此处填写成功文本。成功时请使用带有 `message` 的 `completed: true`。"
+"tool.schema.shell_command_or_script_each_stdout_line_is_an_event_exit_ends_the_watch" = "Shell 命令或脚本。stdout 的每一行都是一个事件；退出后监视结束。"
+"tool.schema.short_human_readable_description_of_what_you_are_monitoring_shown_in_every_notification" = "正在监视内容的简短易读描述（会显示在每条通知中）。"
+"tool.schema.kill_the_monitor_after_this_deadline_ms_default_36000000_10_hr_max_36000000_10_hr" = "在此截止时间（毫秒）后终止监视器。默认为 36000000（10 小时），最大为 36000000（10 小时）。"
+"tool.schema.run_for_the_lifetime_of_the_session_no_timeout_if_tools_by_kind_kill_task_action_stop_with_tools_by_kind_kill_task_action_endif" = "在会话整个生命周期内运行（无超时）。${%- if tools.by_kind.kill_task_action %} 使用 ${{ tools.by_kind.kill_task_action }} 停止。${%- endif %}"
+"tool.schema.the_lsp_operation_to_perform" = "要执行的 LSP 操作。"
+"tool.schema.absolute_path_to_the_file" = "文件的绝对路径。"
+"tool.schema.0_indexed_line_number" = "从 0 开始计数的行号。"
+"tool.schema.0_indexed_column_number" = "从 0 开始计数的列号。"
+"tool.schema.symbol_name_or_partial_name_workspacesymbol_only" = "符号名称或部分名称（仅适用于 workspaceSymbol）。"
+"tool.schema.the_path_of_the_file_to_edit" = "要编辑的文件路径。"
+
+"tool.schema.name_of_a_registered_workflow_built_in_or_discovered_from_the_project_grok_workflows_or_user_grok_workflows" = "已注册的工作流名称（内置工作流，或从项目 `.grok/workflows/` 或用户 `~/.grok/workflows/` 中发现的工作流）。"
+"tool.schema.inline_rhai_workflow_script_it_must_start_with_a_pure_literal_let_meta_name_description_map_before_authoring_read_the_create_workflow_skill_s_skill_md_run_the_path_specific_validate_only_smoke_check_with_representative_args" = "内联 Rhai 工作流脚本。必须以纯字面量 `let meta = #{ name: ..., description: ... };` 映射开头。编写前请阅读 `create-workflow` 技能的 SKILL.md。使用代表性 args 运行路径专用的 `validate_only` 冒烟检查。"
+"tool.schema.path_to_a_rhai_workflow_script_on_disk" = "磁盘上的 .rhai 工作流脚本路径。"
+"tool.schema.resume_a_same_process_paused_run_continuing_its_original_immutable_source_and_args_a_budget_limited_run_resumes_only_when_agent_budget_is_passed_with_a_higher_cap_process_restart_interruptions_are_terminal" = "恢复同一进程中暂停的运行，继续使用其不可变的原始 source 和 args。预算受限的运行只有在传入更高的 agent_budget 时才会恢复。进程重启中断属于终止状态。"
+"tool.schema.exactly_one_workflow_source_the_type_tag_selects_a_registered_name_inline_script_script_path_or_same_process_resume" = "必须提供且只能提供一个工作流 source。`type` 标签会选择已注册名称、内联脚本、脚本路径或同一进程恢复。"
+"tool.schema.absolute_cumulative_cap_on_logical_child_agent_calls_for_this_run_every_agent_and_every_parallel_item_consumes_one_slot_schema_retries_do_not_defaults_to_128_and_may_be_set_from_1_through_1_024_a_panel_that_would_exceed_the_remaining_budget_is_rejected_before_any_of_its_children_launch" = "本次运行中逻辑子代理调用次数的绝对累计上限。每个 agent() 和 parallel() 项都会消耗一个名额，schema 重试不消耗名额。默认为 128，可设置为 1 到 1,024。如果面板会超出剩余名额，则会在启动任何子代理前被拒绝。"
+"tool.schema.json_value_bound_to_the_script_s_args_global_use_an_object_for_named_arguments" = "绑定到脚本 `args` 全局变量的 JSON 值。使用对象传递命名参数。"
+"tool.schema.run_a_path_specific_smoke_check_without_launching_validate_metadata_compile_the_full_script_and_execute_the_single_path_selected_by_the_supplied_args_and_canned_host_results_it_does_not_exercise_every_branch_or_prove_live_tools_and_agent_outputs_work" = "在不启动的情况下运行路径专用冒烟检查：验证元数据、编译完整脚本，并执行由所提供 args 和预设主机结果选择的单一路径。它不会覆盖每个分支，也不能证明实时工具和代理输出有效。"
+"tool.schema.alias_of_run_id_workflow_runs_are_not_background_tasks_do_not_pass_to_task_output_wait_tasks_completion_notifies_automatically" = "run_id 的别名；工作流运行不是后台任务，不要将其传给 task_output/wait_tasks。完成时会自动通知。"
+"tool.schema.the_session_unique_display_handle_for_this_run_such_as_review_changes_or_review_changes_2_use_it_in_user_facing_status_and_workflow_management_keep_run_id_internal" = "本次运行在会话内唯一的显示句柄，例如 review-changes 或 review-changes-2。用于面向用户的状态和 /workflow 管理；请将 run_id 保持为内部字段。"
+
+"tool.schema.array_of_todo_items_the_complete_updated_todo_list_replaces_all_existing_todos" = "待办事项数组，即完整更新后的待办列表，会替换所有现有待办事项。"
+"tool.schema.brief_description_of_the_task" = "任务的简短描述"
+"tool.schema.priority_level_high_medium_or_low" = "优先级：high、medium 或 low"
+"tool.schema.the_current_status_of_the_todo_item_pending_in_progress_completed_or_cancelled" = "待办事项的当前状态：pending、in_progress、completed 或 cancelled"
+"tool.schema.optional_arguments_to_pass_to_the_skill" = "传递给技能的可选参数"
+"tool.schema.the_name_of_the_skill_to_invoke" = "要调用的技能名称"
+"tool.schema.optional_timeout_in_milliseconds" = "可选超时时间，单位为毫秒。"
+"tool.schema.optional_working_directory_defaults_to_the_session_working_directory" = "可选工作目录。默认为会话工作目录。"
+"tool.schema.output_format_for_pdf_files_image_default_renders_pages_as_images_text_extracts_text_content_ignored_for_non_pdf_files" = "PDF 文件的输出格式。'image'（默认）会将页面渲染为图像；'text' 会提取文本内容。非 PDF 文件会忽略此项。"
+"tool.schema.page_range_for_pdf_files_e_g_1_5_3_10_required_for_pdfs_with_more_than_10_pages_max_20_pages_per_call_ignored_for_non_pdf_files" = "PDF 文件的页面范围（例如 '1-5'、'3'、'10-'）。超过 10 页的 PDF 必须提供此项。每次调用最多 20 页。非 PDF 文件会忽略此项。"
+"tool.schema.the_line_number_to_start_reading_from_only_provide_if_the_file_is_too_large_to_read_at_once" = "开始读取的行号。仅当文件过大、无法一次读取时提供。"
+"tool.schema.the_number_of_lines_to_read_only_provide_if_the_file_is_too_large_to_read_at_once" = "要读取的行数。仅当文件过大、无法一次读取时提供。"
+"tool.schema.the_path_of_the_file_to_read_you_can_use_either_a_relative_path_in_the_workspace_or_an_absolute_path_if_an_absolute_path_is_provided_it_will_be_preserved_as_is" = "要读取的文件路径。可以使用相对于工作区的路径或绝对路径。如果提供绝对路径，将按原样保留。"
+"tool.schema.the_path_to_the_file_to_modify_you_can_use_either_a_relative_path_in_the_workspace_or_an_absolute_path" = "要修改的文件路径。可以使用相对于工作区的路径或绝对路径。"
+"tool.schema.the_text_to_replace" = "要替换的文本"
+"tool.schema.the_text_to_replace_it_with_must_be_different_from_params_edit_old_string" = "用于替换的文本（必须不同于 ${{ params.edit.old_string }}）"
+"tool.schema.replace_all_occurrences_of_params_edit_old_string_default_false" = "替换 ${{ params.edit.old_string }} 的所有出现位置（默认为 false）"
+"tool.schema.the_path_to_the_file_to_modify" = "要修改的文件路径。"
+"tool.schema.the_text_to_replace_it_with_must_be_different_from_params_edit_oldstring" = "用于替换的文本（必须不同于 ${{ params.edit.oldString }}）"
+"tool.schema.replace_all_occurrences_of_params_edit_oldstring" = "替换 ${{ params.edit.oldString }} 的所有出现位置"
+# 内置工具描述
+
+'tool.description.use_this_tool_to_edit_files' = '''使用此工具编辑文件。
+你的补丁语言是一种经过精简、面向文件的差异格式，设计目标是易于解析且安全应用。可以把它看作一个高级封装：
+
+*** Begin Patch
+[ 一个或多个文件区段 ]
+*** End Patch
+
+在这个封装中，你会提供一系列文件操作。
+必须包含一个表头来指定正在执行的操作。
+每个操作都以以下三种表头之一开头：
+
+*** Add File: <path> - 创建新文件。后续每一行都必须是 + 行（初始内容）。
+*** Delete File: <path> - 删除现有文件。此表头后不跟任何 hunk。
+*** Update File: <path> - 原地修改现有文件（可选重命名）。
+
+如果要重命名文件，可以紧接着添加 *** Move to: <new path>。
+随后是一个或多个由 @@ 引入的 hunk（可选地带有 hunk 表头）。
+hunk 中的每一行都以以下字符之一开头：
++ 表示插入的文本，
+- 表示删除的文本，或
+  （一个空格）表示未改变的上下文。
+
+关于 [context_before] 和 [context_after] 的说明：
+- 默认显示每个变更上方紧邻的 3 行代码和下方紧邻的 3 行代码。如果某个变更距离前一个变更不超过 3 行，不要在第二个变更的 [context_before] 中重复第一个变更的 [context_after] 行。
+- 如果 3 行上下文不足以在文件中唯一确定代码片段，请使用 @@ 操作符指明代码所属的类或函数。例如：
+@@ class BaseClass
+[3 lines of pre-context]
+- [old_code]
++ [new_code]
+[3 lines of post-context]
+
+- 如果一个类或函数中的代码块重复得太多，即使使用单个 @@ 语句和 3 行上下文也无法唯一确定代码片段，可以使用多个 @@ 语句跳转到正确的上下文。例如：
+
+@@ class BaseClass
+@@ 	 def method():
+[3 lines of pre-context]
+- [old_code]
++ [new_code]
+[3 lines of post-context]
+
+完整的语法定义如下：
+Patch := Begin { FileOp } End
+Begin := "*** Begin Patch" NEWLINE
+End := "*** End Patch" NEWLINE
+FileOp := AddFile | DeleteFile | UpdateFile
+AddFile := "*** Add File: " path NEWLINE { "+" line NEWLINE }
+DeleteFile := "*** Delete File: " path NEWLINE
+UpdateFile := "*** Update File: " path NEWLINE [ MoveTo ] { Hunk }
+MoveTo := "*** Move to: " newPath NEWLINE
+Hunk := "@@" [ header ] NEWLINE { HunkLine } [ "*** End of File" NEWLINE ]
+HunkLine := (" " | "-" | "+") text NEWLINE
+
+一个完整补丁可以组合多个操作：
+
+*** Begin Patch
+*** Add File: hello.txt
++Hello world
+*** Update File: src/app.py
+*** Move to: src/main.py
+@@ def greet():
+-print("Hi")
++print("Hello, world!")
+*** Delete File: obsolete.txt
+*** End Patch
+
+请务必记住：
+
+- 每个补丁都必须以 *** Begin Patch 开头，并以 *** End Patch 结尾，包括只删除文件的补丁。
+- 必须包含一个表头来说明目标操作（Add/Delete/Update）。
+- 即使是在创建新文件时，新行也必须加上 `+` 前缀。
+'''
+'tool.description.finds_files_whose_contents_match_the_params_search_pattern_and_lists_them_by_modification_time' = '''查找内容匹配 ${{ params.search.pattern }} 的文件，并按修改时间列出它们。'''
+'tool.description.lists_entries_in_a_local_directory_with_1_indexed_entry_numbers_and_simple_type_labels' = '''列出本地目录中的条目，为其标注从 1 开始的条目编号和简单类型标签。'''
+'tool.description.reads_a_local_file_with_1_indexed_line_numbers_supporting_slice_and_indentation_aware_block_modes' = '''读取本地文件，行号从 1 开始，并支持切片模式和保留缩进的代码块模式。'''
+'tool.description.reads_a_file_from_the_computer_s_filesystem_you_can_access_any_file_directly_by_using_this_tool' = '''从计算机文件系统读取文件。你可以直接使用此工具访问任何文件。
+读取不存在的文件是允许的；工具会返回错误。
+
+用法：
+- 可以指定 ${{ params.read.offset }} 和 ${{ params.read.limit }}（对较长文件尤其有用）。
+- 输出中的行号从 1 开始，格式为：LINE_NUMBER→LINE_CONTENT。
+- 你可以在同一个响应中调用多个工具。对于可能有用的多个文件，最好将它们作为一批进行推测性读取。'''
+'tool.description.grok_build_concise.performs_exact_string_replacements_in_files' = '''在文件中替换精确的字符串。
+
+- 不要将文件读取结果中的 "LINE_NUMBER→" 前缀包含在 ${{ params.edit.old_string }} 或 ${{ params.edit.new_string }} 中；保留精确缩进。
+- ${{ params.edit.old_string }} 必须在文件中精确匹配一个位置。如果出现多次，请添加周围的行使其唯一，或将 ${{ params.edit.replace_all }} 设为 true 以修改所有出现位置（适合重命名标识符）。
+- 要创建新文件，请将 ${{ params.edit.old_string }} 设为空字符串。'''
+'tool.description.edit_a_file_using_anchors_if_tools_by_kind_read_and_tools_by_kind_search_from_tools_by_kind_read_or_tools_by_kind_search_elif_tools_by_kind_read_from_tools_by_kind_read_elif_tools_by_kind_search_from_tools_by_kind_search_endif' = '''使用锚点编辑文件${%- if tools.by_kind.read and tools.by_kind.search %}，锚点来自 ${{ tools.by_kind.read }} 或 ${{ tools.by_kind.search }}${%- elif tools.by_kind.read %}，锚点来自 ${{ tools.by_kind.read }}${%- elif tools.by_kind.search %}，锚点来自 ${{ tools.by_kind.search }}${%- endif %}。
+
+操作（使用 "op" 字段）：
+
+  "replace" — 用新内容替换一行或一个范围。
+    { "op": "replace", "anchor": "{example_anchor}", "content": "    let x = 42;" }
+    范围：添加 "end_anchor"，即可从 anchor 替换到 end_anchor（包括首尾两行及其中的所有内容）。如果 anchor 或 end_anchor 所在行包含必须保留的闭合分隔符，例如 `}`，请将其包含在 "content" 中。
+    删除一行：{ "op": "replace", "anchor": "{example_anchor}", "content": "" }
+    删除一个范围：{ "op": "replace", "anchor": "{example_anchor}", "end_anchor": "...", "content": "" }
+
+  "insert_after" — 在锚定行之后插入新行。
+    { "op": "insert_after", "anchor": "{example_anchor}", "content": "    let y = 1;" }
+    插入空行：{ "op": "insert_after", "anchor": "{example_anchor}", "content": "" }
+    多行插入：content 中的换行会添加多行。
+    文件开头：使用 "0:" 作为 anchor。
+    文件末尾：使用 "EOF" 作为 anchor。
+    anchor 以下的现有行会保留；只包含需要新增的内容。
+    添加行而不删除现有行时，优先使用 insert_after，而不是 replace。
+
+  "write" — 替换整个文件内容（不需要锚点）。
+    { "op": "write", "content": "full file content here" }
+
+批量编辑：在 "${{ params.edit.edits }}" 中传入多个操作。它们会针对编辑前的快照进行校验，并以自底向上的方式原子应用；如果任何锚点校验失败，整个批次的编辑都会被拒绝（一个也不会应用）。
+重叠的范围也会被拒绝。
+
+范围安全：
+- 多行编辑可能返回警告，尤其是范围较大的重写。
+- 允许较大的重写，但只有在确定目标范围时才使用。
+- 对于非常大的重写（占文件大部分），优先使用单个 "write" 操作，而不是许多 replace 操作。
+
+后续编辑：
+- 成功后，工具会返回变更区域周围带有新鲜锚点的片段。
+- 锚点过期错误发生时，工具会返回目标行周围的新鲜锚点。
+  使用这些锚点立即重试编辑；不要重新读取文件。
+- anchor 是 → 分隔符之前完整的 "LINE:HASH" 或 "LINE:HASH:HASH"
+  （例如 "{example_anchor}"）。始终包含行号。不要包含 → 或
+  分隔符之后的行内容。
+- 不要伪造或修改锚点；只能使用之前工具输出中返回的精确锚点。'''
+'tool.description.search_file_contents_with_anchor_annotated_results_if_tools_by_kind_edit_for_use_with_tools_by_kind_edit_endif' = '''搜索文件内容并返回带锚点的结果${%- if tools.by_kind.edit %}，供 ${{ tools.by_kind.edit }} 使用${%- endif %}。
+
+匹配行包含锚点${%- if tools.by_kind.edit %}，可以直接传给 ${{ tools.by_kind.edit }}${%- if tools.by_kind.read %}，无需先使用 ${{ tools.by_kind.read }} 读取文件${%- endif %}${%- endif %}。此 grep 格式会在锚点后保留 grep 风格的分隔符：匹配行为 `:`，上下文行为 `-`。
+
+内容输出格式：
+
+  {grep_match}    ← 匹配（:）
+  {grep_context}    ← 上下文（-）
+
+用法：
+- ${{ params.search.pattern }} 是正则表达式，例如：`log.*Error`、`function\s+\w+`、`TODO`
+- 默认输出带锚点的内容匹配结果（没有 output-mode 选择器）
+- 使用 -A、-B、-C 指定匹配结果周围的上下文行
+- 只有确定文件类型时才使用 '${{ params.search.type }}' 或 '${{ params.search.glob }}'
+- 结果数量有上限；截断结果会显示“至少”计数'''
+'tool.description.read_a_file_with_line_anchored_output_if_tools_by_kind_edit_for_use_with_tools_by_kind_edit_endif' = '''读取文件并返回带行锚点的输出${%- if tools.by_kind.edit %}，供 ${{ tools.by_kind.edit }} 使用${%- endif %}。
+
+每一行的格式都是 ANCHOR→CONTENT，例如：
+{example_line1}
+{example_line2}
+
+此读取格式在锚点和内容之间使用 `→`。${%- if tools.by_kind.search %}相比之下，
+${{ tools.by_kind.search }} 会在锚点之后保留 grep 风格的分隔符：匹配行为 `:`，
+上下文行为 `-`。${%- endif %}
+
+ANCHOR（例如 "{example_anchor}"）是由行内容及其周围上下文生成的紧凑指纹。${%- if tools.by_kind.edit %} 将锚点传给 ${{ tools.by_kind.edit }} 进行编辑时，
+工具会验证目标位置仍与所见快照一致。
+锚点仅对读取时的文件状态有效；编辑后，
+请使用 ${{ tools.by_kind.edit }} 返回的新鲜锚点，或重新读取文件。${%- endif %}
+
+用法：
+- ${{ params.read.target_file }} 参数可以是工作区中的相对路径，也可以是绝对路径
+- 默认从文件开头读取最多 {max_lines_read} 行
+- 对较大文件，可以指定 ${{ params.read.offset }} 和 ${{ params.read.limit }}
+- 可以读取图像（PNG、JPG 等）和 PDF 文件（每页渲染为图像；对于超过 10 页的 PDF，使用 ${{ params.read.pages }}，每次调用最多 20 页）
+- 你可以在同一个响应中调用多个工具
+- 如果读取的文件存在但内容为空，你会收到系统提醒，而不是文件内容。'''
+'tool.description.read_a_file' = '''读取文件。
+
+用法：
+- ${{ params.read.target_file }} 参数可以是工作区中的相对路径，也可以是绝对路径
+- 默认从文件开头读取最多 {max_lines_read} 行
+- 首行以及文件中每隔 10 行会以 LINE_NUMBER→LINE_CONTENT 格式显示带锚点的行号；中间的行只显示内容。引用具体行时，请从最近的锚点开始计数
+- 此工具可以读取 PDF 文件（.pdf）、PowerPoint 文件（.pptx）、Jupyter notebook（.ipynb）和图像文件（例如 PNG、JPG 等）。
+- 读取图像文件时，内容会以视觉形式呈现，因为此工具使用多模态 LLM。'''
+'tool.description.grok_build.performs_exact_string_replacements_in_files' = '''在文件中替换精确的字符串。
+
+${% if tools.by_kind.read -%}
+- ${{ tools.by_kind.read }} 会为每一行添加 "LINE_NUMBER→" 前缀。该前缀不属于文件内容：只匹配 → 之后的内容，并保留其精确缩进。
+${% endif -%}
+- `${{ params.edit.old_string }}` 必须在文件中精确匹配一个位置。如果出现多次，请添加周围的行使其唯一，或将 `${{ params.edit.replace_all }}` 设为 true 以修改所有出现位置（适合重命名标识符）。
+- 要创建新文件，请将 `${{ params.edit.old_string }}` 设为空字符串。空的 `${{ params.edit.old_string }}` 不能覆盖现有的非空文件。'''
+'tool.description.fast_file_pattern_matching_tool_that_works_with_any_codebase_size' = '''适用于任意规模代码库的快速文件模式匹配工具。
+
+- 通过必需的 ${{ params.list.pattern }} 参数支持 "**/*.js" 或 "src/**/*.ts" 等 glob 模式
+- 可以选择设置 ${{ params.list.path }} 来指定搜索目录（默认为当前工作目录）
+- 返回按修改时间排序的匹配文件路径（最近修改的在前），最多 100 个
+- 会包含隐藏（点号）文件；对于模式未明确匹配的路径，会遵守 .gitignore 规则
+- 需要按文件名模式查找文件时使用此工具
+- 你可以在同一个响应中调用多个工具。对于可能有用的多个搜索，最好将它们作为一批进行推测性执行。'''
+'tool.description.a_powerful_search_tool_built_on_ripgrep' = '''基于 ripgrep 构建的强大搜索工具。
+
+用法：
+- 对精确的符号或字符串搜索，优先使用 ${{ tools.by_kind.search }}。在可能的情况下，应使用此工具代替终端 grep/rg。此工具更快，并且遵守 .gitignore
+- 支持完整的正则表达式语法，例如 `log.*Error`、`function\s+\w+`。请确保转义特殊字符以获得精确匹配，例如 `functionCall\(`
+- 避免使用过于宽泛的 glob 模式（例如 '--glob *'），因为它们会绕过 .gitignore 规则且可能很慢
+- ${{ params.search.pattern }} 字段是原始正则字符串：不要将其包在引号中，也不要不必要地添加尾部引号
+- 只有确定所需文件类型时才使用 '${{ params.search.include }}'。注意：导入路径可能与源文件类型不匹配（.js 与 .ts）
+- 结果数量有上限以保持响应速度；截断结果会显示“至少”计数。
+- 使用 ${{ params.search.include }} 参数按模式筛选文件（例如 "*.js"、"*.{ts,tsx}"）
+- 返回至少包含一个匹配项的文件路径和行号，并按修改时间排序
+- 需要查找包含特定模式的文件时使用此工具'''
+'tool.description.create_or_overwrite_a_file' = '''创建或覆盖文件。
+
+- 写入现有路径会替换文件${%- if tools.by_kind.read %}；请先使用 ${{ tools.by_kind.read }} 工具读取它${%- endif %}。
+- 如果父目录不存在，工具会为你创建。'''
+'tool.description.reads_a_file_or_directory_from_the_local_filesystem_you_can_access_any_file_directly_by_using_this_tool' = '''从本地文件系统读取文件或目录。你可以直接使用此工具访问任何文件。
+假定此工具能够读取计算机上的所有文件。如果用户提供文件路径，请假定该路径有效。读取不存在的文件是允许的；工具会返回错误。
+
+用法：
+- ${{ params.read.filePath }} 参数必须是绝对路径，不能是相对路径
+- 默认从文件开头读取最多 2000 行
+- 可以指定 ${{ params.read.offset }} 和 ${{ params.read.limit }}（对较长文件尤其有用），但建议不提供这些参数以读取整个文件
+- 超过 {max_chars_per_line} 个字符的行会被截断
+- 内容中的每一行都会带有行号前缀，格式为 `LINE_NUMBER: LINE_CONTENT`，行号从 1 开始。例如，文件内容为 "foo\n" 时，会返回 "1: foo"
+- 对于目录，每个条目占一行（不带行号），子目录末尾带 `/`
+- 此工具可以读取图像（如 PNG、JPG 等）。读取图像文件时，内容会以视觉形式呈现，因为此工具使用多模态 LLM。
+- 此工具可以读取 PDF 文件（.pdf）。PDF 会作为附件以视觉形式呈现给多模态 LLM。
+- 你可以在同一个响应中调用多个工具。对于可能有用的多个文件，最好将它们作为一批进行推测性读取。
+- 你会经常被要求读取截图。如果用户提供截图路径，请始终使用此工具查看该路径。此工具适用于所有临时文件路径。
+- 如果读取的文件存在但内容为空，你会收到系统提醒，而不是文件内容。'''
+'tool.description.load_a_specialized_skill_that_provides_domain_specific_instructions_and_workflows' = '''加载提供特定领域说明和工作流的专用技能。
+
+当你识别出任务符合下面列出的某个可用技能时，使用此工具加载完整的技能说明。
+
+该技能会通过包含加载内容的 `<skill_content name="...">` 区块，将详细说明、工作流以及对捆绑资源的访问注入对话。
+
+以下技能为特定任务提供专门的能力集合。
+当任务符合下面列出的某个可用技能时，调用此工具：
+
+<available_skills>
+${%- if skills %}
+${%- for skill in skills %}
+  <skill>
+    <name>${{ skill.name }}</name>
+    <description>${{ skill.description|e }}</description>
+    <location>${{ skill.location }}</location>
+  </skill>
+${%- endfor %}
+${%- else %}
+（没有可用技能。可以在 ~/.grok/skills/ 或 .grok/skills/ 中添加技能。）
+${%- endif %}
+</available_skills>'''
+'tool.description.opencode.performs_exact_string_replacements_in_files' = '''在文件中执行精确字符串替换。
+
+用法：${%- if tools.by_kind.read %}
+- 从 ${{ tools.by_kind.read }} 工具输出中编辑文本时，请确保保留行号前缀之后的精确缩进（制表符或空格）。行号前缀格式为：行号 + ": "。该 ": " 分隔符之后的所有内容才是需要匹配的实际文件内容。绝不要将行号前缀的任何部分包含在 ${{ params.edit.oldString }} 或 ${{ params.edit.newString }} 中。${%- endif %}
+- 始终优先编辑代码库中的现有文件。除非明确要求，否则绝不要写入新文件。
+- 如果 `${{ params.edit.oldString }}` 在文件中不唯一，编辑将失败。请提供包含更多周围上下文的较大字符串使其唯一，或使用 `${{ params.edit.replaceAll }}` 修改 `${{ params.edit.oldString }}` 的每个出现位置。
+- 使用 `${{ params.edit.replaceAll }}` 在文件中替换和重命名字符串。例如，重命名变量时这个参数很有用。
+- 要创建新文件，请将 ${{ params.edit.oldString }} 设为空字符串。
+- 只有用户明确要求时才使用 emoji。除非用户提出要求，否则避免向文件中添加 emoji。'''
+'tool.description.executes_a_given_bash_command_in_a_shell_session_with_optional_timeout_ensuring_proper_handling_and_security_measures_each_command_runs_in_a_fresh_shell_working_directory_changes_and_environment_variables_do_not_persist_between_calls' = '''在 shell 会话中执行给定的 bash 命令，支持可选超时并确保得到适当处理和安全措施。每条命令都会在新的 shell 中运行：工作目录变更和环境变量不会在调用之间保留。
+重要：此工具用于 git、npm、docker 等终端操作。不要使用它执行文件操作（读取、写入、编辑、搜索或查找文件）；请改用专用工具。
+
+执行命令前，请遵循以下步骤：
+
+1. 目录验证：
+   - 如果命令会创建新目录或文件，先使用 `ls` 验证父目录存在且位置正确
+   - 例如，在运行 "mkdir foo/bar" 前，先使用 `ls foo` 检查 `foo` 存在并且是预期的父目录
+
+2. 命令执行：
+   - 包含空格的文件路径始终使用双引号（例如：rm "path with spaces/file.txt"）
+   - 正确引用的示例：
+     - mkdir "/Users/name/My Documents"（正确）
+     - mkdir /Users/name/My Documents（错误，会失败）
+     - python "/path/with spaces/script.py"（正确）
+     - python /path/with spaces/script.py（错误，会失败）
+   - 确认引用正确后，执行命令。
+   - 捕获命令输出。
+
+用法说明：
+  - ${{ params.execute.command }} 参数是必需的。
+  - 可以指定可选的 ${{ params.execute.timeout }}，单位为毫秒。如果未指定，命令会使用默认超时时间。
+  - 最好用 5 到 10 个词清楚、简洁地说明命令的作用。
+  - 如果输出超过 {max_output_bytes} 个字符，返回前会截断输出。
+${%- if tools.by_kind.list or tools.by_kind.search or tools.by_kind.read or tools.by_kind.edit or tools.by_kind.write %}
+${%- if has_unix_utilities %}
+  - 除非明确要求，或任务确实需要，否则避免使用 `find`、`grep`、`cat`、`head`、`tail`、`sed`、`awk` 或 `echo` 命令。请始终优先使用以下专用工具：${%- if tools.by_kind.list %}
+    - 文件搜索：使用 ${{ tools.by_kind.list }} 工具（不要使用 `find` 或 `ls` shell 命令）${%- endif %}${%- if tools.by_kind.search %}
+    - 内容搜索：使用 ${{ tools.by_kind.search }} 工具（不要使用 `grep` 或 `rg` shell 命令）${%- endif %}${%- if tools.by_kind.read %}
+    - 读取文件：使用 ${{ tools.by_kind.read }}（不要使用 cat/head/tail）${%- endif %}${%- if tools.by_kind.edit %}
+    - 编辑文件：使用 ${{ tools.by_kind.edit }}（不要使用 sed/awk）${%- endif %}${%- if tools.by_kind.write %}
+    - 写入文件：使用 ${{ tools.by_kind.write }}（不要使用 echo >/cat <<EOF）${%- endif %}
+    - 沟通：直接输出文本（不要使用 echo/printf）
+${%- else %}
+  - Unix 工具 `grep`、`head`、`tail`、`sed`、`awk` 和 `find` 在此 shell 中不可用，会因 `'<name>' is not recognized` 失败（PowerShell 会添加 `as a cmdlet`；cmd.exe 会添加 `as an internal or external command`）。请改用以下专用工具：${%- if tools.by_kind.list %}
+    - 文件搜索：使用 ${{ tools.by_kind.list }}（不要使用 `Get-ChildItem` / `gci` / `dir` / `ls`）${%- endif %}${%- if tools.by_kind.search %}
+    - 内容搜索：使用 ${{ tools.by_kind.search }}（不要使用 `Select-String` / `sls`）${%- endif %}${%- if tools.by_kind.read %}
+    - 读取文件：使用 ${{ tools.by_kind.read }}（不要使用 `Get-Content` / `gc` / `cat`）${%- endif %}${%- if tools.by_kind.edit %}
+    - 编辑文件：使用 ${{ tools.by_kind.edit }}（不要使用 `(Get-Content ...) -replace ... | Set-Content`；`sed` 和 `awk` 不可用）${%- endif %}${%- if tools.by_kind.write %}
+    - 写入文件：使用 ${{ tools.by_kind.write }}（不要使用 `Set-Content` / `Out-File` / `echo >`）${%- endif %}
+    - 沟通：直接输出文本（不要使用 `Write-Output` / `echo`）
+${%- endif %}
+${%- endif %}
+  - 发出多条命令时：
+    - 如果命令彼此独立且可以并行执行，请在同一条消息中多次调用此工具。例如，需要 `git status` 和 `git diff` 时，同时发出两个工具调用。
+    - 如果命令有依赖关系且必须按顺序执行，请使用单个调用并以 `&&` 连接命令（例如：`git add . && git commit -m "message" && git push`）。${%- if tools.by_kind.edit %}例如，如果某个操作必须先完成才能执行另一个操作（如 mkdir 之后才能 cp、先使用 ${{ tools.by_kind.edit }} 再执行 git 操作，或先 git add 再 git commit），请按顺序执行。${%- endif %}
+    - 只有在需要按顺序执行命令、但不关心前面的命令是否失败时，才使用 `;`
+    - 不要使用换行分隔命令（引号内的字符串可以包含换行）
+  - 尽量在整个会话中保持当前工作目录，使用绝对路径并避免使用 `cd`。只有用户明确要求时才使用 `cd`。
+
+# 使用 git 提交变更
+
+只有用户要求时才创建提交。不确定时先询问。当用户要求创建新的 git 提交时，请仔细遵循以下步骤：
+
+Git 安全协议：
+- 绝不要更新 git 配置
+- 除非用户明确要求，绝不要执行不可逆的危险 git 命令（例如 push --force、hard reset 等）
+- 除非用户明确要求，绝不要跳过钩子（--no-verify、--no-gpg-sign 等）
+- 绝不要强制推送到 main/master；如果用户要求，提醒其风险
+- 避免使用 git commit --amend。只有在以下条件全部满足时才使用 --amend：
+  (1) 用户明确要求 amend，或者提交已成功但提交前钩子自动修改了需要纳入的文件
+  (2) HEAD 提交由你在本次对话中创建（使用 git log -1 --format='%an %ae' 验证）
+  (3) 尚未推送到远程（使用 git status 验证分支显示 ahead）
+- 如果提交失败或被钩子拒绝，绝不要 amend；修复问题后创建新提交
+- 如果已经推送到远程，除非用户明确要求，绝不要 amend（这需要强制推送）
+- 除非用户明确要求，绝不要提交文件
+
+1. 可以在同一条消息中并行调用多个工具。独立且预计都会成功时，并行执行以下 bash 命令：
+  - 运行 git status 查看所有未跟踪文件。
+  - 运行 git diff 查看所有已暂存和未暂存的变更。
+  - 运行 git log 了解最近的提交信息格式。
+2. 分析所有已暂存的变更（包括之前已暂存和新加入的变更），拟定提交信息：
+  - 总结变更性质（例如新功能、增强、修复、重构或测试）及其目的。
+  - 不要提交可能包含机密的文件（.env、credentials.json 等）。如果用户明确要求提交这些文件，提醒用户。
+  - 拟定简洁的提交信息，说明变更原因。
+  - 确保提交信息准确反映变更及其目的。
+3. 可以在同一条消息中并行调用多个工具。独立且预计都会成功时，执行以下命令：
+  - 将相关未跟踪文件加入暂存区。
+  - 使用提交信息创建提交。
+  - 提交完成后运行 git status 验证成功。
+  注意：git status 依赖提交完成，必须在提交之后顺序执行。
+4. 如果提交因提交前钩子失败，修复问题后创建新提交。
+
+重要说明：
+- 除 git bash 命令外，不要运行其他命令来读取或探索代码
+- 除非用户明确要求，不要推送到远程仓库
+- 绝不要使用需要交互输入的带 -i 选项的 git 命令
+- 如果没有变更（没有未跟踪文件且没有修改），不要创建空提交
+
+# 创建 pull request
+对于所有 GitHub 相关任务（包括 issue、pull request、检查和 release），使用 gh 命令。如果用户提供 GitHub URL，使用 gh 命令获取所需信息。
+
+用户要求创建 pull request 时，请遵循以下步骤：
+
+1. 可以在同一条消息中并行调用多个工具。独立且预计都会成功时，并行查看当前分支自分叉以来的状态：
+   - 运行 git status 查看所有未跟踪文件
+   - 运行 git diff 查看所有已暂存和未暂存的变更
+   - 检查当前分支是否跟踪远程分支以及是否与远程同步，以确定是否需要推送
+   - 运行 git log 和 `git diff [base-branch]...HEAD` 查看分叉以来的完整提交历史
+2. 分析 pull request 将包含的所有变更并拟定摘要。
+3. 使用 `gh pr create` 创建 pull request，并返回其 URL。'''
+'tool.description.todowrite' = '''使用此工具创建和管理当前编码会话的结构化待办列表。这有助于跟踪进度、组织复杂任务，并向用户展示工作的完整性。
+它还帮助用户了解任务进展以及其请求的总体进度。
+
+## 何时使用此工具
+使用此工具主动处理以下场景：
+
+1. 复杂的多步骤任务：任务需要 3 个或更多不同的步骤或操作
+2. 非平凡且复杂的任务：需要仔细规划或多次操作的任务
+3. 用户明确要求待办列表：用户直接要求你使用待办列表
+4. 用户提供多项任务：用户提供了任务列表（编号列表或逗号分隔）
+5. 收到新指令后：立即将用户需求记录为待办事项。可以根据新信息编辑待办列表。
+6. 完成任务后：将其标记为已完成，并添加任何后续待办事项
+7. 开始新任务时：将待办事项标记为 in_progress。理想情况下，同时只能有一个待办事项处于 in_progress 状态。完成当前任务后再开始其他任务。
+
+## 何时不使用此工具
+以下情况跳过此工具：
+
+1. 只有一个直接明了的任务
+2. 任务很简单，跟踪它不会带来组织上的好处
+3. 任务可以在少于 3 个简单步骤内完成
+4. 任务纯粹是对话或信息咨询
+
+注意：如果只有一个简单任务，不应使用此工具。在这种情况下，直接完成任务更合适。
+
+## 使用待办列表的示例
+
+<example>
+用户：我想给应用的设置页面添加深色模式切换。完成后请确保运行测试和构建！
+助手：我会帮助你给应用的设置页面添加深色模式切换。让我创建一个待办列表来跟踪实现过程。
+*创建以下待办列表：*
+1. 在设置页面创建深色模式切换组件
+2. 添加深色模式状态管理（上下文/存储）
+3. 实现 CSS-in-JS 深色主题样式
+4. 更新现有组件以支持主题切换
+5. 运行测试和构建流程，并处理出现的失败
+*开始处理第一个任务*
+
+<reasoning>
+助手使用待办列表的原因：
+1. 添加深色模式是一个多步骤功能，需要状态管理、组件和样式等多个方面
+2. 用户明确要求完成后运行测试和构建
+3. 助手通过添加“确保测试和构建通过”作为最后一项，推断测试和构建是必要步骤
+</reasoning>
+</example>
+
+<example>
+用户：帮我把整个项目中的函数 getCwd 重命名为 getCurrentWorkingDirectory
+助手：我会先检查代码库，找到所有 getCwd 的出现位置。
+*使用搜索工具定位 getCwd 的所有实例*
+助手：我在 8 个文件中找到了 15 个 getCwd 实例。让我创建一个待办列表来跟踪这些修改。
+*创建待办事项，分别对应需要更新的文件和位置*
+
+<reasoning>
+助手使用待办列表的原因：
+1. 先搜索代码库，了解需要修改的范围
+2. 找到跨多个文件的多个实例后，确定任务需要多个步骤
+3. 待办列表有助于系统地跟踪这些变更
+4. 这种方式可以避免遗漏实例并保持代码一致性
+</reasoning>
+</example>
+
+<example>
+用户：我需要为电子商务网站实现这些功能：用户注册、商品目录、购物车和结账流程。
+助手：我会帮助你实现这些功能。首先，让我添加所有功能对应的待办事项。
+*创建待办列表，将实现过程拆分为具体步骤*
+助手：让我们从用户注册开始。这将涉及数据库模型、API 端点和表单，并需要集成现有的身份验证系统。
+
+<reasoning>
+助手使用待办列表的原因：
+1. 用户以逗号分隔的列表提供了多个复杂功能
+2. 待办列表有助于将大任务拆分为可管理的步骤
+3. 这种方式可以跟踪整个实现过程的进度
+</reasoning>
+</example>
+
+<example>
+用户：你能帮我优化 React 应用吗？它渲染很慢，还有性能问题。
+助手：我会帮助你优化 React 应用。首先，让我检查代码库，找出潜在的性能瓶颈。
+*检查组件结构、渲染模式、状态管理和数据获取*
+助手：分析后，我发现了几个性能问题。让我创建一个待办列表来跟踪优化工作。
+*创建待办事项，例如：在 ProductList 中为耗时计算实现记忆化；在 Dashboard 中为长列表添加虚拟化；在 Gallery 中优化图片加载；修复 ShoppingCart 中的状态更新循环；检查包大小并实现代码拆分*
+助手：让我们从 ProductList 中耗时计算的记忆化开始实现。
+
+<reasoning>
+助手使用待办列表的原因：
+1. 首先检查代码库，定位具体的性能问题
+2. 根据分析结果，识别出多个优化机会
+3. 性能优化是需要多个步骤的非平凡任务
+4. 这种系统化的方式可以逐一跟踪所有性能瓶颈
+5. 这种方式确保不会遗漏任何性能瓶颈
+</reasoning>
+</example>
+
+## 不使用待办列表的示例
+
+<example>
+用户：如何在 Python 中打印“Hello World”？
+助手：在 Python 中，可以使用以下简单代码打印 "Hello World"：
+
+```python
+print("Hello World")
+```
+
+<reasoning>
+助手没有使用待办列表的原因：这是一个执行后立即得到结果的单一命令。没有多个步骤需要跟踪或组织，因此不需要待办列表。
+</reasoning>
+</example>
+
+<example>
+用户：git status 命令做什么？
+助手：git status 命令会显示当前工作目录和暂存区的状态。它会列出哪些变更已暂存、哪些尚未暂存，以及哪些文件尚未被 Git 跟踪。这是提交前了解代码库当前状态的基础命令。
+
+<reasoning>
+助手没有使用待办列表的原因：这是一个没有实际编码任务的信息咨询。用户只是询问解释，并没有要求助手执行多个步骤或任务。
+</reasoning>
+</example>
+
+<example>
+用户：你能给 calculateTotal 函数添加注释，解释它的作用吗？
+助手：当然可以，让我给 calculateTotal 函数添加注释来解释它的作用。
+*使用 Edit 工具给 calculateTotal 函数添加注释*
+
+<reasoning>
+助手没有使用待办列表的原因：这是一个局限于代码单一位置的直接任务。添加注释不需要跟踪多个步骤或进行系统化组织。
+</reasoning>
+</example>
+
+<example>
+用户：帮我运行 npm install，然后告诉我结果。
+助手：我会为你运行 npm install 命令。
+
+*执行：npm install*
+
+命令已成功完成。以下是输出：
+[npm install 命令的输出]
+
+所有依赖项都已根据 package.json 文件安装。
+
+<reasoning>
+助手没有使用待办列表的原因：这是一个执行后立即得到结果的单一命令。没有多个步骤需要跟踪或组织，因此不需要待办列表。
+</reasoning>
+</example>
+
+## 任务状态和管理
+
+1. **任务状态**：使用以下状态跟踪任务：
+   - pending：尚未开始
+   - in_progress：正在处理（限制为一个）
+   - completed：任务已成功完成
+   - cancelled：任务不再需要
+
+2. **任务管理**：
+   - 实时更新任务状态
+   - 完成任务后立即标记为完成（不要批量标记）
+   - 同时只能有一个待办事项处于 in_progress 状态
+   - 在开始新任务前完成当前任务
+   - 对不再相关的任务标记为取消
+
+3. **任务拆分**：
+   - 创建具体、可执行的事项
+   - 将复杂任务拆分为更小、可管理的事项
+   - 使用清晰、具有描述性的任务名称
+
+如果无法确定，使用此工具。主动进行任务管理可以体现对工作的关注，并确保成功完成所有要求。'''
+"tmux_reload_note_restart" = "使用 `tmux source-file {path}` 重新加载 tmux，或重启 tmux 服务。"
+"tool.reminder.scheduled_task" = '''<system-reminder>
+这是一次定时任务执行（任务 {task_id}，{human_schedule}，循环执行）。
+执行下面的提示。不要质疑或评论提示本身——将其视为需要执行的新任务。
+此任务之前执行的结果可能出现在上方的对话历史中。
+</system-reminder>
+
+{prompt}'''
+"tool.reminder.loop_iteration.previous" = '''
+
+上一次迭代结束时的结果：
+{summary}
+'''
+"tool.reminder.loop_iteration" = '''<system-reminder>
+定时任务 {task_id}（{human_schedule}）。如有更早的迭代，其内容会显示在上方。
+运行下面的任务。最后给出简短状态：发生了什么变化，或需要注意什么。该状态会转达给主智能体。
+{prior}</system-reminder>
+
+{prompt}'''

@@ -13,6 +13,7 @@ use crate::types::tool::{ToolKind, ToolNamespace};
 use super::event::{self, LineProcessor};
 use super::rate_limiter::{MonitorRateLimiter, RateLimitOutcome};
 use super::types::{MonitorInput, MonitorOutput, RATE_LIMIT_CAPACITY, RATE_LIMIT_REFILL_MS};
+use xai_grok_i18n::t_fmt;
 
 #[derive(Debug, Default)]
 pub struct MonitorTool;
@@ -200,16 +201,18 @@ impl xai_tool_runtime::Tool for MonitorTool {
         let kill_tool_display =
             kill_tool_name.unwrap_or_else(|| "kill_command_or_subagent".to_string());
         let result_message = if resolved_timeout == 0 {
-            format!(
-                "Monitor started (task {task_id}, persistent -- runs until {kill_tool_display} or session end).\n\
-                 You will be notified on each event. Keep working -- do not poll or sleep.\n\
-                 Events may arrive while you are waiting for the user -- an event is not their reply."
+            t_fmt(
+                "tool.monitor.persistent",
+                &[("task", task_id.as_str()), ("kill_tool", &kill_tool_display)],
             )
         } else {
-            format!(
-                "Monitor started (task {task_id}, timeout {resolved_timeout}ms).\n\
-                 You will be notified on each event. Keep working -- do not poll or sleep.\n\
-                 Events may arrive while you are waiting for the user -- an event is not their reply."
+            t_fmt(
+                "tool.monitor.timeout",
+                &[
+                    ("task", task_id.as_str()),
+                    ("timeout_ms", &resolved_timeout.to_string()),
+                    ("kill_tool", &kill_tool_display),
+                ],
             )
         };
 

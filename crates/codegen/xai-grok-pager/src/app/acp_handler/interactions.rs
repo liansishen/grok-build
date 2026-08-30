@@ -194,7 +194,7 @@ pub(crate) fn handle_ask_user_question(
                 // card, so the queue stays parked; only the card is lost.
                 LocalQuestionKind::PromptBlocked { .. } => {
                     agent.scrollback.push_block(RenderBlock::system(
-                        "The blocked-prompt card was replaced by another question. Your prompt is still held at the front of the queue.".to_owned(),
+                        xai_grok_i18n::t("prompt_blocked.replaced").to_owned(),
                     ));
                 }
                 kind => {

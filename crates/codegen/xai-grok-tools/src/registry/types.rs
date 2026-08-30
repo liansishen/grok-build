@@ -1165,6 +1165,11 @@ impl ToolRegistryBuilder {
                 &entry.input_schema,
                 &effective_params,
             );
+            if entry.namespace != ToolNamespace::MCP.to_string() {
+                crate::types::localization::localize_schema_descriptions(
+                    &mut definition.function.parameters,
+                );
+            }
             if let Some(desc) = &definition.function.description {
                 definition.function.description = Some(truncation_config.interpolate_description(
                     desc,

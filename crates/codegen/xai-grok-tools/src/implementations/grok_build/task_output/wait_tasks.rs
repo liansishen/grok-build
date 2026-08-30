@@ -17,6 +17,7 @@ use crate::types::resources::{Terminal, TruncationCfg};
 use crate::types::template_renderer::TemplateRenderer;
 use crate::types::tool::{ToolKind, ToolNamespace};
 use xai_tool_types::{MultiTaskOutputResult, TaskOutputOutput, WaitMode, WaitTasksToolInput};
+use xai_grok_i18n::{t, t_fmt};
 
 #[derive(Debug, Default)]
 pub struct WaitTasksTool;
@@ -142,12 +143,13 @@ impl xai_tool_runtime::Tool for WaitTasksTool {
 
         if input.task_ids.is_empty() {
             return Err(xai_tool_runtime::ToolError::invalid_arguments(
-                "task_ids must not be empty.".to_string(),
+                t("task_output.invalid_args.empty_ids").to_string(),
             ));
         }
         if input.task_ids.len() > MAX_MULTI_WAIT_IDS {
-            return Err(xai_tool_runtime::ToolError::invalid_arguments(format!(
-                "task_ids exceeds maximum of {MAX_MULTI_WAIT_IDS} entries."
+            return Err(xai_tool_runtime::ToolError::invalid_arguments(t_fmt(
+                "task_output.invalid_args.too_many_ids",
+                &[("max", &MAX_MULTI_WAIT_IDS.to_string())],
             )));
         }
 

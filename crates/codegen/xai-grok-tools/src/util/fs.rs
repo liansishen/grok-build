@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use xai_grok_i18n::t_fmt;
 
 pub(crate) const FS_SYSCALL_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -165,11 +166,9 @@ async fn try_resolve_unicode_filename_inner(path: &Path) -> Option<UnicodePathMa
             format!(" ({})", differing_chars.join(", "))
         };
 
-        let note = format!(
-            "The specified filename did not exist exactly as given. A file was found \
-             by normalizing Unicode characters{chars_list} to their ASCII equivalents. \
-             The actual filename is: {matched_name}\n\
-             For shell commands referencing this file, use glob patterns to avoid the mismatch.",
+        let note = t_fmt(
+            "tool.fs.unicode_filename_fallback",
+            &[("chars", &chars_list), ("matched_name", matched_name)],
         );
 
         tracing::Span::current().record("result", "resolved");

@@ -40,19 +40,16 @@ where
     match tokio::time::timeout(timeout, acp_send(request, tx)).await {
         Ok(result) => result,
         Err(_elapsed) => {
-            Err(
-                acp::Error::new(
-                    acp::ErrorCode::InternalError.into(),
-                    format!(
-                "{action} timed out after {}s. It may still finish in the background; \
-                 retrying right away can run into the same delay.",
-                timeout.as_secs()
-            ),
+            let seconds = timeout.as_secs().to_string();
+            Err(acp::Error::new(
+                acp::ErrorCode::InternalError.into(),
+                xai_grok_i18n::t_fmt(
+                    "error.effects.acp_timeout",
+                    &[("action", action), ("seconds", &seconds)],
                 ),
-            )
+            ))
         }
     }
-}
 /// Typed progress message for session restore.
 /// Keeps the progress channel from accepting arbitrary `TaskResult` variants.
 pub(crate) struct RestoreProgressMsg {

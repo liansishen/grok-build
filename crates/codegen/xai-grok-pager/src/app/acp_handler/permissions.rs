@@ -356,13 +356,14 @@ fn qualify_permission_title_for_local_workspace(
     if !session_local_workspace {
         return title;
     }
-    if title.contains("on your machine") {
+    let suffix = xai_grok_i18n::t("permission.local_workspace.suffix");
+    if title.contains(suffix) {
         return title;
     }
     if let Some(stripped) = title.strip_suffix('?') {
-        return format!("{stripped} (on your machine)?");
+        return format!("{stripped} {suffix}?");
     }
-    format!("{title} (on your machine)")
+    format!("{title} {suffix}")
 }
 
 /// Lines shown under the permission title: protected-edit note (if any), then

@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
+use xai_grok_i18n::{t, t_fmt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -185,6 +186,41 @@ pub enum SchedulerError {
     Timeout,
 }
 
+impl SchedulerError {
+    /// Render scheduler failures in the active locale for tool callers.
+    pub fn localized_message(&self) -> String {
+        match self {
+            Self::InvalidInterval(detail) => t_fmt(
+                "scheduler.error.invalid_interval",
+                &[("detail", detail)],
+            ),
+            Self::TaskLimitReached(max) => {
+                let max = max.to_string();
+                t_fmt("scheduler.error.task_limit_reached", &[("max", &max)])
+            }
+            Self::TaskNotFound(id) => {
+                t_fmt("scheduler.error.task_not_found", &[("id", id)])
+            }
+            Self::Persistence(error) => {
+                let error = error.to_string();
+                t_fmt("scheduler.error.persistence", &[("error", &error)])
+            }
+            Self::Notification(error) => {
+                let error = error.to_string();
+                t_fmt("scheduler.error.notification", &[("error", &error)])
+            }
+            Self::NoDurableNotificationConsumer => {
+                t("scheduler.error.no_durable_notification_consumer").to_owned()
+            }
+            Self::RemovalPending(id) => {
+                t_fmt("scheduler.error.removal_pending", &[("id", id)])
+            }
+            Self::Cancelled => t("scheduler.error.cancelled").to_owned(),
+            Self::Timeout => t("scheduler.error.timeout").to_owned(),
+        }
+    }
+}
+
 pub fn scheduler_tool_error(error: SchedulerError) -> xai_tool_runtime::ToolError {
     let code = match &error {
         SchedulerError::InvalidInterval(_)
@@ -197,7 +233,7 @@ pub fn scheduler_tool_error(error: SchedulerError) -> xai_tool_runtime::ToolErro
         SchedulerError::Cancelled => "scheduler_cancelled",
         SchedulerError::Timeout => "scheduler_timeout",
     };
-    xai_tool_runtime::ToolError::custom(code, error.to_string())
+    xai_tool_runtime::ToolError::custom(code, error.localized_message())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

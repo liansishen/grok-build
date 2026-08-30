@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 use reqwest::Client;
+use xai_grok_i18n::{t, t_fmt};
 
 /// Roots are skipped for plain HTTP targets: reqwest loads the OS store at
 /// build time regardless of scheme, and a broken store must not fail the CLI.
@@ -17,7 +18,7 @@ fn builder_for(url: &str) -> reqwest::ClientBuilder {
 fn client_for(url: &str) -> Result<Client> {
     builder_for(url)
         .build()
-        .context("failed to build HTTP client")
+        .context(t("ptyctl.error.client_build"))
 }
 
 /// Send keystrokes to a session.
@@ -33,11 +34,11 @@ pub async fn send(url: &str, keys: &str, enter: bool) -> Result<()> {
         .json(&serde_json::json!({"keys": keys}))
         .send()
         .await
-        .context("failed to send keys")?;
+        .context(t("ptyctl.error.send_keys"))?;
 
     if !resp.status().is_success() {
         let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("send failed: {body}");
+        anyhow::bail!("{}", t_fmt("ptyctl.error.send", &[("body", &body)]));
     }
     Ok(())
 }
@@ -69,11 +70,11 @@ pub async fn screen(
         req = req.query(&[("full", "true")]);
     }
 
-    let resp = req.send().await.context("failed to query screen")?;
+    let resp = req.send().await.context(t("ptyctl.error.failed_screen_query"))?;
 
     if !resp.status().is_success() {
         let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("screen query failed: {body}");
+        anyhow::bail!("{}", t_fmt("ptyctl.error.screen_query", &[("body", &body)]));
     }
 
     let body = resp.text().await?;
@@ -105,7 +106,7 @@ pub async fn cursor(url: &str) -> Result<()> {
         .get(format!("{url}/query/cursor"))
         .send()
         .await
-        .context("failed to query cursor")?;
+        .context(t("ptyctl.error.cursor_query"))?;
     let body = resp.text().await?;
     println!("{body}");
     Ok(())
@@ -118,7 +119,7 @@ pub async fn status(url: &str) -> Result<()> {
         .get(format!("{url}/query/status"))
         .send()
         .await
-        .context("failed to query status")?;
+        .context(t("ptyctl.error.status_query"))?;
     let body = resp.text().await?;
     println!("{body}");
     Ok(())
@@ -128,9 +129,9 @@ pub async fn status(url: &str) -> Result<()> {
 pub async fn resize(url: &str, size: &str) -> Result<()> {
     let (cols, rows) = size
         .split_once('x')
-        .ok_or_else(|| anyhow::anyhow!("invalid size format, expected COLSxROWS (e.g. 120x40)"))?;
-    let cols: u16 = cols.parse().context("invalid cols")?;
-    let rows: u16 = rows.parse().context("invalid rows")?;
+        .ok_or_else(|| anyhow::anyhow!("{}", t("ptyctl.error.invalid_size")))?;
+    let cols: u16 = cols.parse().context(t("ptyctl.error.invalid_cols"))?;
+    let rows: u16 = rows.parse().context(t("ptyctl.error.invalid_rows"))?;
 
     let client = client_for(url)?;
     let resp = client
@@ -138,13 +139,13 @@ pub async fn resize(url: &str, size: &str) -> Result<()> {
         .json(&serde_json::json!({"cols": cols, "rows": rows}))
         .send()
         .await
-        .context("failed to resize")?;
+        .context(t("ptyctl.error.resize"))?;
 
     if !resp.status().is_success() {
         let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("resize failed: {body}");
+        anyhow::bail!("{}", t_fmt("ptyctl.error.resize_failed", &[("body", &body)]));
     }
-    println!("Resized to {cols}x{rows}");
+    println!("{}", t_fmt("ptyctl.resize.success", &[("cols", &cols.to_string()), ("rows", &rows.to_string())]));
     Ok(())
 }
 
@@ -165,7 +166,7 @@ pub async fn wait(
             timeout_secs.saturating_add(5),
         ))
         .build()
-        .context("failed to build HTTP client")?;
+        .context(t("ptyctl.error.client_build"))?;
 
     let mut req = client
         .get(format!("{url}/wait"))
@@ -183,13 +184,13 @@ pub async fn wait(
         req = req.query(&[("stable_ms", ms.to_string())]);
     }
 
-    let resp = req.send().await.context("failed to call wait")?;
+    let resp = req.send().await.context(t("ptyctl.error.wait"))?;
     if !resp.status().is_success() {
         let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("wait failed: {body}");
+        anyhow::bail!("{}", t_fmt("ptyctl.error.wait_failed", &[("body", &body)]));
     }
 
-    let outcome: serde_json::Value = resp.json().await.context("invalid wait response")?;
+    let outcome: serde_json::Value = resp.json().await.context(t("ptyctl.error.invalid_wait_response"))?;
     println!("{}", serde_json::to_string_pretty(&outcome)?);
     Ok(outcome
         .get("matched")
@@ -204,12 +205,12 @@ pub async fn stop(url: &str) -> Result<()> {
         .post(format!("{url}/control/stop"))
         .send()
         .await
-        .context("failed to stop session")?;
+        .context(t("ptyctl.error.stop"))?;
 
     if !resp.status().is_success() {
         let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("stop failed: {body}");
+        anyhow::bail!("{}", t_fmt("ptyctl.error.stop_failed", &[("body", &body)]));
     }
-    println!("Session stopped");
+    println!("{}", t("ptyctl.session.stopped"));
     Ok(())
 }

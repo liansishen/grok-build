@@ -681,7 +681,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             app.workspace_store_loading = false;
             app.workspace_write_in_flight = false;
             app.dashboard_sessions_loading = false;
-            app.show_toast(&format!("Could not load dashboard workspace: {error}"));
+            app.show_toast(&xai_grok_i18n::t_fmt(
+                "task_result.workspace_load_failed",
+                &[("error", &error.to_string())],
+            ));
             vec![]
         }
         TaskResult::WorkspaceMembersUpserted {
@@ -703,7 +706,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     app.workspace_store = None;
                     app.workspace_store_loading = true;
                     app.workspace_sync_requested = true;
-                    app.show_toast("Dashboard workspace changed; refreshing");
+                    app.show_toast(xai_grok_i18n::t("task_result.workspace_refreshing"));
                     return vec![Effect::LoadWorkspaceSnapshot { db_path }];
                 }
             };
@@ -727,15 +730,19 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     error = failure.error,
                     "dashboard workspace sync partially failed"
                 );
-                app.show_toast(&format!(
-                    "Could not sync {} dashboard session{}",
-                    failures.len(),
-                    if failures.len() == 1 { "" } else { "s" }
-                ));
+                let message = if failures.len() == 1 {
+                    xai_grok_i18n::t("task_result.workspace_sync_failed_one").to_owned()
+                } else {
+                    xai_grok_i18n::t_fmt(
+                        "task_result.workspace_sync_failed_many",
+                        &[("count", &failures.len().to_string())],
+                    )
+                };
+                app.show_toast(&message);
             }
             if app.workspace_writes_disabled {
                 app.workspace_sync_requested = false;
-                app.show_toast("Dashboard workspace is read-only in this Grok version");
+                app.show_toast(xai_grok_i18n::t("task_result.workspace_read_only"));
             } else {
                 let mut request_retry = false;
                 for member in attempted {
@@ -771,7 +778,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             app.workspace_store = None;
             app.workspace_write_in_flight = false;
             app.workspace_store_loading = true;
-            app.show_toast("Dashboard workspace writer failed; reopening");
+            app.show_toast(xai_grok_i18n::t("task_result.workspace_writer_failed"));
             vec![Effect::LoadWorkspaceSnapshot { db_path }]
         }
         TaskResult::CardDetailLoaded {

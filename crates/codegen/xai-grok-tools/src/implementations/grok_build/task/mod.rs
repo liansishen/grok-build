@@ -1092,7 +1092,7 @@ mod tests {
                 );
                 assert!(
                     text.text
-                        .contains(xai_tool_types::BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK),
+                        .contains(&xai_tool_types::background_subagent_continue_parent_work()),
                     "auto-bg result must keep in-flight parent work: {}",
                     text.text
                 );
@@ -1331,7 +1331,7 @@ mod tests {
                 assert!(text.text.contains("Subagent started in background"));
                 assert!(
                     text.text
-                        .contains(xai_tool_types::BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK),
+                        .contains(&xai_tool_types::background_subagent_continue_parent_work()),
                     "background spawn must keep in-flight parent work: {}",
                     text.text
                 );
@@ -1374,7 +1374,7 @@ mod tests {
                 assert!(
                     !text
                         .text
-                        .contains(xai_tool_types::BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK),
+                        .contains(&xai_tool_types::background_subagent_continue_parent_work()),
                     "review-only ask must not get continue-parent CTA: {}",
                     text.text
                 );
@@ -1432,7 +1432,7 @@ mod tests {
             ToolOutput::Text(text) => {
                 assert!(
                     text.text
-                        .contains(xai_tool_types::BACKGROUND_SUBAGENT_CONTINUE_PARENT_WORK),
+                        .contains(&xai_tool_types::background_subagent_continue_parent_work()),
                     "synthetic rows must not hide leftover exec: {}",
                     text.text
                 );

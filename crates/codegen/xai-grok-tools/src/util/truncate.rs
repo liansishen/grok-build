@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use xai_grok_i18n::t_fmt;
 
 /// Default wrap width for soft-wrapping (used by bash, task_output).
 pub const DEFAULT_SOFT_WRAP_WIDTH: usize = 2_000;
@@ -37,12 +38,11 @@ pub fn truncate_line(line: &str, max_chars: usize) -> Cow<'_, str> {
         .nth(max_chars)
         .map(|(i, _)| i)
         .unwrap_or(line.len());
-    Cow::Owned(format!(
-        "{} [... truncated ({} chars total)]",
-        &line[..end_byte],
-        char_count
+    let count = char_count.to_string();
+    Cow::Owned(t_fmt(
+        "tool.output.line_truncated",
+        &[("text", &line[..end_byte]), ("count", &count)],
     ))
-}
 
 /// Soft-wrap a long line by inserting newlines every `wrap_width` characters.
 /// **All content is preserved** — nothing is discarded.
@@ -145,8 +145,14 @@ pub fn truncate_with_preview(
     }
 
     let footer = match footer_hint {
-        Some(hint) => format!("[Output truncated - {total_bytes} bytes total. {hint}]"),
-        None => format!("[Output truncated - {total_bytes} bytes total]"),
+        Some(hint) => t_fmt(
+            "tool.output.truncated_with_hint",
+            &[("total_bytes", &total_bytes.to_string()), ("hint", hint)],
+        ),
+        None => t_fmt(
+            "tool.output.truncated",
+            &[("total_bytes", &total_bytes.to_string())],
+        ),
     };
     // Text that fits the limit can still be part of a larger output; the
     // reader still needs the total size and where to find the rest.

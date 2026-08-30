@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 
 use crate::types::tool::ToolKind;
+use xai_grok_i18n::{t, t_fmt};
 
 pub const DEFAULT_MAX_PARALLEL_IMAGE_GEN: usize = 8;
 pub const DEFAULT_MAX_PARALLEL_VIDEO_GEN: usize = 4;
@@ -120,39 +121,46 @@ pub fn resample_reminder(egregious: &[MediaGenOverCap]) -> String {
     debug_assert!(!egregious.is_empty());
     let names = join_backticked_names(egregious.iter().map(|o| o.name.as_str()));
     let limit = match egregious {
-        [one] => format!("the max limit for {names} is {}", one.max),
-        many if many.iter().all(|o| o.max == many[0].max) => {
-            format!("the max limit for {names} is {}", many[0].max)
-        }
-        many => {
-            let parts = many
-                .iter()
-                .map(|o| format!("`{}` is {}", o.name, o.max))
-                .collect::<Vec<_>>()
-                .join(" and the max limit for ");
-            format!("the max limit for {parts}")
-        }
+        [one] => t_fmt(
+            "media_gen.max_limit",
+            &[("names", &names), ("max", &one.max.to_string())],
+        ),
+        many if many.iter().all(|o| o.max == many[0].max) => t_fmt(
+            "media_gen.max_limit",
+            &[("names", &names), ("max", &many[0].max.to_string())],
+        ),
+        many => many
+            .iter()
+            .map(|o| {
+                let names = format!("`{}`", o.name);
+                t_fmt(
+                    "media_gen.max_limit",
+                    &[("names", &names), ("max", &o.max.to_string())],
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(t("media_gen.limit_separator")),
     };
-    format!(
-        "Consider the user message carefully for your future responses and tool calls. \
-         If you are considering making {names} calls, {limit} in one parallel set of calls. \
-         Larger requests will be rejected."
+    t_fmt(
+        "media_gen.resample_reminder",
+        &[("names", &names), ("limits", &limit)],
     )
 }
 
 fn join_backticked_names<'a>(names: impl IntoIterator<Item = &'a str>) -> String {
     let names: Vec<&str> = names.into_iter().collect();
+    let conjunction = t("media_gen.conjunction");
     match names.as_slice() {
         [] => String::new(),
         [one] => format!("`{one}`"),
-        [a, b] => format!("`{a}` and `{b}`"),
+        [a, b] => format!("`{a}` {conjunction} `{b}`"),
         names => match names.split_last() {
             Some((last, rest)) if !rest.is_empty() => format!(
-                "{}, and `{last}`",
+                "{} {conjunction} `{last}`",
                 rest.iter()
                     .map(|n| format!("`{n}`"))
                     .collect::<Vec<_>>()
-                    .join(", ")
+                    .join(", "),
             ),
             _ => String::new(),
         },
@@ -199,10 +207,13 @@ pub fn partition_media_gen_batch<T>(
         } else {
             rejected.push((
                 call,
-                format!(
-                    "Rejected: at most {max} `{name}` tool calls are allowed in a single model step \
-                     (this batch had {total}). This extra call was skipped. \
-                     If you still need more, make a new step with at most {max} `{name}` call(s)."
+                t_fmt(
+                    "media_gen.rejected",
+                    &[
+                        ("max", &max.to_string()),
+                        ("name", name.as_str()),
+                        ("total", &total.to_string()),
+                    ],
                 ),
             ));
         }

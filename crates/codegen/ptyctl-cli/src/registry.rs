@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
+use xai_grok_i18n::{t, t_fmt};
 
 /// Information about a registered session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,22 +25,22 @@ fn registry_dir() -> Result<PathBuf> {
     }
     let state_dir = dirs::state_dir()
         .or_else(dirs::data_local_dir)
-        .context("cannot determine state directory")?;
+        .context(t("ptyctl.registry.state_dir"))?;
     Ok(state_dir.join("ptyctl").join("sessions"))
 }
 
 /// Register a named session.
 pub fn register_session(name: &str, info: &SessionInfo) -> Result<()> {
     let dir = registry_dir()?;
-    fs::create_dir_all(&dir).context("failed to create session registry directory")?;
+    fs::create_dir_all(&dir).context(t("ptyctl.registry.create_dir"))?;
 
     let path = dir.join(format!("{name}.json"));
     let json = serde_json::to_string_pretty(info)?;
 
     // Atomic write: write to temp file, then rename.
     let tmp = dir.join(format!(".{name}.json.tmp"));
-    fs::write(&tmp, &json).context("failed to write session file")?;
-    fs::rename(&tmp, &path).context("failed to rename session file")?;
+    fs::write(&tmp, &json).context(t("ptyctl.registry.write"))?;
+    fs::rename(&tmp, &path).context(t("ptyctl.registry.rename"))?;
 
     Ok(())
 }
@@ -50,11 +51,11 @@ pub fn lookup_session(name: &str) -> Result<SessionInfo> {
     let path = dir.join(format!("{name}.json"));
 
     if !path.exists() {
-        bail!("session '{name}' not found");
+        bail!("{}", t_fmt("ptyctl.registry.not_found", &[("name", name)]));
     }
 
-    let json = fs::read_to_string(&path).context("failed to read session file")?;
-    let info: SessionInfo = serde_json::from_str(&json).context("failed to parse session file")?;
+    let json = fs::read_to_string(&path).context(t("ptyctl.registry.read"))?;
+    let info: SessionInfo = serde_json::from_str(&json).context(t("ptyctl.registry.parse"))?;
 
     Ok(info)
 }
@@ -64,7 +65,7 @@ pub fn unregister_session(name: &str) -> Result<()> {
     let dir = registry_dir()?;
     let path = dir.join(format!("{name}.json"));
     if path.exists() {
-        fs::remove_file(&path).context("failed to remove session file")?;
+        fs::remove_file(&path).context(t("ptyctl.registry.remove"))?;
     }
     Ok(())
 }
@@ -104,7 +105,7 @@ pub fn list_sessions() -> Result<Vec<(String, SessionInfo)>> {
     }
 
     let mut sessions = Vec::new();
-    for entry in fs::read_dir(&dir).context("failed to read session directory")? {
+    for entry in fs::read_dir(&dir).context(t("ptyctl.registry.read_dir"))? {
         let entry = entry?;
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) == Some("json") {

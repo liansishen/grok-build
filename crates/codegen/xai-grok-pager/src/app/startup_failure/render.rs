@@ -96,8 +96,8 @@ impl Advice {
         ) {
             let _ = write!(
                 explanation,
-                " On a slow machine or network filesystem, a larger startup \
-                 budget can help. Set it with the command below."
+                " {}",
+                t("startup.failure.slow_machine_hint")
             );
         }
         explanation

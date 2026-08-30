@@ -6,6 +6,7 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use xai_grok_i18n::t_fmt;
 
 /// Ceiling for the single blocking-thread filesystem probe.
 const HINT_TIMEOUT: Duration = Duration::from_millis(100);
@@ -30,20 +31,26 @@ pub struct PathNotFoundHint {
 }
 
 impl fmt::Display for PathNotFoundHint {
-    /// Formats as a suffix to append after `"Error: {path} does not exist."`.
+    /// Formats as a suffix to append after the localized base error.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(ref s) = self.suggestion {
-            write!(f, " Did you mean {}?", s.display())?;
+            let path = s.display().to_string();
+            write!(
+                f,
+                "{}",
+                t_fmt("path_suggestions.did_you_mean", &[("path", &path)])
+            )?;
         } else if !self.similar.is_empty() {
             let names: Vec<&str> = self
                 .similar
                 .iter()
                 .filter_map(|p| p.file_name().and_then(|n| n.to_str()))
                 .collect();
+            let entries = names.join(", ");
             write!(
                 f,
-                "\nSimilar entries in parent directory: {}",
-                names.join(", ")
+                "{}",
+                t_fmt("path_suggestions.similar_parent", &[("entries", &entries)])
             )?;
         }
 
@@ -59,9 +66,10 @@ impl fmt::Display for PathNotFoundHint {
 /// `display_cwd` is the model-facing working directory (for the CWD note).
 #[tracing::instrument(name = "fs.path_not_found_hint", skip_all)]
 pub async fn path_not_found_hint(path: &Path, cwd: &Path, display_cwd: &Path) -> PathNotFoundHint {
-    let cwd_note = format!(
-        "Note: your current working directory is {}",
-        display_cwd.display()
+    let display_cwd = display_cwd.display().to_string();
+    let cwd_note = t_fmt(
+        "path_suggestions.cwd_note",
+        &[("path", &display_cwd)],
     );
 
     // All filesystem probing runs in a single spawn_blocking.
@@ -117,7 +125,8 @@ pub async fn format_not_found_error(
     display_cwd: &Path,
     hints_enabled: bool,
 ) -> String {
-    let base = format!("Error: {} does not exist.", display_path.display());
+    let display_path = display_path.display().to_string();
+    let base = t_fmt("path_suggestions.not_exist", &[("path", &display_path)]);
     if !hints_enabled {
         return base;
     }

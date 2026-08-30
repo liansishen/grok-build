@@ -14,6 +14,7 @@ pub mod process_manager;
 pub mod requirements;
 pub mod resources;
 pub mod schema;
+pub(crate) mod localization;
 pub mod session_mode;
 pub mod skill_discovery_tracker;
 pub mod template_renderer;

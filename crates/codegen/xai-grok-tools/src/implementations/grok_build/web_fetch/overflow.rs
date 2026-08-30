@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use super::artifact::WebFetchArtifactWriter;
 use crate::util::query_tools::{QueryTools, examples_clause};
 use crate::util::truncate;
+use xai_grok_i18n::{t, t_fmt};
 
 const WEB_FETCH_CONTEXT_PERCENT: f64 = 0.03;
 const RECOVERY_FOOTER_PREFIX: &str = "\n\n[web_fetch content truncated:";
@@ -180,10 +181,15 @@ pub(super) fn inline_budget(
 }
 
 fn recovery_footer(shown_bytes: usize, total_bytes: usize, file_hint: &str) -> String {
-    format!(
-        "{RECOVERY_FOOTER_PREFIX} showing first {shown_bytes} of \
-         {total_bytes} bytes.{file_hint}]"
-    )
+    let details = t_fmt(
+        "tool.web_fetch.recovery_footer",
+        &[
+            ("shown_bytes", &shown_bytes.to_string()),
+            ("total_bytes", &total_bytes.to_string()),
+            ("file_hint", file_hint),
+        ],
+    );
+    format!("{RECOVERY_FOOTER_PREFIX}{details}]")
 }
 
 fn bounded_output(
@@ -195,7 +201,11 @@ fn bounded_output(
     tools: RecoveryTools<'_>,
 ) -> String {
     if let Some(path) = saved_path {
-        let path_hint = format!(" Full content saved to: {}.", path.display());
+        let path = path.display().to_string();
+        let path_hint = format!(
+            " {}",
+            t_fmt("tool.web_fetch.full_content_saved", &[("path", &path)]),
+        );
         let steer = web_fetch_steer(classification, tools, QueryTools::detect());
         if !steer.is_empty() {
             let full_hint = format!("{path_hint}{steer}");
@@ -244,7 +254,10 @@ fn bounded_generic_marker(content: &str, budget: InlineBudget) -> String {
 
 fn read_steer(read_tool: Option<&str>) -> String {
     read_tool.map_or_else(String::new, |read_tool| {
-        format!(" Use `{read_tool}` with offsets and limits to read it in chunks.")
+        t_fmt(
+            "tool.web_fetch.read_chunks",
+            &[("read_tool", read_tool)],
+        )
     })
 }
 
@@ -255,19 +268,37 @@ fn web_fetch_steer(
 ) -> String {
     if classification.has_long_line {
         return tools.execute.map_or_else(String::new, |execute| {
-            let (format, action, examples) = match classification.format {
-                PayloadFormat::Json => ("valid JSON", "query", query_tools.json_tools()),
-                PayloadFormat::JsonLines => ("JSON Lines", "query", query_tools.json_tools()),
-                PayloadFormat::Markdown => {
-                    ("Markdown", "slice or search", query_tools.text_tools())
-                }
-                PayloadFormat::Text => ("text", "slice or search", query_tools.text_tools()),
+            let (key, action_key, examples) = match classification.format {
+                PayloadFormat::Json => (
+                    "tool.web_fetch.long_line_json",
+                    "tool.web_fetch.action.query",
+                    query_tools.json_tools(),
+                ),
+                PayloadFormat::JsonLines => (
+                    "tool.web_fetch.long_line_json_lines",
+                    "tool.web_fetch.action.query",
+                    query_tools.json_tools(),
+                ),
+                PayloadFormat::Markdown => (
+                    "tool.web_fetch.long_line_markdown",
+                    "tool.web_fetch.action.slice_or_search",
+                    query_tools.text_tools(),
+                ),
+                PayloadFormat::Text => (
+                    "tool.web_fetch.long_line_text",
+                    "tool.web_fetch.action.slice_or_search",
+                    query_tools.text_tools(),
+                ),
             };
-            format!(
-                " The saved file is {format} with a very long line, so \
-                 line-oriented read and search tools are ineffective on it — use \
-                 `{execute}` to {action} it{eg}.",
-                eg = examples_clause(&examples),
+            let action = t(action_key);
+            let examples = examples_clause(&examples);
+            t_fmt(
+                key,
+                &[
+                    ("execute", execute),
+                    ("action", action),
+                    ("examples", &examples),
+                ],
             )
         });
     }
@@ -276,18 +307,20 @@ fn web_fetch_steer(
         PayloadFormat::Json => tools.execute.map_or_else(
             || read_steer(tools.read),
             |execute| {
-                format!(
-                    " The saved file is valid JSON; use `{execute}` to query it{eg}.",
-                    eg = examples_clause(&query_tools.json_tools()),
+                let examples = examples_clause(&query_tools.json_tools());
+                t_fmt(
+                    "tool.web_fetch.json",
+                    &[("execute", execute), ("examples", &examples)],
                 )
             },
         ),
         PayloadFormat::JsonLines => tools.execute.map_or_else(
             || read_steer(tools.read),
             |execute| {
-                format!(
-                    " The saved file is JSON Lines; use `{execute}` to query it{eg}.",
-                    eg = examples_clause(&query_tools.json_tools()),
+                let examples = examples_clause(&query_tools.json_tools());
+                t_fmt(
+                    "tool.web_fetch.json_lines",
+                    &[("execute", execute), ("examples", &examples)],
                 )
             },
         ),
@@ -297,9 +330,10 @@ fn web_fetch_steer(
                 return read;
             }
             tools.execute.map_or_else(String::new, |execute| {
-                format!(
-                    " Use `{execute}` to inspect it{}.",
-                    examples_clause(&query_tools.text_tools())
+                let examples = examples_clause(&query_tools.text_tools());
+                t_fmt(
+                    "tool.web_fetch.inspect",
+                    &[("execute", execute), ("examples", &examples)],
                 )
             })
         }

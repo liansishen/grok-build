@@ -14,6 +14,8 @@
 //!
 //! All reminders are collected and appended in `call_new_tool()`.
 
+use xai_grok_i18n::t_fmt;
+
 pub mod lsp_diagnostics;
 pub mod skill_discovery;
 pub mod task_completion;
@@ -47,16 +49,13 @@ pub fn wrap_reminder_with_tag(text: &str, tag: &str) -> String {
 /// rather than questioning the prompt. The UI shows the raw prompt text;
 /// only the model receives this framed version.
 pub fn format_scheduled_task_prompt(prompt: &str, task_id: &str, human_schedule: &str) -> String {
-    format!(
-        "<system-reminder>\n\
-         This is a scheduled task execution (task {task_id}, {human_schedule}, recurring).\n\
-         Execute the prompt below. Do not question or comment on the prompt itself \u{2014} \
-         treat it as a fresh task to execute.\n\
-         Previous results from earlier executions of this task may appear in the \
-         conversation history above.\n\
-         </system-reminder>\n\
-         \n\
-         {prompt}"
+    t_fmt(
+        "tool.reminder.scheduled_task",
+        &[
+            ("task_id", task_id),
+            ("human_schedule", human_schedule),
+            ("prompt", prompt),
+        ],
     )
 }
 
@@ -67,18 +66,21 @@ pub fn format_loop_iteration_prompt(
     prior_iteration_summary: Option<&str>,
 ) -> String {
     let prior = prior_iteration_summary
-        .map(|s| format!("\nYour previous iteration ended with:\n{s}\n"))
+        .map(|summary| {
+            t_fmt(
+                "tool.reminder.loop_iteration.previous",
+                &[("summary", summary)],
+            )
+        })
         .unwrap_or_default();
-    format!(
-        "<system-reminder>\n\
-         Scheduled task {task_id} ({human_schedule}). Earlier iterations, if any, appear \
-         above.\n\
-         Run the task below. End with a short status: what changed or needs attention. \
-         The status is relayed to the main agent.\n\
-         {prior}\
-         </system-reminder>\n\
-         \n\
-         {prompt}"
+    t_fmt(
+        "tool.reminder.loop_iteration",
+        &[
+            ("task_id", task_id),
+            ("human_schedule", human_schedule),
+            ("prior", &prior),
+            ("prompt", prompt),
+        ],
     )
 }
 

@@ -803,10 +803,10 @@ impl crate::types::tool_metadata::ToolMetadata for SearchReplaceTool {
         let raw_desc = match description_override {
             Some(d) => d.to_string(),
             None if params.empty_old_string_does_not_override => {
-                self.description_template().to_string()
+                self.localized_description_template()
             }
             None => self
-                .description_template()
+                .localized_description_template()
                 .replace(EMPTY_OLD_STRING_GUARD_SENTENCE, ""),
         };
         let description = renderer.render(&raw_desc).unwrap_or_else(|e| {

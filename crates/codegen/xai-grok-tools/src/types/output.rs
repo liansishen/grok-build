@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use strip_ansi_escapes::strip_str;
 use xai_tool_types::SubagentCompletedOutput;
+use xai_grok_i18n::{t, t_fmt};
 /// `(added, removed)` line counts for the `edit.lines` telemetry counter.
 pub fn line_diff(old: &str, new: &str) -> (i64, i64) {
     let mut added = 0i64;
@@ -107,15 +108,15 @@ impl MediaGenOutput {
     /// ("Image generated" / "Video generated" / "Image edited"); the trailing
     /// guidance stops the model re-reading or narrating the result.
     pub fn prompt_text(&self, action: &str) -> String {
+        let action = t(action);
         if let Some(url) = &self.uploaded_url {
-            return format!(
-                "{action} and uploaded to {url}. The file is not available locally — reference it by this URL. Do not read or re-display it, and do not describe how it appears to the user."
+            return t_fmt(
+                "tool.media.uploaded",
+                &[("action", action), ("url", url)],
             );
         }
         let path = self.path.to_string_lossy().to_string();
-        let message = format!(
-            "{action} and saved to {path}. Do not read or re-display it, and do not describe how it appears to the user."
-        );
+        let message = t_fmt("tool.media.saved", &[("action", action), ("path", &path)]);
         serde_json::json!({
             "path": path,
             "filename": &self.filename,
@@ -711,25 +712,24 @@ impl ToolOutput {
             ToolOutput::ReadFile(read_file_output) => match read_file_output {
                 ReadFileOutput::FileContent(file_content) if file_content.content.is_empty() => {
                     if file_content.total_lines == 0 {
-                        "File is empty.".to_string()
+                        t("tool.read.file_empty").to_string()
                     } else if file_content
                         .offset
                         .is_some_and(|offset| offset > file_content.total_lines)
                     {
-                        format!(
-                            "(no lines returned: the requested window is past the end of the \
-                             file; the file has {} lines)",
-                            file_content.total_lines
+                        t_fmt(
+                            "tool.read.no_lines_past_end",
+                            &[("total_lines", &file_content.total_lines.to_string())],
                         )
                     } else {
-                        "(no lines returned)".to_string()
+                        t("tool.read.no_lines").to_string()
                     }
                 }
                 ReadFileOutput::FileContent(file_content) => file_content.content.clone(),
                 ReadFileOutput::ImageContent(image_content) => {
-                    format!(
-                        "[Image content of type: {} is included inline in this tool result]",
-                        image_content.mime_type,
+                    t_fmt(
+                        "tool.read.image_inline",
+                        &[("mime_type", &image_content.mime_type)],
                     )
                 }
                 ReadFileOutput::FileNotFound(error_msg)
@@ -744,12 +744,14 @@ impl ToolOutput {
                         .iter()
                         .map(|p| p.page_number.to_string())
                         .collect();
-                    format!(
-                        "[Read PDF: {} pages rendered (pages {}). Total document: {} pages, {:.1} KB]",
-                        pdf.pages.len(),
-                        page_list.join(", "),
-                        pdf.total_pages,
-                        pdf.file_size as f64 / 1024.0,
+                    t_fmt(
+                        "tool.read.pdf_summary",
+                        &[
+                            ("rendered", &pdf.pages.len().to_string()),
+                            ("pages", &page_list.join(", ")),
+                            ("total_pages", &pdf.total_pages.to_string()),
+                            ("size_kb", &format!("{:.1}", pdf.file_size as f64 / 1024.0)),
+                        ],
                     )
                 }
             },
@@ -785,16 +787,25 @@ impl ToolOutput {
                 if let Some(ref pre) = web_search_output.pre_formatted {
                     pre.clone()
                 } else {
-                    format!(
-                        "Web search results for: \"{}\"\n\n{}",
-                        web_search_output.query, web_search_output.content
+                    t_fmt(
+                        "tool.web_search.results_for",
+                        &[
+                            ("query", &web_search_output.query),
+                            ("content", &web_search_output.content),
+                        ],
                     )
                 }
             }
             ToolOutput::WebFetch(o) => o.to_prompt_format(),
             ToolOutput::MCP(mcp_output) => match &mcp_output.output {
                 MCPOutputDetails::Error(error) => {
-                    format!("Failed to call {}: {}", &mcp_output.tool_name, error)
+                    t_fmt(
+                        "tool.mcp.call_failed",
+                        &[
+                            ("tool", &mcp_output.tool_name),
+                            ("error", error),
+                        ],
+                    )
                 }
                 MCPOutputDetails::OkayOutput(output) => output.to_owned(),
             },
@@ -821,24 +832,33 @@ impl ToolOutput {
             ToolOutput::TaskOutput(task_output) => match task_output {
                 TaskOutputOutput::Result(r) => {
                     let mut lines = vec![
-                        format!("=== Task {} ===", r.task_id),
-                        format!("Command: {}", r.command),
-                        format!("Status: {}", r.status),
-                        format!("Duration: {:.2}s", r.duration_secs),
+                        t_fmt("task_output.result.title", &[("task_id", &r.task_id)]),
+                        t_fmt("task_output.result.command", &[("command", &r.command)]),
+                        t_fmt("task_output.result.status", &[("status", &r.status)]),
+                        t_fmt(
+                            "task_output.result.duration",
+                            &[("duration", &format!("{:.2}", r.duration_secs))],
+                        ),
                     ];
                     if let Some(code) = r.exit_code {
-                        lines.push(format!("Exit Code: {}", code));
+                        lines.push(t_fmt(
+                            "task_output.result.exit_code",
+                            &[("code", &code.to_string())],
+                        ));
                     }
                     if !r.output_file.is_empty() {
-                        lines.push(format!("Output File: {}", r.output_file));
+                        lines.push(t_fmt(
+                            "task_output.result.output_file",
+                            &[("path", &r.output_file)],
+                        ));
                     }
                     lines.push(String::new());
-                    lines.push("=== Output ===".to_string());
+                    lines.push(t("task_output.result.output_header").to_string());
                     if r.output.is_empty() {
                         if r.status == "running" {
-                            lines.push("(no output yet)".to_string());
+                            lines.push(t("task_output.result.no_output_yet").to_string());
                         } else {
-                            lines.push("(no output)".to_string());
+                            lines.push(t("task_output.result.no_output").to_string());
                         }
                     } else {
                         lines.push(r.output.clone());
@@ -850,14 +870,25 @@ impl ToolOutput {
                 }
                 TaskOutputOutput::TaskNotFound(msg) => msg.to_owned(),
                 TaskOutputOutput::MultiResult(mr) => {
-                    let mut lines = vec![format!("=== Multi-wait ({}) ===", mr.mode)];
+                    let mut lines = vec![t_fmt(
+                        "task_output.multi.title",
+                        &[("mode", &mr.mode)],
+                    )];
                     for r in &mr.results {
-                        lines.push(format!(
-                            "--- Task {} [{}] ---\nCommand: {}\nDuration: {:.2}s",
-                            r.task_id, r.status, r.command, r.duration_secs,
+                        lines.push(t_fmt(
+                            "task_output.multi.task",
+                            &[
+                                ("task_id", &r.task_id),
+                                ("status", &r.status),
+                                ("command", &r.command),
+                                ("duration", &format!("{:.2}", r.duration_secs)),
+                            ],
                         ));
                         if let Some(code) = r.exit_code {
-                            lines.push(format!("Exit Code: {code}"));
+                            lines.push(t_fmt(
+                                "task_output.multi.exit_code",
+                                &[("code", &code.to_string())],
+                            ));
                         }
                         if !r.output.is_empty() {
                             lines.push(r.output.clone());
@@ -911,47 +942,50 @@ impl ToolOutput {
                 let task_hint = if tool_hints.task.is_empty() {
                     String::new()
                 } else {
-                    format!(
-                        "\n     You can use the {} tool with subagent_type=\"explore\" to \
-                         parallelize codebase exploration without filling your context window.",
-                        tool_hints.task
+                    t_fmt(
+                        "plan_mode.task_hint",
+                        &[("tool", &tool_hints.task)],
                     )
                 };
                 let plan_status = match plan_file_seed {
-                    PlanFileSeedStatus::Empty => {
-                        format!(
-                            "Write your plan to {plan_file_path}. The file exists and is empty."
-                        )
-                    }
-                    PlanFileSeedStatus::NonEmpty => {
-                        format!(
-                            "Write your plan to {plan_file_path}. The file exists but is not empty."
-                        )
-                    }
+                    PlanFileSeedStatus::Empty => t_fmt(
+                        "plan_mode.file.empty",
+                        &[("path", plan_file_path)],
+                    ),
+                    PlanFileSeedStatus::NonEmpty => t_fmt(
+                        "plan_mode.file.non_empty",
+                        &[("path", plan_file_path)],
+                    ),
                     PlanFileSeedStatus::Missing(reason) => {
                         let detail = match reason {
-                            PlanFileSeedFailure::NotCreated => "The file has not yet been created.",
-                            PlanFileSeedFailure::NotAFile => {
-                                "A directory already exists at that path."
+                            PlanFileSeedFailure::NotCreated => {
+                                t("plan_mode.file.not_created").to_string()
                             }
-                            PlanFileSeedFailure::Inaccessible => "The file could not be accessed.",
+                            PlanFileSeedFailure::NotAFile => {
+                                t("plan_mode.file.not_a_file").to_string()
+                            }
+                            PlanFileSeedFailure::Inaccessible => {
+                                t("plan_mode.file.inaccessible").to_string()
+                            }
                             PlanFileSeedFailure::Unavailable => {
-                                "The plan file location is unavailable."
+                                t("plan_mode.file.unavailable").to_string()
                             }
                         };
-                        format!("Write your plan to {plan_file_path}. {detail}")
+                        t_fmt(
+                            "plan_mode.file.missing",
+                            &[("path", plan_file_path), ("detail", &detail)],
+                        )
                     }
                 };
-                format!(
-                    "{message}\n\n\
-                     {plan_status}\n\n\
-                     In plan mode, you should:\n\
-                     1. Thoroughly explore the codebase to understand existing patterns{task_hint}\n\
-                     2. Identify similar features, codebase architecture, and understand trade-offs\n\
-                     3. Use {ask} if you need to clarify the approach\n\
-                     4. Design a concrete implementation strategy\n\
-                     5. Write your plan to the plan file above\n\
-                     6. When ready, use {exit} to present your plan to the user."
+                t_fmt(
+                    "plan_mode.instructions",
+                    &[
+                        ("message", message),
+                        ("plan_status", &plan_status),
+                        ("task_hint", &task_hint),
+                        ("ask_user", ask),
+                        ("exit_plan", exit),
+                    ],
                 )
             }
             ToolOutput::ExitPlanMode(exit) => match exit {
@@ -959,12 +993,14 @@ impl ToolOutput {
                     message,
                     plan_content,
                     plan_file_path,
-                } => {
-                    format!(
-                        "{message}\n\nYour plan has been saved at: {plan_file_path}\n\n\
-                         ## Plan:\n{plan_content}"
-                    )
-                }
+                } => t_fmt(
+                    "plan_mode.exit.saved",
+                    &[
+                        ("message", message),
+                        ("path", plan_file_path),
+                        ("content", plan_content),
+                    ],
+                ),
                 ExitPlanModeOutput::EmptyPlan { message, .. } => message.clone(),
             },
             ToolOutput::AskUserQuestion(
@@ -974,32 +1010,42 @@ impl ToolOutput {
             ToolOutput::SendSubagentMessage(output) => output.to_string(),
             ToolOutput::Monitor(o) => {
                 if o.persistent {
-                    format!(
-                        "Monitor started (task {}, persistent -- runs until kill_task or session end).\n\
-                         You will be notified on each event. Keep working -- do not poll or sleep.\n\
-                         Events may arrive while you are waiting for the user -- an event is not their reply.",
-                        o.task_id
+                    t_fmt(
+                        "tool.monitor.persistent",
+                        &[
+                            ("task", &o.task_id),
+                            ("kill_tool", "kill_task"),
+                        ],
                     )
                 } else {
-                    format!(
-                        "Monitor started (task {}, timeout {}ms).\n\
-                         You will be notified on each event. Keep working -- do not poll or sleep.\n\
-                         Events may arrive while you are waiting for the user -- an event is not their reply.",
-                        o.task_id, o.timeout_ms
+                    t_fmt(
+                        "tool.monitor.timeout",
+                        &[
+                            ("task", &o.task_id),
+                            ("timeout_ms", &o.timeout_ms.to_string()),
+                            ("kill_tool", "kill_task"),
+                        ],
                     )
                 }
             }
             ToolOutput::SchedulerCreate(o) => {
-                let verb = if o.updated { "updated" } else { "created" };
-                format!(
-                    "Scheduled task {} (ID: {}, {}).",
-                    verb, o.id, o.human_schedule
+                let key = if o.updated {
+                    "tool.scheduler.updated"
+                } else {
+                    "tool.scheduler.created"
+                };
+                t_fmt(
+                    key,
+                    &[
+                        ("id", &o.id),
+                        ("schedule", &o.human_schedule),
+                    ],
                 )
             }
             ToolOutput::SchedulerDelete(o) => o.message.clone(),
             ToolOutput::SchedulerList(o) => {
                 if o.tasks.is_empty() {
-                    "No scheduled tasks.".into()
+                    t("tool.scheduler.none").to_string()
                 } else {
                     serde_json::to_string_pretty(&o.tasks).unwrap_or_default()
                 }
@@ -1008,10 +1054,10 @@ impl ToolOutput {
             ToolOutput::Workflow(o) => o.message.clone(),
             ToolOutput::Dynamic(v) => serde_json::to_string_pretty(&v.value).unwrap_or_default(),
             ToolOutput::Text(text) => text.text.clone(),
-            ToolOutput::ImageGen(m) => m.prompt_text("Image generated"),
-            ToolOutput::ImageToVideo(m) => m.prompt_text("Video generated"),
-            ToolOutput::ReferenceToVideo(m) => m.prompt_text("Video generated"),
-            ToolOutput::ImageEdit(m) => m.prompt_text("Image edited"),
+            ToolOutput::ImageGen(m) => m.prompt_text("tool.media.action.image_generated"),
+            ToolOutput::ImageToVideo(m) => m.prompt_text("tool.media.action.video_generated"),
+            ToolOutput::ReferenceToVideo(m) => m.prompt_text("tool.media.action.video_generated"),
+            ToolOutput::ImageEdit(m) => m.prompt_text("tool.media.action.image_edited"),
         }
     }
 }

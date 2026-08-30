@@ -49,6 +49,19 @@ pub trait ToolMetadata: Send + Sync {
     /// the `TemplateRenderer`.
     fn description_template(&self) -> &str;
 
+    /// Localized built-in description template, preserving dynamic custom text.
+    fn localized_description_template(&self) -> String {
+        let raw = self.description_template();
+        if self.tool_namespace() == ToolNamespace::MCP {
+            raw.to_owned()
+        } else {
+            crate::types::localization::localized_description_for_namespace(
+                self.tool_namespace(),
+                raw,
+            )
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Defaults — override only when needed
     // -----------------------------------------------------------------------
@@ -80,7 +93,9 @@ pub trait ToolMetadata: Send + Sync {
     /// with the finalized toolset context; this is only for consumers that
     /// bypass the registry, which must never see raw template syntax.
     fn sanitized_description_template(&self) -> String {
-        crate::types::template_renderer::strip_template_markers(self.description_template())
+        crate::types::template_renderer::strip_template_markers(
+            &self.localized_description_template(),
+        )
     }
 
     /// Build the tool definition for a given contract version.
@@ -99,9 +114,11 @@ pub trait ToolMetadata: Send + Sync {
         input_schema: &serde_json::Value,
         _effective_params: &serde_json::Value,
     ) -> ToolDefinition {
-        let raw_desc = description_override.unwrap_or_else(|| self.description_template());
-        let description = renderer.render(raw_desc).unwrap_or_else(|e| {
-            crate::types::template_renderer::strip_markers_on_render_failure(raw_desc, &e)
+        let raw_desc = description_override
+            .map(str::to_owned)
+            .unwrap_or_else(|| self.localized_description_template());
+        let description = renderer.render(&raw_desc).unwrap_or_else(|e| {
+            crate::types::template_renderer::strip_markers_on_render_failure(&raw_desc, &e)
         });
         let remapped_schema = if param_map.is_empty() {
             input_schema.clone()

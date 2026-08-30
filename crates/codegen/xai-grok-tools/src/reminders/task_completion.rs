@@ -26,15 +26,15 @@ use std::sync::Arc;
 use xai_tool_types::KillTaskOutput;
 use xai_tool_types::SubagentCompletedOutput;
 use xai_tool_types::TaskOutputOutput;
+use xai_grok_i18n::{t, t_fmt};
 /// Default tool name used in auto-wake completion messages.
 pub const DEFAULT_TASK_OUTPUT_TOOL: &str = "get_task_output";
 /// UI/Stop kill with no live waiter: tell the model not to relaunch the task.
-const USER_KILLED_NOTICE: &str = "This task was killed by the user — do not restart it.\n";
-fn user_killed_notice(task: &TaskSnapshot) -> &'static str {
+fn user_killed_notice(task: &TaskSnapshot) -> String {
     if task.explicitly_killed && !task.kill_result_delivered {
-        USER_KILLED_NOTICE
+        t("task_completion.killed_notice").to_string()
     } else {
-        ""
+        String::new()
     }
 }
 /// Inline preview cap applied ONLY to bash completion reminders that ship
@@ -127,37 +127,33 @@ pub fn format_bash_completion(
     let command = task.display_command.as_deref().unwrap_or(&task.command);
     let duration_secs = task.duration_secs();
     let status_str = match task.signal.as_deref() {
-        Some(sig) => format!("terminated by signal {sig}"),
+        Some(sig) => t_fmt("task_completion.status.signal", &[("signal", sig)]),
         None => {
-            let exit_code_str = task
+            let exit_code = task
                 .exit_code
                 .map(|c| c.to_string())
-                .unwrap_or_else(|| "unknown".into());
-            format!("exit code: {exit_code_str}")
+                .unwrap_or_else(|| t("task_completion.status.unknown").to_string());
+            t_fmt("task_completion.status.exit", &[("code", &exit_code)])
         }
     };
     let notice = user_killed_notice(task);
-    let mut msg = format!(
-        "Background task \"{}\" completed ({}).\n\
-         Command: {} | Duration: {:.1}s\n\
-         {notice}",
-        task.task_id, status_str, command, duration_secs,
+    let duration = format!("{:.1}", duration_secs);
+    let mut msg = t_fmt(
+        "task_completion.background",
+        &[
+            ("id", &task.task_id),
+            ("status", &status_str),
+            ("command", command),
+            ("duration", &duration),
+            ("notice", &notice),
+        ],
     );
     if task.signal.is_some() && duration_secs < 1.0 {
-        msg.push_str(
-            "Note: this is much shorter than expected for a backgrounded command. \
-             The wrapper bash may have been killed by signal (e.g. `pkill -f <pat>` \
-             matching its own argv) before the inner command ran. Re-check the \
-             command for self-matching kill patterns, signals sent by the script \
-             itself, or upstream sources of SIGTERM/SIGHUP.\n",
-        );
+        msg.push_str(t("task_completion.short_command_note"));
     }
     let disk_pointer_footer = read_tool_name.map(|name| {
-        format!(
-            "Use {} on {} for full content",
-            name,
-            task.output_file.display()
-        )
+        let path = task.output_file.display().to_string();
+        t_fmt("task_completion.full_content", &[("tool", name), ("path", &path)])
     });
     render_completion_output_delivery(
         &mut msg,
@@ -177,52 +173,61 @@ pub fn format_bash_completion(
 /// exited while the agent was idle and produced no further stdout.
 pub fn format_monitor_completion(task: &TaskSnapshot, task_output_name: Option<&str>) -> String {
     let reason = match task.signal.as_deref() {
-        Some(sig) => format!("killed by signal {sig}"),
+        Some(sig) => t_fmt("task_completion.monitor_reason_signal", &[("signal", sig)]),
         None => match task.exit_code {
-            Some(code) => format!("exited (code {code})"),
-            None => "ended".to_string(),
+            Some(code) => {
+                let code = code.to_string();
+                t_fmt("task_completion.monitor_reason_exit", &[("code", &code)])
+            }
+            None => t("task_completion.monitor_reason_ended").to_string(),
         },
     };
     let description = task
         .display_command
         .as_deref()
         .and_then(|d| d.strip_prefix("[monitor] "))
-        .unwrap_or("monitor");
+        .unwrap_or_else(|| t("task_completion.monitor_description_default"));
     let tool = task_output_name.unwrap_or(DEFAULT_TASK_OUTPUT_TOOL);
     let notice = user_killed_notice(task);
-    format!(
-        "Monitor \"{id}\" ended: [monitor ended: {reason}].\n\
-         Description: {description}\n\
-         Command: {cmd}\n\
-         Duration: {dur:.1}s\n\
-         Use {tool}(\"{id}\") for full output.\n\
-         {notice}",
-        id = task.task_id,
-        cmd = task.command,
-        dur = task.duration_secs(),
+    let duration = format!("{:.1}", task.duration_secs());
+    t_fmt(
+        "task_completion.monitor",
+        &[
+            ("id", &task.task_id),
+            ("reason", &reason),
+            ("description", description),
+            ("command", &task.command),
+            ("duration", &duration),
+            ("tool", tool),
+            ("notice", &notice),
+        ],
     )
-}
 /// Warn the model about other background tasks that are still running.
 fn format_running_tasks_warning(running: &[&TaskSnapshot], kill_task_name: Option<&str>) -> String {
-    use std::fmt::Write as _;
     let n = running.len();
-    let label = if n == 1 { "task is" } else { "tasks are" };
-    let mut buf = format!("Note: {n} other background {label} still running:\n");
+    let mut buf = if n == 1 {
+        t("task_completion.running_one").to_string()
+    } else {
+        let count = n.to_string();
+        t_fmt("task_completion.running_many", &[("count", &count)])
+    };
     for task in running {
         let cmd = task.display_command.as_deref().unwrap_or(&task.command);
-        let _ = writeln!(
-            buf,
-            "- \"{}\" (running for {:.0}s): {}",
-            task.task_id,
-            task.duration_secs(),
-            cmd,
-        );
+        let duration = format!("{:.0}", task.duration_secs());
+        buf.push_str(&t_fmt(
+            "task_completion.running_item",
+            &[
+                ("id", &task.task_id),
+                ("duration", &duration),
+                ("command", cmd),
+            ],
+        ));
     }
     let kill_name = kill_task_name.unwrap_or("kill_command_or_subagent");
-    let _ = write!(
-        buf,
-        "Consider killing duplicate tasks with {kill_name} before launching new ones."
-    );
+    buf.push_str(&t_fmt(
+        "task_completion.duplicate_hint",
+        &[("tool", kill_name)],
+    ));
     buf
 }
 /// Split a pre-wrapped `<monitor-event description="…" task_id="…">…</monitor-event>`
@@ -278,8 +283,8 @@ pub fn format_monitor_events(
         [event] => {
             let (label, inner) = match split_wrapped_monitor_event(&event.event_text) {
                 Some((desc, inner)) if !desc.is_empty() => (desc, inner),
-                Some((_, inner)) => ("event", inner),
-                None => ("event", event.event_text.as_str()),
+                Some((_, inner)) => (t("task_completion.monitor_events.event_default"), inner),
+                None => (t("task_completion.monitor_events.event_default"), event.event_text.as_str()),
             };
             let label =
                 crate::implementations::grok_build::monitor::event::sanitize_monitor_description(
@@ -300,16 +305,21 @@ pub fn format_monitor_events(
                     None => groups.push((&event.task_id, vec![event])),
                 }
             }
-            let mut buf = format!(
-                "{} monitor events from {} {} (use {} to identify each monitor):",
-                events.len(),
-                groups.len(),
-                if groups.len() == 1 {
-                    "monitor"
-                } else {
-                    "monitors"
-                },
-                tool_hint,
+            let monitor_label = if groups.len() == 1 {
+                t("task_completion.monitor_events.monitor_one")
+            } else {
+                t("task_completion.monitor_events.monitor_many")
+            };
+            let event_count = events.len().to_string();
+            let group_count = groups.len().to_string();
+            let mut buf = t_fmt(
+                "task_completion.monitor_events.header",
+                &[
+                    ("events", &event_count),
+                    ("groups", &group_count),
+                    ("monitor_label", monitor_label),
+                    ("tool", tool_hint),
+                ],
             );
             for (task_id, group) in &groups {
                 let description = group
@@ -317,7 +327,7 @@ pub fn format_monitor_events(
                     .find_map(|e| split_wrapped_monitor_event(&e.event_text))
                     .map(|(desc, _)| desc)
                     .filter(|d| !d.is_empty())
-                    .unwrap_or("event");
+                    .unwrap_or_else(|| t("task_completion.monitor_events.event_default"))
                 let description = crate::implementations::grok_build::monitor::event::sanitize_monitor_description(
                     description,
                 );
@@ -374,10 +384,12 @@ pub fn render_completion_output_delivery(
     task_output_name: Option<&str>,
     disk_pointer_footer: Option<&str>,
 ) {
-    use std::fmt::Write as _;
     match task_output_name {
         Some(name) => {
-            let _ = write!(buf, "Use {name}(\"{subagent_id}\") to see the full output.");
+            buf.push_str(&t_fmt(
+                "task_completion.poll_full_output",
+                &[("tool", name), ("id", subagent_id)],
+            ));
         }
         None => match disk_pointer_footer {
             Some(footer) => {
@@ -387,10 +399,13 @@ pub fn render_completion_output_delivery(
                     PREVIEW_SIZE,
                     Some(footer),
                 );
-                let _ = write!(buf, "response:\n{output}");
+                buf.push_str(&t_fmt("task_completion.response", &[("output", &output)]));
             }
             None => {
-                let _ = write!(buf, "response:\n{}", output.text());
+                buf.push_str(&t_fmt(
+                    "task_completion.response",
+                    &[("output", output.text())],
+                ));
             }
         },
     }
@@ -429,20 +444,22 @@ pub fn format_subagent_completion(
     scheduler_delete_name: Option<&str>,
 ) -> String {
     let status = if c.success {
-        "successfully"
+        t("task_completion.subagent_status.success")
     } else {
-        "with failure"
+        t("task_completion.subagent_status.failure")
     };
-    let mut out = format!(
-        "Background subagent \"{}\" ({}: \"{}\") completed {}.\n\
-         Duration: {:.1}s | Tool calls: {} | Turns: {}",
-        c.subagent_id,
-        c.subagent_type,
-        c.description,
-        status,
-        c.duration_ms as f64 / 1000.0,
-        c.tool_calls,
-        c.turns,
+    let duration = format!("{:.1}", c.duration_ms as f64 / 1000.0);
+    let mut out = t_fmt(
+        "task_completion.subagent",
+        &[
+            ("id", &c.subagent_id),
+            ("type", &c.subagent_type),
+            ("description", &c.description),
+            ("status", status),
+            ("duration", &duration),
+            ("tool_calls", &c.tool_calls.to_string()),
+            ("turns", &c.turns.to_string()),
+        ],
     );
     out.push_str(match task_output_name {
         Some(_) => "\n",
@@ -475,11 +492,11 @@ fn append_scheduler_cleanup_hint(
         return;
     };
     out.push_str(prefix);
-    out.push_str(
-        &format!(
-        "If the monitored work is complete, call `{delete_name}(\"{task_id}\")` to stop the monitor."
-    ),
+    let message = t_fmt(
+        "task_completion.scheduler_cleanup",
+        &[("tool", delete_name), ("id", task_id)],
     );
+    out.push_str(&message);
 }
 /// Format buffered between-turn subagent completions into a system-reminder
 /// string. When `task_output_name` is `None` each subagent's full output is
@@ -489,22 +506,36 @@ pub fn format_between_turn_completions(
     task_output_name: Option<&str>,
     scheduler_delete_name: Option<&str>,
 ) -> String {
-    use std::fmt::Write as _;
     let n = completions.len();
-    let label = if n == 1 { "subagent" } else { "subagents" };
-    let mut buf = format!("While you were idle, {n} background {label} completed:\n");
+    let mut buf = if n == 1 {
+        t("task_completion.between_turn.subagent_one").to_string()
+    } else {
+        let count = n.to_string();
+        t_fmt(
+            "task_completion.between_turn.subagent_many",
+            &[("count", &count)],
+        )
+    };
     for c in completions {
         let status = if c.success {
-            "completed successfully"
+            t("task_completion.between_turn.status.success")
         } else {
-            "failed"
+            t("task_completion.between_turn.status.failure")
         };
-        let secs = c.duration_ms as f64 / 1000.0;
-        let _ = write!(
-            buf,
-            "- [{}] {:?} \u{2014} {status} ({secs:.1}s, {} tool calls)\n  subagent_id: {}",
-            c.subagent_type, c.description, c.tool_calls, c.subagent_id,
+        let duration = format!("{:.1}", c.duration_ms as f64 / 1000.0);
+        let description = format!("{:?}", c.description);
+        let item = t_fmt(
+            "task_completion.between_turn.subagent_item",
+            &[
+                ("type", &c.subagent_type),
+                ("description", &description),
+                ("status", status),
+                ("duration", &duration),
+                ("tool_calls", &c.tool_calls.to_string()),
+                ("id", &c.subagent_id),
+            ],
         );
+        buf.push_str(&item);
         match task_output_name {
             Some(_) => buf.push_str(". "),
             None => buf.push_str("\n  "),
@@ -546,12 +577,12 @@ pub fn format_between_turn_bash_completions(
     read_tool_name: Option<&str>,
 ) -> String {
     let n = tasks.len();
-    let label = if n == 1 {
-        "background task"
+    let mut buf = if n == 1 {
+        t("task_completion.between_turn.task_one").to_string()
     } else {
-        "background tasks"
+        let count = n.to_string();
+        t_fmt("task_completion.between_turn.task_many", &[("count", &count)])
     };
-    let mut buf = format!("While you were idle, {n} {label} completed:\n");
     for task in tasks {
         buf.push_str(&format_bash_completion(
             task,
