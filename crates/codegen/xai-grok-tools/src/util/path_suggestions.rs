@@ -66,10 +66,10 @@ impl fmt::Display for PathNotFoundHint {
 /// `display_cwd` is the model-facing working directory (for the CWD note).
 #[tracing::instrument(name = "fs.path_not_found_hint", skip_all)]
 pub async fn path_not_found_hint(path: &Path, cwd: &Path, display_cwd: &Path) -> PathNotFoundHint {
-    let display_cwd = display_cwd.display().to_string();
+    let display_cwd_text = display_cwd.display().to_string();
     let cwd_note = t_fmt(
         "path_suggestions.cwd_note",
-        &[("path", &display_cwd)],
+        &[("path", &display_cwd_text)],
     );
 
     // All filesystem probing runs in a single spawn_blocking.

@@ -110,7 +110,7 @@ Usage notes:
             "proxy_enabled": params.proxy_endpoint.is_some(),
         });
         let description = renderer
-            .render_with_extra(raw_desc, &extras)
+            .render_with_extra(&raw_desc, &extras)
             .unwrap_or_else(|e| {
                 tracing::warn!("Description template render failed, using raw: {e}");
                 raw_desc.to_string()

@@ -255,6 +255,7 @@ async fn truncate_mcp_text(text: &mut String, trunc_ctx: &McpTruncateContext) {
         "tool.mcp.output_truncated",
         &[
             ("shown", &shown),
+            ("truncated", &truncated),
             ("total", &total),
             ("file_hint", &file_hint),
             ("steer", &steer),
