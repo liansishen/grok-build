@@ -1332,7 +1332,7 @@ fn task_model_guidance(model_slugs: &[String]) -> String {
     t_fmt(
         "tool.description.task.model_guidance.available",
         &[
-            ("model_list", &model_list),
+            ("model_list", model_list.as_str()),
             ("model_param", TASK_MODEL_PARAM),
         ],
     )
