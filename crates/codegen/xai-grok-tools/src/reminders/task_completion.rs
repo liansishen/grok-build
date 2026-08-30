@@ -202,6 +202,7 @@ pub fn format_monitor_completion(task: &TaskSnapshot, task_output_name: Option<&
             ("notice", &notice),
         ],
     )
+}
 /// Warn the model about other background tasks that are still running.
 fn format_running_tasks_warning(running: &[&TaskSnapshot], kill_task_name: Option<&str>) -> String {
     let n = running.len();
@@ -327,7 +328,7 @@ pub fn format_monitor_events(
                     .find_map(|e| split_wrapped_monitor_event(&e.event_text))
                     .map(|(desc, _)| desc)
                     .filter(|d| !d.is_empty())
-                    .unwrap_or_else(|| t("task_completion.monitor_events.event_default"))
+                    .unwrap_or_else(|| t("task_completion.monitor_events.event_default"));
                 let description = crate::implementations::grok_build::monitor::event::sanitize_monitor_description(
                     description,
                 );

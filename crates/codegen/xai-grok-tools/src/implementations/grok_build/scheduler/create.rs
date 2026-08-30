@@ -167,7 +167,7 @@ impl xai_tool_runtime::Tool for SchedulerCreateTool {
             .as_deref()
             .map(parse_interval)
             .transpose()
-            .map_err(|e| xai_tool_runtime::ToolError::invalid_arguments(e.localized_message()))?
+            .map_err(|e| xai_tool_runtime::ToolError::invalid_arguments(e.localized_message()))?;
 
         let sender = {
             let res = resources.lock().await;
