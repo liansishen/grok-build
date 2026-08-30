@@ -8175,6 +8175,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "xai-grok-i18n",
 ]
 
 [[package]]
@@ -14571,6 +14572,7 @@ dependencies = [
  "xai-grok-config",
  "xai-grok-env",
  "xai-grok-extra-ca",
+ "xai-grok-i18n",
  "xai-grok-sandbox",
  "xai-grok-test-support",
  "xai-grok-tools-api",
@@ -14983,6 +14985,7 @@ dependencies = [
  "schemars 1.0.4",
  "serde",
  "serde_json",
+ "xai-grok-i18n",
 ]
 
 [[package]]
