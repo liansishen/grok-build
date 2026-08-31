@@ -596,6 +596,14 @@ pub(crate) fn hook_group_any_enabled<'a>(
     unpinned.is_empty() || unpinned.iter().any(|h| !h.disabled)
 }
 
+/// Whether removing this hook's source would touch a managed-policy hook (`x` removes the whole `source_dir`, so the gate is source-level).
+pub(crate) fn hook_source_pinned(
+    hooks: &[xai_hooks_plugins_types::HookInfo],
+    source_dir: &str,
+) -> bool {
+    hooks.iter().any(|h| h.source_dir == source_dir && h.pinned)
+}
+
 /// Filter items by enabled/disabled status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum StatusFilter {
@@ -1079,6 +1087,8 @@ pub enum ConfirmationAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModalMessage {
     Error(String),
+    /// Same covering overlay and any-key dismissal as [`Self::Error`], but rendered in the secondary text color: a policy notice, not a failure.
+    Info(String),
     Confirmation {
         message: String,
         action: ConfirmationAction,
@@ -1881,6 +1891,8 @@ pub struct ExtensionsModalState {
     /// Maps visible row offset to skill index (for mouse click).
     pub skills_visible_map: Vec<Option<usize>>,
     pub hooks_collapsed_groups: std::collections::HashSet<String>,
+    /// See [`Self::seed_hook_groups_once`].
+    pub hooks_groups_seeded: bool,
     /// Collapsed plugin source groups (by [`PluginGroup`] key).
     pub plugins_collapsed_groups: std::collections::HashSet<String>,
     /// See [`Self::seed_plugin_groups_once`].
@@ -1972,6 +1984,7 @@ impl ExtensionsModalState {
             skills_collapsed_groups: std::collections::HashSet::new(),
             skills_groups_seeded: false,
             hooks_collapsed_groups: std::collections::HashSet::new(),
+            hooks_groups_seeded: false,
             plugins_collapsed_groups: std::collections::HashSet::new(),
             plugins_groups_seeded: false,
             marketplace_collapsed_sources: std::collections::HashSet::new(),
@@ -3744,7 +3757,7 @@ pub fn render_extensions_modal(
     // would not split correctly through the default Shortcut renderer.
     // The overlay above is shortened to leave the footer line visible.
     let modal_msg_kind = state.modal_message.as_ref().map(|m| match m {
-        ModalMessage::Error(_) => ModalMsgKind::Error,
+        ModalMessage::Error(_) | ModalMessage::Info(_) => ModalMsgKind::Error,
         ModalMessage::Confirmation { .. } => ModalMsgKind::Confirm,
     });
     let mut shortcuts: Vec<Shortcut<'_>> = Vec::new();
@@ -4158,6 +4171,7 @@ pub fn render_extensions_modal(
     if let Some(ref msg) = state.modal_message {
         let (text, fg) = match msg {
             ModalMessage::Error(e) => (e.as_str(), theme.accent_error),
+            ModalMessage::Info(m) => (m.as_str(), theme.text_secondary),
             ModalMessage::Confirmation { message, .. } => (message.as_str(), theme.accent_tool),
         };
         if let Some(popup_rect) = state.window.popup_area {

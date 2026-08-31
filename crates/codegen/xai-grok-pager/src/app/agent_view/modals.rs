@@ -1697,7 +1697,7 @@ impl AgentView {
                             &[("label", &label)],
                         ),
                         crate::views::extensions_modal::ConfirmationAction::Hooks(
-                            xai_hooks_plugins_types::HooksAction::Remove { path },
+                            xai_hooks_plugins_types::HooksAction::Remove { path: path.clone() },
                         ),
                     )
                 }
