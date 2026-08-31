@@ -234,14 +234,15 @@ fn write_activity(buf: &mut String, activity: &TurnActivity) {
         TurnActivity::Retrying {
             attempt,
             max_retries,
-            ..
+            reason,
+            error_type,
         } => {
-            buf.push_str(&xai_grok_i18n::t_fmt(
-                "notification.title.retrying",
-                &[
-                    ("attempt", &attempt.to_string()),
-                    ("max", &max_retries.to_string()),
-                ],
+            buf.push_str(&crate::app::error_display::format_retry_activity_label(
+                *attempt,
+                *max_retries,
+                reason,
+                error_type.as_deref(),
+                crate::app::error_display::RetryLabelStyle::Compact,
             ));
         }
         TurnActivity::WritingToolCall(writing) => buf.push_str(&writing.label()),
@@ -514,14 +515,15 @@ mod tests {
         let activity = TurnActivity::Retrying {
             attempt: 2,
             max_retries: 5,
-            reason: "timeout".to_owned(),
+            reason: "API error (status 504 Gateway Timeout): upstream timeout".to_owned(),
+            error_type: None,
         };
         let state = TitleState {
             activity: Some(&activity),
             ..idle_state()
         };
         mgr.update(&state);
-        assert_eq!(mgr.last_title, "Retrying (2/5)");
+        assert_eq!(mgr.last_title, "Request timed out (504) | Retrying (2/5)");
     }
 
     #[test]

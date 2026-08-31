@@ -1080,11 +1080,7 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
             RenderBlock::ContextInfo(_) => {
                 return xai_grok_i18n::t("dashboard.response.context").to_string();
             }
-            RenderBlock::CreditLimit(_) => {
-                return xai_grok_i18n::t("dashboard.response.credit_limit").to_string();
-            }
-            // The user's latest input marks the turn boundary — there's
-            // no agent response after it yet.
+            // The user's latest input marks the turn boundary; there's no agent response after it yet
             RenderBlock::UserPrompt(_) => break,
             // Structural blocks carry no response type — keep scanning.
             RenderBlock::System(_)
@@ -1222,9 +1218,6 @@ fn block_short_text(block: &crate::scrollback::block::RenderBlock) -> Option<Str
         RenderBlock::Btw(_) => Some(xai_grok_i18n::t("dashboard.peek.btw").to_string()),
         RenderBlock::ContextInfo(_) => {
             Some(xai_grok_i18n::t("dashboard.peek.context_info").to_string())
-        }
-        RenderBlock::CreditLimit(_) => {
-            Some(xai_grok_i18n::t("dashboard.peek.credit_limit").to_string())
         }
         RenderBlock::Stub(_) => None,
     }

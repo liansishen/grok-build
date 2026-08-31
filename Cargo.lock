@@ -13596,6 +13596,7 @@ dependencies = [
  "reqwest-middleware 0.4.2",
  "rustls",
  "serde_json",
+ "tokio",
  "tracing",
  "xai-grok-auth",
  "xai-grok-extra-ca",
@@ -13698,6 +13699,7 @@ dependencies = [
  "filetime",
  "flate2",
  "git2",
+ "libc",
  "nix 0.30.1",
  "notify",
  "reqwest 0.12.24",
@@ -13747,7 +13749,7 @@ dependencies = [
 
 [[package]]
 name = "xai-grok-pager"
-version = "1.0.12"
+version = "1.0.13"
 dependencies = [
  "agent-client-protocol",
  "ansi-to-tui",
@@ -13845,7 +13847,7 @@ dependencies = [
 
 [[package]]
 name = "xai-grok-pager-bin"
-version = "1.0.12"
+version = "1.0.13"
 dependencies = [
  "anyhow",
  "clap",
@@ -14167,7 +14169,7 @@ dependencies = [
 
 [[package]]
 name = "xai-grok-shell"
-version = "1.0.12"
+version = "1.0.13"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
@@ -14197,6 +14199,7 @@ dependencies = [
  "git2",
  "glob",
  "globset",
+ "hmac",
  "ignore",
  "image",
  "indexmap",
@@ -14426,7 +14429,6 @@ dependencies = [
  "chrono",
  "ctor",
  "filetime",
- "futures-executor",
  "git2",
  "http 1.4.0",
  "mid",
@@ -14587,6 +14589,7 @@ dependencies = [
  "xai-tool-types",
  "xai-tty-utils",
  "zip",
+ "zstd",
 ]
 
 [[package]]
@@ -14637,7 +14640,7 @@ dependencies = [
 
 [[package]]
 name = "xai-grok-version"
-version = "1.0.12"
+version = "1.0.13"
 dependencies = [
  "semver",
 ]
@@ -14901,7 +14904,6 @@ name = "xai-ratatui-textarea"
 version = "0.1.0"
 dependencies = [
  "arboard",
- "chrono",
  "crossterm",
  "fuzzy-matcher",
  "ignore",

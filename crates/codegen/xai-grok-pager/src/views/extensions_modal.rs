@@ -1239,6 +1239,61 @@ fn action_key_footer_desc_for_mapping(
     }
 }
 
+/// Whether removal can succeed for the Hooks-tab selection (`HookInfo::removable`): only user-registered directories without a managed-policy member are.
+/// The `hook_source_pinned` check backstops older shells whose `removable` reflects registration alone; a current shell already reports `removable: false` on every member of a pinned source, so the check is redundant there.
+/// Headers resolve via group key.
+fn selected_hook_source_removable_at(
+    state: &ExtensionsModalState,
+    entry_data_indices: &[Option<usize>],
+    entry_group_keys: &[Option<String>],
+    selected: usize,
+) -> bool {
+    if !matches!(state.active_tab, ExtensionsTab::Hooks) {
+        // Other tabs manage their own action sets; never suppress here.
+        return true;
+    }
+    let TabDataState::Loaded(ref data) = state.hooks_data else {
+        return true;
+    };
+    if let Some(source_dir) = entry_group_keys.get(selected).and_then(|k| k.as_ref()) {
+        return data
+            .hooks
+            .iter()
+            .any(|h| &h.source_dir == source_dir && h.removable)
+            && !hook_source_pinned(&data.hooks, source_dir);
+    }
+    let Some(idx) = data_index_at(entry_data_indices, selected) else {
+        return true;
+    };
+    data.hooks
+        .get(idx)
+        .is_none_or(|h| h.removable && !hook_source_pinned(&data.hooks, &h.source_dir))
+}
+
+/// Hooks-tab selections the dispatcher would refuse to toggle: a pinned hook row, or a group header whose group has no unpinned members.
+/// Headers resolve via group key (they carry no data index).
+fn selected_hook_policy_enforced_at(
+    state: &ExtensionsModalState,
+    entry_data_indices: &[Option<usize>],
+    entry_group_keys: &[Option<String>],
+    selected: usize,
+) -> bool {
+    if !matches!(state.active_tab, ExtensionsTab::Hooks) {
+        return false;
+    }
+    let TabDataState::Loaded(ref data) = state.hooks_data else {
+        return false;
+    };
+    if let Some(source_dir) = entry_group_keys.get(selected).and_then(|k| k.as_ref()) {
+        // Headers: policy-locked only when every member is pinned.
+        let mut members = data.hooks.iter().filter(|h| &h.source_dir == source_dir);
+        return members.all(|h| h.pinned);
+    }
+    let Some(idx) = data_index_at(entry_data_indices, selected) else {
+        return false;
+    };
+    data.hooks.get(idx).is_some_and(|h| h.pinned)
+}
 pub fn action_key_cheatsheet_desc(ch: char, desc: &'static str) -> &'static str {
     if ch == ' ' && desc == "toggle" {
         t("extensions.action.enable_disable")
@@ -1975,17 +2030,29 @@ impl ExtensionsModalState {
         self.picker_state.hovered = None;
     }
 
+    /// Seed the all-collapsed default for hook source groups once, on the first non-empty delivery.
+    /// Called from both hook-data delivery channels (list fetch and the `HooksChanged` push).
+    pub fn seed_hook_groups_once(&mut self, hooks: &[xai_hooks_plugins_types::HookInfo]) {
+        seed_groups_once(
+            &mut self.hooks_groups_seeded,
+            &mut self.hooks_collapsed_groups,
+            hooks,
+            |h| h.source_dir.clone(),
+        );
+    }
+
     /// Seed the all-collapsed default for plugin source groups exactly once.
     ///
     /// Called from both plugin-data delivery channels (list fetch and the
     /// `PluginsChanged` push); the first to deliver seeds, later deliveries
     /// preserve the user's expand state.
     pub fn seed_plugin_groups_once(&mut self, plugins: &[xai_hooks_plugins_types::PluginInfo]) {
-        if self.plugins_groups_seeded {
-            return;
-        }
-        self.plugins_collapsed_groups = plugins.iter().map(|p| plugin_group(p).key).collect();
-        self.plugins_groups_seeded = true;
+        seed_groups_once(
+            &mut self.plugins_groups_seeded,
+            &mut self.plugins_collapsed_groups,
+            plugins,
+            |p| plugin_group(p).key,
+        );
     }
 
     /// Seed default-collapsed skill source groups exactly once.
@@ -1993,14 +2060,12 @@ impl ExtensionsModalState {
     /// Unions [`SkillGroup::label`] keys into `skills_collapsed_groups`;
     /// later reloads leave the set alone so user expand state survives.
     pub fn seed_skills_groups_once(&mut self, skills: &[SkillInfo]) {
-        if self.skills_groups_seeded {
-            return;
-        }
-        for skill in skills {
-            self.skills_collapsed_groups
-                .insert(skill_group(skill).label);
-        }
-        self.skills_groups_seeded = true;
+        seed_groups_once(
+            &mut self.skills_groups_seeded,
+            &mut self.skills_collapsed_groups,
+            skills,
+            |s| skill_group(s).label,
+        );
     }
 
     /// Whether a group header at picker index `sel` with the given
@@ -2260,6 +2325,23 @@ pub(crate) fn build_mcp_servers_picker_rows(
         }
     }
     out
+}
+
+/// Shared rule for the hook/plugin/skill group-collapse seeds: collapse every
+/// group once, on the first non-empty delivery. An empty list must not finish
+/// seeding (groups arriving later would open expanded instead of getting the
+/// collapsed default), and later deliveries preserve the user's expand state.
+fn seed_groups_once<T>(
+    seeded: &mut bool,
+    collapsed_groups: &mut std::collections::HashSet<String>,
+    items: &[T],
+    group_key: impl Fn(&T) -> String,
+) {
+    if *seeded || items.is_empty() {
+        return;
+    }
+    collapsed_groups.extend(items.iter().map(group_key));
+    *seeded = true;
 }
 
 /// On first MCP list load, collapse each distinct plugin section by default.
@@ -5472,10 +5554,158 @@ mod tests {
         assert_eq!(action_key_cheatsheet_desc('a', "install"), "install");
     }
 
-    /// Regression: footer Space verb must follow the *current*
-    /// entry-mapping (post filter/query/tab), not a stale one from the previous
-    /// list shape. Render passes freshly built locals into
-    /// `action_key_footer_desc_for_mapping` (state publish is post-paint only).
+    /// The remove gate is source-level: a pinned hook blocks its whole source, and only its own source.
+    #[test]
+    fn hook_source_pinned_is_source_level() {
+        let mut pinned = make_hook("policy/a", "/etc/grok", false);
+        pinned.pinned = true;
+        let sibling = make_hook("user/b", "/etc/grok", false);
+        let elsewhere = make_hook("user/c", "/home/u/.grok", false);
+        let hooks = vec![pinned, sibling, elsewhere];
+
+        assert!(hook_source_pinned(&hooks, "/etc/grok"));
+        assert!(!hook_source_pinned(&hooks, "/home/u/.grok"));
+        assert!(!hook_source_pinned(&hooks, "/nonexistent"));
+    }
+
+    /// The Space hint is suppressed for policy-enforced selections; mixed groups and unpinned rows keep it.
+    #[test]
+    fn policy_enforced_selection_suppresses_space_hint() {
+        let mut pinned = make_hook("policy/a", "/etc/grok", false);
+        pinned.pinned = true;
+        let mut user = make_hook("user/b", "/home/u/.grok", false);
+        user.removable = true;
+
+        // Entry maps as the picker builds them (headers carry a group key, no data index):
+        //   0: header /etc/grok, 1: pinned row, 2: header user, 3: user row
+        let mut state = ExtensionsModalState::new(ExtensionsTab::Hooks);
+        state.hooks_data = TabDataState::Loaded(xai_hooks_plugins_types::HooksListResponse {
+            hooks: vec![pinned, user],
+            project_trusted: true,
+            load_errors: Vec::new(),
+        });
+        let data_indices = vec![None, Some(0), None, Some(1)];
+        let group_keys = vec![
+            Some("/etc/grok".to_string()),
+            None,
+            Some("/home/u/.grok".to_string()),
+            None,
+        ];
+
+        let enforced =
+            |sel| selected_hook_policy_enforced_at(&state, &data_indices, &group_keys, sel);
+        let removable =
+            |sel| selected_hook_source_removable_at(&state, &data_indices, &group_keys, sel);
+        // Policy group header and the pinned row: Space and x suppressed.
+        assert!(enforced(0));
+        assert!(enforced(1));
+        assert!(!removable(0));
+        assert!(!removable(1));
+        // Registered-dir header and row: both hints stay.
+        assert!(!enforced(2));
+        assert!(!enforced(3));
+        assert!(removable(2));
+        assert!(removable(3));
+
+        // Mixed group header: unpinned members keep it toggleable.
+        let mut mixed_pinned = make_hook("policy/c", "/mixed", false);
+        mixed_pinned.pinned = true;
+        let mixed_user = make_hook("user/d", "/mixed", false);
+        let mixed_state = {
+            let mut s = ExtensionsModalState::new(ExtensionsTab::Hooks);
+            s.hooks_data = TabDataState::Loaded(xai_hooks_plugins_types::HooksListResponse {
+                hooks: vec![mixed_pinned, mixed_user],
+                project_trusted: true,
+                load_errors: Vec::new(),
+            });
+            s
+        };
+        let mixed_indices = vec![None, Some(0), Some(1)];
+        let mixed_keys = vec![Some("/mixed".to_string()), None, None];
+        assert!(!selected_hook_policy_enforced_at(
+            &mixed_state,
+            &mixed_indices,
+            &mixed_keys,
+            0
+        ));
+        // ...but a non-registered source is never removable.
+        for sel in 0..3 {
+            assert!(!selected_hook_source_removable_at(
+                &mixed_state,
+                &mixed_indices,
+                &mixed_keys,
+                sel
+            ));
+        }
+    }
+
+    /// The x hint must mirror the remove handler: a managed-policy member
+    /// makes the whole source unremovable even when the shell reports the
+    /// directory as user-registered (`removable: true` — older shells set it
+    /// from registration alone).
+    #[test]
+    fn remove_hint_suppressed_for_registered_but_pinned_source() {
+        let mut pinned = make_hook("policy/a", "/reg/policy", false);
+        pinned.pinned = true;
+        pinned.removable = true;
+        let mut sibling = make_hook("user/b", "/reg/policy", false);
+        sibling.removable = true;
+
+        let mut state = ExtensionsModalState::new(ExtensionsTab::Hooks);
+        state.hooks_data = TabDataState::Loaded(xai_hooks_plugins_types::HooksListResponse {
+            hooks: vec![pinned, sibling],
+            project_trusted: true,
+            load_errors: Vec::new(),
+        });
+        // 0: header, 1: pinned row, 2: unpinned sibling row.
+        let data_indices = vec![None, Some(0), Some(1)];
+        let group_keys = vec![Some("/reg/policy".to_string()), None, None];
+        for sel in 0..3 {
+            assert!(
+                !selected_hook_source_removable_at(&state, &data_indices, &group_keys, sel),
+                "selection {sel} must not offer x remove for a pinned source"
+            );
+        }
+    }
+
+    /// Regression: refetches must not re-collapse expanded groups.
+    #[test]
+    fn hook_groups_seed_only_once() {
+        let mut state = ExtensionsModalState::new(ExtensionsTab::Hooks);
+        let hooks = vec![
+            make_hook("a", "/src1", false),
+            make_hook("b", "/src2", false),
+        ];
+        // An empty first delivery must not finish seeding: sources arriving
+        // later would open expanded instead of getting the collapsed default.
+        state.seed_hook_groups_once(&[]);
+        state.seed_hook_groups_once(&hooks);
+        assert!(state.hooks_collapsed_groups.contains("/src1"));
+        assert!(state.hooks_collapsed_groups.contains("/src2"));
+
+        // User expands /src1; the refetch delivery must preserve that.
+        state.hooks_collapsed_groups.remove("/src1");
+        state.seed_hook_groups_once(&hooks);
+        assert!(!state.hooks_collapsed_groups.contains("/src1"));
+        assert!(state.hooks_collapsed_groups.contains("/src2"));
+    }
+
+    /// The plugin and skill seeds share the hooks seed's empty-first-delivery
+    /// rule (an empty list leaves seeding open for the next delivery).
+    #[test]
+    fn plugin_and_skill_group_seeds_skip_empty_first_delivery() {
+        let mut state = ExtensionsModalState::new(ExtensionsTab::Plugins);
+        state.seed_plugin_groups_once(&[]);
+        state.seed_plugin_groups_once(&[make_plugin("p")]);
+        assert!(!state.plugins_collapsed_groups.is_empty());
+
+        state.seed_skills_groups_once(&[]);
+        state.seed_skills_groups_once(&[make_skill("alpha", "a")]);
+        assert!(state.skills_collapsed_groups.contains("User"));
+    }
+
+    /// Regression: footer Space verb must follow the *current* entry-mapping (post filter/query/tab), not a stale one from the previous list shape.
+    /// Render passes freshly built locals into `action_key_footer_desc_for_mapping` (state publish is post-paint only).
     #[test]
     fn space_footer_follows_refreshed_entry_data_indices_after_filter_shape_change() {
         let mut state = ExtensionsModalState::new(ExtensionsTab::Plugins);

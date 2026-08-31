@@ -88,94 +88,30 @@ pub(crate) fn is_credit_limit_error(http_status: Option<u16>, message: &str) -> 
     }
 }
 
-/// Open the credit-limit upsell on the given agent.
+/// Option id for Try Again. Submit routes on this sentinel, not on
+/// position in the telemetry `choices` vec.
+pub(crate) const CREDIT_LIMIT_RETRY_OPTION_ID: &str = "retry-last-prompt";
+
+struct CreditLimitCopy {
+    heading: &'static str,
+    upgrade_tier_desc: &'static str,
+    secondary_label: &'static str,
+    secondary_desc: &'static str,
+    second_choice: xai_grok_telemetry::events::CreditLimitChoice,
+    payg_telemetry: bool,
+}
+
+/// Open the credit-limit upsell Q&A on the given agent.
 ///
-/// **`max_tier = false`** (default): shows the Q&A question modal with
-/// two options ("Upgrade tier" + buy-credits or PAYG). Each option's `id`
-/// carries the target URL so the submit handler is position-independent.
-///
-/// **`max_tier = true`** (positively identified as SuperGrok Heavy):
-/// pushes an inline scrollback card (`CreditLimitBlock`) with a single
-/// continue action. No Q&A modal — the user can't upgrade further.
+/// Non-max-tier: Upgrade tier + buy-credits (or PAYG) + Try Again.
+/// Max-tier (SuperGrok Heavy): buy-credits (or PAYG) + Try Again — no
+/// upgrade option. URL options carry the target in `id` so the submit
+/// handler is position-independent.
 pub(super) fn open_credit_limit_upsell(
     agent: &mut AgentView,
     mode: CreditLimitUpsellMode,
     max_tier: bool,
 ) {
-    use crate::scrollback::blocks::CreditLimitCardAction;
-
-    let (
-        heading,
-        upgrade_tier_desc,
-        secondary_label,
-        secondary_desc,
-        card_action,
-        second_choice,
-        payg_telemetry,
-    ): (
-        &str,
-        &str,
-        &str,
-        &str,
-        CreditLimitCardAction,
-        xai_grok_telemetry::events::CreditLimitChoice,
-        bool,
-    ) = match mode {
-        CreditLimitUpsellMode::UnifiedCredits => (
-            t("billing.heading_weekly_limit"),
-            t("billing.upgrade_tier_desc_usage"),
-            t("billing.buy_more_credits"),
-            t("billing.buy_credits_desc"),
-            CreditLimitCardAction::PurchaseCredits,
-            xai_grok_telemetry::events::CreditLimitChoice::PurchaseCredits,
-            false,
-        ),
-        CreditLimitUpsellMode::LegacyPayg { enabled: true } => (
-            t("billing.heading_spending_cap"),
-            t("billing.upgrade_tier_desc_credits"),
-            t("billing.increase_limit"),
-            t("billing.increase_limit_desc"),
-            CreditLimitCardAction::IncreasePaygLimit,
-            xai_grok_telemetry::events::CreditLimitChoice::PayAsYouGo,
-            true,
-        ),
-        CreditLimitUpsellMode::LegacyPayg { enabled: false } => (
-            t("billing.heading_credit_limit"),
-            t("billing.upgrade_tier_desc_credits"),
-            t("billing.pay_as_you_go"),
-            t("billing.pay_as_you_go_desc"),
-            CreditLimitCardAction::EnablePayg,
-            xai_grok_telemetry::events::CreditLimitChoice::PayAsYouGo,
-            false,
-        ),
-    };
-    let unified_billing = matches!(mode, CreditLimitUpsellMode::UnifiedCredits);
-
-    // ── Max tier: inline scrollback card ─────────────────────────
-    if max_tier {
-        use crate::scrollback::block::RenderBlock;
-        log_event(xai_grok_telemetry::events::CreditLimitUpsellShown {
-            surface: xai_grok_telemetry::events::CreditLimitUpsellSurface::InlineCard,
-            max_tier: true,
-            pay_as_you_go: payg_telemetry,
-            unified_billing,
-        });
-        agent.scrollback.push_block(RenderBlock::credit_limit_card(
-            heading,
-            card_action,
-            UPSELL_URL_PAYG,
-        ));
-        return;
-    }
-
-    log_event(xai_grok_telemetry::events::CreditLimitUpsellShown {
-        surface: xai_grok_telemetry::events::CreditLimitUpsellSurface::QuestionModal,
-        max_tier: false,
-        pay_as_you_go: payg_telemetry,
-        unified_billing,
-    });
-
-    // ── Default: Q&A question modal with two options ────────────────
     use crate::views::question_view::{LocalQuestionKind, QuestionViewState};
     use xai_grok_tools::implementations::grok_build::ask_user_question::{
         Question, QuestionOption,
@@ -185,22 +121,70 @@ pub(super) fn open_credit_limit_upsell(
         return;
     }
 
+    let copy = match mode {
+        CreditLimitUpsellMode::UnifiedCredits => CreditLimitCopy {
+            heading: t("billing.heading_weekly_limit"),
+            upgrade_tier_desc: t("billing.upgrade_tier_desc_usage"),
+            secondary_label: t("billing.buy_more_credits"),
+            secondary_desc: t("billing.buy_credits_desc"),
+            second_choice: xai_grok_telemetry::events::CreditLimitChoice::PurchaseCredits,
+            payg_telemetry: false,
+        },
+        CreditLimitUpsellMode::LegacyPayg { enabled: true } => CreditLimitCopy {
+            heading: t("billing.heading_spending_cap"),
+            upgrade_tier_desc: t("billing.upgrade_tier_desc_credits"),
+            secondary_label: t("billing.increase_limit"),
+            secondary_desc: t("billing.increase_limit_desc"),
+            second_choice: xai_grok_telemetry::events::CreditLimitChoice::PayAsYouGo,
+            payg_telemetry: true,
+        },
+        CreditLimitUpsellMode::LegacyPayg { enabled: false } => CreditLimitCopy {
+            heading: t("billing.heading_credit_limit"),
+            upgrade_tier_desc: t("billing.upgrade_tier_desc_credits"),
+            secondary_label: t("billing.pay_as_you_go"),
+            secondary_desc: t("billing.pay_as_you_go_desc"),
+            second_choice: xai_grok_telemetry::events::CreditLimitChoice::PayAsYouGo,
+            payg_telemetry: false,
+        },
+    };
+    let unified_billing = matches!(mode, CreditLimitUpsellMode::UnifiedCredits);
+
+    log_event(xai_grok_telemetry::events::CreditLimitUpsellShown {
+        surface: xai_grok_telemetry::events::CreditLimitUpsellSurface::QuestionModal,
+        max_tier,
+        pay_as_you_go: copy.payg_telemetry,
+        unified_billing,
+    });
+
+    let mut options = Vec::new();
+    let mut choices = Vec::new();
+    if !max_tier {
+        options.push(QuestionOption {
+            label: t("billing.upgrade_tier").into(),
+            description: copy.upgrade_tier_desc.into(),
+            preview: None,
+            id: Some(UPSELL_URL_UPGRADE.into()),
+        });
+        choices.push(xai_grok_telemetry::events::CreditLimitChoice::UpgradeTier);
+    }
+    options.push(QuestionOption {
+        label: copy.secondary_label.into(),
+        description: copy.secondary_desc.into(),
+        preview: None,
+        id: Some(UPSELL_URL_PAYG.into()),
+    });
+    choices.push(copy.second_choice);
+    options.push(QuestionOption {
+        label: t("billing.try_again").into(),
+        description: t("billing.try_again_desc").into(),
+        preview: None,
+        id: Some(CREDIT_LIMIT_RETRY_OPTION_ID.into()),
+    });
+    choices.push(xai_grok_telemetry::events::CreditLimitChoice::RetryLastPrompt);
+
     let question = Question {
-        question: heading.into(),
-        options: vec![
-            QuestionOption {
-                label: t("billing.upgrade_tier").into(),
-                description: upgrade_tier_desc.into(),
-                preview: None,
-                id: Some(UPSELL_URL_UPGRADE.into()),
-            },
-            QuestionOption {
-                label: secondary_label.into(),
-                description: secondary_desc.into(),
-                preview: None,
-                id: Some(UPSELL_URL_PAYG.into()),
-            },
-        ],
+        question: copy.heading.into(),
+        options,
         multi_select: Some(false),
         id: None,
     };
@@ -211,12 +195,7 @@ pub(super) fn open_credit_limit_upsell(
         vec![question],
         stashed,
     )
-    .with_local_kind(LocalQuestionKind::CreditLimitUpsell {
-        choices: vec![
-            xai_grok_telemetry::events::CreditLimitChoice::UpgradeTier,
-            second_choice,
-        ],
-    })
+    .with_local_kind(LocalQuestionKind::CreditLimitUpsell { choices })
     .with_no_freeform();
     agent.question_view = Some(state);
     agent.prompt.set_text("");
@@ -580,9 +559,11 @@ pub(super) fn handle_credit_limit_recheck_complete(
         let mode = credit_limit_upsell_mode(balance);
         let max_tier = is_max_tier(app.subscription_tier.as_deref());
         open_credit_limit_upsell(agent, mode, max_tier);
+        // Keep the stashed prompt so Try Again can resubmit after the
+        // user buys credits or the limit resets.
+    } else {
+        agent.credit_limit_stashed_prompt = None;
     }
-    // Either way, drop the stashed prompt.
-    agent.credit_limit_stashed_prompt = None;
 
     let mut drain = maybe_drain_queue(agent);
     drain.effects.push(Effect::FetchBilling {
@@ -595,6 +576,41 @@ pub(super) fn handle_credit_limit_recheck_complete(
         drain
             .effects
             .push(Effect::FetchAppBilling { request: None });
+    }
+    note_peek_page_flip(app, agent_id, drain.page_flip_entry);
+    drain.effects
+}
+
+/// Resubmit the prompt that hit the credit limit (modal option or card button).
+pub(super) fn dispatch_retry_credit_limit_prompt(app: &mut AppView) -> Vec<Effect> {
+    use crate::app::app_view::ActiveView;
+
+    let ActiveView::Agent(agent_id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&agent_id) else {
+        return vec![];
+    };
+    let Some(prompt) = agent.credit_limit_stashed_prompt.take() else {
+        agent.show_toast(t("billing.no_prompt_to_retry"));
+        agent
+            .scrollback
+            .push_block(RenderBlock::system(t("billing.no_prompt_to_retry")));
+        return vec![];
+    };
+    agent.session.enqueue_in_flight_prompt_front(prompt);
+    let drain = maybe_drain_queue(agent);
+    if drain.effects.iter().any(|effect| {
+        matches!(
+            effect,
+            Effect::SendPrompt { .. }
+                | Effect::SendPromptBlocks { .. }
+                | Effect::SendBashCommand { .. }
+        )
+    }) {
+        agent
+            .scrollback
+            .push_block(RenderBlock::system(t("billing.trying_again")));
     }
     note_peek_page_flip(app, agent_id, drain.page_flip_entry);
     drain.effects
