@@ -334,7 +334,7 @@
 "billing.subscription_upgraded" = "订阅已升级至 {tier_name}。正在重试…"
 "billing.try_again" = "重试"
 "billing.try_again_desc" = "有用量后再提交上一条提示"
-"billing.trying_again" = "正在重试\u{2026}"
+"billing.trying_again" = "正在重试…"
 "billing.upgrade_supergrok" = "升级至 SuperGrok"
 "billing.upgrade_supergrok_desc" = "适合日常编程和生产力任务"
 "billing.upgrade_supergrok_heavy" = "升级至 SuperGrok Heavy"
