@@ -60,38 +60,41 @@ impl TimedInputEvent {
 /// composer, as opposed to terminal noise (mouse/focus/resize reports,
 /// cursor/device-attribute replies) or control keys.
 ///
-/// Text is defined by the live composer's
-/// [`is_text_input_key`](crate::input::key::is_text_input_key) — plain and
-/// Shifted characters plus Windows AltGr (Ctrl+Alt) chords — plus Backspace and
-/// bracketed Paste; Enter, arrows, Esc, function keys, and true chording
-/// modifiers are dropped. Reusing that predicate keeps startup type-ahead
-/// consistent with what the composer accepts once the reader thread is live.
-/// Terminal query replies (DA2/OSC) that leak as raw key events decode as an Esc
-/// followed by printable bytes; the Esc is non-text and [`filter_startup_typeahead`]
-/// truncates the batch at the first Esc key, so such residue is unlikely to
-/// reach the input field.
+/// Text is what the live composer's [`is_text_input_key`](crate::input::key::is_text_input_key) accepts, plus Backspace and bracketed Paste.
+/// Shift+Enter is kept so the live composer inserts a newline. Bare Enter is handled separately as a submission only after non-empty text.
+/// Arrows, Esc, function keys, and other chording modifiers are dropped.
+/// A terminal query reply (DA2/OSC) that leaks as raw key events decodes as an Esc followed by printable bytes.
+/// The Esc is non-text, and [`filter_startup_typeahead`] truncates the batch at the first Esc key, so such residue is unlikely to reach the composer.
 fn is_typeahead_event(event: &Event) -> bool {
     match event {
         // Repeat is kept alongside Press so a held key typed during startup is
         // not silently dropped; Release events carry no text.
         Event::Key(key) if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) => {
-            crate::input::key::is_text_input_key(key) || key.code == KeyCode::Backspace
+            (crate::input::key::is_text_input_key(key)
+                && !matches!(key.code, KeyCode::Char(character) if character.is_control()))
+                || key.code == KeyCode::Backspace
+                || (key.code == KeyCode::Enter
+                    && key
+                        .modifiers
+                        .intersects(KeyModifiers::SHIFT | KeyModifiers::ALT))
         }
         Event::Paste(_) => true,
         _ => false,
     }
 }
 
-/// Apply the type-ahead policy to one ordered drain batch: keep only genuine
-/// typing (see [`is_typeahead_event`]), truncating at the first Esc key. A
-/// terminal query reply (DA2/OSC) leaks as an Esc followed by printable bytes,
-/// and after `EnableMouseCapture`/`EnableFocusChange` it is often prefixed by
-/// mouse/focus reports in the same drain, so the Esc is not necessarily first.
-/// Dropping everything from the Esc onward discards that printable tail (which
-/// the per-event filter would otherwise keep as ghost text) while preserving
-/// genuine typing that arrived before it; the leading reports are dropped by the
-/// per-event filter regardless. Pure, so ordering and filtering are unit-testable
-/// without touching the tty.
+/// Apply the type-ahead policy to one ordered drain batch: keep only genuine typing (see [`is_typeahead_event`]), truncating at the first Esc key.
+/// A terminal query reply (DA2/OSC) leaks as an Esc followed by printable bytes.
+/// After `EnableMouseCapture`/`EnableFocusChange` it is often prefixed by mouse/focus reports in the same drain, so the Esc is not necessarily first.
+/// Dropping from the Esc onward discards the printable tail the per-event filter would keep as ghost text, while keeping typing that came before it.
+/// The leading reports are dropped by the per-event filter regardless.
+/// Pure, so ordering and filtering are unit-testable without touching the tty.
+fn is_startup_submission_enter(event: &Event) -> bool {
+    matches!(event, Event::Key(key)
+        if key.kind == KeyEventKind::Press
+            && key.code == KeyCode::Enter
+            && key.modifiers.is_empty())
+}
 fn filter_startup_typeahead(batch: Vec<TimedInputEvent>) -> Vec<TimedInputEvent> {
     let cutoff = batch
         .iter()
@@ -100,41 +103,113 @@ fn filter_startup_typeahead(batch: Vec<TimedInputEvent>) -> Vec<TimedInputEvent>
     batch
         .into_iter()
         .take(cutoff)
-        .filter(|e| is_typeahead_event(&e.event))
+        .filter(|event| {
+            is_typeahead_event(&event.event) || is_startup_submission_enter(&event.event)
+        })
         .collect()
 }
 
-/// Poll-drain the terminal input queue, returning the events `keep` selects and
-/// discarding the rest. `poll_timeout` bounds each individual `poll` (not the
-/// total time spent draining). One shared loop for both disposal rules: startup
-/// type-ahead capture keeps typing (see [`capture_startup_typeahead`]); the
-/// teardown/handoff drains keep nothing.
-pub(super) fn drain_pending_events(
+pub(super) fn normalize_startup_submissions(events: &mut Vec<TimedInputEvent>) {
+    let mut draft = String::new();
+    let mut activated = false;
+    events.retain(|event| {
+        if activated {
+            return true;
+        }
+        if is_typeahead_event(&event.event) {
+            match &event.event {
+                Event::Paste(text) => draft.push_str(text),
+                Event::Key(key) if key.code == KeyCode::Backspace => {
+                    draft.pop();
+                }
+                Event::Key(key) if key.code == KeyCode::Enter => draft.push('\n'),
+                Event::Key(key) => {
+                    if let KeyCode::Char(character) = key.code
+                        && !character.is_control()
+                    {
+                        draft.push(character);
+                    }
+                }
+                _ => {}
+            }
+            true
+        } else if is_startup_submission_enter(&event.event) {
+            activated = !draft.trim().is_empty();
+            activated
+        } else {
+            false
+        }
+    });
+}
+
+/// Poll-drain the terminal input queue, returning the events `keep` selects and discarding the rest.
+/// `poll_timeout` is the quiet window and restarts after each event.
+/// Startup capture uses [`capture_startup_typeahead`] for an absolute deadline.
+/// Startup type-ahead capture keeps typing (see [`capture_startup_typeahead`]); the teardown/handoff drains keep nothing.
+fn drain_deadline_reached(poll_timeout: Duration, deadline: std::time::Instant) -> bool {
+    !poll_timeout.is_zero() && std::time::Instant::now() >= deadline
+}
+
+fn drain_pending_events_with(
     poll_timeout: Duration,
-    keep: impl Fn(&Event) -> bool,
+    absolute_deadline: bool,
+    mut map: impl FnMut(Event) -> Option<TimedInputEvent>,
 ) -> Vec<TimedInputEvent> {
+    let deadline = std::time::Instant::now() + poll_timeout;
     let mut kept = Vec::new();
-    while crossterm::event::poll(poll_timeout).unwrap_or(false) {
+    loop {
+        let remaining = if absolute_deadline && !poll_timeout.is_zero() {
+            deadline.saturating_duration_since(std::time::Instant::now())
+        } else {
+            poll_timeout
+        };
+        if !crossterm::event::poll(remaining).unwrap_or(false) {
+            break;
+        }
         match crossterm::event::read() {
-            Ok(event) if keep(&event) => kept.push(TimedInputEvent::now(event)),
-            Ok(_) => {}
+            Ok(event) => kept.extend(map(event)),
             Err(_) => break,
+        }
+        if absolute_deadline && drain_deadline_reached(poll_timeout, deadline) {
+            break;
         }
     }
     kept
 }
 
+pub(super) fn drain_pending_events(
+    poll_timeout: Duration,
+    keep: impl Fn(&Event) -> bool,
+) -> Vec<TimedInputEvent> {
+    drain_pending_events_with(poll_timeout, false, |event| {
+        keep(&event).then(|| TimedInputEvent::now(event))
+    })
+}
+
 /// Capture keyboard type-ahead pending in the terminal input queue.
 ///
-/// Contract: keeps genuine typing (printable keys, Backspace, Paste) and drops
-/// terminal noise (mouse/focus/resize reports, query replies, control keys); a
-/// batch that begins with an Esc is dropped whole. [`run`] replays the captured
-/// events into the composer when it is already the active consumer at launch
-/// (authed + trusted), so a prompt typed while the app was still loading is not
-/// lost; if a login/trust/paywall screen is still up it drops them rather than
-/// let that screen swallow (or be answered by) the keys.
+/// Keeps genuine typing (printable keys, Backspace, Paste, Shift+Enter) and a bare Enter that submits non-empty captured text.
+/// Drops terminal noise (mouse/focus/resize reports, query replies, other control keys). A batch that begins with an Esc is dropped whole.
+/// [`run`] replays the captured events into the composer when it is already the active consumer at launch (authed and trusted).
+/// A prompt typed while the app was still loading is therefore not lost.
+/// If a login/trust/paywall screen is still up, [`run`] drops the events rather than let that screen swallow (or be answered by) the keys.
+fn normalize_startup_event(event: Event) -> Event {
+    match event {
+        Event::Key(mut key) if matches!(key.code, KeyCode::Char('\u{0008}' | '\u{007f}')) => {
+            key.code = KeyCode::Backspace;
+            key.modifiers = KeyModifiers::NONE;
+            Event::Key(key)
+        }
+        event => event,
+    }
+}
 pub(super) fn capture_startup_typeahead(poll_timeout: Duration) -> Vec<TimedInputEvent> {
-    let captured = filter_startup_typeahead(drain_pending_events(poll_timeout, |_| true));
+    // A queued legacy carriage return carries no modifier history. Treat it as
+    // bare Enter; retroactively sampling current OS modifiers can misclassify it.
+    let captured =
+        filter_startup_typeahead(drain_pending_events_with(poll_timeout, true, |event| {
+            Some(TimedInputEvent::now(normalize_startup_event(event)))
+        }));
     if !captured.is_empty() {
         crate::unified_log::debug(
             "startup type-ahead captured",
@@ -1379,6 +1454,9 @@ pub(crate) async fn run(
         app.voice_ui_active = false;
     }
     app.apply_voice_mode_enabled(voice_mode_enabled);
+    crate::views::dock::set_enabled(crate::app::resolve_dock_enabled(
+        remote_settings.as_ref().and_then(|s| s.dock_enabled),
+    ));
 
     // Fallback: prefetch may have gate info the shell's AuthMeta missed.
     // Errs on the side of blocking if stale.
@@ -1858,10 +1936,10 @@ pub(crate) async fn run(
             Some(serde_json::json!({ "count": startup_typeahead.len() })),
         );
     }
-    // The reader thread owns the sole strong sender, so when it dies (e.g. a
-    // terminal spewing bytes crossterm cannot parse) or on shutdown (`input_rx`
-    // dropped) the channel closes and `input_rx.recv()` returns `None`, exiting
-    // the loop.
+    let live_input_started_at = std::time::Instant::now();
+    // The reader thread owns the sole strong sender.
+    // When it dies (e.g. a terminal spewing bytes crossterm cannot parse) or on shutdown (`input_rx` dropped), the channel closes.
+    // `input_rx.recv()` then returns `None`, exiting the loop.
     let reader_input_tx = input_tx;
     // Set true around tty handoffs (e.g. $EDITOR) so the reader stops touching
     // stdin and the inheriting child process keeps every keystroke. The handoff
@@ -2797,6 +2875,7 @@ pub(crate) async fn run(
                 let result = drain_and_process(
                     ev, &mut input_rx, &mut app, &mut tasks, &progress_tx,
                     &mut csi_filter, &mut x10_filter, &mut xt_filter,
+                    live_input_started_at,
                 ).await;
                 if let Some(window) =
                     stall_rollup.observe(waited, stall_activity, result.handled, handled_at)
@@ -3753,14 +3832,19 @@ struct RoutedInputEvent {
     event: Event,
     arrived_at: std::time::Instant,
     paste_provenance: PasteProvenance,
+    is_startup_replay: bool,
 }
 
 fn tty_suspend_armed(app: &AppView) -> bool {
     app.pending_editor.is_some() || app.pending_pager_path.is_some()
 }
 
-fn normalize_input_event(timed: TimedInputEvent) -> RoutedInputEvent {
+fn normalize_input_event(
+    timed: TimedInputEvent,
+    live_input_started_at: std::time::Instant,
+) -> RoutedInputEvent {
     let TimedInputEvent { event, arrived_at } = timed;
+    let is_startup_replay = arrived_at < live_input_started_at;
     #[cfg(target_os = "linux")]
     {
         use crossterm::event::{MouseButton, MouseEventKind};
@@ -3778,6 +3862,7 @@ fn normalize_input_event(timed: TimedInputEvent) -> RoutedInputEvent {
                 event: Event::Paste(text),
                 arrived_at,
                 paste_provenance: PasteProvenance::X11Primary,
+                is_startup_replay,
             };
         }
     }
@@ -3785,6 +3870,7 @@ fn normalize_input_event(timed: TimedInputEvent) -> RoutedInputEvent {
         event,
         arrived_at,
         paste_provenance: PasteProvenance::Terminal,
+        is_startup_replay,
     }
 }
 
@@ -3810,6 +3896,7 @@ async fn drain_and_process(
     csi_filter: &mut super::csi_filter::CsiFragmentFilter,
     x10_filter: &mut super::x10_filter::X10ReassemblyFilter,
     xt_filter: &mut super::xt_filter::XtversionFilter,
+    live_input_started_at: std::time::Instant,
 ) -> DrainResult {
     let mut needs_draw = false;
     let mut had_resize = false;
@@ -3820,39 +3907,43 @@ async fn drain_and_process(
     let mut raw_events = vec![first];
     drain_immediate(&mut raw_events, input_rx);
 
-    // XTVERSION reply removal must precede paste coalescing so reply chars
-    // are never folded into a synthetic Paste.
+    // Startup replay is queued before the live reader starts. Keep that prefix
+    // sequential, while preserving normal paste detection for a live suffix that
+    // reaches this drain in the same scheduler turn.
+    let live_start = raw_events.partition_point(|event| event.arrived_at < live_input_started_at);
+    let mut live_events = raw_events.split_off(live_start);
+    let startup_events = raw_events;
+
+    // XTVERSION reply removal must precede paste coalescing so reply chars are never folded into a synthetic Paste.
     if xt_filter.armed() {
-        raw_events =
-            super::xt_filter::filter_with_fragment_wait(xt_filter, raw_events, input_rx).await;
+        live_events =
+            super::xt_filter::filter_with_fragment_wait(xt_filter, live_events, input_rx).await;
     }
 
-    // On terminals without bracketed paste, try to capture more events
-    // that may still be in transit from the input reader thread.
-    if should_extend_for_paste(&raw_events) && detect_paste(&mut raw_events, input_rx).await {
-        collect_remaining_paste(&mut raw_events, input_rx).await;
-        // The paste extension pulled more events off the channel without
-        // running them through the still-armed filter — a late or split
-        // XTVERSION reply could otherwise be folded into the paste.
+    // On terminals without bracketed paste, try to capture more events that may still be in transit from the input reader thread.
+    if should_extend_for_paste(&live_events) && detect_paste(&mut live_events, input_rx).await {
+        collect_remaining_paste(&mut live_events, input_rx).await;
+        // The paste extension pulled more events off the channel without running them through the still-armed filter.
+        // A late or split XTVERSION reply could otherwise be folded into the paste.
         if xt_filter.armed() {
-            raw_events =
-                super::xt_filter::filter_with_fragment_wait(xt_filter, raw_events, input_rx).await;
+            live_events =
+                super::xt_filter::filter_with_fragment_wait(xt_filter, live_events, input_rx).await;
         }
     }
 
-    // The /gboom game tracks keys by press → release, so it needs the
-    // release events that `coalesce_rapid_keys` strips (and it never
-    // pastes). Skip coalescing while it owns input.
-    let coalesced = if app.gboom_active() {
-        raw_events
+    // The /gboom game tracks keys by press/release, so it needs the release events that `coalesce_rapid_keys` strips (and it never pastes).
+    // Skip coalescing while it owns input.
+    let mut coalesced = startup_events;
+    if app.gboom_active() {
+        coalesced.extend(live_events);
     } else {
-        coalesce_rapid_keys(raw_events)
-    };
+        coalesced.extend(coalesce_live_keys(live_events));
+    }
     let coalesced = csi_filter.filter(coalesced);
     let coalesced = x10_filter.filter(coalesced);
     let coalesced = coalesced
         .into_iter()
-        .map(normalize_input_event)
+        .map(|event| normalize_input_event(event, live_input_started_at))
         .collect::<Vec<_>>();
 
     let mut handled: u32 = 0;
@@ -4009,6 +4100,9 @@ async fn drain_and_process(
             return false;
         }
         let is_resize = matches!(ev, Event::Resize(_, _));
+        let _rescue_guard = routed
+            .is_startup_replay
+            .then(crate::input::suppress_os_modifier_rescue);
         match app.handle_input_at_with_paste_provenance(
             ev,
             routed.arrived_at,
@@ -4295,7 +4389,29 @@ fn is_voice_chord(ke: &KeyEvent) -> bool {
 ///    instead of a bracketed paste; this branch recovers them.
 ///
 /// No-op when bracketed paste already arrives as `Event::Paste`.
+#[cfg(test)]
 fn coalesce_rapid_keys(events: Vec<TimedInputEvent>) -> Vec<TimedInputEvent> {
+    let live_input_started_at = events
+        .iter()
+        .map(|event| event.arrived_at)
+        .min()
+        .unwrap_or_else(std::time::Instant::now);
+    coalesce_rapid_keys_since(events, live_input_started_at)
+}
+
+#[cfg(test)]
+fn coalesce_rapid_keys_since(
+    events: Vec<TimedInputEvent>,
+    live_input_started_at: std::time::Instant,
+) -> Vec<TimedInputEvent> {
+    let live_start = events.partition_point(|event| event.arrived_at < live_input_started_at);
+    let mut events = events;
+    let live_events = events.split_off(live_start);
+    events.extend(coalesce_live_keys(live_events));
+    events
+}
+
+fn coalesce_live_keys(events: Vec<TimedInputEvent>) -> Vec<TimedInputEvent> {
     // Fast path: not enough events for coalescing to trigger.
     if events.len() < PASTE_COALESCE_THRESHOLD {
         return events;
@@ -4736,11 +4852,40 @@ mod tests {
         let paste = Event::Paste("fix the bug".to_string());
         assert!(is_typeahead_event(&paste), "a paste is text");
 
-        // Control-modified keys, Esc, Enter, arrows and function keys are not
-        // plain text: dropped so terminal-reply residue and accidental submits
-        // never land in the composer.
+        // Shift+Enter is text editing; bare Enter is admitted separately only after non-empty text.
+        let enter = Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(!is_typeahead_event(&enter));
+        assert!(is_startup_submission_enter(&enter));
+        let shift_enter = Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::SHIFT));
+        assert!(
+            is_typeahead_event(&shift_enter),
+            "Shift+Enter inserts a newline"
+        );
+
+        // Other control-modified keys, Esc, arrows and function keys are not plain text.
         let ctrl_c = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
         assert!(!is_typeahead_event(&ctrl_c), "Ctrl+char is not text");
+        let raw_ctrl_b = Event::Key(KeyEvent::new(KeyCode::Char('\u{0002}'), KeyModifiers::NONE));
+        assert!(
+            !is_typeahead_event(&raw_ctrl_b),
+            "raw control bytes do not make a startup draft submittable"
+        );
+        for raw in ['\u{0008}', '\u{007f}'] {
+            for modifiers in [
+                KeyModifiers::NONE,
+                KeyModifiers::SHIFT,
+                KeyModifiers::ALT,
+                KeyModifiers::SHIFT | KeyModifiers::ALT,
+            ] {
+                assert_eq!(
+                    normalize_startup_event(Event::Key(KeyEvent::new(
+                        KeyCode::Char(raw),
+                        modifiers,
+                    ))),
+                    Event::Key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)),
+                );
+            }
+        }
         let alt_a = Event::Key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::ALT));
         assert!(!is_typeahead_event(&alt_a), "Alt+char is not text");
 
@@ -4755,9 +4900,9 @@ mod tests {
             KeyCode::Esc,
             KeyModifiers::NONE
         ))));
-        assert!(!is_typeahead_event(&Event::Key(KeyEvent::new(
+        assert!(is_typeahead_event(&Event::Key(KeyEvent::new(
             KeyCode::Enter,
-            KeyModifiers::NONE
+            KeyModifiers::ALT
         ))));
         assert!(!is_typeahead_event(&Event::Key(KeyEvent::new(
             KeyCode::Up,
@@ -4815,9 +4960,129 @@ mod tests {
             "text kept in original order"
         );
 
-        // A batch that begins with an Esc key is a terminal query reply
-        // (DA2/OSC leaking as raw bytes): dropped even though its tail decodes
-        // as printable characters.
+        let shifted_enter = TimedInputEvent::now(Event::Key(KeyEvent::new(
+            KeyCode::Enter,
+            KeyModifiers::SHIFT,
+        )));
+        let mut enter_chords = filter_startup_typeahead(vec![
+            timed(KeyCode::Char('h')),
+            shifted_enter.clone(),
+            timed(KeyCode::Char('i')),
+            timed(KeyCode::Enter),
+        ]);
+        normalize_startup_submissions(&mut enter_chords);
+        assert_eq!(
+            enter_chords
+                .into_iter()
+                .map(|event| event.event)
+                .collect::<Vec<_>>(),
+            vec![
+                Event::Key(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::NONE)),
+                shifted_enter.event,
+                Event::Key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE)),
+                Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+            ],
+            "Shift+Enter and bare Enter stay ordered with the captured draft"
+        );
+
+        let normalized = |batch| {
+            let mut events = filter_startup_typeahead(batch);
+            normalize_startup_submissions(&mut events);
+            events
+        };
+        assert!(
+            normalized(vec![timed(KeyCode::Enter)]).is_empty(),
+            "a leading Enter cannot activate startup UI"
+        );
+        assert_eq!(
+            normalized(vec![timed(KeyCode::Char(' ')), timed(KeyCode::Enter)]).len(),
+            1,
+            "whitespace is preserved but does not enable submission"
+        );
+        assert_eq!(
+            normalized(vec![
+                timed(KeyCode::Char('a')),
+                timed(KeyCode::Backspace),
+                timed(KeyCode::Enter),
+            ])
+            .len(),
+            2,
+            "Backspace can empty the captured draft and suppress submission"
+        );
+        let mut raw_delete = vec![
+            timed(KeyCode::Char('a')),
+            TimedInputEvent::now(normalize_startup_event(Event::Key(KeyEvent::new(
+                KeyCode::Char('\u{007f}'),
+                KeyModifiers::NONE,
+            )))),
+            timed(KeyCode::Enter),
+        ];
+        normalize_startup_submissions(&mut raw_delete);
+        assert_eq!(
+            raw_delete.len(),
+            2,
+            "raw DEL deletes the draft and suppresses submission"
+        );
+
+        let mut split_drain = filter_startup_typeahead(vec![timed(KeyCode::Char('a'))]);
+        split_drain.extend(filter_startup_typeahead(vec![timed(KeyCode::Enter)]));
+        normalize_startup_submissions(&mut split_drain);
+        assert_eq!(
+            split_drain.len(),
+            2,
+            "text and Enter captured by separate drains still submit together"
+        );
+
+        let mut continuation = normalized(vec![
+            timed(KeyCode::Char('a')),
+            timed(KeyCode::Char('\\')),
+            timed(KeyCode::Enter),
+            timed(KeyCode::Enter),
+        ]);
+        assert_eq!(
+            continuation.len(),
+            4,
+            "both Enters reach the real composer, which owns continuation semantics"
+        );
+        let live_input_started_at = continuation
+            .iter()
+            .map(|event| event.arrived_at)
+            .max()
+            .expect("non-empty startup batch")
+            + Duration::from_millis(1);
+        assert_eq!(
+            coalesce_rapid_keys_since(std::mem::take(&mut continuation), live_input_started_at,)
+                .len(),
+            4,
+            "startup events bypass paste coalescing"
+        );
+
+        let start = std::time::Instant::now();
+        let mut mixed = vec![
+            TimedInputEvent {
+                event: Event::Key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
+                arrived_at: start,
+            },
+            TimedInputEvent {
+                event: Event::Key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE)),
+                arrived_at: start + Duration::from_millis(2),
+            },
+            TimedInputEvent {
+                event: Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+                arrived_at: start + Duration::from_millis(3),
+            },
+            TimedInputEvent {
+                event: Event::Key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE)),
+                arrived_at: start + Duration::from_millis(4),
+            },
+        ];
+        let mixed =
+            coalesce_rapid_keys_since(std::mem::take(&mut mixed), start + Duration::from_millis(1));
+        assert_eq!(mixed.len(), 2);
+        assert_eq!(mixed[1].event, Event::Paste("a\nb".to_owned()));
+
+        // A batch that begins with an Esc key is a terminal query reply (DA2/OSC leaking as raw bytes).
+        // It is dropped even though its tail decodes as printable characters.
         assert!(
             chars(vec![
                 timed(KeyCode::Esc),
@@ -5045,6 +5310,7 @@ mod tests {
             &mut csi_filter,
             &mut x10_filter,
             &mut xt_filter,
+            std::time::Instant::now(),
         )
         .await;
 
@@ -5089,6 +5355,7 @@ mod tests {
             &mut csi_filter,
             &mut x10_filter,
             &mut xt_filter,
+            std::time::Instant::now(),
         )
         .await;
 
@@ -5924,7 +6191,7 @@ mod tests {
             scroll_event(ScrollUp, start + Duration::from_millis(4)),
             scroll_event(ScrollUp, start + Duration::from_millis(12)),
         ] {
-            let routed = normalize_input_event(event);
+            let routed = normalize_input_event(event, start);
             let _ = app.handle_input_at_with_paste_provenance(
                 &routed.event,
                 routed.arrived_at,
@@ -5939,8 +6206,10 @@ mod tests {
             Some(8.0)
         );
 
-        let routed =
-            normalize_input_event(scroll_event(ScrollDown, start + Duration::from_millis(40)));
+        let routed = normalize_input_event(
+            scroll_event(ScrollDown, start + Duration::from_millis(40)),
+            start,
+        );
         let _ = app.handle_input_at_with_paste_provenance(
             &routed.event,
             routed.arrived_at,
@@ -5972,7 +6241,7 @@ mod tests {
             KeyModifiers::NONE,
         );
         let arrived_at = input.arrived_at;
-        let normalized = normalize_input_event(input);
+        let normalized = normalize_input_event(input, arrived_at);
 
         assert_eq!(normalized.event, Event::Paste("PRIMARY\nexact".to_owned()));
         assert_eq!(normalized.arrived_at, arrived_at);
@@ -5992,18 +6261,18 @@ mod tests {
         });
 
         let release = mouse_event(MouseEventKind::Up(MouseButton::Middle), KeyModifiers::NONE);
-        let normalized = normalize_input_event(release.clone());
+        let normalized = normalize_input_event(release.clone(), release.arrived_at);
         assert_eq!(normalized.event, release.event);
         assert_eq!(normalized.paste_provenance, PasteProvenance::Terminal);
         let modified = mouse_event(
             MouseEventKind::Down(MouseButton::Middle),
             KeyModifiers::SHIFT,
         );
-        let normalized = normalize_input_event(modified.clone());
+        let normalized = normalize_input_event(modified.clone(), modified.arrived_at);
         assert_eq!(normalized.event, modified.event);
         assert_eq!(normalized.paste_provenance, PasteProvenance::Terminal);
         let left = mouse_event(MouseEventKind::Down(MouseButton::Left), KeyModifiers::NONE);
-        let normalized = normalize_input_event(left.clone());
+        let normalized = normalize_input_event(left.clone(), left.arrived_at);
         assert_eq!(normalized.event, left.event);
         assert_eq!(normalized.paste_provenance, PasteProvenance::Terminal);
         assert_eq!(crate::clipboard::primary_selection_read_call_count(), 0);
@@ -6024,7 +6293,7 @@ mod tests {
             KeyModifiers::NONE,
         );
 
-        let normalized = normalize_input_event(middle.clone());
+        let normalized = normalize_input_event(middle.clone(), middle.arrived_at);
         assert_eq!(normalized.event, middle.event);
         assert_eq!(normalized.paste_provenance, PasteProvenance::Terminal);
         assert_eq!(crate::clipboard::primary_selection_read_call_count(), 1);

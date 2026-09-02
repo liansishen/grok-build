@@ -1111,6 +1111,8 @@ pub struct AppView {
     /// matching key in place. In-memory only and per-session — never persisted
     /// to disk, so each pager run starts fresh (count 0).
     pub tip_seen_counts: std::collections::HashMap<&'static str, u32>,
+    /// Session-wide: /copy or /export ran. Suppresses the export-copy tip on every view.
+    pub export_copy_slash_used: bool,
     /// Terminal height (rows) from startup / the last `Event::Resize`. Feeds
     /// the auto-compact derivation (`views::agent::effective_compact`): the
     /// render-value compact flag is forced on while the terminal is
@@ -1833,6 +1835,7 @@ impl AppView {
             contextual_hints: Default::default(),
             remote_contextual_hints: None,
             tip_seen_counts: Default::default(),
+            export_copy_slash_used: false,
             last_known_terminal_rows: 0,
             small_screen_tip_evaluated: false,
             ssh_wrap_tip_evaluated: false,
@@ -5817,6 +5820,11 @@ impl AppView {
                     lanes,
                 )
             ) && spinner_frame_tick;
+            needs_redraw |= agent
+                .extensions_modal
+                .as_ref()
+                .is_some_and(|m| m.needs_spinner_tick())
+                && spinner_frame_tick;
             needs_redraw |= agent.drain_blocked();
             agent.prompt.slash_controller.set_workflows_available(
                 agent
@@ -5851,6 +5859,24 @@ impl AppView {
             needs_redraw |= agent.prompt.history_search.poll();
             needs_redraw |= agent.poll_scrollback_search();
             needs_redraw |= agent.tick_toast();
+            if !self.export_copy_slash_used
+                && let Some(child_sid) = agent.active_subagent.clone()
+                && let Some(child_view) = agent.subagent_views.get_mut(&child_sid)
+            {
+                if child_view.tick_export_copy_detector() {
+                    needs_redraw |= super::dispatch::present_export_copy_tip(
+                        child_view,
+                        &mut self.tip_seen_counts,
+                        self.contextual_hints.export_copy,
+                    );
+                }
+            } else if !self.export_copy_slash_used && agent.tick_export_copy_detector() {
+                needs_redraw |= super::dispatch::present_export_copy_tip(
+                    agent,
+                    &mut self.tip_seen_counts,
+                    self.contextual_hints.export_copy,
+                );
+            }
             needs_redraw |= agent.tick_extensions_result_notice();
             needs_redraw |= agent.tick_ephemeral_tip();
             needs_redraw |= agent.tick_mode_banner();
@@ -6141,7 +6167,7 @@ impl AppView {
                     || agent
                         .extensions_modal
                         .as_ref()
-                        .is_some_and(|m| m.result_notice.is_some())
+                        .is_some_and(|m| m.result_notice.is_some() || m.needs_spinner_tick())
                     || agent.ephemeral_tip_needs_tick()
                     || agent.mode_switch_banner.is_some()
                     || agent.has_drag_autoscroll()

@@ -1892,7 +1892,8 @@ pub fn render_picker_content(
 /// x-position. When `scrollbar_x` is `Some(x)`, the scrollbar is
 /// rendered at that column instead of `content_area.x + content_area.width - 1`.
 /// Used by modals with h_pad to place the scrollbar flush against the border.
-/// `loading_tick` animates the loading spinner (pass 0 for a static frame).
+/// A spinner that renders without a ticking `loading_tick` and `needs_animation` parks on its first frame.
+/// Pass `0` only for tests or a static placeholder.
 #[allow(clippy::too_many_arguments)]
 pub fn render_picker_content_with_scrollbar_x(
     buf: &mut Buffer,
@@ -2224,9 +2225,8 @@ fn render_picker_content_inner(
 
 /// Render the unified picker. Caller provides filtered entries.
 ///
-/// Returns hit areas for mouse interaction. The caller stores these in
-/// `state.hit_areas` for use by `handle_picker_input`.
-/// `loading_tick` animates the loading spinner (pass 0 for a static frame).
+/// Returns hit areas for mouse interaction; the caller stores these in `state.hit_areas` for use by `handle_picker_input`.
+/// `loading_tick` selects the loading-spinner frame. Live UIs must pass a ticking value and keep `needs_animation` true.
 #[allow(clippy::too_many_arguments)]
 pub fn render_picker(
     buf: &mut Buffer,

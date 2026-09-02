@@ -32,7 +32,7 @@ use xai_grok_i18n::{t, t_fmt};
 /// constant is not applied unless a wait is active.
 pub(crate) const DEFAULT_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// The blocking-wait ceiling: `GROK_MAX_WAIT_BLOCK_MS`, else 10 min.
+/// The blocking-wait ceiling: `GROK_MAX_WAIT_BLOCK_MS`, else `MAX_WAIT_BLOCK_MS_DEFAULT`.
 ///
 /// The same value fills `{max_wait_ms}` in the descriptions, so a wait can
 /// never exceed what the model was told it may ask for.
@@ -82,36 +82,50 @@ impl WaitSubject {
     }
 }
 
-fn still_running_wait_hint(hint: WaitHint, subject: WaitSubject) -> String {
+fn still_running_do_not_cancel(subject: WaitSubject) -> String {
     let noun = subject.noun();
-    let lead = match hint {
+    // Bash tasks have no follow-up channel; only subagents can be told to stop.
+    match subject {
+        WaitSubject::Subagent => t_fmt(
+            "task_output.wait.do_not_cancel.subagent",
+            &[("subject", noun)],
+        ),
+        WaitSubject::Task => t_fmt(
+            "task_output.wait.do_not_cancel.task",
+            &[("subject", noun)],
+        ),
+    }
+}
+
+fn still_running_wait_hint(hint: WaitHint, subject: WaitSubject) -> String {
+    let tail = still_running_do_not_cancel(subject);
+    match hint {
         WaitHint::Elapsed { requested, waited } => {
             let waited_label = format_waited_duration(waited);
-            if requested > waited {
+            let lead = if requested > waited {
                 let requested_label = format_waited_duration(requested);
                 t_fmt(
                     "task_output.wait.per_call_max",
                     &[
                         ("waited", &waited_label),
                         ("requested", &requested_label),
-                        ("subject", noun),
                     ],
                 )
             } else {
                 t_fmt(
                     "task_output.wait.requested",
-                    &[("waited", &waited_label), ("subject", noun)],
+                    &[("waited", &waited_label)],
                 )
-            }
+            };
+            format!("{lead} {tail}")
         }
-        WaitHint::ReturnedEarly => t_fmt(
-            "task_output.wait.returned_early",
-            &[("subject", noun)],
-        ),
-        WaitHint::NotRequested => t("task_output.wait.not_requested").to_string(),
-    };
-    let notify = t_fmt("task_output.wait.auto_notify", &[("subject", noun)]);
-    format!("{lead} {notify}")
+        WaitHint::ReturnedEarly => {
+            format!("{} {tail}", t("task_output.wait.returned_early"))
+        }
+        WaitHint::NotRequested => {
+            format!("{} {tail}", t("task_output.wait.not_requested"))
+        }
+    }
 }
 
 fn format_waited_duration(d: Duration) -> String {
@@ -1116,8 +1130,12 @@ mod tests {
             capped_wait_timeout(Some(5_000), cap),
             Duration::from_millis(5_000)
         );
-        assert_eq!(capped_wait_timeout(Some(36_000_000), cap), cap);
-        assert_eq!(capped_wait_timeout(Some(600_000), cap), cap);
+        assert_eq!(capped_wait_timeout(Some(3_600_000), cap), cap);
+        assert_eq!(capped_wait_timeout(Some(7_200_000), cap), cap);
+        assert_eq!(
+            capped_wait_timeout(Some(600_000), cap),
+            Duration::from_millis(600_000)
+        );
     }
 
     /// A client that shortens the cap at finalize must also shorten the wait —
@@ -1136,11 +1154,11 @@ mod tests {
     fn still_running_wait_hint_omitted_invites_timeout_ms() {
         assert_eq!(
             still_running_wait_hint(WaitHint::NotRequested, WaitSubject::Task),
-            "Use timeout_ms to wait for completion. You will be notified automatically when the task completes."
+            "Use timeout_ms to wait for completion. Unless the user specified, do not kill this task just because this wait returned. It is still working. You will be notified automatically when it completes. Do other work, or wait again with a longer timeout_ms."
         );
         assert_eq!(
             still_running_wait_hint(WaitHint::NotRequested, WaitSubject::Subagent),
-            "Use timeout_ms to wait for completion. You will be notified automatically when the subagent completes."
+            "Use timeout_ms to wait for completion. Unless the user specified, do not kill this subagent and do not tell it to stop just because this wait returned. It is still working. You will be notified automatically when it completes. Do other work, or wait again with a longer timeout_ms."
         );
     }
 
@@ -1152,13 +1170,11 @@ mod tests {
         };
         assert_eq!(
             still_running_wait_hint(hint, WaitSubject::Task),
-            "Waited the requested 30s; the task is still running. \
-             You will be notified automatically when the task completes."
+            "Waited the requested 30s. Unless the user specified, do not kill this task just because this wait returned. It is still working. You will be notified automatically when it completes. Do other work, or wait again with a longer timeout_ms."
         );
         assert_eq!(
             still_running_wait_hint(hint, WaitSubject::Subagent),
-            "Waited the requested 30s; the subagent is still running. \
-             You will be notified automatically when the subagent completes."
+            "Waited the requested 30s. Unless the user specified, do not kill this subagent and do not tell it to stop just because this wait returned. It is still working. You will be notified automatically when it completes. Do other work, or wait again with a longer timeout_ms."
         );
     }
 
@@ -1170,15 +1186,11 @@ mod tests {
         };
         assert_eq!(
             still_running_wait_hint(hint, WaitSubject::Task),
-            "Waited 600s, the per-call maximum, of the 2400s you requested; \
-             the task is still running. You do not need to call this again. \
-             You will be notified automatically when the task completes."
+            "Waited 600s, the per-call maximum, of the 2400s you requested. Unless the user specified, do not kill this task just because this wait returned. It is still working. You will be notified automatically when it completes. Do other work, or wait again with a longer timeout_ms."
         );
         assert_eq!(
             still_running_wait_hint(hint, WaitSubject::Subagent),
-            "Waited 600s, the per-call maximum, of the 2400s you requested; \
-             the subagent is still running. You do not need to call this again. \
-             You will be notified automatically when the subagent completes."
+            "Waited 600s, the per-call maximum, of the 2400s you requested. Unless the user specified, do not kill this subagent and do not tell it to stop just because this wait returned. It is still working. You will be notified automatically when it completes. Do other work, or wait again with a longer timeout_ms."
         );
     }
 
@@ -1186,13 +1198,11 @@ mod tests {
     fn still_running_wait_hint_returned_early_is_honest() {
         assert_eq!(
             still_running_wait_hint(WaitHint::ReturnedEarly, WaitSubject::Task),
-            "Wait returned early because another finished; this task is still running. \
-             You will be notified automatically when the task completes."
+            "Wait returned early because another finished. Unless the user specified, do not kill this task just because this wait returned. It is still working. You will be notified automatically when it completes. Do other work, or wait again with a longer timeout_ms."
         );
         assert_eq!(
             still_running_wait_hint(WaitHint::ReturnedEarly, WaitSubject::Subagent),
-            "Wait returned early because another finished; this subagent is still running. \
-             You will be notified automatically when the subagent completes."
+            "Wait returned early because another finished. Unless the user specified, do not kill this subagent and do not tell it to stop just because this wait returned. It is still working. You will be notified automatically when it completes. Do other work, or wait again with a longer timeout_ms."
         );
     }
 
