@@ -315,7 +315,11 @@ pub fn mode_flags<'a>(
     }
     if permission != PermissionLabel::Ask {
         flags.push(PromptFlag {
-            text: permission.as_canonical(),
+            text: match permission {
+                PermissionLabel::Auto => xai_grok_i18n::t("mode.flag.auto"),
+                PermissionLabel::AlwaysApprove => xai_grok_i18n::t("mode.flag.always_approve"),
+                PermissionLabel::Ask => permission.as_canonical(),
+            },
             // Blue `accent_system` reads as "system/automation", distinct from plan
             color: (permission == PermissionLabel::Auto).then_some(theme.accent_system),
             bold: false,

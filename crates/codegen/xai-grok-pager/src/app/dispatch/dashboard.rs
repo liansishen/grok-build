@@ -2295,20 +2295,8 @@ pub(super) fn dispatch_dashboard_commit_rename(app: &mut AppView) -> Vec<Effect>
     effects
 }
 
-/// Pick the dashboard row the cursor should land on after `closed` is
-/// removed. Computed against the CURRENT (pre-removal) display order so
-/// it mirrors what the user sees: the next visible row below `closed`
-/// (so the cursor stays put while the rows below shift up — i.e. it
-/// "moves down 1" relative to the list) or, when `closed` is the last
-/// row, the previous visible row. Section headers are skipped so the
-/// cursor always lands on an agent row. Returns `None` when `closed`
-/// is the only row — the caller then clears the selection and lets
-/// `reanchor_selection` fall back to the `[+ New Agent]` button.
-///
-/// Without this, closing the selected agent leaves a stale cursor that
-/// `reanchor_selection` drops to `None`, and the next ↑/↓ restarts from
-/// the top of the list — a jarring jump.
-pub(super) fn dashboard_neighbor_row(
+/// Dashboard v2 rows in display order, the same build the renderer runs.
+pub(super) fn workspace_rows(
     app: &AppView,
     filter: &crate::views::dashboard::Filter,
 ) -> (
@@ -2344,11 +2332,16 @@ pub(super) fn dashboard_focusables(app: &AppView) -> Vec<crate::views::dashboard
     let (rows, grouping) = if app.workspace_dashboard_enabled {
         workspace_rows(app, &d.filter)
     } else {
-        crate::views::dashboard::build_rows_with_roster(
-            &app.agents,
-            &d.pinned,
-            &d.reorder,
-            None,
+        (
+            crate::views::dashboard::build_rows_with_roster(
+                &app.agents,
+                &d.pinned,
+                &d.reorder,
+                d.grouping,
+                &d.filter,
+                home,
+                roster,
+            ),
             d.grouping,
         )
     };

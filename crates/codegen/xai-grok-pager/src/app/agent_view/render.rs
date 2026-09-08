@@ -34,8 +34,7 @@ use ratatui::widgets::Widget;
 use std::collections::HashSet;
 use std::time::Instant;
 /// AppView-owned per-frame inputs to [`AgentView::draw`]: state the agent
-/// view cannot see itself (the voice pipeline, app-level Esc ownership, the
-/// status row).
+/// view cannot see itself (the voice pipeline, the status row).
 /// Grouped (mirroring `WelcomeRenderParams`) so the next app-level render
 /// fact extends this struct instead of every `draw` call site; tests take
 /// `Default` and override only what they exercise.
@@ -48,12 +47,6 @@ pub struct AppRenderParams<'a> {
     pub voice_listening: bool,
     /// Interim transcript for the prompt overlay while dictating.
     pub voice_interim: Option<&'a str>,
-    /// App-level Esc ownership snapshot — single producer
-    /// `AppView::esc_owned_before_agent` (voice listening / cold-start,
-    /// focused dev tracing pane, cloud / import-Claude modals, dashboard
-    /// attached-agent popup). Feeds the hint path so the bar never
-    /// advertises `Esc cancel` while an app-level owner would consume it.
-    pub esc_owned_before_agent: bool,
     /// The status row this frame paints, or `Off` when this frame has none.
     pub status_line: crate::views::status_line::StatusLineFrame,
     pub workspace_dashboard_enabled: bool,
@@ -298,15 +291,8 @@ impl AgentView {
     /// still reflects parent context (documented limitation, pre-existing before
     /// this change).
     ///
-    /// `esc_owned_before_agent`: app-level Esc ownership snapshot
-    /// (`AppView::esc_owned_before_agent`); the draw path passes its param
-    /// of the same name.
-    pub fn current_shortcut_hints(
-        &self,
-        registry: &ActionRegistry,
-        esc_owned_before_agent: bool,
-    ) -> Vec<HintItem> {
-        match self.shortcuts_bar_content(registry, esc_owned_before_agent) {
+    pub fn current_shortcut_hints(&self, registry: &ActionRegistry) -> Vec<HintItem> {
+        match self.shortcuts_bar_content(registry) {
             ShortcutsBarContent::Surface(hints) | ShortcutsBarContent::Pane(hints) => hints,
             ShortcutsBarContent::Hidden => vec![],
         }
@@ -324,11 +310,7 @@ impl AgentView {
     }
     /// The bar names the surface the keys actually reach, so it asks
     /// [`AgentView::key_owner`] rather than keeping an order of its own.
-    fn shortcuts_bar_content(
-        &self,
-        registry: &ActionRegistry,
-        esc_owned_before_agent: bool,
-    ) -> ShortcutsBarContent {
+    fn shortcuts_bar_content(&self, registry: &ActionRegistry) -> ShortcutsBarContent {
         use crate::views::shortcuts_bar::HintItem;
         match self.key_owner() {
             KeyOwner::LineViewer => self.line_viewer_bar(),
@@ -394,11 +376,7 @@ impl AgentView {
     /// Shared "normal pane" hints: flag computation + `build_hints` + queue hint.
     /// Single source of truth for the two former duplicated blocks in
     /// `current_shortcut_hints` and `draw`.
-    fn normal_pane_hints(
-        &self,
-        registry: &ActionRegistry,
-        esc_owned_before_agent: bool,
-    ) -> Vec<HintItem> {
+    fn normal_pane_hints(&self, registry: &ActionRegistry) -> Vec<HintItem> {
         let fold_label = self.selected_fold_label();
         let is_editing = matches!(self.prompt_mode, PromptMode::EditingQueued { .. });
         let selected_entry = self
@@ -2591,28 +2569,12 @@ impl AgentView {
                 xai_grok_i18n::t("mode.flag.plan_approval")
             } else {
                 xai_grok_i18n::t("mode.flag.plan")
-            };
-            mode_flags_vec.push(PromptFlag {
-                text: plan_label,
-                color: Some(theme.accent_plan),
-                bold: false,
-            });
-        }
-        if self.session.is_yolo() && !effective_plan {
-            mode_flags_vec.push(PromptFlag {
-                text: xai_grok_i18n::t("mode.flag.always_approve"),
-                color: None,
-                bold: false,
-            });
-        }
-        if self.auto_flag_visible(effective_plan) {
-            mode_flags_vec.push(PromptFlag {
-                text: xai_grok_i18n::t("mode.flag.auto"),
-                color: Some(theme.accent_system),
-                bold: false,
-            });
-        }
-        let mode_flags: &[PromptFlag] = &mode_flags_vec;
+            })
+        } else {
+            None
+        };
+        let flags: Vec<PromptFlag> =
+            mode_flags(plan_label, self.session.permission_label(), &theme);
         let multiline = self.multiline_mode;
         // Consumer billing surface (personal OAuth), not slash-registry
         // availability. `/usage` is tier-restricted on free/X Basic and when

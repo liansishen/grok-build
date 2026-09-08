@@ -133,7 +133,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: ${{ runner.os }}-x86_64-release
+          key: ${{ github.sha }}
           cache-on-failure: true
+
+      - name: Check release binary
+        shell: bash
+        run: cargo check --locked -p xai-grok-pager-bin
 
       - name: Test sampler library
         if: runner.os == 'Linux'

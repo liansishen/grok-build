@@ -650,10 +650,6 @@ pub fn prompt_for_trust(key: &Path) -> bool {
         "{}",
         t_fmt("folder_trust.folder", &[("path", &folder)])
     );
-    let _ = writeln!(err, "This folder contains repo-local config (MCP/LSP servers, hooks, permission rules) \
-         or project instructions/skills that Grok would otherwise apply automatically.");
-    let _ = write!(err, "{}", t("folder_trust.prompt"));
-    );
     let _ = write!(err, "{}", t("folder_trust.prompt"));
     let _ = err.flush();
 

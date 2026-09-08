@@ -2268,67 +2268,113 @@ async fn test_windows_replace_exe_sweeps_accumulated_asides() {
     );
 }
 
-    #[test]
-    fn test_reported_fork_version_requires_exact_semver_token() {
-        assert_eq!(
-            reported_fork_version(b"Grok Build 0.2.105-fork.1 (abcdef)").unwrap(),
-            semver::Version::parse("0.2.105-fork.1").unwrap()
-        );
-        assert_ne!(
-            reported_fork_version(b"Grok Build 0.2.105-fork.10").unwrap(),
-            semver::Version::parse("0.2.105-fork.1").unwrap()
-        );
-        assert!(reported_fork_version(b"Grok Build 0.2.105").is_none());
-    }
+#[cfg(unix)]
+fn assert_decoded_executable(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let mode = std::fs::metadata(path).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o755, "decoded binary must be executable");
+}
+#[cfg(not(unix))]
+fn assert_decoded_executable(_path: &std::path::Path) {}
 
-    #[test]
-    fn test_reinstall_hint_npm_redirects_to_fork_releases() {
-        let hint = reinstall_hint("npm", "stable");
-        assert!(
-            hint.contains("GitHub Releases") || hint.contains("github"),
-            "hint: {hint}"
-        );
-        assert!(
-            hint.contains("not the official npm package"),
-            "hint: {hint}"
-        );
-    }
+#[tokio::test]
+async fn download_and_decode_round_trips_each_codec() {
+    use std::io::Write;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    #[test]
-    fn test_reinstall_hint_gh_release_names_fork_repo() {
-        let hint = reinstall_hint("gh-release", "stable");
-        assert!(hint.contains("GitHub Releases") || hint.contains("github"), "hint: {hint}");
-        assert!(
-            hint.contains(crate::version::GH_RELEASE_REPO),
-            "hint: {hint}"
-        );
-    }
+    let payload = b"\x7fELF grok binary payload".to_vec();
+    let zst = zstd::encode_all(&payload[..], 3).unwrap();
+    let gz = {
+        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        enc.write_all(&payload).unwrap();
+        enc.finish().unwrap()
+    };
 
-    #[test]
-    fn test_needs_update_fork_channel_orders_fork_builds() {
+    for (suffix, codec, body) in [("zst", Codec::Zstd, zst), ("gz", Codec::Gzip, gz)] {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(format!("/grok-1.2.3-linux-x86_64.{suffix}")))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+            .mount(&server)
+            .await;
+
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("grok-1.2.3-linux-x86_64");
+        let url = format!("{}/grok-1.2.3-linux-x86_64.{suffix}", server.uri());
+        download_and_decode(&url, &dest, codec, false)
+            .await
+            .unwrap_or_else(|e| panic!("decode .{suffix}: {e}"));
+
         assert_eq!(
-            needs_update("0.2.105-fork.1", "0.2.105-fork.2", "fork", false),
-            Some(true)
+            std::fs::read(&dest).unwrap(),
+            payload,
+            ".{suffix} decode mismatch"
         );
-        assert_eq!(
-            needs_update("0.2.105-fork.2", "0.2.105-fork.1", "fork", false),
-            Some(false)
-        );
-        assert_eq!(
-            needs_update("0.2.105-fork.2", "0.2.106-fork.1", "fork", false),
-            Some(true)
-        );
-        assert_eq!(
-            needs_update("0.2.105-fork.1", "0.2.106-alpha.1", "fork", false),
-            Some(false),
-            "fork channel must reject unrelated prereleases"
-        );
-        assert_eq!(
-            needs_update("0.2.105-fork.1", "0.2.106", "fork", false),
-            Some(false),
-            "fork channel must reject official stable releases"
-        );
+        assert_decoded_executable(&dest);
     }
+}
+
+#[test]
+fn test_reported_fork_version_requires_exact_semver_token() {
+    assert_eq!(
+        reported_fork_version(b"Grok Build 0.2.105-fork.1 (abcdef)").unwrap(),
+        semver::Version::parse("0.2.105-fork.1").unwrap()
+    );
+    assert_ne!(
+        reported_fork_version(b"Grok Build 0.2.105-fork.10").unwrap(),
+        semver::Version::parse("0.2.105-fork.1").unwrap()
+    );
+    assert!(reported_fork_version(b"Grok Build 0.2.105").is_none());
+}
+
+#[test]
+fn test_reinstall_hint_npm_redirects_to_fork_releases() {
+    let hint = reinstall_hint("npm", "stable");
+    assert!(
+        hint.contains("GitHub Releases") || hint.contains("github"),
+        "hint: {hint}"
+    );
+    assert!(
+        hint.contains("not the official npm package"),
+        "hint: {hint}"
+    );
+}
+
+#[test]
+fn test_reinstall_hint_gh_release_names_fork_repo() {
+    let hint = reinstall_hint("gh-release", "stable");
+    assert!(hint.contains("GitHub Releases") || hint.contains("github"), "hint: {hint}");
+    assert!(
+        hint.contains(crate::version::GH_RELEASE_REPO),
+        "hint: {hint}"
+    );
+}
+
+#[test]
+fn test_needs_update_fork_channel_orders_fork_builds() {
+    assert_eq!(
+        needs_update("0.2.105-fork.1", "0.2.105-fork.2", "fork", false),
+        Some(true)
+    );
+    assert_eq!(
+        needs_update("0.2.105-fork.2", "0.2.105-fork.1", "fork", false),
+        Some(false)
+    );
+    assert_eq!(
+        needs_update("0.2.105-fork.2", "0.2.106-fork.1", "fork", false),
+        Some(true)
+    );
+    assert_eq!(
+        needs_update("0.2.105-fork.1", "0.2.106-alpha.1", "fork", false),
+        Some(false),
+        "fork channel must reject unrelated prereleases"
+    );
+    assert_eq!(
+        needs_update("0.2.105-fork.1", "0.2.106", "fork", false),
+        Some(false),
+        "fork channel must reject official stable releases"
+    );
 }
 
 #[tokio::test]
