@@ -1141,8 +1141,7 @@ mod alt_m_model_picker_tests {
                 agent.active_modal,
                 Some(ActiveModal::ArgPicker { ref command, .. }) if command == "model"
             ),
-            "Alt+M from the prompt must open the model picker, got {:?}",
-            agent.active_modal
+            "Alt+M from the prompt must open the model picker"
         );
         assert!(
             !agent.multiline_mode,

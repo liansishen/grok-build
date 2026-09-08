@@ -96,6 +96,8 @@ pub enum DynamicEnumSource {
     /// Models from the active session's catalog.
     /// Prepends a `"(no override)"` sentinel so the user can clear the setting.
     ActiveModelCatalog,
+    /// Reasoning-effort levels for the effective fork-secondary model.
+    ForkSecondaryReasoningEffort,
 }
 
 /// Build the owned choice list for a `DynamicEnum` at picker-open time.
@@ -109,14 +111,30 @@ pub fn dynamic_enum_choices(
             let mut out = Vec::with_capacity(snapshot.available_models.len() + 1);
             out.push(OwnedEnumChoice {
                 canonical: String::new(),
-                display: "(no override)".to_string(),
-                description: "Inherit the default model (no per-user override).".to_string(),
+                display: xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string(),
+                description: xai_grok_i18n::t("settings.dynamic_enum.no_override_desc").to_string(),
             });
             for (name, _id) in &snapshot.available_models {
                 out.push(OwnedEnumChoice {
                     canonical: name.clone(),
                     display: name.clone(),
                     description: String::new(),
+                });
+            }
+            out
+        }
+        DynamicEnumSource::ForkSecondaryReasoningEffort => {
+            let mut out = Vec::with_capacity(snapshot.fork_secondary_effort_options.len() + 1);
+            out.push(OwnedEnumChoice {
+                canonical: String::new(),
+                display: xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string(),
+                description: xai_grok_i18n::t("settings.dynamic_enum.no_override_effort_desc").to_string(),
+            });
+            for (canonical, display, description) in &snapshot.fork_secondary_effort_options {
+                out.push(OwnedEnumChoice {
+                    canonical: canonical.clone(),
+                    display: display.clone(),
+                    description: description.clone(),
                 });
             }
             out
@@ -199,6 +217,23 @@ pub struct SettingMeta {
     pub hidden_in_minimal: bool,
 }
 
+impl SettingMeta {
+    /// Localized setting label from the fork's settings catalog.
+    pub fn label_t(&self) -> &'static str {
+        let key = format!("settings.{}.label", self.key);
+        xai_grok_i18n::t_for(xai_grok_i18n::current_locale(), &key)
+    }
+}
+
+impl EnumChoice {
+    /// Localized choice label, falling back to the metadata display text.
+    pub fn display_t(&self, setting_key: SettingKey) -> &'static str {
+        let key = format!("settings.{setting_key}.choice_{}", self.canonical);
+        let translated = xai_grok_i18n::t_for(xai_grok_i18n::current_locale(), &key);
+        if translated == key { self.display } else { translated }
+    }
+}
+
 /// A typed value carried by `Action::Set*` payloads, modal preview state, and the rollback path on persist failure.
 ///
 /// Each variant aligns 1:1 with a `SettingKind` variant.
@@ -241,6 +276,8 @@ pub struct PagerLocalSnapshot {
     pub auto_mode: bool,
     /// Currently-selected model's display name, or `None` if no catalog has loaded yet.
     pub current_model_name: Option<String>,
+    /// Persisted `[models].web_search` override, or empty when unset.
+    pub web_search_model_name: String,
     /// `(display_name, ModelId)` pairs from the active session's catalog.
     /// Cloned into the snapshot so the modal's validator and resolver are self-contained (the modal outlives the borrow on `app.agents`).
     pub available_models: Vec<(String, acp::ModelId)>,
@@ -275,6 +312,8 @@ pub struct PagerLocalSnapshot {
     /// Live `voice_config.language` at snapshot time.
     /// Lets the modal show the language actually in effect when `[ui].voice_stt_language` is unset but an explicit `[voice].language` applies.
     pub voice_stt_language: String,
+    /// Effort menu for the effective fork-secondary model.
+    pub fork_secondary_effort_options: Vec<(String, String, String)>,
 }
 
 impl Default for PagerLocalSnapshot {
@@ -285,6 +324,7 @@ impl Default for PagerLocalSnapshot {
             auto_mode: false,
             current_model_name: None,
             available_models: Vec::new(),
+            web_search_model_name: String::new(),
             coding_data_sharing_opt_out: true,
             coding_data_sharing_lock: None,
             plan_mode_active: false,
@@ -298,6 +338,7 @@ impl Default for PagerLocalSnapshot {
             auto_mode_gate: false,
             ask_user_question_timeout_enabled: None,
             voice_stt_language: xai_grok_voice::STT_LANGUAGE_DEFAULT.to_string(),
+            fork_secondary_effort_options: Vec::new(),
         }
     }
 }
@@ -311,6 +352,11 @@ pub fn canonical_voice_capture_mode(value: Option<&str>) -> &'static str {
     } else {
         "hold"
     }
+}
+
+/// Canonicalize the UI language preference while preserving the fork's locale aliases.
+pub fn canonical_ui_language(value: Option<&str>) -> &'static str {
+    xai_grok_i18n::canonicalize_language(value)
 }
 
 /// Canonicalize a raw voice STT language to a settings choice. Delegates to
@@ -473,6 +519,12 @@ pub fn current_value_for(
         "compact_mode" => Some(SettingValue::Bool(ui.compact_mode)),
         "show_timestamps" => Some(SettingValue::Bool(ui.show_timestamps.unwrap_or(true))),
         "show_timeline" => Some(SettingValue::Bool(ui.show_timeline_enabled())),
+        "show_session_usage_bar" => Some(SettingValue::Bool(
+            ui.show_session_usage_bar.unwrap_or(false),
+        )),
+        "show_request_metrics" => Some(SettingValue::Bool(
+            ui.show_request_metrics_enabled(),
+        )),
         // The cache is the send-path source of truth (same pattern as group_tool_verbs)
         "page_flip_on_send" => Some(SettingValue::Bool(
             crate::appearance::cache::load_page_flip_on_send(),
@@ -577,6 +629,9 @@ pub fn current_value_for(
                 .as_deref()
                 .unwrap_or(&pager.voice_stt_language),
         )))),
+        "language" => Some(SettingValue::Enum(canonical_ui_language(
+            ui.language.as_deref(),
+        ))),
         // Theme: unknown disk values fall through to the canonical default
         // auto_dark_theme and auto_light_theme additionally filter out "auto" (a circular reference)
         "theme" => Some(SettingValue::Enum(
@@ -645,6 +700,22 @@ pub fn current_value_for(
         // None (no catalog yet) renders as the empty string
         "default_model" => Some(SettingValue::String(
             pager.current_model_name.clone().unwrap_or_default(),
+        )),
+        "web_search_model" => Some(SettingValue::String({
+            let raw = pager.web_search_model_name.as_str();
+            if raw.is_empty() {
+                String::new()
+            } else {
+                pager
+                    .available_models
+                    .iter()
+                    .find(|(name, id)| id.0.as_ref() == raw || name == raw)
+                    .map(|(name, _)| name.clone())
+                    .unwrap_or_else(|| raw.to_owned())
+            }
+        })),
+        "fork_secondary_reasoning_effort" => Some(SettingValue::String(
+            ui.fork_secondary_reasoning_effort.clone(),
         )),
         // max_thoughts_width: `u16` widened to `i64`.
         "max_thoughts_width" => Some(SettingValue::Int(ui.max_thoughts_width as i64)),
@@ -912,6 +983,17 @@ mod tests {
                          cfg.models.default at session start",
                     );
                 }
+                ("web_search_model", SettingKind::DynamicEnum { default, .. }) => {
+                    assert_eq!(*default, "");
+                }
+                ("fork_secondary_reasoning_effort", SettingKind::DynamicEnum { default, .. }) => {
+                    assert_eq!(*default, "");
+                    assert_eq!(ui.fork_secondary_reasoning_effort, "");
+                }
+                ("language", SettingKind::Enum { default, .. }) => {
+                    assert_eq!(ui.language, None);
+                    assert_eq!(*default, canonical_ui_language(ui.language.as_deref()));
+                }
                 // max_thoughts_width: `u16` widened to `i64`.
                 ("max_thoughts_width", SettingKind::Int { default, .. }) => {
                     assert_eq!(
@@ -952,6 +1034,12 @@ mod tests {
                         "auto_update registry default must be true \
                          (matches auto_update.rs's `.unwrap_or(true)`)"
                     );
+                }
+                ("show_session_usage_bar", SettingKind::Bool { default }) => {
+                    assert_eq!(*default, ui.show_session_usage_bar.unwrap_or(false));
+                }
+                ("show_request_metrics", SettingKind::Bool { default }) => {
+                    assert_eq!(*default, ui.show_request_metrics_enabled());
                 }
                 // vim_mode: Option<bool>; None reads as false
                 ("vim_mode", SettingKind::Bool { default }) => {
@@ -1568,6 +1656,13 @@ mod tests {
         let hits = reg.search("compact density");
         assert_eq!(hits.len(), 1, "expected 1 match for 'compact density'");
         assert_eq!(hits[0].key, "compact_mode");
+
+        let stamp_hits = reg.search("stamp");
+        assert_eq!(
+            stamp_hits.iter().map(|meta| meta.key).collect::<Vec<_>>(),
+            vec!["show_timestamps"],
+            "the usage-bar description must not make `stamp` match an unrelated setting",
+        );
 
         let empty = reg.search("xyzzy-no-match");
         assert!(empty.is_empty(), "expected no match for 'xyzzy-no-match'");

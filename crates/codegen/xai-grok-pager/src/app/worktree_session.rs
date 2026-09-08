@@ -8,10 +8,7 @@ use serde::Serialize;
 use xai_acp_lib::{AcpAgentTx, acp_send};
 use xai_grok_workspace::session::git::RestoreDegree;
 
-use super::effects::{
-    acp_send_bounded, parse_worktree_restore_payload, parse_worktree_strategy_summary,
-    sanitize_user_error,
-};
+use super::effects::{parse_worktree_strategy_summary, sanitize_user_error};
 use super::session_startup::worktree_session_cwd;
 use super::session_title_resolve::worktree_resume_failure_message;
 
@@ -175,6 +172,24 @@ pub(crate) fn parse_create_response(
     })
 }
 
+fn parse_worktree_restore_payload(
+    result_obj: &serde_json::Value,
+) -> (bool, Option<String>, Option<RestoreDegree>) {
+    let code_restored = result_obj
+        .get("codeRestored")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let restore_summary = result_obj
+        .get("restoreSummary")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let restore_degree = result_obj
+        .get("restoreDegree")
+        .cloned()
+        .and_then(|v| serde_json::from_value(v).ok());
+    (code_restored, restore_summary, restore_degree)
+}
+
 pub(crate) fn parse_resume_response(
     raw: &str,
     requested_session_id: &str,
@@ -255,7 +270,7 @@ pub(crate) async fn resume_session_into_worktree(
             .into(),
     );
     let started = std::time::Instant::now();
-    let resp = match acp_send_bounded(req, acp_tx, "Worktree session resume").await {
+    let resp = match acp_send(req, acp_tx).await {
         Ok(resp) => {
             tracing::info!(
                 session_id,

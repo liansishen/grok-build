@@ -43,7 +43,6 @@ pub(crate) use billing::{
 pub(crate) use dashboard::{DashboardStopReadiness, dashboard_stop_readiness};
 pub(crate) use modes::{downgrade_displayed_auto_if_gated, effective_auto};
 pub(crate) use notes::feedback_question_label;
-pub(crate) use notes::FEEDBACK_QUESTION_LABEL;
 pub(crate) use notes::FEEDBACK_TRACE_UPLOAD_TIMEOUT_MS;
 pub(crate) use notes::{recap_unavailable_toast, scrollback_has_user_messages};
 pub(crate) use permissions::resolve_permission_queue_transition;

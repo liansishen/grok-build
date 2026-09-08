@@ -251,6 +251,7 @@ fn deferred_paste_completion_after_refused_editor_does_not_implicitly_send_witho
                 target: crate::app::actions::ClipboardPasteTarget::AgentPrompt {
                     agent_id: id,
                     images_dir: None,
+                    from_feedback_pane: false,
                 },
                 source: crate::app::actions::ClipboardPasteSource::ClipboardKey {
                     text: crate::app::actions::ClipboardTextRead::Success(Some(

@@ -670,6 +670,8 @@ pub struct AppView {
     /// to the frame's `post_flush_escapes` so they are written inside the
     /// synchronized output block.
     pub(crate) pending_notification_escapes: Option<String>,
+    /// Queue handle for out-of-band terminal escapes.
+    pub(crate) escape_writer: crate::render::draw::EscapeWriter,
     /// Notification deferred by several ticks so the terminal has time to
     /// process the idle title escape before the notification fires.
     ///
@@ -721,6 +723,9 @@ pub struct AppView {
     /// `[marketplace].plugin_cta_marketplace` is set in the effective config.
     /// `None` keeps the default xAI Official source.
     pub plugin_cta_marketplace: Option<String>,
+    pub(crate) workspace_membership: crate::app::workspace_membership::WorkspaceMembership,
+    /// Trust failure printed after terminal restoration.
+    pub trust_quit_error: Option<String>,
     pub workspace_dashboard_enabled: bool,
     /// Consumer billing surface (credit fetches / warnings). False for team
     /// and API-key auth. `/usage` itself stays available for session token/cost
@@ -772,30 +777,6 @@ pub struct AppView {
     pub dashboard_local_sessions: Vec<crate::app::roster::RosterEntry>,
     /// Whether the dashboard is currently loading local sessions (non-leader mode).
     pub dashboard_sessions_loading: bool,
-    /// The single SQLite workspace connection owned by this pager process.
-    /// Opened lazily only after dashboard v2 is entered.
-    pub workspace_store: Option<xai_grok_dashboard_store::WorkspaceStore>,
-    /// Initial workspace view read from [`Self::workspace_store`].
-    pub workspace_snapshot: Option<xai_grok_dashboard_store::WorkspaceSnapshot>,
-    /// Prevents duplicate open/snapshot effects while the first read is pending.
-    pub workspace_store_loading: bool,
-    /// Agent metadata changed after workspace initialization and needs a scan.
-    pub workspace_sync_requested: bool,
-    /// The single store handle is currently owned by an async write effect.
-    pub workspace_write_in_flight: bool,
-    /// A newer read-only schema was opened; suppress writes but keep reads.
-    pub workspace_writes_disabled: bool,
-    /// Exact metadata payloads that have consumed their one automatic retry.
-    pub workspace_retry_metadata: std::collections::HashMap<
-        xai_grok_dashboard_store::SessionId,
-        xai_grok_dashboard_store::MemberMetadata,
-    >,
-    /// Last metadata payloads that exhausted or cannot use their retry. An
-    /// identical payload stays suppressed until its agent metadata changes.
-    pub workspace_failed_metadata: std::collections::HashMap<
-        xai_grok_dashboard_store::SessionId,
-        xai_grok_dashboard_store::MemberMetadata,
-    >,
     /// Server-authoritative shared prompt queues, keyed by `sessionId`
     /// Reconciled from `x.ai/queue/changed` broadcasts so
     /// every client renders the same ordered queue (including prompts queued
@@ -821,13 +802,6 @@ pub struct AppView {
     /// non-selectable headers. Gated by `GROK_SESSION_PICKER_GROUPED` env var
     /// or remote settings `session_picker_grouped`; defaults to `false`.
     pub session_picker_grouped: bool,
-    /// Startup-only seed for `AgentView::scheduler_background_loops`, resolved
-    /// once from the config layers plus the remote tier known at connect.
-    /// Read only until a session's own value arrives on its `session/new` /
-    /// `session/load` response, and by the session-less dashboard. Never
-    /// refreshed afterwards — the authoritative value is per session, pinned by
-    /// the shell when that session's actor spawned.
-    pub scheduler_background_loops_seed: bool,
     /// Whether Ctrl+C before first server activity rewinds the prompt
     /// back into the input box. Gated by `GROK_CANCEL_REWIND` env /
     /// `[features] cancel_rewind` config / remote settings flag.
@@ -863,6 +837,8 @@ pub struct AppView {
     /// Whether the welcome screen prompt is currently capturing focus (user typed in it).
     /// Focus state of the home composer (Escape unfocuses; arrows then drive the menu). Any printable key leaves home either way.
     pub welcome_prompt_focused: bool,
+    /// Session created for the current home screen.
+    pub home_session_agent: Option<AgentId>,
     /// Sticky flag: set once the user types in the welcome prompt, hides the
     /// tip for the rest of the session (even if the input is cleared).
     pub welcome_tip_typing_dismissed: bool,
@@ -1389,6 +1365,11 @@ fn paint_welcome_toast(
         }
         col = col.saturating_add(ch_w.max(1));
     }
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum UnconsumedInputScope {
+    All,
+    QuitAndResize,
 }
 impl AppView {
     fn handle_dashboard_session_picker_input(&mut self, ev: &Event) -> Option<InputOutcome> {
@@ -2016,6 +1997,7 @@ impl AppView {
             session_recap_available: false,
             shell_feedback_trace_offer: false,
             feedback_trace_choice_latched: false,
+            feedback_trace_upload_pending: None,
             tutorial: None,
             dashboard: None,
             dashboard_return: None,
@@ -2355,11 +2337,11 @@ impl AppView {
             ActiveView::Welcome | ActiveView::AgentDashboard => None,
         }
     }
-    /// Unused optimistic session kept behind Welcome. Not the session the user left.
+    /// Unused optimistic session kept behind Welcome.
     pub fn home_session(&self) -> Option<&AgentView> {
         self.home_session_agent.and_then(|id| self.agents.get(&id))
     }
-    /// True when Welcome is still a cold launch: no agents, or only the unused home husk.
+    /// True when Welcome is still a cold launch.
     pub fn only_unused_home_or_empty(&self) -> bool {
         match self.home_session_agent {
             None => self.agents.is_empty() && self.next_agent_id == 0,

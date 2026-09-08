@@ -33,6 +33,12 @@ use super::{PagerArgs, PagerTerminal, acp_handler, dispatch, effects};
 /// During a continuous terminal drag, dozens of resize events fire per second,
 /// and each would rebuild the layout of every entry. One deferred draw runs
 /// after the size stabilizes instead.
+/// Whether authenticated interactive startup should create the unused home session.
+pub(crate) fn should_create_home_on_authenticated_startup(app: &AppView) -> bool {
+    matches!(app.active_view, ActiveView::Welcome)
+        && app.session_startup_allowed()
+        && !app.is_access_blocked()
+}
 const RESIZE_DEBOUNCE: Duration = Duration::from_millis(16);
 
 /// A resize queues a forced status-line re-run, and the script is told the
@@ -257,6 +263,8 @@ pub(crate) struct TerminalState {
 pub(crate) struct RunResult {
     pub exit_info: Option<super::ExitInfo>,
     pub quit_for_update: bool,
+    /// stderr line to print after the TUI is restored (failed Welcome trust save).
+    pub trust_quit_error: Option<String>,
     /// When set, the process should re-exec into the other screen mode after
     /// terminal restore. See `/minimal` and `/fullscreen`.
     pub relaunch: Option<super::app_view::ScreenModeRelaunch>,
@@ -290,11 +298,6 @@ struct AgentLoadOutcome {
     /// client is driving mid-reconnect, adopted at finalize (mirrors the
     /// `SessionLoaded` adoption in `dispatch.rs`).
     running_prompt_id: Option<String>,
-    /// `x.ai/schedulerBackgroundLoops` from the reload response. A reconnect
-    /// re-spawns the session actor, which re-pins the fire mode, so the
-    /// pre-reconnect value can be stale — adopt the reloaded one or `/loop`
-    /// describes a runtime the new actor will not use.
-    scheduler_background_loops: Option<bool>,
 }
 
 /// Fields of the reconnect `session/load`, derived from the agent being
@@ -1651,17 +1654,6 @@ pub(crate) async fn run(
         .value,
     );
 
-    // Pre-arrival seed only. The authoritative per-session value rides the
-    // `session/new` / `session/load` response, but `/loop` can be reached from
-    // the session-less dashboard and from a session whose response has not
-    // landed yet; both need an answer now, and this is the same resolver the
-    // shell runs at spawn, so the seed agrees with the flag as it stands today.
-    app.scheduler_background_loops_seed =
-        xai_grok_shell::util::config::resolve_scheduler_background_loops(
-            remote_settings
-                .as_ref()
-                .and_then(|s| s.scheduler_background_loops),
-        );
 
     app.usage_billing_redirect_url = remote_settings
         .as_ref()
@@ -2149,12 +2141,9 @@ pub(crate) async fn run(
         None
     };
 
-    // Leader-mode roster poll (FleetView dashboard). Only fires while the
-    // dashboard is open AND we're connected via a leader. Armed to fire
-    // immediately at loop start so an already-open dashboard refreshes
-    // without waiting a full interval.
-    const ROSTER_POLL_INTERVAL: Duration = Duration::from_secs(1);
-    let mut roster_poll_at: Option<Instant> = Some(Instant::now());
+    // Shared cadence for v1 roster refresh and v2 foreign-commit detection.
+    const DASHBOARD_POLL_INTERVAL: Duration = Duration::from_secs(1);
+    let mut dashboard_poll_at: Option<Instant> = Some(Instant::now());
 
     // Pre-generate the automatic "return-from-away" recap while the terminal is
     // unfocused, so it's already in the scrollback (instant) when the user
@@ -2624,18 +2613,11 @@ pub(crate) async fn run(
             app.gboom_release_all_games();
         }
 
-        // Re-arm the dashboard roster poll when the dashboard is open but the
-        // poll has gone dormant — i.e. the dashboard was just opened. The poll
-        // arm leaves `roster_poll_at = None` only when it fired with the
-        // dashboard closed, so this fires an immediate refresh exactly on the
-        // closed→open transition rather than every iteration. Applies in both
-        // modes: leader mode polls the live roster, non-leader mode polls the
-        // local on-disk idle-session list.
-        if !app.workspace_dashboard_enabled
-            && roster_poll_at.is_none()
-            && matches!(app.active_view, ActiveView::AgentDashboard)
-        {
-            roster_poll_at = Some(Instant::now());
+        let dashboard_open = matches!(app.active_view, ActiveView::AgentDashboard);
+        if !dashboard_open {
+            dashboard_poll_at = None;
+        } else if dashboard_poll_at.is_none() {
+            dashboard_poll_at = Some(Instant::now());
         }
 
         // (Re-)arm the subscription watch on the dormant→wanted transition
@@ -3186,13 +3168,8 @@ pub(crate) async fn run(
                 }
             }
 
-            _ = roster_poll => {
-                roster_poll_at = None;
-                // Only poll while the dashboard is open. When it is not active
-                // we deliberately do NOT re-arm, so the loop isn't woken once
-                // per second forever. In leader mode we poll the live FleetView
-                // roster; outside leader mode we poll the local on-disk
-                // idle-session list so the dashboard still shows idle sessions.
+            _ = dashboard_poll => {
+                dashboard_poll_at = None;
                 let dashboard_open = matches!(app.active_view, ActiveView::AgentDashboard);
                 if dashboard_open {
                     let effects = if app.workspace_dashboard_enabled {
@@ -3566,11 +3543,6 @@ pub(crate) async fn run(
                 for id in &pending.agent_ids {
                     let (ok, running_prompt_id) = loads.remove(id).unwrap_or((false, None));
                     if let Some(agent) = app.agents.get_mut(id) {
-                        // The reloaded actor re-pinned the fire mode; a failed
-                        // load leaves the previous value rather than guessing.
-                        if let Some(mode) = scheduler_background_loops {
-                            agent.scheduler_background_loops = Some(mode);
-                        }
                         agent.finalize_reload_and_maybe_adopt(
                             pending.generation,
                             ok,
@@ -4930,6 +4902,13 @@ fn process_effects(
 ) -> bool {
     let flags = session_flags_for_effects(app, &effs);
     for mut eff in effs {
+        if matches!(eff, super::actions::Effect::ResetMouseReporting) {
+            if crate::app::MOUSE_CAPTURE_ENABLED.load(std::sync::atomic::Ordering::Acquire) {
+                app.escape_writer.emit_command(crossterm::event::DisableMouseCapture);
+                app.escape_writer.emit_command(crossterm::event::EnableMouseCapture);
+            }
+            continue;
+        }
         stamp_billing_request(&mut eff, app);
         let (quit, meta) = effects::execute(eff, tasks, &app.acp_tx, &app.cwd, &flags, progress_tx);
         // Install auth abort handle if the current auth state still matches.

@@ -1368,6 +1368,7 @@ fn newer_billing_result_wins_over_older_overlapping_request() {
             balance: Some(test_bal(25.0)),
             subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+            nonce: Default::default(),
         }),
         &mut app,
     );
@@ -1380,6 +1381,7 @@ fn newer_billing_result_wins_over_older_overlapping_request() {
             silent: false,
             subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+            nonce: Default::default(),
         }),
         &mut app,
     );
@@ -1404,6 +1406,7 @@ fn older_app_failure_does_not_change_cadence_after_newer_success() {
             balance: Some(test_bal(30.0)),
             subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+            nonce: Default::default(),
         }),
         &mut app,
     );
@@ -1463,6 +1466,7 @@ fn old_account_result_is_ignored_after_billing_surface_returns() {
             balance: Some(test_bal(99.0)),
             subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+            nonce: Default::default(),
         }),
         &mut app,
     );
@@ -1493,6 +1497,7 @@ fn hidden_billing_surface_stops_polling_and_ignores_late_result() {
             balance: Some(test_bal(99.0)),
             subscription_tier: None,
             autotopup: crate::views::credit_bar::AutoTopupFetch::Cleared,
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1566,6 +1571,7 @@ fn old_account_billing_error_is_ignored() {
             request: old_request,
             error: "old account failed".into(),
             silent: false,
+            nonce: Default::default(),
         }),
         &mut app,
     );
@@ -2107,6 +2113,7 @@ fn background_billing_reply_does_not_settle_modal_loading() {
     dispatch(
         Action::TaskComplete(TaskResult::BillingError {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             error: "background boom".to_string(),
             silent: true,
             nonce: Default::default(),
@@ -2131,6 +2138,7 @@ fn billing_error_surfaces_in_usage_modal_without_scrollback() {
     dispatch(
         Action::TaskComplete(TaskResult::BillingError {
             agent_id: AgentId(0),
+            request: next_billing_request(&mut app),
             error: "billing boom".to_string(),
             silent: true,
             nonce,

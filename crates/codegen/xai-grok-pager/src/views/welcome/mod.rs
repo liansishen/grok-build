@@ -799,6 +799,7 @@ pub fn render_welcome(
             let info = PromptInfo {
                 model_name: params.model_name,
                 flags: params.flags,
+                usage_status: None,
                 multiline: false,
                 usage_warning: None,
                 usage_warning_critical: false,
@@ -1077,11 +1078,17 @@ fn render_welcome_trust(
 }
 
 /// Header text shared by Loopback and Command auth modes.
-const AUTH_HEADER: &str = "A browser window will open for authentication.";
+fn auth_header() -> &'static str {
+    xai_grok_i18n::t("auth.browser_open_header")
+}
 /// Header text for the device-flow auth mode.
-const DEVICE_AUTH_HEADER: &str = "Approve in your browser to finish signing in.";
+fn device_auth_header() -> &'static str {
+    xai_grok_i18n::t("auth.device_header")
+}
 /// Caption beneath the device code.
-const DEVICE_CODE_CAPTION: &str = "Make sure your browser shows this code.";
+fn device_code_caption() -> &'static str {
+    xai_grok_i18n::t("auth.device_code_caption")
+}
 
 /// Extract `user_code` from a device verification URL (`None` if absent or malformed).
 /// It is shown on-screen so the user can confirm it matches the browser before approving (anti-phishing).
@@ -1095,21 +1102,27 @@ fn extract_user_code(url: &str) -> Option<&str> {
     valid.then_some(code)
 }
 /// Clickable copy prompt shared by Loopback and Command auth modes.
-const AUTH_COPY_PREFIX: &str = "If it doesn't open, click ";
-const AUTH_COPY_HERE: &str = "here";
-const AUTH_COPY_SUFFIX: &str = " to copy.";
+fn auth_copy_prefix() -> &'static str {
+    xai_grok_i18n::t("auth.copy_prefix")
+}
+fn auth_copy_here() -> &'static str {
+    xai_grok_i18n::t("auth.copy_here")
+}
+fn auth_copy_suffix() -> &'static str {
+    xai_grok_i18n::t("auth.copy_suffix")
+}
 
 /// Build the "click here to copy" line with "here" underlined in accent color.
 fn auth_copy_line(theme: &Theme) -> Line<'static> {
     Line::from(vec![
-        Span::styled(AUTH_COPY_PREFIX, Style::default().fg(theme.gray_bright)),
+        Span::styled(auth_copy_prefix(), Style::default().fg(theme.gray_bright)),
         Span::styled(
-            AUTH_COPY_HERE,
+            auth_copy_here(),
             Style::default()
                 .fg(theme.accent_user)
                 .add_modifier(Modifier::UNDERLINED),
         ),
-        Span::styled(AUTH_COPY_SUFFIX, Style::default().fg(theme.gray_bright)),
+        Span::styled(auth_copy_suffix(), Style::default().fg(theme.gray_bright)),
     ])
     .alignment(Alignment::Center)
 }
@@ -1122,16 +1135,18 @@ fn auth_copy_preceding_rows(header: &str, inner_width: u16) -> u16 {
 
 /// Number of physical rows the copy line occupies when wrapped.
 fn auth_copy_line_rows(inner_width: u16) -> u16 {
-    let copy_len = AUTH_COPY_PREFIX.len() + AUTH_COPY_HERE.len() + AUTH_COPY_SUFFIX.len();
+    let copy_len = auth_copy_prefix().len() + auth_copy_here().len() + auth_copy_suffix().len();
     (copy_len as u16).div_ceil(inner_width)
 }
 
-const AUTH_FALLBACK_TEXT: &str = "Copying not working? Click here to show full URL.";
+fn auth_fallback_text() -> &'static str {
+    xai_grok_i18n::t("auth.show_full_url")
+}
 
 /// Build the fallback "show full URL" link line.
 fn auth_fallback_line(theme: &Theme) -> Line<'static> {
     Line::from(Span::styled(
-        AUTH_FALLBACK_TEXT,
+        auth_fallback_text(),
         Style::default()
             .fg(theme.gray)
             .add_modifier(Modifier::UNDERLINED),
@@ -1319,17 +1334,17 @@ fn render_browser_status_arm(
 
     // Device also parses the user code from the verification URL.
     let (header, waiting_text, user_code) = match kind {
-        BrowserStatusKind::Command => (AUTH_HEADER, "Waiting for login to complete...", None),
+        BrowserStatusKind::Command => (auth_header(), xai_grok_i18n::t("auth.waiting_login"), None),
         BrowserStatusKind::Device => (
-            DEVICE_AUTH_HEADER,
-            "Waiting for approval...",
+            device_auth_header(),
+            xai_grok_i18n::t("auth.waiting_approval"),
             auth_url.and_then(extract_user_code),
         ),
     };
 
     let header_rows = (header.len() as u16).div_ceil(inner_width);
     let code_extra = if user_code.is_some() {
-        let caption_rows = (DEVICE_CODE_CAPTION.len() as u16).div_ceil(inner_width);
+        let caption_rows = (device_code_caption().len() as u16).div_ceil(inner_width);
         1 + 1 + 1 + caption_rows // blank + code + blank + caption
     } else {
         0
@@ -1372,7 +1387,7 @@ fn render_browser_status_arm(
         lines.push(Line::default());
         lines.push(
             Line::from(Span::styled(
-                DEVICE_CODE_CAPTION,
+                device_code_caption(),
                 Style::default().fg(theme.gray),
             ))
             .alignment(Alignment::Center),
@@ -1437,7 +1452,7 @@ fn render_welcome_authenticating(
             }
 
             let msg_height = if auth_url.is_some() {
-                let header_rows = (AUTH_HEADER.len() as u16).div_ceil(inner_width);
+                let header_rows = (auth_header().len() as u16).div_ceil(inner_width);
                 header_rows + auth_copy_block_rows(inner_width)
             } else {
                 1u16
@@ -1462,7 +1477,7 @@ fn render_welcome_authenticating(
             if auth_url.is_some() {
                 lines.push(
                     Line::from(Span::styled(
-                        AUTH_HEADER,
+                        auth_header(),
                         Style::default().fg(theme.gray_bright),
                     ))
                     .alignment(Alignment::Center),
@@ -1483,7 +1498,7 @@ fn render_welcome_authenticating(
                 .render(msg_area, buf);
 
             let (click_rect, fallback_rect) = if auth_url.is_some() {
-                auth_hit_rects(msg_area, h_pad, inner_width, AUTH_HEADER, 0)
+                auth_hit_rects(msg_area, h_pad, inner_width, auth_header(), 0)
             } else {
                 (None, None)
             };
@@ -2234,6 +2249,7 @@ fn render_welcome_done(
             model_name: p.model_name,
             flags: p.flags,
             multiline: false,
+            usage_status: None,
             usage_warning: usage_warning_text.as_deref(),
             usage_warning_critical,
         };

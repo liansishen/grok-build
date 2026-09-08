@@ -1,5 +1,6 @@
 #![cfg_attr(rustfmt, rustfmt::skip)]
     use super::*;
+    use crate::app::acp_handler::permissions::build_permission_display;
 
     #[test]
     fn mcp_args_lines_extracts_planned_tool_input() {

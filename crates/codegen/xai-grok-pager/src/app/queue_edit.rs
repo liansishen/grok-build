@@ -984,6 +984,7 @@ mod tests {
         let ctx = crate::app::actions::ClipboardPasteContext {
             target: crate::app::actions::ClipboardPasteTarget::AgentPrompt {
                 agent_id: agent.session.id,
+                from_feedback_pane: false,
                 images_dir: None,
             },
             source: crate::app::actions::ClipboardPasteSource::ClipboardKey {

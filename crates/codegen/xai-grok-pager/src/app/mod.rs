@@ -104,7 +104,7 @@ static GBOOM_KEYBOARD_PUSHED: AtomicBool = AtomicBool::new(false);
 /// release events — required to track several keys held at once. No-op
 /// unless the Kitty keyboard protocol is active. Balanced by
 /// [`pop_gboom_keyboard_flags`] (and by `restore_terminal` on teardown).
-pub(crate) fn push_gboom_keyboard_flags() {
+pub(crate) fn push_gboom_keyboard_flags(writer: &EscapeWriter) {
     if !kitty_flags_pushed() || GBOOM_KEYBOARD_PUSHED.swap(true, Ordering::AcqRel) {
         return;
     }
@@ -711,15 +711,17 @@ pub async fn run(
     let startup_start = std::time::Instant::now();
     let raw_config = xai_grok_shell::config::load_effective_config()
         .map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
-    let grok_com_config = match xai_grok_shell::agent::config::Config::new_from_toml_cfg(
-        &raw_config,
-    ) {
-        Ok(c) => c.grok_com_config,
-        Err(e) => {
-            tracing::warn!(error = %e, "failed to parse config for auth refresh, using defaults");
-            xai_grok_login::GrokComConfig::default()
-        }
-    };
+    let (grok_com_config, proxy_base_url) =
+        match xai_grok_shell::agent::config::Config::new_from_toml_cfg(&raw_config) {
+            Ok(c) => (c.grok_com_config, c.endpoints.proxy_url()),
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to parse config for auth refresh, using defaults");
+                (
+                    xai_grok_login::GrokComConfig::default(),
+                    xai_grok_shell::agent::config::EndpointsConfig::default().proxy_url()
+                )
+            }
+        };
     let refreshed_auth = tokio::time::timeout(
         xai_grok_shell::http::STARTUP_AUTH_REFRESH_TIMEOUT,
         xai_grok_login::try_ensure_fresh_auth(&grok_com_config, proxy_base_url),
@@ -791,7 +793,7 @@ pub async fn run(
     if args.trust {
         use xai_grok_workspace::folder_trust::{grant_folder_trust, report_cli_trust_grant};
         match std::env::current_dir() {
-            Ok(cwd) => xai_grok_shell::agent::folder_trust::grant_folder_trust(&cwd),
+            Ok(cwd) => report_cli_trust_grant(&grant_folder_trust(&cwd)),
             Err(e) => {
                 tracing::warn!(error = %e, "--trust: failed to resolve cwd; folder not trusted");
                 eprintln!("error: --trust: failed to resolve cwd; folder not trusted: {e}");
@@ -1714,6 +1716,8 @@ fn init_terminal(
         startup_typeahead,
     })
 }
+/// How long teardown waits for the writer thread to drain before detaching it. Same order as the panic hook's grace: a terminal that stopped reading must not turn `/quit` into a hang.
+const WRITER_JOIN_GRACE: std::time::Duration = std::time::Duration::from_secs(2);
 /// Drop the terminal (closing the writer mpsc channel) and join the
 /// writer thread. After this returns, subsequent direct stderr writes
 /// are guaranteed to land strictly after every queued frame.
@@ -1791,6 +1795,34 @@ fn emit_terminal_teardown_sequences(mode: ScreenMode, inline_cursor_row: Option<
     #[cfg(windows)]
     win_native_selection::restore_stdin_mode();
 }
+/// Run a best-effort teardown `f` on a helper thread, waiting at most `grace` for it.
+/// For paths where the stderr lock may be wedged (the panic hook; a restore whose writer thread is still parked in its tty write): an unbounded teardown would hang forever, never restoring raw mode. On timeout the helper is detached; the process is exiting anyway. Runs `f` inline if no thread can spawn.
+fn run_bounded_teardown(f: impl FnOnce() + Send + 'static, grace: std::time::Duration) {
+    let slot = std::sync::Arc::new(parking_lot::Mutex::new(Some(f)));
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    let worker_slot = std::sync::Arc::clone(&slot);
+    let spawned = std::thread::Builder::new()
+        .name("bounded-teardown".into())
+        .spawn(move || {
+            if let Some(f) = worker_slot.lock().take() {
+                f();
+            }
+            let _ = done_tx.send(());
+        });
+    match spawned {
+        Ok(_) => {
+            let _ = done_rx.recv_timeout(grace);
+        }
+        Err(_) => {
+            if let Some(f) = slot.lock().take() {
+                f();
+            }
+        }
+    }
+}
+/// Bound on teardown writes when the stderr lock may be wedged: the panic hook, and a restore
+/// whose writer thread is still parked in its tty write after a timed-out join.
+const TEARDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(2);
 /// Consumes `terminal` and `writer_thread`: queues a final fullscreen clear,
 /// drains every accepted frame, then emits teardown sequences. Teardown still
 /// runs if draining fails, so terminal state is restored before returning that

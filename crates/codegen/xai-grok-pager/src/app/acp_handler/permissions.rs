@@ -267,7 +267,7 @@ fn resolve_subagent_label(agent: &AgentView, session_id: &acp::SessionId) -> Opt
 /// Falls back to ACP-level `title`/`kind` fields when deserialization fails.
 ///
 /// Returns `(title, description, bash_command_raw)`.
-fn build_permission_display(
+pub(super) fn build_permission_display(
     req: &acp::RequestPermissionRequest,
     bash_highlights: Option<&BashCommandHighlights>,
     session_local_workspace: bool,
@@ -278,11 +278,19 @@ fn build_permission_display(
         serde_json::from_value::<xai_grok_tools::implementations::BashToolInput>(v.clone()).ok()
     });
 
+    let ask = hook_ask(req);
+    let acp_title = req
+        .tool_call
+        .fields
+        .title
+        .as_deref()
+        .map(|title| match &ask {
+            Some(ask) => ask.strip_prompt_header(title),
+            None => title,
+        });
+
     let raw_command = bash_input.as_ref().map(|b| b.command.clone()).or_else(|| {
-        req.tool_call
-            .fields
-            .title
-            .as_deref()
+        acp_title
             .and_then(|t| t.strip_prefix("Execute `"))
             .and_then(|t| t.strip_suffix('`'))
             .map(|s| s.to_string())
@@ -343,7 +351,7 @@ fn build_permission_display(
     };
 
     let title = qualify_permission_title_for_local_workspace(title, session_local_workspace);
-    let description = permission_description_lines(req);
+    let description = permission_description_lines(req, ask.as_ref());
     let bash_cmd = if is_execute { raw_command } else { None };
     (title, description, bash_cmd)
 }
@@ -366,14 +374,20 @@ fn qualify_permission_title_for_local_workspace(
     format!("{title} {suffix}")
 }
 
-/// Lines shown under the permission title: protected-edit note (if any), then
-/// MCP planned-argument lines (empty for bash/edit).
-fn permission_description_lines(req: &acp::RequestPermissionRequest) -> Vec<String> {
+/// Lines shown under the permission title: hook ask and protected-edit notes,
+/// then MCP planned-argument lines (empty for bash/edit).
+fn permission_description_lines(
+    req: &acp::RequestPermissionRequest,
+    hook_ask: Option<&xai_grok_workspace::permission::HookAsk>,
+) -> Vec<String> {
     let mut lines = mcp_args_lines(req);
     if is_edit_permission(req)
         && let Some(desc) = protected_edit_description(req)
     {
         lines.insert(0, desc);
+    }
+    if let Some(ask) = hook_ask {
+        lines.insert(0, ask.ask_line());
     }
     lines
 }
@@ -383,6 +397,16 @@ fn protected_edit_description(req: &acp::RequestPermissionRequest) -> Option<Str
     let protected: xai_grok_workspace::permission::ProtectedEditPermission =
         serde_json::from_value(serde_json::Value::Object(meta.clone())).ok()?;
     protected.description.filter(|s| !s.is_empty())
+}
+
+fn hook_ask(
+    req: &acp::RequestPermissionRequest,
+) -> Option<xai_grok_workspace::permission::HookAsk> {
+    let value = req
+        .meta
+        .as_ref()?
+        .get(xai_grok_workspace::permission::HOOK_ASK_META_KEY)?;
+    serde_json::from_value(value.clone()).ok()
 }
 
 /// Maximum stored lines for the MCP planned-arguments display. The overlay
@@ -487,6 +511,11 @@ fn cli_is_idle_for_recap(agent: &crate::app::agent_view::AgentView) -> bool {
     use crate::app::agent::BgTaskStatus;
 
     if !agent.session.state.is_idle() {
+        return false;
+    }
+
+    // Auto-wake turns keep session state idle while their response streams.
+    if agent.running_wake_turn.is_some() {
         return false;
     }
     if agent.session.in_flight_prompt.is_some() || agent.has_held_user_queue() {

@@ -422,10 +422,7 @@ fn btw_no_session_feedback_is_mode_specific() {
 /// A fresh install initializes before login, so the connection-time snapshot of the trace offer is `false`.
 /// The authenticate meta must refresh it or the first post-login `/feedback` silently skips the consent question.
 #[test]
-fn enter_feedback_mode_opens_local_question_pane() {
-    use crate::app::dispatch::feedback_question_label;
-    use crate::views::question_view::{LocalQuestionKind, QuestionFocus};
-
+fn auth_meta_refreshes_feedback_trace_offer_for_feedback_modal() {
     let mut app = test_app_with_agent();
     app.shell_feedback_trace_offer = false; // initialize ran logged-out
 
@@ -435,8 +432,23 @@ fn enter_feedback_mode_opens_local_question_pane() {
         ..Default::default()
     };
     app.apply_auth_meta(&meta);
-    // The modal reads the offer live at submit time, so refreshing the app-level flag is enough.
     assert!(app.feedback_trace_offer(), "login must refresh the offer");
+
+    let effects = dispatch(
+        Action::OpenFeedbackModal(crate::views::feedback_modal::OpenFeedbackModal {
+            text: Some("feedback draft".into()),
+            ..Default::default()
+        }),
+        &mut app,
+    );
+    assert!(
+        app.agents[&AgentId(0)].feedback_modal.is_some(),
+        "feedback must open the modal, not the retired question pane"
+    );
+    assert!(
+        effects.iter().any(|effect| matches!(effect, Effect::FeedbackDraftRequest { .. })),
+        "opening the feedback modal should request saved drafts"
+    );
 }
 
 /// A failed send reports the error and leaves the composer alone.
@@ -456,35 +468,9 @@ fn unknown_immediate_feedback_outcome_warns_against_duplicate_retry() {
         &mut app,
     );
 
-    let agent = app.agents.get(&id).unwrap();
-    let qv = agent
-        .question_view
-        .as_ref()
-        .expect("bare /feedback must open a question pane");
-    assert!(
-        matches!(qv.local_kind, Some(LocalQuestionKind::Feedback)),
-        "local kind should be Feedback, got {:?}",
-        qv.local_kind
-    );
-    assert_eq!(qv.questions.len(), 1);
-    assert!(
-        qv.questions[0].options.is_empty(),
-        "feedback pane is freeform-only"
-    );
-    assert_eq!(
-        qv.questions[0].question, feedback_question_label(),
-        "pane label is the whole question; guidance is the composer placeholder"
-    );
-    assert_eq!(
-        qv.focus,
-        QuestionFocus::InputMode,
-        "should start ready to type freeform"
-    );
-    assert_eq!(
-        agent.prompt_input_mode,
-        crate::app::agent_view::PromptInputMode::Bash,
-        "the mode rides with the draft: the stash carries no mode, so clearing it here would return the draft to a plain composer"
-    );
+    let notice = last_system_text(&app, id);
+    assert!(notice.contains("may still complete"), "{notice}");
+    assert!(notice.contains("do not resend"), "{notice}");
 }
 
 #[test]

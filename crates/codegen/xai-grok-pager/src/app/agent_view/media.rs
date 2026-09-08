@@ -293,7 +293,7 @@ impl AgentView {
             let source_idx = if row
                 .buttons
                 .iter()
-                .any(|b| fits(b.col, b.label.as_str()))
+                .any(|b| fits(b.col, b.label))
             {
                 let idx = self.inline_media_hits.mermaid_sources.len();
                 self.inline_media_hits.mermaid_sources.push(source);
@@ -302,11 +302,11 @@ impl AgentView {
                 None
             };
             for btn in row.buttons {
-                if !fits(btn.col, btn.label.as_str()) {
+                if !fits(btn.col, btn.label) {
                     continue;
                 }
                 let bx = rect.x.saturating_add(btn.col);
-                let width = UnicodeWidthStr::width(btn.label.as_str()) as u16;
+                let width = UnicodeWidthStr::width(btn.label) as u16;
                 let hit = Rect {
                     x: bx,
                     y: rect.y,
@@ -333,7 +333,7 @@ impl AgentView {
 
             // Trailing dim `rendering…` hint after the buttons (not clickable).
             if let Some((col, status)) = row.status
-                && fits(col, status.as_str())
+                && fits(col, status)
             {
                 buf.set_string_safe(
                     rect.x.saturating_add(col),

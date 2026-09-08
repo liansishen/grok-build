@@ -55,7 +55,6 @@ pub fn overlay_cycle_order(
         agents,
         &state.pinned,
         &state.reorder,
-        None,
         state.grouping,
         &state.filter,
         home,

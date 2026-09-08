@@ -33,6 +33,25 @@ pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_MAX: i64 = 60;
 // `theme`, `auto_dark_theme`, and `auto_light_theme`; the auto-* sub-pickers drop "auto" to avoid a circular
 // reference.
 
+/// UI language catalog (`[ui].language`).
+const UI_LANGUAGE_CHOICES: &[EnumChoice] = &[
+    EnumChoice {
+        canonical: "auto",
+        display: "System",
+        description: "Follow the operating system language.",
+    },
+    EnumChoice {
+        canonical: "en",
+        display: "English",
+        description: "English interface.",
+    },
+    EnumChoice {
+        canonical: "zh-CN",
+        display: "简体中文",
+        description: "Simplified Chinese interface.",
+    },
+];
+
 /// Full theme catalog including the "auto" meta-variant; only `theme` uses it.
 const THEME_CHOICES: &[EnumChoice] = &[
     EnumChoice {
@@ -676,6 +695,21 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+        SettingMeta {
+            key: "language",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shell,
+            label: "UI language",
+            description: "Language for the Grok Build interface. System follows your OS locale when Chinese or English is detected.",
+            keywords: &["language", "locale", "i18n", "l10n", "chinese", "english", "中文", "ui"],
+            kind: SettingKind::Enum {
+                default: "auto",
+                choices: UI_LANGUAGE_CHOICES,
+                supports_preview: false,
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
         // --- theme and auto themes -------------------------------------------
         SettingMeta {
             key: "theme",
@@ -850,6 +884,21 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+        SettingMeta {
+            key: "web_search_model",
+            category: SettingCategory::Models,
+            owner: SettingOwner::Shell,
+            label: "Web Search model",
+            description: "Model used by Web Search. This is independent from the active chat model. Pick `(no override)` to use the configured default. Restart required to apply.",
+            keywords: &["web", "search", "model", "tool", "research"],
+            kind: SettingKind::DynamicEnum {
+                default: "",
+                source: DynamicEnumSource::ActiveModelCatalog,
+                supports_preview: false,
+            },
+            restart_required: true,
+            hidden_in_minimal: false,
+        },
         // SHARED. `u16` in UiConfig, widened to `i64` for registry.
         // Width changes apply on the next render frame.
         SettingMeta {
@@ -909,6 +958,35 @@ pub fn default_settings() -> Vec<SettingMeta> {
             ],
             kind: SettingKind::Bool {
                 default: ui_default.show_thinking_blocks.unwrap_or(true),
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "show_session_usage_bar",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shell,
+            label: "Live session usage on prompt",
+            description: "Show this session's total tokens (and estimated cost when \
+                          model prices are configured) to the left of the model name \
+                          on the prompt line. Cost uses server-provided pricing when present, \
+                          otherwise local [model.*] price fields.",
+            keywords: &["usage", "tokens", "cost", "price", "session", "billing", "status", "bar"],
+            kind: SettingKind::Bool {
+                default: ui_default.show_session_usage_bar.unwrap_or(false),
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "show_request_metrics",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shell,
+            label: "Per-request metrics in scrollback",
+            description: "After each model response, show first-token time, generation rate, duration, and token counts in the conversation.",
+            keywords: &["metrics", "ttft", "tps", "first", "token", "latency", "speed", "request", "usage"],
+            kind: SettingKind::Bool {
+                default: ui_default.show_request_metrics_enabled(),
             },
             restart_required: false,
             hidden_in_minimal: false,
@@ -1587,6 +1665,21 @@ pub fn default_settings() -> Vec<SettingMeta> {
             kind: SettingKind::DynamicEnum {
                 default: "",
                 source: DynamicEnumSource::ActiveModelCatalog,
+                supports_preview: false,
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "fork_secondary_reasoning_effort",
+            category: SettingCategory::Models,
+            owner: SettingOwner::Shell,
+            label: "Fork secondary reasoning effort",
+            description: "Reasoning effort for forked/secondary agents. Options follow the secondary model (or the current model when no secondary model is set). Pick `(no override)` to clear.",
+            keywords: &["fork", "secondary", "reasoning", "effort", "thinking", "subagent", "model"],
+            kind: SettingKind::DynamicEnum {
+                default: "",
+                source: DynamicEnumSource::ForkSecondaryReasoningEffort,
                 supports_preview: false,
             },
             restart_required: false,

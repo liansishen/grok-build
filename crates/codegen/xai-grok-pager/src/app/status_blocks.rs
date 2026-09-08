@@ -110,12 +110,12 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
     });
     for info in subs {
         let (type_label, desc) = format_subagent_label(info);
-        let status = if info.pending_kill {
+        let status = if info.attempt.pending_kill {
             t("tasks.status_stopping")
         } else if info.is_running() {
             t("tasks.workflow.running")
         } else {
-            match info.status.as_deref() {
+            match info.attempt.status.as_deref() {
                 Some("done" | "complete" | "completed") | None => t("tasks.status_done"),
                 Some("failed") => t("tasks.status_failed"),
                 Some("stopping") => t("tasks.status_stopping"),

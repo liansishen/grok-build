@@ -22,6 +22,11 @@ use xai_grok_shell::agent::config::UiConfig;
 /// Public display title of the modal, also used by `views/modal.rs::ActiveModal::message` so renames stay in one place.
 pub const MODAL_TITLE: &str = "Settings";
 
+/// Localized title used by the settings modal and command palette.
+pub fn modal_title() -> &'static str {
+    xai_grok_i18n::t("settings.modal.title")
+}
+
 /// Width of the `"─ "` leading decoration before the title in the modal's top border.
 /// Used to compute the breadcrumb hit-rect x offset.
 pub(super) const TITLE_LEADING_DECORATION_W: u16 = 2; // `─ `: 1 cell box-drawing + 1 cell space.
@@ -865,6 +870,8 @@ pub(super) fn action_for_bool(key: SettingKey, new: bool) -> Option<Action> {
         "compact_mode" => Some(Action::SetCompactMode(new)),
         "show_timestamps" => Some(Action::SetTimestamps(new)),
         "show_timeline" => Some(Action::SetTimeline(new)),
+        "show_session_usage_bar" => Some(Action::SetShowSessionUsageBar(new)),
+        "show_request_metrics" => Some(Action::SetShowRequestMetrics(new)),
         "simple_mode" => Some(Action::SetSimpleMode(new)),
         "contextual_hints.undo" => Some(Action::SetContextualHintUndo(new)),
         "contextual_hints.plan_mode" => Some(Action::SetContextualHintPlanMode(new)),
@@ -955,6 +962,7 @@ pub(super) fn action_for_enum_commit(key: SettingKey, choice: &'static str) -> O
         "screen_mode" => Some(Action::SetScreenMode(choice.to_string())),
         "voice_capture_mode" => Some(Action::SetVoiceCaptureMode(choice.to_string())),
         "voice_stt_language" => Some(Action::SetVoiceSttLanguage(choice.to_string())),
+        "language" => Some(Action::SetUiLanguage(choice.to_string())),
         "render_mermaid" => {
             crate::appearance::RenderMermaid::from_canonical(choice).map(Action::SetRenderMermaid)
         }
@@ -1000,6 +1008,28 @@ pub(super) fn action_for_string(
                     .map(Action::SetForkSecondaryModel)
             }
         }
+        "web_search_model" => {
+            if value.is_empty() {
+                Some(Action::ClearWebSearchModel)
+            } else {
+                snapshot
+                    .resolve_model_name(&value)
+                    .map(Action::SetWebSearchModel)
+            }
+        }
+        "fork_secondary_reasoning_effort" => {
+            if value.is_empty() {
+                Some(Action::ClearForkSecondaryReasoningEffort)
+            } else if snapshot
+                .fork_secondary_effort_options
+                .iter()
+                .any(|(canonical, _, _)| canonical == &value)
+            {
+                Some(Action::SetForkSecondaryReasoningEffort(value))
+            } else {
+                None
+            }
+        }
 
         _ => {
             let _ = value;
@@ -1015,6 +1045,9 @@ pub(super) fn action_for_int(key: SettingKey, value: i64) -> Option<Action> {
         "max_thoughts_width" => Some(Action::SetMaxThoughtsWidth(value)),
         "scroll_speed" => Some(Action::SetScrollSpeed(value)),
         "scroll_lines" => Some(Action::SetScrollLines(value)),
+        "usage_refresh_interval_minutes" => {
+            Some(Action::SetUsageRefreshIntervalMinutes(value))
+        }
         _ => None,
     }
 }

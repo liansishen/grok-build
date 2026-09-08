@@ -664,7 +664,7 @@ mod tests {
     fn formats_500_json_dump() {
         let formatted = format_request_failure(
             None,
-            Some("api"),
+            Some(WireErrorType::Api),
             r#"API error (status 500 Internal Server Error): {"error":"upstream exploded","request_id":"abc"}"#,
         );
         assert_eq!(formatted.status, Some(500));
@@ -688,7 +688,7 @@ mod tests {
     fn keeps_parsed_provider_reason_on_4xx() {
         let formatted = format_request_failure(
             Some(400),
-            Some("api"),
+            Some(WireErrorType::Api),
             "API error (status 400 Bad Request): invalid_request_error: \
              Values detected in request that violate rules: JWT Token",
         );
@@ -703,12 +703,58 @@ mod tests {
     }
 
     #[test]
+    fn untyped_truncation_text_recovers_truncation_copy() {
+        // Pre-`errorKind` terminals deliver only the raw string; the literal pins the historical wire bytes.
+        let formatted = format_request_failure(None, None, "response truncated by max_tokens");
+        assert_eq!(
+            formatted.message(),
+            "Response truncated: The model hit its output limit."
+        );
+    }
+
+    #[test]
+    fn untyped_other_errors_keep_generic_fallback() {
+        let formatted = format_request_failure(None, None, "connection reset by peer");
+        assert_eq!(
+            formatted.message(),
+            "Request failed: connection reset by peer. Try sending again."
+        );
+    }
+
+    #[test]
+    fn untyped_unknown_kind_is_not_sniff_reclassified() {
+        // A genuinely unknown kind enters as `Some(Other)` and is not reclassified.
+        let kind = wire_error_kind(Some("a_future_kind"));
+        assert_eq!(kind, Some(WireErrorType::Other));
+        let formatted = format_request_failure(
+            None,
+            kind,
+            "a future failure quoting: response truncated by max_tokens",
+        );
+        assert_eq!(formatted.headline, "Request failed");
+        assert!(formatted.detail.contains("Try sending again."));
+    }
+
+    #[test]
+    fn untyped_status_bearing_raw_prefers_status_copy() {
+        // An HTTP status wins when raw text also quotes the truncation phrase.
+        let formatted = format_request_failure(
+            None,
+            None,
+            "API error (status 400 Bad Request): response truncated by max_tokens is not \
+             acceptable input",
+        );
+        assert_eq!(formatted.headline, "Bad request (400)");
+        assert!(!formatted.message().contains("output limit"));
+    }
+
+    #[test]
     fn dedups_action_already_in_client_error_detail() {
         // 4xx bodies are kept (unlike 5xx), and the canned action is dropped
         // when the server text already says it.
         let formatted = format_request_failure(
             None,
-            Some("api"),
+            Some(WireErrorType::Api),
             "API error (status 429 Too Many Requests): Plan limit reached, try again later",
         );
         assert_eq!(
@@ -721,7 +767,7 @@ mod tests {
     fn formats_403_with_server_message() {
         let formatted = format_request_failure(
             None,
-            Some("api"),
+            Some(WireErrorType::Api),
             "API error (status 403 Forbidden): Access to the chat endpoint is denied",
         );
         assert_eq!(
@@ -735,7 +781,7 @@ mod tests {
         // Re-auth is a dedicated banner; this helper only pretty-prints.
         let formatted = format_request_failure(
             Some(401),
-            Some("api"),
+            Some(WireErrorType::Api),
             r#"Unauthorized (401) from https://cli-chat-proxy.grok.com/v1/responses: {"error":"Invalid or expired credentials (auth_kind=bearer)"}"#,
         );
         assert_eq!(formatted.status, Some(401));
@@ -748,7 +794,7 @@ mod tests {
     fn formats_413() {
         let formatted = format_request_failure(
             None,
-            Some("api"),
+            Some(WireErrorType::Api),
             "API error (status 413 Payload Too Large): request too large",
         );
         assert_eq!(
@@ -761,7 +807,7 @@ mod tests {
     fn formats_openai_shaped_json() {
         let formatted = format_request_failure(
             None,
-            Some("api"),
+            Some(WireErrorType::Api),
             r#"API error (status 400 Bad Request): {"error":{"message":"model does not support tools","type":"invalid_request_error"}}"#,
         );
         assert_eq!(
@@ -774,7 +820,7 @@ mod tests {
     fn formats_idle_timeout_without_status() {
         let formatted = format_request_failure(
             None,
-            Some("idle_timeout"),
+            Some(WireErrorType::IdleTimeout),
             "inference idle timeout after 90s with no chunks",
         );
         assert_eq!(formatted.status, None);
@@ -792,14 +838,14 @@ mod tests {
         // "Request failed (401)" copy.
         let formatted = format_request_failure(
             None,
-            Some("auth_transient"),
+            Some(WireErrorType::AuthTransient),
             "Unauthorized (401): token refresh already in progress",
         );
         assert_eq!(formatted.status, None);
         assert_eq!(formatted.headline, "Authentication temporarily unavailable");
 
         // An explicit caller-parsed status still wins over the wire type.
-        let formatted = format_request_failure(Some(503), Some("idle_timeout"), "whatever");
+        let formatted = format_request_failure(Some(503), Some(WireErrorType::IdleTimeout), "whatever");
         assert_eq!(formatted.headline, "Service unavailable (503)");
     }
 
@@ -820,7 +866,7 @@ mod tests {
     fn formats_404_short_body_tells_user_to_switch_model() {
         let formatted = format_request_failure(
             None,
-            Some("api"),
+            Some(WireErrorType::Api),
             r#"API error (status 404 Not Found): {"error":"model does not exist"}"#,
         );
         assert_eq!(
@@ -833,7 +879,7 @@ mod tests {
     fn drops_model_catalog_dump() {
         let formatted = format_request_failure(
             None,
-            Some("api"),
+            Some(WireErrorType::Api),
             "API error (status 404 Not Found): model does not exist\n\n  Model:     grok-foo\n  Auth:      ApiKey\n  Version:   0.1.0\n  Available: grok-build\n\n  'grok-foo' is not in your available models.\n  Switch models with /model or start a new session.",
         );
         assert_eq!(formatted.status, Some(404));
@@ -865,7 +911,7 @@ mod tests {
     fn strips_reqwest_url_from_connection_error() {
         let formatted = format_request_failure(
             None,
-            Some("http"),
+            Some(WireErrorType::Http),
             "error sending request for url (https://server.grok.com/v1/responses)",
         );
         assert!(
@@ -884,7 +930,7 @@ mod tests {
     fn url_inside_json_body_does_not_mangle_detail() {
         let formatted = format_request_failure(
             None,
-            Some("api"),
+            Some(WireErrorType::Api),
             r#"API error (status 400 Bad Request): {"error":"fetch from https://example.com: connection refused"}"#,
         );
         assert_eq!(formatted.message(), "Bad request (400): connection refused");

@@ -5,6 +5,7 @@
 //! in three places.
 use super::cli::PagerArgs;
 use std::path::{Path, PathBuf};
+use xai_grok_login::{AuthManager, ensure_authenticated_or_noninteractive};
 pub(crate) fn stamp_phase_traceparent(meta: &mut Option<agent_client_protocol::Meta>) {
     let Some(span) = xai_grok_telemetry::startup::current_phase_span() else {
         return;
@@ -817,6 +818,28 @@ impl MaterializeCtx {
         }
     }
 }
+/// Cwd a new worktree session opens in (the interactive and headless SSOT).
+pub fn worktree_session_cwd(
+    worktree_root: &Path,
+    source_git_root: Option<&str>,
+    launch_cwd: &Path,
+) -> PathBuf {
+    let Some(git_root) = source_git_root else {
+        return worktree_root.to_path_buf();
+    };
+    let cwd_str = launch_cwd.to_string_lossy();
+    match cwd_str.strip_prefix(git_root) {
+        Some(relative) => {
+            let relative = relative.trim_start_matches('/');
+            if relative.is_empty() {
+                worktree_root.to_path_buf()
+            } else {
+                worktree_root.join(relative)
+            }
+        }
+        None => worktree_root.to_path_buf(),
+    }
+}
 /// Cwd where a forked child session is written (interactive + headless SSOT).
 ///
 /// When the parent lives under another directory, the fork effect sets
@@ -1280,7 +1303,7 @@ async fn restore_session_from_remote(
             )
         )
     })?;
-    let auth_manager = std::sync::Arc::new(AuthManager::new(
+    let auth_manager = std::sync::Arc::new(AuthManager::new_with_proxy_base_url(
         &grok_home(),
         agent_config.grok_com_config.clone(),
         agent_config.endpoints.proxy_url(),

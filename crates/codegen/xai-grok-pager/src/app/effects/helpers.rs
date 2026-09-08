@@ -27,7 +27,7 @@ pub(super) fn session_rpc_timeout() -> std::time::Duration {
 }
 /// `acp_send` bounded by [`session_rpc_timeout`]; on expiry, an error naming
 /// `action` instead of an eternal spinner.
-pub(super) async fn acp_send_bounded<R, T>(
+pub(crate) async fn acp_send_bounded<R, T>(
     request: T,
     tx: &tokio::sync::mpsc::UnboundedSender<R>,
     action: &str,
@@ -203,7 +203,7 @@ pub(super) fn format_restore_elapsed(d: std::time::Duration) -> String {
 /// CANONICAL wire parser for the worktree resume response. Any other code
 /// consuming the `codeRestored` / `restoreSummary` / `restoreDegree` shape
 /// MUST go through this function — do not re-implement.
-pub(super) fn parse_worktree_restore_payload(
+pub(crate) fn parse_worktree_restore_payload(
     result_obj: &serde_json::Value,
 ) -> (bool, Option<String>, Option<xai_grok_workspace::session::git::RestoreDegree>) {
     let code_restored = result_obj
@@ -261,25 +261,6 @@ pub(crate) fn parse_session_load_running_prompt_id(
         .and_then(|m| m.get("x.ai/runningPromptId"))
         .and_then(|v| v.as_str())
         .map(String::from)
-}
-/// CANONICAL wire parser for the `session/new` / `session/load` response
-/// `_meta[SCHEDULER_BACKGROUND_LOOPS_META_KEY]`.
-///
-/// Carries whether THIS session's scheduled fires run as detached background
-/// subagents, as the shell resolved it when the session's actor spawned. The
-/// pager stores it per session and must not re-resolve the setting: a
-/// mid-session flip would then make `/loop`'s wording describe a runtime the
-/// already-spawned session will never use. `None` when the shell predates the
-/// key (or for gateway chat sessions, which have no local fires), leaving the
-/// reader on the startup seed.
-pub(crate) fn parse_session_scheduler_background_loops(
-    resp_meta: Option<&acp::Meta>,
-) -> Option<bool> {
-    resp_meta
-        .and_then(|m| {
-            m.get(xai_grok_shell::session::SCHEDULER_BACKGROUND_LOOPS_META_KEY)
-        })
-        .and_then(|v| v.as_bool())
 }
 /// Whether `raw` is (or wraps) a disk-full / ENOSPC failure.
 pub(crate) fn is_disk_full_error(raw: &str) -> bool {

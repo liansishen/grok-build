@@ -2095,7 +2095,7 @@ impl AgentView {
                     return self.prompt_extensions_confirm(
                         xai_grok_i18n::t_fmt(
                             "ext_confirm.uninstall_plugin",
-                            &[("name", &name)],
+                            &[ ("name", &plugin.name) ],
                         ),
                         crate::views::extensions_modal::ConfirmationAction::Plugins(
                             xai_hooks_plugins_types::PluginsAction::Uninstall {
@@ -2119,7 +2119,7 @@ impl AgentView {
                     && let Some(plugin) = data.plugins.get(idx)
                 {
                     let action = xai_hooks_plugins_types::PluginsAction::Update {
-                        plugin_id: Some(plugin.id),
+                        plugin_id: Some(plugin.id.clone()),
                     };
                     return self.execute_modal_button_action(ButtonAction::PluginsAction(action));
                 }
@@ -3448,6 +3448,7 @@ mod extensions_action_target_tests {
             timeout_ms: 0,
             source_dir: source_dir.into(),
             disabled,
+            removable: false,
             pinned: false,
         }
     }
@@ -4347,6 +4348,7 @@ mod extensions_modal_confirmation_tests {
             timeout_ms: 0,
             source_dir: source_dir.into(),
             disabled: false,
+            removable: false,
             pinned: false,
         }
     }

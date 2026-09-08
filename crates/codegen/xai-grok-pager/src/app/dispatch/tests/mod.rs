@@ -41,7 +41,7 @@ use super::dashboard::{
     dispatch_open_dashboard, ensure_dashboard_state, resolve_location_input,
 };
 use super::modes::{
-    YOLO_ON_UNDER_PLAN_TOAST, active_agent_plan_nudge_state, dispatch_cycle_mode_and_sync,
+    active_agent_plan_nudge_state, dispatch_cycle_mode_and_sync,
     downgrade_displayed_auto_if_gated, permission_mode_toast, yolo_on_under_plan_toast,
 };
 use super::permissions::drain_permission_queue;
@@ -314,6 +314,7 @@ fn test_app() -> AppView {
         session_recap_available: false,
         shell_feedback_trace_offer: false,
         feedback_trace_choice_latched: false,
+        feedback_trace_upload_pending: None,
         tutorial: None,
         dashboard: None,
         dashboard_return: None,

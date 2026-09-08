@@ -112,32 +112,30 @@ pub(crate) fn format_still_running<'a>(
     use std::fmt::Write as _;
     let mut label = String::with_capacity(48);
     for (count, noun) in kinds {
-        if count == 0 {
-            continue;
-        }
-        if !label.is_empty() {
-            label.push_str(" \u{00b7} ");
-        }
+        if count == 0 { continue; }
+        if !label.is_empty() { label.push_str(" \u{00b7} "); }
         let plural = if count == 1 { "" } else { "s" };
         let _ = write!(label, "{count} {noun}{plural}");
     }
-    if label.is_empty() {
-        return None;
-    }
-    label.push_str(" still running");
-    Some(label)
+    if label.is_empty() { return None; }
+    Some(xai_grok_i18n::t_fmt("turn.watchers.still_running", &[("items", &label)]))
 }
 
 /// The idle watcher cue's label, e.g. `"1 command · 2 monitors · 1 loop · 1 subagent still running"`; `None` when no watchers are live.
 /// It leads with the counts (not an ambient "watching") so a glance under a "Worked for X" marker still reads as unfinished work.
 fn still_running_label(watchers: Watchers) -> Option<String> {
-    format_still_running([
-        (watchers.commands, "command"),
-        (watchers.monitors, "monitor"),
-        (watchers.loops, "loop"),
-        (watchers.subagents, "subagent"),
-        (watchers.workflows, "workflow"),
-    ])
+    let noun = |count, singular, plural| xai_grok_i18n::t(if count == 1 { singular } else { plural }).to_string();
+    let mut items = Vec::new();
+    for (count, singular, plural) in [
+        (watchers.commands, "turn.watchers.command", "turn.watchers.commands"),
+        (watchers.monitors, "turn.watchers.monitor", "turn.watchers.monitors"),
+        (watchers.loops, "turn.watchers.loop", "turn.watchers.loops"),
+        (watchers.subagents, "turn.watchers.subagent", "turn.watchers.subagents"),
+        (watchers.workflows, "turn.watchers.workflow", "turn.watchers.workflows"),
+    ] {
+        if count > 0 { items.push(format!("{count} {}", noun(count, singular, plural))); }
+    }
+    if items.is_empty() { None } else { Some(xai_grok_i18n::t_fmt("turn.watchers.still_running", &[("items", &items.join(" \u{00b7} "))])) }
 }
 
 /// Whether the turn is blocked in a wait the shell aborts as soon as the user sends a message.
@@ -260,12 +258,12 @@ pub fn render_turn_status(
         } else if held_queue > 0 {
             format!(" \u{00b7} {held_queue} queued")
         } else {
-            " \u{00b7} send a message to interrupt".to_string()
+            format!(" \u{00b7} {}", xai_grok_i18n::t("turn.status.interrupt_send"))
         };
         let cue = match (still_running_label(watchers), parked) {
             (Some(label), true) => Some(format!("{label}{parked_suffix}")),
             (Some(label), false) => Some(label),
-            (None, true) => Some(format!("waiting{parked_suffix}")),
+            (None, true) => Some(format!("{}{}", xai_grok_i18n::t("turn.status.waiting"), parked_suffix)),
             (None, false) => None,
         };
         if let Some(cue) = cue {
@@ -439,7 +437,7 @@ pub fn render_turn_status(
                     .strip_prefix("Ask: ")
                     .or_else(|| title.strip_prefix("Ask "))
                     .unwrap_or(title.as_str());
-                let msg = format!("Waiting on answers for {detail}");
+                let msg = xai_grok_i18n::t_fmt("turn.ask.waiting_answers", &[("detail", detail)]);
                 let display = truncate_str(&msg, available_for_label);
                 left_spans.push(Span::styled(display, activity_style));
             } else if let Some(desc) = description
@@ -454,7 +452,7 @@ pub fn render_turn_status(
                 left_spans.push(Span::styled(display, activity_style));
             } else if let Some(query) = title.strip_prefix("Web search: ") {
                 // Web search renders "Search " (muted) then the query (yellow)
-                let prefix = "Search ";
+                let prefix = xai_grok_i18n::t("turn.tool.prefix.search");
                 let prefix_width = prefix.width();
                 let query = query.trim_matches('"');
                 let max_query = available_for_label.saturating_sub(prefix_width).max(5);
@@ -463,7 +461,7 @@ pub fn render_turn_status(
                 left_spans.push(Span::styled(display, Style::default().fg(theme.command)));
             } else if let Some(url) = title.strip_prefix("Fetch: ") {
                 // Fetch tools render "Fetch " (muted) then the URL (yellow)
-                let prefix = "Fetch ";
+                let prefix = xai_grok_i18n::t("turn.tool.prefix.fetch");
                 let prefix_width = prefix.width();
                 let max_url = available_for_label.saturating_sub(prefix_width).max(5);
                 let display = truncate_str(url, max_url);
@@ -472,7 +470,7 @@ pub fn render_turn_status(
             } else {
                 // Normal tools render "Run " (muted) then the command (syntax-highlighted). Prettify it to
                 // `(Server) Action` so the spinner doesn't show the raw delimiter form.
-                let prefix = "Run ";
+                let prefix = xai_grok_i18n::t("turn.tool.prefix.run");
                 let pretty = mcp_pretty_name_if_qualified(title.as_str());
                 let detail = pretty.as_str();
                 let prefix_width = prefix.width();
@@ -585,7 +583,7 @@ fn compute_activity(
     match (state, activity) {
         (AgentState::TurnCancelling | AgentState::CommandCancelling { .. }, _) => (
             Style::default().fg(theme.accent_error),
-            "Cancelling…".to_string(),
+            xai_grok_i18n::t("turn.activity.cancelling").to_string(),
             false,
         ),
         // Goal-mode completion verification runs in-turn after the model stops streaming
@@ -593,17 +591,17 @@ fn compute_activity(
         // Label the whole window "Verifying…" so the multi-minute panel isn't mislabelled as the model responding (or a hung "Waiting…")
         (AgentState::TurnRunning, _) if goal_verifying => (
             Style::default().fg(theme.text_secondary),
-            "Verifying…".to_string(),
+            xai_grok_i18n::t("turn.activity.verifying").to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Thinking)) => (
             Style::default().fg(theme.text_secondary),
-            "Thinking…".to_string(),
+            xai_grok_i18n::t("turn.activity.thinking").to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::Responding)) => (
             Style::default().fg(theme.text_secondary),
-            "Responding…".to_string(),
+            xai_grok_i18n::t("turn.activity.responding").to_string(),
             false,
         ),
         (AgentState::TurnRunning, Some(TurnActivity::ToolRunning { title, description })) => {
@@ -624,7 +622,7 @@ fn compute_activity(
         }
         (AgentState::TurnRunning, Some(TurnActivity::AutoCompacting)) => (
             Style::default().fg(theme.text_secondary),
-            "Compacting…".to_string(),
+            xai_grok_i18n::t("turn.activity.compacting").to_string(),
             false,
         ),
         (
@@ -661,14 +659,14 @@ fn compute_activity(
         (AgentState::TurnRunning, None) if is_bash_turn => (
             // Bash turn: not inference, show generic "Running…".
             Style::default().fg(theme.text_secondary),
-            "Running…".to_string(),
+            xai_grok_i18n::t("turn.activity.running").to_string(),
             false,
         ),
         (AgentState::TurnRunning, None) => (
             // Fallback: a running inference turn with no resolved activity
             // The view resolves this gap into Waiting(Model/Subagent) before render, so this is a rarely-hit safety net
             Style::default().fg(theme.text_secondary),
-            "Waiting…".to_string(),
+            xai_grok_i18n::t("turn.activity.waiting").to_string(),
             false,
         ),
         (
@@ -717,7 +715,7 @@ fn render_starting_session(
     let style = Style::default().fg(theme.gray_dim);
     let spans = vec![
         Span::styled(format!("{} ", frames[frame_idx]), style),
-        Span::styled("Starting session…", style),
+        Span::styled(xai_grok_i18n::t("turn.activity.starting_session"), style),
         Span::styled(timer_str, style),
     ];
     buf.set_line(area.x, area.y, &Line::from(spans), area.width);

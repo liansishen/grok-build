@@ -756,14 +756,17 @@ pub enum Action {
     /// Set plan mode on/off. Per-session, ACP-mediated (not persisted
     /// to config.toml). `/plan <desc>` uses `EnterPlanMode` instead
     /// because it also starts a turn.
-    SetPlanMode(PlanModeKind),
-    /// Open the freeform feedback card. `images` carries composer
-    /// attachments drained at slash-execution time (inline `/feedback`
-    /// composed alongside pasted images); the pane adopts them as chips.
-    OpenFeedbackPane {
-        prefill: Option<String>,
-        images: crate::views::prompt_widget::FeedbackImages,
+    /// Open the full feedback modal.
+    OpenFeedbackModal(crate::views::feedback_modal::OpenFeedbackModal),
+    /// Submit the full feedback modal.
+    SubmitFeedbackModal {
+        modal_id: crate::views::feedback_modal::FeedbackModalId,
     },
+    /// Request draft feedback text from the feedback service.
+    RequestFeedbackDraft {
+        request: crate::views::feedback_modal::FeedbackDraftRequest,
+    },
+    SetPlanMode(PlanModeKind),
     /// Submit feedback (minimal inline `/feedback <text>`, or card
     /// submit). `trace` is `None` when no trace-consent card was shown.
     SendFeedback {
@@ -854,6 +857,10 @@ pub enum Action {
     /// Open the Agent Dashboard view (`/dashboard`, `Ctrl+\`, `grok dashboard`).
     OpenDashboard,
     /// Close the dashboard, returning to the previous `ActiveView`.
+    /// Close the dashboard session picker.
+    DashboardCloseSessionPicker,
+    /// Select a dashboard session-picker entry.
+    DashboardPickSession(usize),
     ExitDashboard,
     /// Attach to a dashboard row — switches to the parent agent and
     /// (for subagent rows) sets the parent's `active_subagent`.
@@ -1300,6 +1307,7 @@ impl CancelTrigger {
     /// Snake_case wire string sent as `_meta.cancelTrigger`.
     pub fn as_wire_str(self) -> &'static str {
         match self {
+            Self::Esc => "esc",
             Self::CtrlC => "ctrl_c",
             Self::Mouse => "mouse",
             Self::DashboardStop => "dashboard_stop",
@@ -1674,9 +1682,8 @@ pub enum Effect {
     /// Lazily open dashboard v2's process-owned SQLite store and read its
     /// initial snapshot off the event-loop thread.
     LoadWorkspaceSnapshot { db_path: std::path::PathBuf },
-    /// Apply one coalesced dashboard-v2 adoption/metadata batch through the
-    /// process-owned store connection.
-    UpsertWorkspaceMembers {
+    /// Apply one dashboard workspace mutation.
+    WriteWorkspace {
         store: xai_grok_dashboard_store::WorkspaceStore,
         mutation: WorkspaceMutation,
     },
@@ -2569,12 +2576,6 @@ pub enum TaskResult {
         agent_id: AgentId,
         session_id: acp::SessionId,
         models: Option<acp::SessionModelState>,
-        /// Whether this session's scheduled fires run detached, as the shell
-        /// resolved it at spawn (response
-        /// `_meta["x.ai/schedulerBackgroundLoops"]`). `None` from a shell that
-        /// predates the key. See
-        /// [`crate::app::effects::parse_session_scheduler_background_loops`].
-        scheduler_background_loops: Option<bool>,
     },
     /// Session creation failed.
     SessionFailed {
@@ -2626,10 +2627,6 @@ pub enum TaskResult {
         /// pass the live `session/update` gate without re-rendering the user
         /// block (replay already rendered it).
         running_prompt_id: Option<String>,
-        /// See [`TaskResult::SessionCreated::scheduler_background_loops`]. A
-        /// resumed session re-spawns its actor, so the load response carries
-        /// the value that spawn just pinned.
-        scheduler_background_loops: Option<bool>,
     },
     /// Session load (resume) failed.
     SessionLoadFailed {
@@ -2744,7 +2741,15 @@ pub enum TaskResult {
     },
     /// The blocking workspace writer panicked or was cancelled, losing its
     /// moved handle; reopen the store before any further writes.
-    WorkspaceMembersUpsertTaskFailed {
+    WorkspaceWriteTaskFailed {
+        db_path: std::path::PathBuf,
+        error: String,
+    },
+    WorkspaceRefreshed {
+        store: xai_grok_dashboard_store::WorkspaceStore,
+        snapshot: Result<Option<xai_grok_dashboard_store::WorkspaceSnapshot>, String>,
+    },
+    WorkspaceRefreshTaskFailed {
         db_path: std::path::PathBuf,
         error: String,
     },

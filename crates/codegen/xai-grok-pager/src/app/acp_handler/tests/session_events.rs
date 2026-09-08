@@ -967,13 +967,13 @@
             elapsed_ms: Some(300),
             summary_preview: None,
         };
-        let changed = handle_child_session_notification(update, child_sid, &mut agent, false);
+        let changed = handle_child_session_notification(update, child_sid, &mut agent, false, false);
         assert!(changed);
 
         let info = agent.subagent_sessions.get(child_sid).unwrap();
-        assert_eq!(info.tokens_used, Some(25000));
+        assert_eq!(info.attempt.tokens_used, Some(25000));
         // 25000 / 131072 * 100 ~= 19
-        assert_eq!(info.context_usage_pct, Some(19));
+        assert_eq!(info.attempt.context_usage_pct, Some(19));
 
         // The child view's context_state.used (context-bar numerator) must
         // also be reset — see the comment in handle_child_session_notification.
@@ -1007,7 +1007,7 @@
             percentage: 72,
             reason: "threshold".into(),
         };
-        let _ = handle_child_session_notification(update, child_sid, &mut agent, false);
+        let _ = handle_child_session_notification(update, child_sid, &mut agent, false, false);
 
         let child_view = agent.subagent_views.get(child_sid).unwrap();
         assert_eq!(
@@ -1026,7 +1026,7 @@
             percentage: 85,
             reason: "threshold".into(),
         };
-        let changed = handle_child_session_notification(update, "unknown-child", &mut agent, false);
+        let changed = handle_child_session_notification(update, "unknown-child", &mut agent, false, false);
         assert!(!changed);
     }
 
@@ -1045,7 +1045,7 @@
             elapsed_ms: Some(300),
             summary_preview: None,
         };
-        let changed = handle_child_session_notification(update, child_sid, &mut agent, false);
+        let changed = handle_child_session_notification(update, child_sid, &mut agent, false, false);
         // No child_view means nothing visible changed — must not trigger redraw.
         assert!(!changed);
         // SubagentInfo should still be updated (data correctness).
@@ -1058,7 +1058,7 @@
     fn child_unknown_event_returns_false() {
         let mut agent = make_agent(Some("root-sess"));
         let update = XaiSessionUpdate::MemoryFlushStarted;
-        let changed = handle_child_session_notification(update, "child-1", &mut agent, false);
+        let changed = handle_child_session_notification(update, "child-1", &mut agent, false, false);
         assert!(!changed);
     }
 

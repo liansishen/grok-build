@@ -26,6 +26,7 @@ use xai_grok_shell::agent::config::UiConfig;
 /// Every setting exercised by this file. Must stay in sync with `SettingsRegistry::defaults().all()`.
 const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "compact_mode",
+    "language",
     "screen_mode",
     "show_timestamps",
     "show_timeline",
@@ -45,7 +46,10 @@ const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "multiline_mode",
     "permission_mode",
     "default_model",
+    "web_search_model",
+    "fork_secondary_reasoning_effort",
     "max_thoughts_width",
+    "usage_refresh_interval_minutes",
     "scroll_speed",
     "scroll_mode",
     "scroll_lines",
@@ -57,6 +61,8 @@ const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "show_tips",
     "auto_update",
     "fork_secondary_model",
+    "show_session_usage_bar",
+    "show_request_metrics",
     "show_thinking_blocks",
     "prompt_suggestions",
     "group_tool_verbs",
@@ -365,6 +371,57 @@ fn esc_in_filter_mode_exits_filter_not_modal() {
 // Per-setting keyboard paths
 // ---------------------------------------------------------------------------
 
+#[test]
+fn language_picker_supports_keyboard_and_mouse_paths() {
+    let mut keyboard = make_state();
+    navigate_to(&mut keyboard, "language");
+    assert!(matches!(
+        handle_settings_key(&mut keyboard, &press(KeyCode::Enter)),
+        SettingsKeyOutcome::Changed
+    ));
+    assert!(matches!(
+        keyboard.mode(),
+        SettingsModalMode::PickingEnum { key: "language", .. }
+    ));
+    let outcome = handle_settings_key(&mut keyboard, &press(KeyCode::Down));
+    assert!(matches!(outcome, SettingsKeyOutcome::Changed));
+    match handle_settings_key(&mut keyboard, &press(KeyCode::Enter)) {
+        SettingsKeyOutcome::Action(Action::SetUiLanguage(value)) => assert_eq!(value, "en"),
+        other => panic!("expected UI-language commit action, got {other:?}"),
+    }
+
+    let mut mouse = make_state();
+    synth_rects(&mut mouse);
+    let row_y = row_idx_for(&mouse, "language") as u16;
+    let outcome = handle_settings_mouse(
+        &mut mouse,
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        72,
+        row_y,
+    );
+    assert!(matches!(outcome, SettingsKeyOutcome::Changed));
+    assert!(matches!(
+        mouse.mode(),
+        SettingsModalMode::PickingEnum { key: "language", .. }
+    ));
+    mouse.picker_choice_rects = (0..3)
+        .map(|i| Rect {
+            x: 0,
+            y: i as u16,
+            width: 80,
+            height: 1,
+        })
+        .collect();
+    match handle_settings_mouse(
+        &mut mouse,
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        10,
+        1,
+    ) {
+        SettingsKeyOutcome::Action(Action::SetUiLanguage(value)) => assert_eq!(value, "en"),
+        other => panic!("expected mouse UI-language commit action, got {other:?}"),
+    }
+}
 #[test]
 fn space_on_compact_mode_dispatches_typed_setter() {
     let mut s = make_state();
@@ -1860,6 +1917,8 @@ fn registry_kind_membership_through_pr_14() {
             "show_thinking_blocks",
             "show_timeline",
             "show_timestamps",
+            "show_session_usage_bar",
+            "show_request_metrics",
             "page_flip_on_send",
             "confirm_before_rewind",
             "combine_queued_prompts",
@@ -1906,6 +1965,7 @@ fn registry_kind_membership_through_pr_14() {
             "theme",
             "voice_capture_mode",
             "voice_stt_language",
+            "language",
         ],
         "Enum kind membership drift",
     );
@@ -1920,7 +1980,12 @@ fn registry_kind_membership_through_pr_14() {
     let dynamic_enum_keys = by_kind.remove("DynamicEnum").unwrap_or_default();
     assert_eq!(
         dynamic_enum_keys,
-        vec!["default_model", "fork_secondary_model",],
+        vec![
+            "default_model",
+            "fork_secondary_model",
+            "fork_secondary_reasoning_effort",
+            "web_search_model",
+        ],
         "DynamicEnum kind membership drift",
     );
 
@@ -1929,7 +1994,12 @@ fn registry_kind_membership_through_pr_14() {
     sorted_int.sort();
     assert_eq!(
         sorted_int,
-        vec!["max_thoughts_width", "scroll_lines", "scroll_speed"],
+        vec![
+            "max_thoughts_width",
+            "scroll_lines",
+            "scroll_speed",
+            "usage_refresh_interval_minutes",
+        ],
         "Int kind membership drift (PR 8)",
     );
 
@@ -1968,6 +2038,7 @@ fn enum_settings_membership_through_pr_14() {
             "follow_up_behavior",
             "hunk_tracker_mode",
             "keep_text_selection",
+            "language",
             "permission_mode",
             "plan_mode",
             "render_mermaid",
@@ -2031,6 +2102,8 @@ fn defaults_round_trip_through_registry() {
             "multiline_mode" => SettingValue::Bool(false),
             "permission_mode" => SettingValue::Enum("ask"),
             "default_model" => SettingValue::String(String::new()),
+            "language" => SettingValue::Enum("auto"),
+            "web_search_model" => SettingValue::String(String::new()),
             "max_thoughts_width" => SettingValue::Int(120),
             "scroll_speed" => SettingValue::Int(50),
             "scroll_mode" => SettingValue::Enum("auto"),
@@ -2047,6 +2120,10 @@ fn defaults_round_trip_through_registry() {
             "show_tips" => SettingValue::Bool(true),
             "auto_update" => SettingValue::Bool(true),
             "fork_secondary_model" => SettingValue::String(String::new()),
+            "fork_secondary_reasoning_effort" => SettingValue::String(String::new()),
+            "usage_refresh_interval_minutes" => SettingValue::Int(5),
+            "show_session_usage_bar" => SettingValue::Bool(false),
+            "show_request_metrics" => SettingValue::Bool(true),
             "show_thinking_blocks" => SettingValue::Bool(true),
             "prompt_suggestions" => SettingValue::Bool(true),
             "group_tool_verbs" => SettingValue::Bool(true),
@@ -3711,42 +3788,30 @@ fn reset_overlay_dims_all_rows_except_target() {
          the prompt is an action element and must stay at full intensity",
     );
 
-    // The action footer's `y reset` / `n cancel` shortcuts render at the modal's bottom edge
-    // Locate them via the rendered row text and assert no cell on those lines carries DIM
-    let find_row_y = |needle: &str| -> Option<u16> {
-        for y in area.y..area.y + area.height {
-            let mut row_text = String::new();
-            for x in area.x..area.x + area.width {
-                if let Some(cell) = buf.cell((x, y)) {
-                    row_text.push_str(cell.symbol());
-                }
-            }
-            if row_text.contains(needle) {
-                return Some(y);
-            }
-        }
-        None
-    };
-    let action_rows: Vec<u16> = ["reset", "cancel"]
+    // Use the hit areas produced by the modal chrome rather than guessing a footer row.
+    // Shortcut labels intentionally use the muted style; the action key itself must remain undimmed.
+    let action_hits: Vec<_> = s
+        .window
+        .shortcut_hits
         .iter()
-        .filter_map(|n| find_row_y(n))
+        .filter(|hit| hit.clickable)
+        .take(2)
         .collect();
-    assert!(
-        !action_rows.is_empty(),
-        "reset/cancel action footer must be visible — found neither row",
+    assert_eq!(
+        action_hits.len(),
+        2,
+        "reset/cancel action footer shortcuts must be visible",
     );
-    for action_y in action_rows {
-        let mut action_dim_count = 0usize;
-        for dx in 0..area.width {
-            if has_dim(area.x + dx, action_y) {
-                action_dim_count += 1;
-            }
-        }
-        assert_eq!(
-            action_dim_count, 0,
-            "no cell on the action footer row (y={action_y}) may carry \
-             Modifier::DIM — y/n shortcuts are action elements and must \
-             stay at full intensity",
+    for hit in action_hits {
+        assert!(hit.rect.y < area.y + area.height);
+        let key_cell = buf
+            .cell((hit.rect.x, hit.rect.y))
+            .expect("action shortcut key must be inside the rendered buffer");
+        assert!(
+            !key_cell.modifier.contains(Modifier::DIM),
+            "action shortcut key must remain undimmed at ({}, {})",
+            hit.rect.x,
+            hit.rect.y,
         );
     }
 }

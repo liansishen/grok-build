@@ -37,7 +37,7 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
     // `subagent` already fills 8 columns.
     let type_width = records
         .iter()
-        .map(|r| UnicodeWidthStr::width(r.kind.as_str()))
+        .map(|r| UnicodeWidthStr::width(r.kind.as_ref()))
         .fold(UnicodeWidthStr::width(type_header), usize::max);
     writeln!(
         out,
@@ -115,7 +115,7 @@ pub fn print_show(rec: &WorktreeRecord, out: &mut impl Write) -> std::io::Result
         "{}",
         t_fmt(
             "cli.worktree.detail.type",
-            &[("value", rec.kind.as_str())]
+            &[("value", rec.kind.as_ref())]
         )
     )?;
     writeln!(
@@ -194,7 +194,7 @@ pub fn print_show(rec: &WorktreeRecord, out: &mut impl Write) -> std::io::Result
         "{}",
         t_fmt(
             "cli.worktree.detail.status",
-            &[("value", rec.status.as_str())]
+            &[("value", rec.status.as_ref())]
         )
     )?;
     if let Some(label) = rec.label() {

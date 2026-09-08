@@ -35,7 +35,7 @@ use xai_grok_telemetry::events::CancellationScope;
 /// grouping), loading + caching `app.dashboard_persisted` on first use. Used
 /// both to materialize the real dashboard and to compute a correct cycle order
 /// before the dashboard has been opened.
-fn dashboard_state_from_persisted(app: &mut AppView) -> crate::views::dashboard::DashboardState {
+fn dashboard_state_for_mode(app: &mut AppView) -> crate::views::dashboard::DashboardState {
     use crate::views::dashboard::{DashboardState, load_persisted};
     if app.workspace_dashboard_enabled {
         return DashboardState::new();
@@ -236,7 +236,8 @@ pub(super) fn dispatch_open_dashboard(app: &mut AppView) -> Vec<Effect> {
         ensure_dashboard_state(app);
     } else if let Some(d) = app.dashboard.as_mut() {
         // Subsequent reopen — just gc dead ids; in-memory state stays.
-        d.gc_stale_refs(&dashboard_alive_fn(&app.agents));
+        let workspace = app.workspace_membership.view();
+        d.gc_stale_refs(&dashboard_alive_fn(&app.agents, workspace.as_ref()));
         d.set_recap_visible(app.session_recap_available);
         d.set_voice_visible(app.voice_mode_enabled);
         d.set_restricted_commands(&app.tier_restricted_commands);
@@ -304,9 +305,10 @@ pub(super) fn dispatch_open_dashboard(app: &mut AppView) -> Vec<Effect> {
 /// Helper: produce a closure that answers "does this DashboardRowId
 /// still exist in `agents`?". Static lifetime not possible (closures
 /// borrow), so callers pass `&app.agents`.
-fn dashboard_alive_fn(
-    agents: &indexmap::IndexMap<AgentId, AgentView>,
-) -> impl Fn(&crate::views::dashboard::DashboardRowId) -> bool + '_ {
+fn dashboard_alive_fn<'a>(
+    agents: &'a indexmap::IndexMap<AgentId, AgentView>,
+    workspace: Option<&'a crate::app::workspace_layout::WorkspaceView>,
+) -> impl Fn(&crate::views::dashboard::DashboardRowId) -> bool + 'a {
     move |id| match id {
         crate::views::dashboard::DashboardRowId::TopLevel(a) => agents.contains_key(a),
         crate::views::dashboard::DashboardRowId::Subagent {
@@ -315,11 +317,15 @@ fn dashboard_alive_fn(
         } => agents
             .get(parent)
             .is_some_and(|a| a.subagent_sessions.contains_key(child_session_id)),
-        // Roster-only rows are not locally hosted; they aren't tracked by
-        // `agents` and are never persisted, so treat them as not alive for
-        // pinned/reorder GC purposes.
-        crate::views::dashboard::DashboardRowId::Roster { .. }
-        | crate::views::dashboard::DashboardRowId::Workspace { .. } => false,
+        crate::views::dashboard::DashboardRowId::Workspace { session_id } => {
+            workspace.is_some_and(|workspace| {
+                workspace.members.iter().any(|member| {
+                    matches!(member.kind, xai_grok_dashboard_store::MemberKind::Build)
+                        && member.session_id.as_ref() == session_id
+                })
+            })
+        }
+        crate::views::dashboard::DashboardRowId::Roster { .. } => false,
     }
 }
 
@@ -339,12 +345,13 @@ pub(super) fn dispatch_exit_dashboard(app: &mut AppView) -> Vec<Effect> {
         }
     }
     log_dashboard_closed(app);
-    let preferred = app
-        .dashboard_return
-        .take()
-        .filter(|t| app.agents.contains_key(&t.agent_id()));
-    // Overlay chrome only when the preferred target is still alive — never
-    // on the insertion-order fallback after the return agent was closed.
+    let preferred = app.dashboard_return.take();
+    if matches!(preferred, Some(DashboardReturn::Welcome)) {
+        app.active_view = ActiveView::Welcome;
+        return vec![];
+    }
+    let preferred =
+        preferred.filter(|t| t.agent_id().is_some_and(|id| app.agents.contains_key(&id)));
     let (return_id, rearm_overlay) = match preferred {
         Some(t) => (t.agent_id(), t.is_overlay()),
         None => (
@@ -1532,7 +1539,10 @@ pub(super) fn dispatch_dashboard_dispatch(
         }
         apply_pending_dispatch_config(agent, pending_model.as_ref(), pending_mode, policy_block);
     }
-    crate::prompt_images::drain_and_cleanup(&mut pasted_images);
+    crate::prompt_images::drain_and_cleanup(
+        crate::prompt_images::SessionPathPolicy::Preserve,
+        &mut pasted_images,
+    );
     // Only clear the input AFTER successful session
     // creation. If the agent failed to register the prompt above we
     // would have already returned without effects.
@@ -1624,9 +1634,7 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
     let auto_mode_gate_from_app = app.auto_mode_gate;
     let ask_user_question_timeout_enabled_from_app = app.ask_user_question_timeout_enabled;
     let voice_stt_language_from_app = app.voice_config.language.clone();
-    // Dashboard commands run before any session exists, so the startup seed is
-    // the only answer available here.
-    let scheduler_background_loops_seed = app.scheduler_background_loops_seed;
+    // Dashboard commands run before any session exists, so app-wide state is the only answer available here.
 
     // Build the execution context from app-wide state. The dashboard
     // is session-less, so `session_id` is `None`. Offered session-less
@@ -1747,9 +1755,19 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
                 auto_mode_gate: auto_mode_gate_from_app,
                 ask_user_question_timeout_enabled: ask_user_question_timeout_enabled_from_app,
                 voice_stt_language: voice_stt_language_from_app,
-                scheduler_background_loops: scheduler_background_loops_seed,
-                fork_secondary_effort_options: Vec::new(),
-            },
+                fork_secondary_effort_options: {
+                    let model_id = if app.current_ui.fork_secondary_model.is_empty() {
+                        app.models.current.clone()
+                    } else {
+                        Some(acp::ModelId::new(app.current_ui.fork_secondary_model.clone()))
+                    };
+                    model_id.map(|id| {
+                        app.models.reasoning_effort_options_for(&id).into_iter()
+                            .map(|opt| (opt.id, opt.label, opt.description.unwrap_or_default()))
+                            .collect()
+                    }).unwrap_or_default()
+                },
+            }
         };
         command.run(&mut ctx, invocation.args)
     };
@@ -2499,6 +2517,89 @@ pub(super) fn dispatch_dashboard_stop(app: &mut AppView) -> Vec<Effect> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DashboardStopReadiness {
+    Archiveable,
+    LocallyClosable,
+    Stoppable,
+    Busy,
+}
+
+impl DashboardStopReadiness {
+    pub(crate) fn can_close(self) -> bool {
+        matches!(self, Self::Archiveable | Self::LocallyClosable)
+    }
+
+    pub(crate) fn action(self) -> crate::views::dashboard::DashboardStopAction {
+        match self {
+            Self::Archiveable => crate::views::dashboard::DashboardStopAction::Archive,
+            Self::LocallyClosable => crate::views::dashboard::DashboardStopAction::Close,
+            Self::Stoppable | Self::Busy => crate::views::dashboard::DashboardStopAction::Stop,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct DashboardStopPlan {
+    cancel_foreground: bool,
+    running_background_tasks: Vec<String>,
+    scheduled_tasks: Vec<String>,
+    discard_queued_prompts: bool,
+}
+
+impl DashboardStopPlan {
+    fn for_agent(agent: &crate::app::agent_view::AgentView) -> Self {
+        let has_session = agent.session.session_id.is_some();
+        Self {
+            cancel_foreground: has_session
+                && (!agent.session.state.is_idle() || agent.wake_turn_active()),
+            running_background_tasks: if has_session {
+                agent
+                    .session
+                    .bg_tasks
+                    .values()
+                    .filter(|task| task.status == crate::app::agent::BgTaskStatus::Running)
+                    .map(|task| task.task_id.clone())
+                    .collect()
+            } else {
+                Vec::new()
+            },
+            scheduled_tasks: if has_session {
+                agent.session.scheduled_tasks.keys().cloned().collect()
+            } else {
+                Vec::new()
+            },
+            discard_queued_prompts: !agent.session.pending_prompts.is_empty(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        !self.cancel_foreground
+            && self.running_background_tasks.is_empty()
+            && self.scheduled_tasks.is_empty()
+            && !self.discard_queued_prompts
+    }
+}
+
+pub(crate) fn dashboard_stop_readiness(
+    agent: &crate::app::agent_view::AgentView,
+) -> DashboardStopReadiness {
+    if agent.session.loading_replay {
+        DashboardStopReadiness::Busy
+    } else if !DashboardStopPlan::for_agent(agent).is_empty() {
+        DashboardStopReadiness::Stoppable
+    } else if agent.session.session_id.is_none() {
+        DashboardStopReadiness::LocallyClosable
+    } else if !matches!(
+        crate::views::dashboard::classify_top_level(agent),
+        crate::views::dashboard::RowState::Working
+    ) {
+        DashboardStopReadiness::Archiveable
+    } else {
+        DashboardStopReadiness::Busy
+    }
+}
+
 /// Stop everything keeping a busy top-level row out of Idle: a running
 /// turn, running background tasks/monitors, scheduled `/loop`s, and queued
 /// (unsent) prompts. Marks local state optimistically (mirroring the agent
@@ -2512,32 +2613,17 @@ fn stop_top_level_activity(agent: &mut crate::app::agent_view::AgentView) -> Opt
         return None;
     }
     let mut effects = Vec::new();
-
-    // Turn / background work need a session id to reach the backend.
-    if let Some(session_id) = session_id {
-        if !agent.session.state.is_idle() || agent.wake_turn_active() {
-            // Same priority as in-pane cancel: compact, then a live wake
-            // marker (shell front is still the wake even if we locally
-            // start_turn'd a user prompt), then a local turn. Do not
-            // cancel_turn a local user turn that is only queued behind a wake.
+    if let Some(session_id) = agent.session.session_id.clone() {
+        if plan.cancel_foreground {
             if agent.session.state.is_compact_running() {
                 agent.cancel_and_arm(CancellationScope::Compaction, CancelOrigin::UserGesture);
             } else if agent.running_wake_turn.is_some() {
-                // Wake cancel only marks the shell-front stop; there is no local
-                // turn to measure, so it intentionally skips arming latency.
                 agent.mark_wake_cancel_sent();
             } else if agent.session.state.is_turn_running() {
                 agent.cancel_and_arm(CancellationScope::Turn, CancelOrigin::UserGesture);
             }
             agent.cancel_trigger_hint = Some(crate::app::actions::CancelTrigger::DashboardStop);
-            // Stop-everything on purpose: unlike the in-pane retry, the row
-            // stop escalates past a recorded keep-subagents choice.
-            effects.push(super::turn::emit_cancel_turn(
-                agent,
-                session_id.clone(),
-                /* cancel_subagents */ true,
-                /* rewind_prompt_id */ None,
-            ));
+            effects.push(super::turn::emit_cancel_turn(agent, session_id.clone(), true, None));
         }
         for task_id in plan.running_background_tasks {
             if let Some(task) = agent.session.bg_tasks.get_mut(&task_id) {
@@ -2558,11 +2644,7 @@ fn stop_top_level_activity(agent: &mut crate::app::agent_view::AgentView) -> Opt
             });
         }
     }
-
-    // Queued prompts are local (unsent), so dropping them needs no effect
-    // and works even before the session exists (a just-dispatched row).
-    let dropped_queue = !agent.session.pending_prompts.is_empty();
-    if dropped_queue {
+    if plan.discard_queued_prompts {
         agent.session.pending_prompts.clear();
         agent.sync_queue_pane();
     }
@@ -2837,18 +2919,23 @@ pub(super) fn dispatch_dashboard_select(app: &mut AppView, next: bool) {
         &app.dashboard_local_sessions
     };
     let rows = if app.workspace_dashboard_enabled {
-        app.workspace_snapshot
-            .as_ref()
-            .map(|snapshot| {
-                crate::views::dashboard::build_rows_with_workspace(&app.agents, snapshot, home)
-            })
-            .unwrap_or_default()
+        let source = crate::app::workspace_sync::WorkspaceRowSource::capture(
+            &app.agents,
+            &app.workspace_membership,
+            app.home_session_agent,
+            app.workspace_dashboard_enabled,
+        );
+        crate::views::dashboard::build_rows_with_workspace(
+            &app.agents,
+            source.inputs(),
+            &d.filter,
+            home,
+        )
     } else {
         crate::views::dashboard::build_rows_with_roster(
             &app.agents,
             &d.pinned,
             &d.reorder,
-            None,
             d.grouping,
             &d.filter,
             home,

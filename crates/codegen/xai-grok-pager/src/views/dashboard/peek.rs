@@ -424,6 +424,7 @@ fn paint_peek_config_badge(
         model_name: &model_label,
         flags: &flags,
         multiline,
+        usage_status: None,
         usage_warning: None,
         usage_warning_critical: false,
     };
@@ -813,6 +814,7 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
             RenderBlock::UserPrompt(_) => break,
             // Structural blocks carry no response type; keep scanning
             RenderBlock::System(_) | RenderBlock::SessionEvent(_) | RenderBlock::Stub(_) => {}
+            RenderBlock::RequestMetrics(_) => {},
         }
     }
     if running {
@@ -902,6 +904,7 @@ fn block_short_text(block: &crate::scrollback::block::RenderBlock) -> Option<Str
         RenderBlock::Btw(_) => Some("(btw)".to_string()),
         RenderBlock::ContextInfo(_) => Some("(context info)".to_string()),
         RenderBlock::Stub(_) => None,
+        RenderBlock::RequestMetrics(_) => None,
     }
 }
 

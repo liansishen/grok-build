@@ -1301,6 +1301,144 @@ fn cycle_mode_plan_plus_auto_keeps_auto_not_reset() {
     );
 }
 
+#[test]
+fn cycle_mode_plan_plus_always_approve_exits_plan_keeps_yolo() {
+    let mut app = test_app_with_agent();
+    app.default_yolo = true;
+    app.current_ui.permission_mode = Some("always-approve".into());
+    {
+        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+        agent.session.yolo_mode = true;
+        agent.plan_mode_pending = Some(true);
+    }
+
+    let effects = dispatch(Action::CycleMode, &mut app);
+
+    let agent = &app.agents[&AgentId(0)];
+    assert_eq!(agent.plan_mode_pending, Some(false));
+    assert!(agent.session.is_yolo(), "Plan+Always-Approve must keep yolo");
+    assert!(app.default_yolo);
+    assert_eq!(
+        app.current_ui.permission_mode.as_deref(),
+        Some("always-approve")
+    );
+    assert!(
+        matches!(
+            effects.as_slice(),
+            [Effect::SetSessionMode { mode_id, .. }] if mode_id.0.as_ref() == "default"
+        ),
+        "expected exactly the plan exit, got {effects:?}"
+    );
+}
+
+#[test]
+fn cycle_mode_plan_plus_always_approve_under_pin_still_resets() {
+    let mut app = test_app_with_agent();
+    app.yolo_policy_block = Some(POLICY_WARNING);
+    app.default_yolo = true;
+    app.current_ui.permission_mode = Some("always-approve".into());
+    {
+        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+        agent.session.yolo_mode = true;
+        agent.plan_mode_pending = Some(true);
+    }
+
+    let effects = dispatch(Action::CycleMode, &mut app);
+
+    let agent = &app.agents[&AgentId(0)];
+    assert_eq!(agent.plan_mode_pending, Some(false));
+    assert!(!agent.session.is_yolo(), "the pin must clear the stale yolo");
+    assert_eq!(app.current_ui.permission_mode.as_deref(), Some("ask"));
+    assert!(
+        effects.iter().any(|e| matches!(e, Effect::SetSessionMode { .. })),
+        "expected plan exit SetSessionMode, got {effects:?}"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::PersistPermissionMode {
+                canonical: "ask",
+                ..
+            }
+        )),
+        "expected PersistPermissionMode(ask) under pin, got {effects:?}"
+    );
+}
+
+#[test]
+fn cycle_mode_pre_session_plan_plus_yolo_unstages_plan_keeps_yolo() {
+    let mut app = test_app_with_agent();
+    app.default_yolo = true;
+    app.current_ui.permission_mode = Some("always-approve".into());
+    {
+        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+        agent.session.session_id = None;
+        agent.session.yolo_mode = true;
+        agent.plan_mode_pending = Some(true);
+        agent.deferred_session_mode = Some(xai_grok_tools::types::SessionMode::Plan);
+        // Left behind by an earlier ring pass that landed on Normal before Ctrl+O re-enabled yolo
+        agent.deferred_permission_mode = Some("ask");
+    }
+
+    let effects = dispatch(Action::CycleMode, &mut app);
+
+    let agent = &app.agents[&AgentId(0)];
+    assert_eq!(agent.plan_mode_pending, Some(false));
+    assert_eq!(agent.deferred_session_mode, None);
+    assert_eq!(
+        agent.deferred_permission_mode, None,
+        "SessionCreated must not replay a stale ask over the seeded yolo"
+    );
+    assert!(agent.session.is_yolo());
+    assert!(app.default_yolo, "CreateSession must still seed yoloMode=true");
+    assert_eq!(
+        app.current_ui.permission_mode.as_deref(),
+        Some("always-approve")
+    );
+    assert!(
+        effects.is_empty(),
+        "nothing to persist or push before a session exists, got {effects:?}"
+    );
+}
+
+#[test]
+fn permission_setters_never_touch_plan_state() {
+    use crate::app::actions::PermissionModeKind;
+    for action in [
+        Action::SetYoloMode(true),
+        Action::SetYoloMode(false),
+        Action::SetPermissionMode(PermissionModeKind::Auto),
+        Action::SetPermissionMode(PermissionModeKind::AlwaysApprove),
+        Action::SetPermissionMode(PermissionModeKind::Ask),
+        Action::SetPermissionMode(PermissionModeKind::Default),
+    ] {
+        let mut app = test_app_with_agent();
+        {
+            let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+            agent.plan_mode_active = true;
+            agent.plan_mode_pending = Some(true);
+        }
+        let label = format!("{action:?}");
+
+        let effects = dispatch(action, &mut app);
+
+        let agent = &app.agents[&AgentId(0)];
+        assert!(agent.plan_mode_active, "{label}: plan_mode_active must survive");
+        assert_eq!(
+            agent.plan_mode_pending,
+            Some(true),
+            "{label}: plan_mode_pending must survive"
+        );
+        assert!(
+            !effects.iter().any(|e| matches!(
+                e,
+                Effect::SetSessionMode { .. } | Effect::SetModeThenPrompt { .. }
+            )),
+            "{label}: a permission change must not touch the session mode, got {effects:?}"
+        );
+    }
+}
+
 /// Security regression (0.2.89): launch with `permission_mode =
 /// "always-approve"`, Shift+Tab on the welcome screen (no session yet) to
 /// Normal, then start the session. The cycle must persist "ask" to disk or

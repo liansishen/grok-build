@@ -43,7 +43,7 @@ pub(super) fn format(report: &DiagnosticReport) -> String {
     );
     match &facts.color.level {
         RuntimeFact::Available(level) => {
-            fact(&mut out, t("label_color"), level.as_str());
+            fact(&mut out, t("label_color"), level.as_ref());
             let themes = if facts.color.available_themes.len() == facts.color.total_themes {
                 t("value_all").to_owned()
             } else {

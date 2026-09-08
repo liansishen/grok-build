@@ -61,6 +61,16 @@ pub(super) fn refresh_context_used(view: &mut AgentView, used: u64) {
     let total = view.session.models.get_context_window().unwrap_or(0);
     view.apply_context_used(used, total);
 }
+/// Context-bar refresh carried by a compaction lifecycle update, if any.
+/// `AutoCompactStarted` carries the count the trigger fired on, and the banner percentage derives from it.
+/// Without this refresh the bar shows the stale pre-turn number right next to the "N% full" banner.
+pub(super) fn compaction_context_refresh(update: &XaiSessionUpdate) -> Option<u64> {
+    match update {
+        XaiSessionUpdate::AutoCompactStarted { tokens_used, .. } => Some(*tokens_used),
+        XaiSessionUpdate::AutoCompactCompleted { tokens_after, .. } => Some(*tokens_after),
+        _ => None,
+    }
+}
 /// Refresh the bar and record `used` as the confirmed count for a pending
 /// compaction message; call only from the `meta.totalTokens` path.
 pub(super) fn confirm_context_used(view: &mut AgentView, used: u64) {
@@ -334,8 +344,10 @@ pub(super) fn handle_session_notification_with_origin(
                 &mut agent.scrollback,
                 is_api_key_auth,
             );
-            if let XaiSessionUpdate::AutoCompactCompleted { tokens_after, .. } = update {
-                refresh_context_used(agent, *tokens_after);
+            if let Some(used) = compaction_context_refresh(update) {
+                refresh_context_used(agent, used);
+            }
+            if let XaiSessionUpdate::AutoCompactCompleted { .. } = update {
                 agent.todo.update_todos(Vec::new());
             }
             changed
@@ -1597,8 +1609,8 @@ pub(crate) fn apply_child_view_session_event(
         &mut child_view.scrollback,
         is_api_key_auth,
     );
-    if let XaiSessionUpdate::AutoCompactCompleted { tokens_after, .. } = update {
-        refresh_context_used(child_view, *tokens_after);
+    if let Some(used) = compaction_context_refresh(update) {
+        refresh_context_used(child_view, used);
     }
     changed
 }
@@ -1856,22 +1868,22 @@ pub(super) fn apply_retry_state(
         session.in_flight_prompt = None;
     }
 }
-/// Single source of truth for plan-mode state on the pager side.
-///
-/// The agent emits `CurrentModeUpdate` on every entry and exit — both for
-/// user-driven mode switches (Shift+Tab → `session/set_mode`) and for
-/// agent-driven `EnterPlanMode` / `ExitPlanMode` tool calls (mapped by the
-/// notification bridge).
-///
-/// Do not be tempted to infer mode from tool-call titles: titles incorporate
-/// raw model/user input (Grep pattern, Bash command, search query, ...), so
-/// a substring match silently bricks sessions whenever any tool happens to
-/// mention `enter_plan_mode`.
-///
-/// Returns `true` when a `CurrentModeUpdate` was processed so the
-/// caller can refresh open settings modals after the per-agent borrow
-/// releases.
-pub(super) fn detect_plan_mode_change(update: &acp::SessionUpdate, agent: &mut AgentView) -> bool {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PlanModeTransition {
+    Unchanged,
+    /// Also claims another attached client's `session/set_mode`: the wire has no trigger field, and that misattribution is accepted.
+    EnteredByAgent,
+    EnteredByUser,
+    /// No scrollback row here: exit rows carry the review verdict, which only the local `close_plan_review` knows; Shift+Tab and `/plan` exits already show a banner.
+    Exited,
+}
+/// Do not be tempted to infer mode from tool-call titles.
+/// A substring match would silently brick sessions whenever any tool happens to mention `enter_plan_mode`.
+/// Entries are attributed locally: every pager-side path stages `plan_mode_pending` before its `session/set_mode`, and the agent's tool call never does.
+pub(super) fn detect_plan_mode_change(
+    update: &acp::SessionUpdate,
+    agent: &mut AgentView,
+) -> Option<PlanModeTransition> {
     use xai_grok_tools::types::SessionMode;
     let acp::SessionUpdate::CurrentModeUpdate(cmu) = update else {
         return None;

@@ -190,7 +190,7 @@ pub(super) fn drain_prompt_state_to_last_queued(agent: &mut AgentView) {
 /// wrapped version is only sent to the model via `Effect::SendPrompt` so
 /// the model knows the message is a scheduled task execution, not a human.
 fn format_cron_prompt(prompt: &str, task_id: &str, human_schedule: &str) -> String {
-    xai_grok_tools::reminders::format_scheduled_task_prompt(prompt, task_id, human_schedule)
+    xai_grok_tools::reminders::format_scheduled_task_prompt(prompt, task_id, task_id, human_schedule)
 }
 
 /// Try to send the next queued entry (prompt, command, bash, or cron) if the agent is idle.
@@ -415,7 +415,7 @@ pub(super) fn maybe_drain_queue(agent: &mut AgentView) -> QueueDrain {
         remaining = agent.session.pending_prompts.len(),
         shared_queue_len = agent.shared_queue.len(),
         session = session_id.0.as_ref(),
-        text = %logged_text,
+        text = %queued.text.chars().take(48).collect::<String>(),
         "draining prompt LOCALLY as a new running turn",
     );
 
@@ -423,11 +423,6 @@ pub(super) fn maybe_drain_queue(agent: &mut AgentView) -> QueueDrain {
 
     // Track whether this turn is a bash-mode command for post-turn focus.
     agent.bash_turn = queued.kind == QueueEntryKind::BashCommand;
-    agent.cron_task_id = if queued.kind == QueueEntryKind::Cron {
-        queued.task_id.clone()
-    } else {
-        None
-    };
     // Generate a fresh prompt_id for every outgoing prompt/command. This is
     // threaded through PromptRequest._meta to the agent and echoed on every
     // SessionNotification + the PromptResponse, letting us correlate
@@ -438,9 +433,7 @@ pub(super) fn maybe_drain_queue(agent: &mut AgentView) -> QueueDrain {
     // ours (drive it; drop a stale post-rewind chunk on a mismatch) rather than
     // adopting them as another client's turn. The `Cron` arm overrides
     // `prompt_id` with a `scheduler-fired-` prefix and records that id itself.
-    if queued.kind != QueueEntryKind::Cron {
-        agent.note_self_originated_prompt(&prompt_id);
-    }
+    agent.note_self_originated_prompt(&prompt_id);
 
     match queued.kind {
         QueueEntryKind::Prompt => {
@@ -1156,6 +1149,19 @@ enum EditedCommandGate {
     /// fail after the row was gone. Keep the row and say so.
     NeedsSession,
 }
+fn preserve_queued_image_paths(
+    app: &AppView,
+    submission: &mut crate::views::prompt_widget::StashedPrompt,
+) {
+    let retained = app
+        .agents
+        .values()
+        .flat_map(|agent| agent.session.pending_prompts.iter())
+        .flat_map(|prompt| prompt.images.iter())
+        .map(|image| image.preview.identity())
+        .collect::<std::collections::HashSet<_>>();
+    submission.disarm_image_cleanup(&retained);
+}
 
 /// `Action::RunEditedQueuedCommand` arm: the row's edited text resolved to a pager builtin, so drop
 /// the row and run the text through slash dispatch, the owner of resolution and command telemetry.
@@ -1224,6 +1230,13 @@ pub(super) fn dispatch_run_edited_queued_command(
     };
 
     let mut effects = Vec::new();
+    let retained = app
+        .agents
+        .values()
+        .flat_map(|agent| agent.session.pending_prompts.iter())
+        .flat_map(|prompt| prompt.images.iter())
+        .map(|image| image.preview.identity())
+        .collect::<std::collections::HashSet<_>>();
     let sends = match gate {
         EditedCommandGate::Run { session_id } => {
             let Some(agent) = app.agents.get_mut(&agent_id) else {
@@ -1703,6 +1716,48 @@ mod tests {
             "the row survives with its pre-edit text"
         );
         assert!(last_system_text(&app, id).contains("already in fullscreen"));
+    }
+
+    /// A refused edit disarms only row-owned temps; a newly pasted file is still deleted on drop.
+    #[test]
+    fn refused_edit_deletes_new_pasted_temps_not_row_owned() {
+        let mut app = test_app_with_agent();
+        let id = AgentId(0);
+        app.agents.get_mut(&id).unwrap().session.state = AgentState::TurnRunning;
+        enqueue_local(&mut app, id, "what is the default");
+        let local_id = app.agents[&id].session.pending_prompts[0].id;
+
+        let dir = tempfile::tempdir().unwrap();
+        let owned_path = dir.path().join("owned.png");
+        let pasted_path = dir.path().join("pasted.png");
+        std::fs::write(&owned_path, b"owned").unwrap();
+        std::fs::write(&pasted_path, b"pasted").unwrap();
+
+        let png = crate::clipboard::ImageData {
+            data: vec![
+                0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0, 0, 0, 0, 0,
+            ],
+            mime_type: "image/png".to_owned(),
+        };
+        let mut owned = crate::prompt_images::from_clipboard_data(&png);
+        owned.staged_temp_path = Some(owned_path.clone());
+        let mut pasted = crate::prompt_images::from_clipboard_data(&png);
+        pasted.staged_temp_path = Some(pasted_path.clone());
+        app.agents.get_mut(&id).unwrap().session.pending_prompts[0].images = vec![owned.clone()];
+
+        let submission = crate::views::prompt_widget::StashedPrompt::from_submission(
+            "/fullscreen".into(),
+            vec![owned, pasted],
+            Vec::new(),
+        );
+        let _ = run_edited_queued_submission(&mut app, local_id, None, submission);
+
+        assert!(owned_path.exists(), "row-owned temp must not be double-deleted");
+        assert!(!pasted_path.exists(), "edit-only pasted temp must be deleted");
+        assert_eq!(
+            app.agents[&id].session.pending_prompts[0].text, "what is the default",
+            "refusal must keep the row"
+        );
     }
 
     /// A refusal releases the edit lock too, so the queue must not park behind the row

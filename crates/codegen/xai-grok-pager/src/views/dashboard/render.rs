@@ -24,6 +24,11 @@ const SPINNER_DIVISOR: u64 = 4;
 /// At the ~30 Hz dashboard tick this toggles roughly every 0.33 s, about a 1.5 Hz blink.
 const NEEDS_INPUT_BLINK_DIVISOR: u64 = 10;
 
+fn age_column_text(age: &str) -> String {
+    let padding = 6usize.saturating_sub(UnicodeWidthStr::width(age));
+    format!("{}{}", " ".repeat(padding), age)
+}
+
 // Row markers use the filled (◆) / hollow (◇) diamonds from `crate::glyphs` (with CP437 fallbacks on legacy consoles)
 // The dashboard uses diamonds instead of circles so this view reads differently from sibling activity views, which use circles
 // Filled marks the non-working states that need a strong visual presence (needs-input, completed, failed, blocked); hollow marks idle rows
@@ -513,10 +518,23 @@ pub(crate) fn render_dashboard(
     dispatch_cursor
 }
 
-const RENAME_PREFIX: &str = "rename: ";
+fn rename_prefix() -> &'static str {
+    xai_grok_i18n::t("dashboard.rename_prefix")
+}
+
+fn dashboard_group_label(state: RowState) -> &'static str {
+    match state {
+        RowState::NeedsInput => xai_grok_i18n::t("dashboard.group.awaiting"),
+        RowState::Working => xai_grok_i18n::t("dashboard.group.working"),
+        RowState::Idle => xai_grok_i18n::t("dashboard.group.idle"),
+        RowState::Inactive => xai_grok_i18n::t("dashboard.group.inactive"),
+        RowState::Completed => xai_grok_i18n::t("dashboard.group.done"),
+        RowState::Failed => xai_grok_i18n::t("dashboard.group.failed"),
+    }
+}
 
 fn rename_editor_view(draft: &RenameDraft, width: u16) -> (&str, u16) {
-    let prefix_width = UnicodeWidthStr::width(RENAME_PREFIX) as u16;
+    let prefix_width = UnicodeWidthStr::width(rename_prefix()) as u16;
     let editor_width = width.saturating_sub(prefix_width);
     let viewport = draft.viewport(editor_width as usize);
     let visible = &draft.text()[viewport.visible_byte_range];
@@ -537,11 +555,11 @@ fn render_rename_editor(
     if width == 0 {
         return;
     }
-    let prefix_width = UnicodeWidthStr::width(RENAME_PREFIX) as u16;
+    let prefix_width = UnicodeWidthStr::width(rename_prefix()) as u16;
     buf.set_span(
         x,
         y,
-        &Span::styled(RENAME_PREFIX, style),
+        &Span::styled(rename_prefix(), style),
         prefix_width.min(width),
     );
     let (visible, _) = rename_editor_view(draft, width);
@@ -1648,7 +1666,7 @@ fn render_rows_with_grouping(
                     buf,
                     line_rect,
                     theme,
-                    rs.group_label(),
+                    dashboard_group_label(*rs),
                     *count,
                     collapsed,
                     selected,
@@ -2154,7 +2172,7 @@ fn render_row(
     let delete_label = crate::glyphs::ballot_x_button();
     let delete_w = UnicodeWidthStr::width(delete_label) as u16;
     let age = format_time_ago(row.last_change_at.elapsed().unwrap_or_default());
-    let age_str = format!("{age:>6}");
+    let age_str = age_column_text(&age);
     let age_w = UnicodeWidthStr::width(age_str.as_str()) as u16;
     let right_w = if show_delete { delete_w } else { age_w };
     let right_x = rect.x + rect.width.saturating_sub(right_w + 1);
@@ -2417,7 +2435,7 @@ fn render_narrow_rows_with_grouping(
                     buf,
                     line_rect,
                     theme,
-                    rs.group_label(),
+                    dashboard_group_label(*rs),
                     *count,
                     collapsed,
                     selected,
@@ -2568,7 +2586,7 @@ fn render_no_match(buf: &mut Buffer, area: Rect, theme: &Theme, filter: &Filter)
         Filter::Agent(n) => format!("No agents match `a:{n}`. Press Esc to clear the filter."),
         Filter::State(s) => format!(
             "No agents in state `{}`: press Esc to clear the filter.",
-            s.group_label()
+            dashboard_group_label(*s)
         ),
         Filter::Substring(n) => format!("No rows match `{n}`: press Esc to clear the filter."),
     };
@@ -2695,6 +2713,7 @@ fn paint_dispatch_config_badge(
         model_name: &model_label,
         flags: &flags,
         multiline: state.multiline_mode,
+        usage_status: None,
         usage_warning: None,
         usage_warning_critical: false,
     };

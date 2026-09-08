@@ -99,6 +99,7 @@ fn displaced_draft_feedback_notice(
         _ => "The remote outcome is unknown. The draft was kept; do not resend it yet.",
     }
 }
+#[cfg(test)]
 pub(super) const X11_PRIMARY_PASTE_HINT: &str = "Try Shift+Insert to paste selected text";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum LiveSessionKind {
@@ -275,7 +276,7 @@ pub(super) fn maybe_show_x11_primary_paste_hint(
     if !eligible || completion != ClipboardPasteCompletion::FullMiss {
         return;
     }
-    show_clipboard_toast(target, x11_primary_paste_hint(), app);
+    show_clipboard_toast(target, xai_grok_i18n::t("toast.x11_primary_paste_hint"), app);
 }
 /// A clean `FullMiss` always qualifies; a remote read *error* (`AttachmentRead`) qualifies too.
 /// Inside `grok wrap` the authoritative pasteboard is the local host's, not the (absent) remote one.
@@ -553,22 +554,13 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
     if result.ends_startup() {
         app.finish_startup(xai_grok_telemetry::startup::StartupOutcome::Ok);
     }
-    if !matches!(
-        &result,
-        TaskResult::WorkspaceSnapshotLoaded { .. }
-            | TaskResult::WorkspaceWriteCompleted { .. }
-            | TaskResult::WorkspaceWriteTaskFailed { .. }
-            | TaskResult::WorkspaceRefreshed { .. }
-            | TaskResult::WorkspaceRefreshTaskFailed { .. }
-    ) {
+    if !matches!(&result, TaskResult::WorkspaceSnapshotLoaded { .. } | TaskResult::WorkspaceSnapshotFailed { .. } | TaskResult::WorkspaceWriteCompleted { .. } | TaskResult::WorkspaceWriteTaskFailed { .. } | TaskResult::WorkspaceRefreshed { .. } | TaskResult::WorkspaceRefreshTaskFailed { .. }) {
         crate::app::workspace_sync::request(app);
     }
     match result {
-        TaskResult::SessionCreated {
-            agent_id,
-            session_id,
-            models: new_models,
-        } => handle_session_created(app, agent_id, session_id, new_models),
+        TaskResult::SessionCreated { agent_id, session_id, models: new_models, .. } => {
+            handle_session_created(app, agent_id, session_id, new_models)
+        }
         TaskResult::SessionFailed { agent_id, error } => {
             handle_session_failed(app, agent_id, error)
         }
@@ -679,6 +671,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             balance,
             subscription_tier,
             autotopup,
+            ..
         } => {
             // Reject hidden, old-account, and out-of-order results before they
             // can repopulate or roll back the app-scoped cache.
@@ -716,6 +709,15 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             }
             vec![]
         }
+        TaskResult::AppBillingError { error, nonce } => {
+            if let Some(state) = app.dashboard.as_mut().and_then(|d| d.usage_modal.as_mut())
+                && state.fetch_nonce == nonce
+            {
+                state.billing_loading = false;
+                state.billing_error = Some(error);
+            }
+            vec![]
+        }
         TaskResult::GateRefreshed { settings } => handle_gate_refreshed(app, settings),
         TaskResult::SessionLoaded {
             agent_id,
@@ -725,6 +727,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             restore_summary,
             restore_degree,
             running_prompt_id,
+            ..
         } => handle_session_loaded(
             app,
             agent_id,
@@ -864,40 +867,42 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         TaskResult::WorkspaceSnapshotLoaded { store, snapshot } => {
             let context = WorkspaceCompletionContext::capture(app);
             app.dashboard_sessions_loading = false;
-            app.show_toast(&xai_grok_i18n::t_fmt(
-                "task_result.workspace_load_failed",
-                &[("error", &error.to_string())],
-            ));
-            vec![]
-        }
-        TaskResult::WorkspaceMembersUpserted {
-            store,
-            snapshot,
-            failures,
-            attempted,
-        } => {
-            app.workspace_writes_disabled = !matches!(
-                store.schema_state(),
-                xai_grok_dashboard_store::SchemaState::Current
+            let transition = app.workspace_membership.on_store_opened(
+                store,
+                snapshot,
+                &context.live_ids,
             );
-            app.workspace_write_in_flight = false;
-            let snapshot = match snapshot {
-                Ok(snapshot) => snapshot,
-                Err(error) => {
-                    let db_path = store.path().to_path_buf();
-                    tracing::warn!(error = %error, "workspace snapshot after write failed");
-                    app.workspace_store = None;
-                    app.workspace_store_loading = true;
-                    app.workspace_sync_requested = true;
-                    app.show_toast(xai_grok_i18n::t("task_result.workspace_refreshing"));
-                    return vec![Effect::LoadWorkspaceSnapshot { db_path }];
-                }
-            };
-            app.workspace_store = Some(store);
-            app.workspace_snapshot = Some(snapshot);
-            let failed_ids: std::collections::HashSet<_> = failures
+            finish_workspace_result(app, context, transition)
+        }
+        TaskResult::WorkspaceSnapshotFailed { error, retryable } => {
+            let transition = app
+                .workspace_membership
+                .on_store_open_failed(error, retryable);
+            app.dashboard_sessions_loading = transition
+                .effects
                 .iter()
                 .any(|effect| matches!(effect, Effect::LoadWorkspaceSnapshot { .. }));
+            apply_workspace_transition(app, transition)
+        }
+        TaskResult::WorkspaceRefreshed { store, snapshot } => {
+            if !matches!(snapshot, Ok(Some(_))) {
+                let transition = app.workspace_membership.on_refresh_completed(
+                    store,
+                    snapshot,
+                    &std::collections::HashSet::new(),
+                );
+                return apply_workspace_transition(app, transition);
+            }
+            let context = WorkspaceCompletionContext::capture(app);
+            let transition = app
+                .workspace_membership
+                .on_refresh_completed(store, snapshot, &context.live_ids);
+            finish_workspace_result(app, context, transition)
+        }
+        TaskResult::WorkspaceRefreshTaskFailed { db_path, error } => {
+            let transition = app
+                .workspace_membership
+                .on_refresh_task_lost(db_path, error);
             apply_workspace_transition(app, transition)
         }
         TaskResult::WorkspaceWriteCompleted { store, completion } => {
@@ -910,64 +915,6 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         TaskResult::WorkspaceWriteTaskFailed { db_path, error } => {
             let transition = app.workspace_membership.on_write_task_lost(db_path, error);
             apply_workspace_transition(app, transition)
-        }
-        TaskResult::WorkspaceRefreshed { store, snapshot } => {
-            if !matches!(snapshot, Ok(Some(_))) {
-                let transition = app.workspace_membership.on_refresh_completed(
-                    store,
-                    snapshot,
-                    &std::collections::HashSet::new(),
-                );
-                let message = if failures.len() == 1 {
-                    xai_grok_i18n::t("task_result.workspace_sync_failed_one").to_owned()
-                } else {
-                    xai_grok_i18n::t_fmt(
-                        "task_result.workspace_sync_failed_many",
-                        &[("count", &failures.len().to_string())],
-                    )
-                };
-                app.show_toast(&message);
-            }
-            if app.workspace_writes_disabled {
-                app.workspace_sync_requested = false;
-                app.show_toast(xai_grok_i18n::t("task_result.workspace_read_only"));
-            } else {
-                let mut request_retry = false;
-                for member in attempted {
-                    let Some(failure) = failures
-                        .iter()
-                        .find(|failure| failure.session_id == member.key.session_id.as_ref())
-                    else {
-                        continue;
-                    };
-                    let already_retried = app
-                        .workspace_retry_metadata
-                        .get(&member.key.session_id)
-                        .is_some_and(|metadata| metadata == &member.metadata);
-                    if failure.retryable && !already_retried {
-                        app.workspace_retry_metadata
-                            .insert(member.key.session_id.clone(), member.metadata.clone());
-                        app.workspace_failed_metadata.remove(&member.key.session_id);
-                        request_retry = true;
-                    } else {
-                        app.workspace_retry_metadata.remove(&member.key.session_id);
-                        app.workspace_failed_metadata
-                            .insert(member.key.session_id, member.metadata);
-                    }
-                }
-                if request_retry {
-                    app.workspace_sync_requested = true;
-                }
-            }
-            vec![]
-        }
-        TaskResult::WorkspaceMembersUpsertTaskFailed { db_path, error } => {
-            tracing::error!(error = %error, "dashboard workspace writer failed");
-            app.workspace_store = None;
-            app.workspace_write_in_flight = false;
-            app.workspace_store_loading = true;
-            app.show_toast(xai_grok_i18n::t("task_result.workspace_writer_failed"));
-            vec![Effect::LoadWorkspaceSnapshot { db_path }]
         }
         TaskResult::CardDetailLoaded {
             host,
@@ -1865,17 +1812,136 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 )
             }
         }
-        TaskResult::FeedbackComplete { .. } => vec![],
-        TaskResult::FeedbackFailed { agent_id, error } => {
-            if let Some(agent) = app.agents.get_mut(&agent_id) {
+        TaskResult::FeedbackComplete {
+            agent_id,
+            origin,
+            outcome,
+            trace_upload_token,
+        } => {
+            if matches!(origin, crate::app::actions::FeedbackSendOrigin::Immediate)
+                && matches!(
+                    outcome,
+                    xai_grok_shell::session::FeedbackOutcome::OutcomeUnknown
+                )
+                && let Some(agent) = app.agents.get_mut(&agent_id)
+            {
                 agent
                     .scrollback
-                    .push_block(crate::scrollback::block::RenderBlock::system(
-                        xai_grok_i18n::t_fmt(
-                            "task_result.feedback_send_failed",
-                            &[("error", error.as_str())],
+                    .push_block(
+                        crate::scrollback::block::RenderBlock::system(
+                            "Feedback was enqueued, but the response did not arrive in time. The send may still complete; do not resend it yet."
+                                .to_owned(),
                         ),
-                    ));
+                    );
+            }
+            if let crate::app::actions::FeedbackSendOrigin::Modal {
+                submission_id,
+                modal_id,
+                is_draft,
+            } = origin
+                && let Some(agent) = app.agents.get_mut(&agent_id)
+            {
+                let mut unknown_copy = None;
+                let mut unknown_draft_request = None;
+                if is_draft {
+                    let has_matching_modal = agent
+                        .feedback_modal
+                        .as_ref()
+                        .is_some_and(|modal| modal.matches_id(modal_id));
+                    if has_matching_modal {
+                        match outcome {
+                            xai_grok_shell::session::FeedbackOutcome::Submitted => {
+                                agent.feedback_modal = None;
+                                agent.scrollback.push_block(
+                                    crate::scrollback::block::RenderBlock::system(
+                                        super::notes::FEEDBACK_THANKS_NOTICE.to_owned(),
+                                    ),
+                                );
+                            }
+                            xai_grok_shell::session::FeedbackOutcome::SubmittedCleanupFailed => {
+                                if let Some(modal) = agent.feedback_modal.as_mut() {
+                                    modal.mark_draft_cleanup_failed();
+                                }
+                            }
+                            xai_grok_shell::session::FeedbackOutcome::LocalOnly => {
+                                if let Some(modal) = agent.feedback_modal.as_mut() {
+                                    modal
+                                        .mark_draft_send_error(
+                                            "Feedback was saved locally but was not sent. The draft was kept."
+                                                .to_owned(),
+                                        );
+                                }
+                            }
+                            xai_grok_shell::session::FeedbackOutcome::OutcomeUnknown
+                            | xai_grok_shell::session::FeedbackOutcome::Other => {
+                                if let Some(modal) = agent.feedback_modal.as_mut() {
+                                    unknown_copy = modal.mark_draft_submit_unknown();
+                                    unknown_draft_request = modal.take_pending_request();
+                                }
+                            }
+                            _ => {
+                                if let Some(modal) = agent.feedback_modal.as_mut() {
+                                    unknown_copy = modal.mark_draft_submit_unknown();
+                                    unknown_draft_request = modal.take_pending_request();
+                                }
+                            }
+                        }
+                    } else {
+                        agent
+                            .scrollback
+                            .push_block(crate::scrollback::block::RenderBlock::system(
+                                displaced_draft_feedback_notice(outcome).to_owned(),
+                            ));
+                    }
+                } else if matches!(
+                    outcome,
+                    xai_grok_shell::session::FeedbackOutcome::OutcomeUnknown
+                ) {
+                    agent
+                        .scrollback
+                        .push_block(
+                            crate::scrollback::block::RenderBlock::system(
+                                "Feedback was enqueued, but the response did not arrive in time. The send may still complete; do not resend it yet."
+                                    .to_owned(),
+                            ),
+                        );
+                }
+                if let Some(text) = unknown_copy.as_deref() {
+                    agent.copy_to_clipboard(text);
+                }
+                let mut effects = Vec::new();
+                if let Some(request) = unknown_draft_request
+                    && let Some(session_id) = agent.session.session_id.clone()
+                {
+                    effects.push(Effect::FeedbackDraftRequest {
+                        agent_id,
+                        session_id,
+                        request,
+                    });
+                }
+                let posted = matches!(
+                    outcome,
+                    xai_grok_shell::session::FeedbackOutcome::Submitted
+                        | xai_grok_shell::session::FeedbackOutcome::SubmittedCleanupFailed
+                );
+                if posted {
+                    if let Some(trace_upload_token) = trace_upload_token
+                        && let Some(consent) =
+                            agent.take_parked_feedback_trace_consent(submission_id)
+                    {
+                        agent.register_pending_trace_upload(submission_id);
+                        effects.push(Effect::UploadFeedbackTrace {
+                            agent_id,
+                            session_id: agent_client_protocol::SessionId::new(consent.session_id),
+                            submission_id: Some(submission_id),
+                            intent: Some(consent.intent),
+                            trace_upload_token: Some(trace_upload_token),
+                        });
+                    }
+                } else {
+                    let _ = agent.take_parked_feedback_trace_consent(submission_id);
+                }
+                return effects;
             }
             vec![]
         }
@@ -1906,11 +1972,9 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     return vec![];
                 }
             }
-            agent
-                .scrollback
-                .push_block(crate::scrollback::block::RenderBlock::system(format!(
-                    "Couldn't send feedback: {error}"
-                )));
+            agent.scrollback.push_block(crate::scrollback::block::RenderBlock::system(
+                xai_grok_i18n::t_fmt("task_result.feedback_send_failed", &[("error", error.as_str())]),
+            ));
             vec![]
         }
         TaskResult::FeedbackDraftListComplete {

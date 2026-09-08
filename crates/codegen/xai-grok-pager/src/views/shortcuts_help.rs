@@ -16,6 +16,8 @@
 
 use std::borrow::Cow;
 
+use xai_grok_i18n::t;
+
 use crate::actions::{ActionDef, ActionId, ActionRegistry, Category, When};
 use crate::input::key::KeyShortcut;
 use crate::views::picker::{PickerConfig, PickerOutcome, PickerState, handle_picker_input};
@@ -68,69 +70,33 @@ impl ShortcutsHelpEntry {
 // ---------------------------------------------------------------------------
 
 /// Category display order and labels for the cheatsheet.
-const CATEGORY_ORDER: &[(Category, &str)] = &[
-    (Category::GettingStarted, "Essentials"),
-    (Category::Input, "Input"),
-    (Category::ConversationNav, "Conversation Navigation"),
-    (Category::ConversationAction, "Conversation Actions"),
-    (Category::Panels, "Panels"),
-    (Category::Session, "Session"),
-    (Category::Dashboard, "Dashboard"),
-];
-
-pub fn default_collapsed() -> std::collections::HashSet<usize> {
-    (1..CATEGORY_ORDER.len()).collect()
+fn category_order() -> [(Category, &'static str); 7] {
+    [
+        (Category::GettingStarted, t("shortcuts.category.essentials")),
+        (Category::Input, t("shortcuts.category.input")),
+        (Category::ConversationNav, t("shortcuts.category.conversation_nav")),
+        (Category::ConversationAction, t("shortcuts.category.conversation_action")),
+        (Category::Panels, t("shortcuts.category.panels")),
+        (Category::Session, t("shortcuts.category.session")),
+        (Category::Dashboard, t("shortcuts.category.dashboard")),
+    ]
 }
 
-// Man-page body for the paste pseudo-row (Enter detail)
-// Keep claims that hold on every host (agent and dashboard); non-image file paths are agent-only
+pub fn default_collapsed() -> std::collections::HashSet<usize> {
+    (1..category_order().len()).collect()
+}
+
+// Man-page bodies for pseudo-rows.
 #[cfg(target_os = "windows")]
-const PASTE_LONG_HELP: &str = "\
-Pastes clipboard images into the prompt as chips, and plain text as typed.\n\
-Prefer Ctrl+V. Use Alt+V as a fallback when Ctrl+V fails (some terminals or \
-configs drop image clipboards; older Windows Terminal versions only pasted \
-text).\n\
-You can also drag an image file from Explorer into the prompt.";
+fn paste_long_help() -> &'static str { t("shortcuts.pseudo.paste_long_help_windows") }
 #[cfg(target_os = "macos")]
-const PASTE_LONG_HELP: &str = "\
-Pastes clipboard images into the prompt as chips, and plain text as typed.\n\
-Use Ctrl+V for screenshots, browser \"Copy Image\", and file-manager image \
-copies (many terminals swallow Cmd+V and never deliver it to the TUI).\n\
-You can also drag an image file into the prompt.";
+fn paste_long_help() -> &'static str { t("shortcuts.pseudo.paste_long_help_macos") }
 #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-const PASTE_LONG_HELP: &str = "\
-Pastes clipboard images into the prompt as chips, and plain text as typed.\n\
-Use Ctrl+V for screenshots, browser \"Copy Image\", and file-manager image \
-copies.\n\
-You can also drag an image file into the prompt.";
-
-// Undo/redo are textarea chords, not ActionRegistry entries
-// Super/Cmd also works where the terminal delivers it; list Ctrl only (hosts often swallow Super)
-const UNDO_LONG_HELP: &str = "\
-Undoes the last change in the prompt editor.\n\
-Covers typing, deletes, line/word kills, and clearing a draft.";
-
-const REDO_LONG_HELP: &str = "\
-Redoes the last undone change in the prompt editor.\n\
-The second chord is the fallback for terminals that cannot send the first one.";
-
-// Prompt history is not an ActionRegistry entry: Up is an inline key handler and /history is a slash command
-// List both here so users can find them
-const HISTORY_LONG_HELP: &str = "\
-Recalls previously sent prompts.\n\
-Press Up on an empty prompt to browse earlier prompts, newest first; each move \
-live-populates the composer so you can edit and resend.\n\
-With prompts queued, Up moves focus into the queue pane on the last row instead.\n\
-Run /history to open a searchable history panel and filter by text.";
-
-// Scrollback search has no ActionRegistry entry: it's the vim `/` inline handler, or the /find slash command in simple mode
-// List both triggers here
-const SCROLLBACK_SEARCH_LONG_HELP: &str = "\
-Searches the conversation scrollback for text and jumps between matches.\n\
-In the prompt input, run /find to search. In vim mode, you can also press / \
-while the scrollback is focused.\n\
-Type a query, then use n and N (or the arrow keys) to step through matches. \
-Press Enter to jump to a match and Esc to dismiss.";
+fn paste_long_help() -> &'static str { t("shortcuts.pseudo.paste_long_help_other") }
+fn undo_long_help() -> &'static str { t("shortcuts.pseudo.undo_long_help") }
+fn redo_long_help() -> &'static str { t("shortcuts.pseudo.redo_long_help") }
+fn history_long_help() -> &'static str { t("shortcuts.pseudo.history_long_help") }
+fn scrollback_search_long_help() -> &'static str { t("shortcuts.pseudo.search_scrollback_long_help") }
 
 /// Build the entries vector for the modal, grouped by category.
 ///
@@ -157,7 +123,7 @@ pub fn build_entries(
             std::collections::HashSet::new()
         };
 
-    for (cat_idx, &(cat, label)) in CATEGORY_ORDER.iter().enumerate() {
+    for (cat_idx, &(cat, label)) in category_order().iter().enumerate() {
         // Dedup per category on the default key, preferring the def whose `When` context is active
         // `DashboardStop` (list) and `DashboardOverlayStop` (overlay) share Ctrl+X and category
         // Whichever matches the active context must win regardless of registration order
@@ -255,13 +221,13 @@ pub fn build_entries(
         // Scrollback search (`/`) has no registered ActionDef yet (vim-only, handled inline); list it here for discoverability
         if vim_mode && cat == Category::ConversationNav {
             let mut item = HintItem::new(crate::key!('/'), "search");
-            item.description = Some("Search scrollback".into());
+            item.description = Some(t("shortcuts.pseudo.search_scrollback").into());
             let dimmed = !active_contexts.contains(&When::ScrollbackFocused);
             entries.push(ShortcutsHelpEntry::Hint {
                 item,
                 dimmed,
                 action_id: None,
-                long_help: Some(SCROLLBACK_SEARCH_LONG_HELP),
+                long_help: Some(scrollback_search_long_help()),
             });
         }
         // Simple mode reaches scrollback search via the `/find` slash command, not a keystroke
@@ -269,7 +235,7 @@ pub fn build_entries(
         if !vim_mode && cat == Category::ConversationNav {
             let mut item = HintItem::new(crate::key!(Null), "search");
             item.custom_display = Some("/find");
-            item.description = Some("Search scrollback".into());
+            item.description = Some(t("shortcuts.pseudo.search_scrollback").into());
             // `/find` is a slash command typed at the prompt (not a scrollback keystroke like the vim `/` above)
             // It is available when the prompt is focused, so dim on `!PromptFocused`, not scrollback
             let dimmed = !active_contexts.contains(&When::PromptFocused);
@@ -277,7 +243,7 @@ pub fn build_entries(
                 item,
                 dimmed,
                 action_id: None,
-                long_help: Some(SCROLLBACK_SEARCH_LONG_HELP),
+                long_help: Some(scrollback_search_long_help()),
             });
         }
         // Clipboard and textarea chords not in ActionRegistry
@@ -297,32 +263,32 @@ pub fn build_entries(
             };
 
             let mut paste = HintItem::new(crate::key!('v', CONTROL), "paste");
-            paste.description = Some("Paste images (and text) from the clipboard".into());
+            paste.description = Some(t("shortcuts.pseudo.paste_clipboard").into());
             #[cfg(target_os = "windows")]
             paste.keys.push(crate::key!('v', ALT));
-            push_pseudo(&mut entries, paste, Some(PASTE_LONG_HELP));
+            push_pseudo(&mut entries, paste, Some(paste_long_help()));
 
             let mut undo = HintItem::new(crate::key!('z', CONTROL), "undo");
-            undo.description = Some("Undo the last prompt edit".into());
-            push_pseudo(&mut entries, undo, Some(UNDO_LONG_HELP));
+            undo.description = Some(t("shortcuts.pseudo.undo").into());
+            push_pseudo(&mut entries, undo, Some(undo_long_help()));
 
             // Alt+Z is the fallback on terminals that send Ctrl+Shift+Z as plain Ctrl+Z
             let mut redo = HintItem::new(crate::key!('z', CONTROL | SHIFT), "redo");
-            redo.description = Some("Redo the last undone prompt edit".into());
+            redo.description = Some(t("shortcuts.pseudo.redo").into());
             redo.keys.push(crate::key!('z', ALT));
-            push_pseudo(&mut entries, redo, Some(REDO_LONG_HELP));
+            push_pseudo(&mut entries, redo, Some(redo_long_help()));
 
             // Prompt history (Up / /history)
             // It is not part of the shared paste/undo/redo `dimmed`: that also lights on DashboardFocused
             // Up-history is prompt-only, so give it its own dim scoped to PromptFocused
-            let mut history = HintItem::new(crate::key!(Up), "history");
+            let mut history = HintItem::new(crate::key!(Up), t("hint.history"));
             history.description = Some("Prompt history".into());
             let history_dimmed = !active_contexts.contains(&When::PromptFocused);
             entries.push(ShortcutsHelpEntry::Hint {
                 item: history,
                 dimmed: history_dimmed,
                 action_id: None,
-                long_help: Some(HISTORY_LONG_HELP),
+                long_help: Some(history_long_help()),
             });
         }
         let count = entries.len() - header_idx - 1;
@@ -622,7 +588,7 @@ pub fn modal_footer_detail() -> Vec<crate::views::modal_window::Shortcut<'static
     use crate::views::modal_window::Shortcut;
     vec![
         Shortcut {
-            label: "Esc back",
+            label: t("shortcuts.footer.esc_back"),
             clickable: false,
             id: 0,
         },
@@ -632,7 +598,7 @@ pub fn modal_footer_detail() -> Vec<crate::views::modal_window::Shortcut<'static
             id: 0,
         },
         Shortcut {
-            label: "Ctrl+./X close",
+            label: t("shortcuts.footer.close_chord"),
             clickable: false,
             id: 0,
         },
@@ -727,7 +693,7 @@ pub fn render_detail(
     };
     let footer = modal_footer_detail();
     let modal_config = mw::ModalWindowConfig {
-        title: "Keyboard Shortcuts",
+        title: t("modal.keyboard_shortcuts"),
         tabs: None,
         shortcuts: &footer,
         sizing: modal_sizing(compact),
@@ -1043,9 +1009,9 @@ pub fn modal_footer(filter_active: bool) -> Vec<crate::views::modal_window::Shor
         },
         Shortcut {
             label: if filter_active {
-                "f show all"
+                t("shortcuts.footer.show_all")
             } else {
-                "f filter"
+                t("shortcuts.footer.filter")
             },
             clickable: false,
             id: 0,
@@ -1061,17 +1027,17 @@ pub fn modal_footer(filter_active: bool) -> Vec<crate::views::modal_window::Shor
             id: 0,
         },
         Shortcut {
-            label: "Enter details",
+            label: t("shortcuts.footer.details"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "/ search",
+            label: t("shortcuts.footer.search"),
             clickable: false,
             id: 0,
         },
         Shortcut {
-            label: "Esc close",
+            label: t("shortcuts.footer.close"),
             clickable: false,
             id: 0,
         },
@@ -1293,7 +1259,7 @@ pub fn render_modal(
     let non_sel: Vec<bool> = vec![false; picker_entries.len()];
     let footer = modal_footer(filter_active);
     let modal_config = mw::ModalWindowConfig {
-        title: "Keyboard Shortcuts",
+        title: t("modal.keyboard_shortcuts"),
         tabs: None,
         shortcuts: &footer,
         sizing: modal_sizing(compact),
@@ -1404,7 +1370,7 @@ pub fn handle_modal_key(
         modal_footer(filter_active)
     };
     let chrome_cfg = mw::ModalWindowConfig {
-        title: "Keyboard Shortcuts",
+        title: t("modal.keyboard_shortcuts"),
         tabs: None,
         shortcuts: &footer,
         sizing: modal_sizing(compact),

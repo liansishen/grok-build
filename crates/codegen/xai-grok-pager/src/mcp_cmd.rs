@@ -707,6 +707,7 @@ async fn run_set_enabled(name: &str, enabled: bool) -> Result<()> {
         xai_grok_shell::config::load_from_disk()
             .is_ok_and(|user_config| user_disabled_list_has(&user_config, name))
     };
+    let was_disabled = if enabled { !already } else { already };
     if already {
         let state = if enabled { "enabled" } else { "disabled" };
         println!("MCP server '{name}' is already {state}.");
@@ -728,7 +729,7 @@ async fn run_set_enabled(name: &str, enabled: bool) -> Result<()> {
         );
         std::process::exit(1);
     }
-    if !enabled && now_enabled {
+    if !enabled && !now_disabled {
         eprintln!(
             "{}",
             t_fmt(
@@ -739,6 +740,7 @@ async fn run_set_enabled(name: &str, enabled: bool) -> Result<()> {
         std::process::exit(1);
     }
 
+    let now_enabled = !now_disabled;
     let result_key = if was_disabled == now_disabled {
         if now_enabled {
             "cli.mcp.set_enabled.already_enabled"

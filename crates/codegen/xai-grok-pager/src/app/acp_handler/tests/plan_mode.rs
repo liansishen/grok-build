@@ -411,6 +411,18 @@
         })
     }
 
+    fn plan_entry_rows(app: &AppView) -> Vec<PermissionLabel> {
+        app.agents[&AgentId(0)]
+            .scrollback
+            .session_events()
+            .into_iter()
+            .filter_map(|event| match event {
+                SessionEvent::PlanModeEnteredByAgent { permission } => Some(permission),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Unknown mode ids (e.g. a custom agent definition name like
     /// `"browser_use"`) parse to `SessionMode::Default` and deactivate
     /// plan mode.
@@ -421,7 +433,7 @@
 
         let refresh_needed =
             detect_plan_mode_change(&make_current_mode_update("browser_use"), &mut agent);
-        assert!(refresh_needed);
+        assert!(refresh_needed.is_some());
         assert!(!agent.plan_mode_active);
     }
 

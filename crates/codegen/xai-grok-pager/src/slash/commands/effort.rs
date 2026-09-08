@@ -72,7 +72,7 @@ impl SlashCommand for EffortCommand {
                 .reasoning_effort
                 .map(|e| {
                     xai_grok_i18n::t_or("slash.effort.current_suffix", " (current: {effort})")
-                        .replace("{effort}", e.as_str())
+                        .replace("{effort}", &e.to_string())
                 })
                 .unwrap_or_default();
             let levels = if offered.is_empty() {

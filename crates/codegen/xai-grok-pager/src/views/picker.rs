@@ -24,6 +24,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use xai_grok_i18n::t;
 
 use crate::input::line_editor::{LineEditOutcome, LineEditor};
 use crate::render::line_utils::truncate_str;
@@ -179,7 +180,7 @@ pub fn compute_scroll_offset(
 // Search bar
 // ---------------------------------------------------------------------------
 
-const SEARCH_BAR_LABEL: &str = " search: ";
+fn search_bar_label() -> String { format!(" {}", t("list_pane.input.search")) }
 const SEARCH_BAR_TRAILING_GAP: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -200,7 +201,7 @@ impl SearchBarLayout {
 }
 
 pub fn search_bar_layout(width: u16, trailing_width: u16) -> SearchBarLayout {
-    let label_width = (SEARCH_BAR_LABEL.len() as u16).min(width);
+    let label_width = (search_bar_label().width() as u16).min(width);
     let available_input = width - label_width;
     let trailing_reserved = if trailing_width > 0
         && available_input
@@ -245,7 +246,7 @@ pub fn render_search_bar(
         y,
         width,
         theme,
-        SEARCH_BAR_LABEL,
+        &search_bar_label(),
         query,
         active,
         show_hint,
@@ -273,7 +274,7 @@ pub fn render_search_bar_with_viewport(
         y,
         layout.render_width,
         theme,
-        SEARCH_BAR_LABEL,
+        &search_bar_label(),
         query,
         active,
         show_hint,
@@ -316,7 +317,7 @@ pub(crate) fn render_line_editor_search_bar(
         y,
         width,
         theme,
-        SEARCH_BAR_LABEL,
+        &search_bar_label(),
         editor,
         active,
         show_hint,
@@ -1726,7 +1727,7 @@ pub fn picker_shortcuts() -> &'static [HintItem] {
         vec![
             HintItem {
                 keys: vec![],
-                label: "nav".into(),
+                label: t("extensions.hint.nav").into(),
                 custom_display: Some("\u{2191}/\u{2193}"),
                 description: None,
                 pinned: false,
@@ -3330,7 +3331,7 @@ mod tests {
         let theme = Theme::current();
         for counter in ["no matches", "bad pattern", "12/34"] {
             let counter_width = counter.width() as u16;
-            let width = SEARCH_BAR_LABEL.len() as u16 + counter_width + SEARCH_BAR_TRAILING_GAP;
+            let width = search_bar_label().width() as u16 + counter_width + SEARCH_BAR_TRAILING_GAP;
             let layout = search_bar_layout(width, counter_width);
             assert_eq!(
                 layout.trailing_width(),

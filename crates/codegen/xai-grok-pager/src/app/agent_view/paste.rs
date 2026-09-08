@@ -103,6 +103,7 @@ impl AgentView {
                     target: crate::app::actions::ClipboardPasteTarget::AgentPrompt {
                         agent_id: self.session.id,
                         images_dir,
+                        from_feedback_pane: false,
                     },
                     source,
                 },
@@ -1684,7 +1685,7 @@ pub(super) mod paste_key_tests {
         let theme = Theme::current();
         let source = "flowchart TD\nA-->B\n".to_string();
         let layout = affordance_row(false);
-        let cols = std::array::from_fn(|i| layout.buttons[i].col);
+        let cols: [u16; 3] = std::array::from_fn(|i| layout.buttons[i].col);
         let mut agent = make_agent();
         let rect = Rect::new(0, 0, 80, 1);
         let mut buf = Buffer::empty(rect);
@@ -1708,7 +1709,7 @@ pub(super) mod paste_key_tests {
             "the ◇ mermaid label is dim",
         );
         for (col, button) in cols.iter().zip(layout.buttons.iter()) {
-            let width = unicode_width::UnicodeWidthStr::width(button.label.as_str()) as u16;
+            let width = unicode_width::UnicodeWidthStr::width(button.label) as u16;
             assert_eq!(span(*col, width), button.label);
         }
         let buttons = &agent.inline_media_hits.mermaid_buttons;
@@ -1740,7 +1741,7 @@ pub(super) mod paste_key_tests {
         use ratatui::style::Modifier;
         let theme = Theme::current();
         let layout = affordance_row(false);
-        let cols = std::array::from_fn(|i| layout.buttons[i].col);
+        let cols: [u16; 3] = std::array::from_fn(|i| layout.buttons[i].col);
         let placement = |rect: Rect| DiagramAffordancePlacement {
             screen_rect: rect,
             source: "A-->B\n".to_string(),
@@ -1796,7 +1797,7 @@ pub(super) mod paste_key_tests {
         let layout = crate::scrollback::blocks::mermaid_content::affordance_row(false);
         let first = &layout.buttons[0];
         let first_end = first.col
-            + unicode_width::UnicodeWidthStr::width(first.label.as_str()) as u16;
+            + unicode_width::UnicodeWidthStr::width(first.label) as u16;
         let mut agent = make_agent();
         let rect = Rect::new(0, 0, first_end, 1);
         let mut buf = Buffer::empty(Rect::new(0, 0, 80, 1));
@@ -1812,11 +1813,11 @@ pub(super) mod paste_key_tests {
             .filter_map(|x| buf.cell((x, 0)).map(|c| c.symbol()))
             .collect();
         assert!(
-            row.contains(first.label.as_str()),
+            row.contains(first.label),
             "the first localized button fits and is painted: {row:?}"
         );
         assert!(
-            !row.contains(layout.buttons[1].label.as_str()),
+            !row.contains(layout.buttons[1].label),
             "clipped segments are not painted: {row:?}"
         );
         assert_eq!(
@@ -2313,6 +2314,7 @@ pub(super) mod paste_key_tests {
         crate::app::actions::ClipboardPasteContext {
             target: crate::app::actions::ClipboardPasteTarget::AgentPrompt {
                 agent_id: agent.session.id,
+                from_feedback_pane: false,
                 images_dir: None,
             },
             source: crate::app::actions::ClipboardPasteSource::ClipboardKey {

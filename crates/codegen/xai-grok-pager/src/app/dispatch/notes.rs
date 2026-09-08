@@ -1,6 +1,6 @@
 //! Feedback, remember-note, btw, and recap dispatchers.
 
-use super::ctx::{NO_SESSION_NOTICE, with_active_agent};
+use super::ctx::with_active_agent;
 use crate::app::actions::{Effect, FeedbackSendOrigin, FeedbackTraceChoice};
 use crate::app::agent::AgentId;
 use crate::app::agent_view::{AgentView, PromptInputMode};
@@ -23,7 +23,6 @@ pub(crate) fn feedback_question_label() -> &'static str {
     t("feedback.question_label")
 }
 
-pub(crate) use crate::views::question_view::FEEDBACK_QUESTION_LABEL;
 
 /// One copy of the send-time thank-you, shared by the immediate and modal commit paths.
 pub(crate) const FEEDBACK_THANKS_NOTICE: &str =
@@ -54,7 +53,7 @@ pub(super) fn dispatch_open_feedback_modal(
             && let Some(dashboard) = app.dashboard.as_mut()
         {
             dashboard.dispatch.set_text("");
-            dashboard.set_error_toast(NO_SESSION_NOTICE);
+            dashboard.set_error_toast(t("toast.no_active_session"));
         }
         return vec![];
     };
@@ -84,7 +83,7 @@ pub(super) fn dispatch_open_feedback_modal(
                 .session
                 .session_id
                 .is_none()
-                .then_some(NO_SESSION_NOTICE)
+                .then_some(t("toast.no_active_session"))
         })
     };
     if let Some(message) = blocked {
@@ -214,7 +213,7 @@ pub(super) fn dispatch_submit_feedback_modal(
         return vec![];
     }
     let Some(session_id) = session_id else {
-        modal.set_error(NO_SESSION_NOTICE.to_string());
+        modal.set_error(t("toast.no_active_session").to_string());
         return vec![];
     };
     if !modal.is_sendable() {
@@ -468,7 +467,7 @@ pub(super) fn dispatch_send_feedback(
     let Some(session_id) = agent.session.session_id.clone() else {
         agent
             .scrollback
-            .push_block(RenderBlock::system(NO_SESSION_NOTICE.to_string()));
+            .push_block(RenderBlock::system(t("toast.no_active_session").to_string()));
         return vec![];
     };
 

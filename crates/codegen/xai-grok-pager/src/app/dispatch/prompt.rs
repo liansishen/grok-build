@@ -617,11 +617,24 @@ pub(super) fn dispatch_send_prompt_submission(
                     auto_mode_gate: auto_mode_gate_from_app,
                     ask_user_question_timeout_enabled: ask_user_question_timeout_enabled_from_app,
                     voice_stt_language: voice_stt_language_from_app,
-                    // This session's own value (what its fires will actually do), seed only until the session response lands
-                    scheduler_background_loops: agent
-                        .scheduler_background_loops
-                        .unwrap_or(scheduler_background_loops_seed),
-                    fork_secondary_effort_options: Vec::new(),
+                    fork_secondary_effort_options: {
+                        let model_id = if !app.current_ui.fork_secondary_model.is_empty() {
+                            Some(acp::ModelId::new(app.current_ui.fork_secondary_model.clone()))
+                        } else {
+                            agent.session.models.current.clone()
+                        };
+                        model_id
+                            .map(|mid| {
+                                agent
+                                    .session
+                                    .models
+                                    .reasoning_effort_options_for(&mid)
+                                    .into_iter()
+                                    .map(|opt| (opt.id.clone(), opt.label.clone(), opt.description.unwrap_or_default()))
+                                    .collect()
+                            })
+                            .unwrap_or_default()
+                    },
                 },
             };
 

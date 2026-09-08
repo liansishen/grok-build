@@ -35,9 +35,9 @@ use super::modes::{
     set_permission_mode, set_plan_mode, set_yolo_mode,
 };
 use super::notes::{
-    dispatch_enter_remember_mode, dispatch_open_feedback_modal,
+    dispatch_enter_remember_mode, dispatch_open_feedback_modal, dispatch_submit_feedback_modal,
     dispatch_save_remember_note_from_modal, dispatch_send_btw, dispatch_send_feedback,
-    dispatch_send_recap, dispatch_send_remember_note, dispatch_submit_feedback_modal,
+    dispatch_send_recap, dispatch_send_remember_note,
 };
 use super::permissions::{
     dispatch_permission_cancel, dispatch_permission_followup, dispatch_permission_select,

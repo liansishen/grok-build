@@ -1,5 +1,6 @@
 //! Tests for dashboard dispatchers: attach, overlays, rows, and permissions.
 use super::*;
+use crate::app::actions::BillingRequestId;
 use crate::app::app_view::InputOutcome;
 use crate::app::dispatch::queue::maybe_drain_queue;
 use crate::app::workspace_test_fixtures::{
@@ -3191,13 +3192,10 @@ fn dashboard_slash_usage_opens_dashboard_modal() {
     open_dashboard(&mut app);
     let before = app.agents.len();
     let effects = dispatch_dashboard_dispatch_slash(&mut app, "/usage".into());
-    let [Effect::FetchAppBilling { nonce }] = effects.as_slice() else {
+    let [Effect::FetchAppBilling { request }] = effects.as_slice() else {
         panic!("session-less open refreshes only the account allowance, got: {effects:?}");
     };
-    assert_ne!(
-        *nonce, 0,
-        "a modal-driven fetch must carry a real generation"
-    );
+    assert!(request.is_some(), "a modal-driven fetch must carry a request");
     assert_eq!(app.agents.len(), before, "must not add an agent");
     assert!(
         matches!(app.active_view, ActiveView::AgentDashboard),
@@ -3212,7 +3210,7 @@ fn dashboard_slash_usage_opens_dashboard_modal() {
     );
     let modal = dashboard_usage_modal(&app);
     assert_eq!(modal.active_tab, UsageInfoTab::UsageLimit);
-    assert_eq!(modal.fetch_nonce, *nonce);
+    assert_ne!(modal.fetch_nonce, 0);
     assert!(modal.ctx.session_id.is_none());
     assert!(modal.ctx.usage_visible);
     assert!(!modal.ctx.chat_kind);
@@ -3275,13 +3273,23 @@ fn dashboard_usage_modal_reopen_retabs_without_refetch_and_session_slashes_stay_
 fn dashboard_usage_modal_settles_only_on_its_own_app_billing_generation() {
     let mut app = three_agent_app();
     open_dashboard(&mut app);
-    let _ = dispatch_dashboard_dispatch_slash(&mut app, "/usage".into());
+    let effects = dispatch_dashboard_dispatch_slash(&mut app, "/usage".into());
+    let request = match effects.as_slice() {
+        [Effect::FetchAppBilling { request: Some(request) }] => *request,
+        effects => panic!("expected one correlated billing fetch, got: {effects:?}"),
+    };
+    let newer_request = BillingRequestId {
+        generation: request.generation,
+        sequence: request.sequence + 1,
+    };
     let nonce = dashboard_usage_modal(&app).fetch_nonce;
     let _ = dispatch(
         Action::TaskComplete(TaskResult::AppBillingFetched {
             balance: Some(test_bal(10.0)),
             autotopup: crate::views::credit_bar::AutoTopupFetch::Unchanged,
+            subscription_tier: None,
             nonce: 0,
+            request,
         }),
         &mut app,
     );
@@ -3294,7 +3302,9 @@ fn dashboard_usage_modal_settles_only_on_its_own_app_billing_generation() {
         Action::TaskComplete(TaskResult::AppBillingFetched {
             balance: Some(test_bal(42.0)),
             autotopup: crate::views::credit_bar::AutoTopupFetch::Unchanged,
+            subscription_tier: None,
             nonce,
+            request: newer_request,
         }),
         &mut app,
     );

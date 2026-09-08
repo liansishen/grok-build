@@ -117,6 +117,41 @@ pub(super) fn open_usage_info_modal(
     effects
 }
 
+/// Open the dashboard usage modal for account-level billing information.
+/// The dashboard has no session, so only the billing surface is fetched.
+fn open_dashboard_usage_modal(
+    app: &mut AppView,
+    tab: crate::views::usage_modal::UsageInfoTab,
+) -> Vec<Effect> {
+    use crate::views::usage_modal::{UsageInfoContext, UsageInfoModalState};
+
+    let chat_kind = app.chat_mode;
+    let billing_reachable =
+        app.usage_visible && !chat_kind && app.usage_billing_redirect_url.is_none();
+    let ctx = UsageInfoContext {
+        session_id: None,
+        usage_visible: app.usage_visible,
+        chat_kind,
+        billing_redirect_url: app.usage_billing_redirect_url.clone(),
+        subscription_tier: app.subscription_tier.clone(),
+    };
+    let Some(dashboard) = app.dashboard.as_mut() else {
+        return vec![];
+    };
+    if let Some(state) = dashboard.usage_modal.as_mut() {
+        state.set_tab(tab);
+        return vec![];
+    }
+    let mut state = UsageInfoModalState::new(tab, ctx);
+    let mut effects = Vec::new();
+    if billing_reachable {
+        state.fetch_nonce = next_usage_fetch_nonce();
+        state.billing_loading = true;
+        effects.push(Effect::FetchAppBilling { request: None });
+    }
+    dashboard.usage_modal = Some(Box::new(state));
+    effects
+}
 /// `/session-info` — open the usage modal on its "Session info" tab, or
 /// fetch-and-show in scrollback in minimal mode.
 pub(super) fn dispatch_show_session_info(app: &mut AppView) -> Vec<Effect> {
@@ -627,8 +662,10 @@ pub(super) fn handle_coding_data_sharing_updated(
             effects.push(Effect::UploadFeedbackTrace {
                 agent_id: pending.agent_id,
                 session_id: pending.session_id,
+                submission_id: None,
+                intent: None,
+                trace_upload_token: None,
             });
-            effects.push(super::notes::persist_trace_upload_consent());
         } else {
             // The write round-tripped but the server-confirmed state is
             // still opted out: nothing uploaded or persisted, so undo the

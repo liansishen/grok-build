@@ -1430,6 +1430,7 @@ fn complete_session_usage(app: &mut AppView) {
             agent_id: AgentId(0),
             session_id: "test-session".to_string().into(),
             usage: Box::default(),
+            for_status_bar: false,
             nonce,
         }),
         app,

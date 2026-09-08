@@ -166,30 +166,6 @@ pub(crate) fn handle_ask_user_question(
         if let Some(kind) = old_qv.local_kind.take() {
             use crate::views::question_view::LocalQuestionKind;
             match kind {
-                LocalQuestionKind::FeedbackTrace { report, images } => {
-                    if let Some(session_id) = agent.session.session_id.clone() {
-                        if let Some(effect) = notes::commit_feedback(
-                            agent,
-                            app.coding_data_retention_opt_out,
-                            id,
-                            session_id,
-                            report,
-                            images,
-                            Some(FeedbackTraceChoice::NoUpload),
-                            true,
-                        ) {
-                            app.pending_effects.push(effect);
-                        }
-                    } else {
-                        notes::log_trace_consent_selected(
-                            app.coding_data_retention_opt_out,
-                            FeedbackTraceChoice::NoUpload,
-                        );
-                        agent.scrollback.push_block(RenderBlock::system(
-                            xai_grok_i18n::t("feedback.cancelled_displaced").to_owned(),
-                        ));
-                    }
-                }
                 LocalQuestionKind::DoctorFix { .. } => {
                     agent.scrollback.push_block(RenderBlock::system(
                         xai_grok_i18n::t_fmt(

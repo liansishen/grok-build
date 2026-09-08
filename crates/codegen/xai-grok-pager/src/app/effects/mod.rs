@@ -370,54 +370,19 @@ pub(crate) fn execute(
                     let worktree_id = worktree_session::new_worktree_id(
                         preferred_session_id.as_deref(),
                     );
-                    let ext_resp = match acp_send(ext_req, &tx).await {
-                        Ok(resp) => resp,
-                        Err(e) => {
-                            return TaskResult::WorktreeSessionFailed {
-                                agent_id,
-                                error: sanitize_user_error(
-                                    &xai_grok_i18n::t_fmt("error.effects.create_worktree_err", &[("error", &format!("{e}"))]),
-                                ),
-                            };
-                        }
-                    };
-                    let resp_value: serde_json::Value = match serde_json::from_str(
-                        ext_resp.0.get(),
-                    ) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            return TaskResult::WorktreeSessionFailed {
-                                agent_id,
-                                error: sanitize_user_error(
-                                    &xai_grok_i18n::t_fmt("error.effects.create_worktree_err", &[("error", &format!("{e}"))]),
-                                ),
-                            };
-                        }
-                    };
-                    if let Some(err) = resp_value.get("error") {
-                        let msg = err
-                            .as_str()
-                            .map(String::from)
-                            .unwrap_or_else(|| err.to_string());
-                        return TaskResult::WorktreeSessionFailed {
-                            agent_id,
-                            error: sanitize_user_error(
-                                &xai_grok_i18n::t_fmt("error.effects.create_worktree_err", &[("error", &format!("{msg}"))]),
-                            ),
-                        };
-                    }
-                    let result_obj = resp_value.get("result").unwrap_or(&resp_value);
-                    let worktree_root = match result_obj
-                        .get("worktreePath")
-                        .and_then(|v| v.as_str())
+                    let created = match worktree_session::create_worktree(
+                        &tx,
+                        &cwd,
+                        &spec,
+                        &worktree_id,
+                    )
+                    .await
                     {
                         Ok(created) => created,
                         Err(e) => {
                             return TaskResult::WorktreeSessionFailed {
                                 agent_id,
-                                error: sanitize_user_error(
-                                    xai_grok_i18n::t("error.effects.create_worktree_missing_path"),
-                                ),
+                                error: e.0,
                             };
                         }
                     };
@@ -712,9 +677,7 @@ pub(crate) fn execute(
                     let result = acp_send(request, &tx).await;
                     match result {
                         Ok(resp) => {
-                            let payload = match read_session_list_response(
-                                resp.0.get(),
-                            ) {
+                            let payload = match read_session_list_response(resp.0.get()) {
                                 Ok(payload) => payload,
                                 Err(error) => {
                                     return TaskResult::SessionListFailed {
@@ -728,24 +691,12 @@ pub(crate) fn execute(
                             };
                             let partial = parse_session_list_partial(&payload);
                             let scope = parse_session_list_scope(&payload);
-                            let sessions = match parse_session_picker_entries_blocking(
-                                    payload,
-                                    LocalPresence::for_host(host),
-                                )
-                                .unwrap_or_default();
-                            if let Some(err) = wrapper.get("error") {
-                                return TaskResult::SessionListFailed {
-                                    host,
-                                    generation,
-                                    error: err.as_str().unwrap_or(xai_grok_i18n::t("error.unknown")).to_string(),
-                                    seq,
-                                    query,
-                                };
-                            }
-                            let payload = wrapper.get("result").unwrap_or(&wrapper);
-                            let sessions = parse_session_picker_entries(payload);
-                            let partial = parse_session_list_partial(payload);
-                            let scope = parse_session_list_scope(payload);
+                            let sessions = parse_session_picker_entries_blocking(
+                                payload,
+                                LocalPresence::for_host(host),
+                            )
+                            .await
+                            .unwrap_or_default();
                             TaskResult::SessionListLoaded {
                                 host,
                                 generation,
@@ -3793,6 +3744,7 @@ pub(crate) fn execute(
                         Err(e) => {
                             return TaskResult::FeedbackFailed {
                                 agent_id,
+                                origin,
                                 error: sanitize_user_error(&xai_grok_i18n::t_fmt(
                                     "error.effects.serialize_feedback_err",
                                     &[("error", &format!("{e}"))],
@@ -3881,74 +3833,107 @@ pub(crate) fn execute(
         }
         Effect::FeedbackDraftRequest { agent_id, session_id, request } => {
             let tx = acp_tx.clone();
-            const FEEDBACK_DRAFT_ACP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
-                15,
-            );
-            tasks
-                .spawn(async move {
-                    match request {
-                        crate::views::feedback_modal::FeedbackDraftRequest::List {
-                            modal_id,
-                            generation,
-                        } => {
-                            let raw_params = match serde_json::value::to_raw_value(
-                                &serde_json::json!({
+            const FEEDBACK_DRAFT_ACP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+            tasks.spawn(async move {
+                match request {
+                    crate::views::feedback_modal::FeedbackDraftRequest::List { modal_id, generation } => {
+                        let raw_params = match serde_json::value::to_raw_value(&serde_json::json!({
                             "session_id": session_id.0.to_string(),
-                        }),
-                            ) {
-                                Ok(value) => value,
-                                Err(error) => {
-                                    return TaskResult::FeedbackDraftListComplete {
-                                        agent_id,
-                                        modal_id,
-                                        generation,
-                                        result: Err(
-                                            sanitize_user_error(
-                                                &format!(
-                                        "couldn't serialize feedback draft list: {error}"
-                                    ),
-                                            ),
-                                        ),
-                                    };
-                                }
-                            };
-                            let request = acp::ExtRequest::new(
-                                "x.ai/feedback/drafts/list",
-                                raw_params.into(),
-                            );
-                            let result = match tokio::time::timeout(
-                                    FEEDBACK_DRAFT_ACP_TIMEOUT,
-                                    acp_send(request, &tx),
-                                )
-                                .await
-                            {
-                                Ok(send) => {
-                                    send.map_err(|error| sanitize_user_error(
-                                            &error.to_string(),
-                                        ))
-                                        .and_then(|response| {
-                                            #[derive(serde::Deserialize)]
-                                            struct DraftListResponse {
-                                                drafts: Vec<xai_grok_feedback::FeedbackDraft>,
-                                            }
-                                            serde_json::from_str::<DraftListResponse>(response.0.get())
-                                                .map(|response| response.drafts)
-                                                .map_err(|error| sanitize_user_error(&error.to_string()))
-                                        })
-                                }
-                                Err(_elapsed) => {
-                                    Err("feedback draft list timed out".to_string())
-                                }
-                            };
-                            TaskResult::FeedbackDraftListComplete {
+                        })) {
+                            Ok(value) => value,
+                            Err(error) => return TaskResult::FeedbackDraftListComplete {
                                 agent_id,
-                                error: sanitize_user_error(
-                                    &xai_grok_i18n::t_fmt("error.effects.send_feedback_err", &[("error", &format!("{e}"))]),
-                                ),
-                            }
-                        }
+                                modal_id,
+                                generation,
+                                result: Err(sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.serialize_feedback_err", &[("error", &format!("{error}"))]))),
+                            },
+                        };
+                        let request = acp::ExtRequest::new("x.ai/feedback/drafts/list", raw_params.into());
+                        let result = match tokio::time::timeout(FEEDBACK_DRAFT_ACP_TIMEOUT, acp_send(request, &tx)).await {
+                            Ok(send) => send.map_err(|error| sanitize_user_error(&error.to_string())).and_then(|response| {
+                                #[derive(serde::Deserialize)]
+                                struct DraftListResponse { drafts: Vec<xai_grok_feedback::FeedbackDraft> }
+                                serde_json::from_str::<DraftListResponse>(response.0.get())
+                                    .map(|response| response.drafts)
+                                    .map_err(|error| sanitize_user_error(&error.to_string()))
+                            }),
+                            Err(_elapsed) => Err("feedback draft list timed out".to_string()),
+                        };
+                        TaskResult::FeedbackDraftListComplete { agent_id, modal_id, generation, result }
                     }
-                });
+                    crate::views::feedback_modal::FeedbackDraftRequest::Load(load) => {
+                        let raw_params = match serde_json::value::to_raw_value(&serde_json::json!({
+                            "session_id": session_id.0.to_string(),
+                            "draft_id": load.draft_id,
+                        })) {
+                            Ok(value) => value,
+                            Err(error) => return TaskResult::FeedbackDraftLoadComplete {
+                                agent_id,
+                                load,
+                                result: Err(sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.serialize_feedback_err", &[("error", &format!("{error}"))]))),
+                            },
+                        };
+                        let request = acp::ExtRequest::new("x.ai/feedback/drafts/get", raw_params.into());
+                        let result = match tokio::time::timeout(FEEDBACK_DRAFT_ACP_TIMEOUT, acp_send(request, &tx)).await {
+                            Ok(send) => send.map_err(|error| sanitize_user_error(&error.to_string())).and_then(|response| {
+                                #[derive(serde::Deserialize)]
+                                struct DraftGetResponse { draft: xai_grok_feedback::FeedbackDraft }
+                                serde_json::from_str::<DraftGetResponse>(response.0.get())
+                                    .map(|response| response.draft)
+                                    .map_err(|error| sanitize_user_error(&error.to_string()))
+                            }),
+                            Err(_elapsed) => Err("feedback draft load timed out".to_string()),
+                        };
+                        TaskResult::FeedbackDraftLoadComplete { agent_id, load, result }
+                    }
+                    crate::views::feedback_modal::FeedbackDraftRequest::Delete(delete) => {
+                        let raw_params = match serde_json::value::to_raw_value(&serde_json::json!({
+                            "session_id": session_id.0.to_string(),
+                            "draft_id": delete.draft_id,
+                        })) {
+                            Ok(value) => value,
+                            Err(error) => return TaskResult::FeedbackDraftDeleteComplete {
+                                agent_id,
+                                delete,
+                                result: Err(sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.serialize_feedback_err", &[("error", &format!("{error}"))]))),
+                            },
+                        };
+                        let request = acp::ExtRequest::new("x.ai/feedback/drafts/delete", raw_params.into());
+                        let result = match tokio::time::timeout(FEEDBACK_DRAFT_ACP_TIMEOUT, acp_send(request, &tx)).await {
+                            Ok(send) => send.map(|_| ()).map_err(|error| sanitize_user_error(&error.to_string())),
+                            Err(_elapsed) => Err("feedback draft delete timed out".to_string()),
+                        };
+                        TaskResult::FeedbackDraftDeleteComplete { agent_id, delete, result }
+                    }
+                    crate::views::feedback_modal::FeedbackDraftRequest::Update(update) => {
+                        let raw_params = match serde_json::value::to_raw_value(&xai_grok_shell::session::FeedbackDraftUpdateRequest {
+                            session_id: session_id.0.to_string(),
+                            draft_id: update.draft_id.clone(),
+                            input: xai_grok_feedback::FeedbackDraftInput {
+                                title: update.title.clone(),
+                                details: update.details.clone(),
+                                area: update.area.clone(),
+                                r#type: update.r#type,
+                                task_category: update.task_category,
+                                failure_mode: update.failure_mode,
+                            },
+                        }) {
+                            Ok(value) => value,
+                            Err(error) => return TaskResult::FeedbackDraftUpdateComplete {
+                                agent_id,
+                                update,
+                                result: Err(sanitize_user_error(&xai_grok_i18n::t_fmt("error.effects.serialize_feedback_err", &[("error", &format!("{error}"))]))),
+                            },
+                        };
+                        let request = acp::ExtRequest::new("x.ai/feedback/drafts/update", raw_params.into());
+                        let result = match tokio::time::timeout(FEEDBACK_DRAFT_ACP_TIMEOUT, acp_send(request, &tx)).await {
+                            Ok(send) => send.map(|_| ()).map_err(|error| sanitize_user_error(&error.to_string())),
+                            Err(_elapsed) => Err("feedback draft update timed out".to_string()),
+                        };
+                        TaskResult::FeedbackDraftUpdateComplete { agent_id, update, result }
+                    }
+                }
+            });
         }
         Effect::UploadFeedbackTrace {
             agent_id,
@@ -4829,7 +4814,7 @@ pub(crate) fn execute(
                         Err(e) => {
                             return TaskResult::AppBillingError {
                                 error: sanitize_user_error(&format!("{e}")),
-                                nonce,
+                                nonce: 0,
                             };
                         }
                     };
@@ -4843,7 +4828,7 @@ pub(crate) fn execute(
                         Err(e) => {
                             return TaskResult::AppBillingError {
                                 error: format!("Parse error: {e}"),
-                                nonce,
+                                nonce: 0,
                             };
                         }
                     };
@@ -4854,9 +4839,11 @@ pub(crate) fn execute(
                         crate::views::credit_bar::AutoTopupFetch::Cleared
                     };
                     TaskResult::AppBillingFetched {
+                        request,
                         balance,
+                        subscription_tier: billing.subscription_tier,
                         autotopup,
-                        nonce,
+                        nonce: 0,
                     }
                 });
         }

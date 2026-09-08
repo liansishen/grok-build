@@ -686,6 +686,79 @@ async fn fork_then_open(
     }
 }
 
+/// Mirrors `Effect::CreateWorktreeSession`. A `-s` UUID also names the worktree, and
+/// `open_session_with_id` checks its availability under the worktree cwd, which is why
+/// `materialize_startup_for_cwd` skipped that check when `has_worktree` is set.
+async fn open_session_in_new_worktree(
+    acp_tx: &AcpAgentTx,
+    cwd: &Path,
+    spec: &WorktreeSpec,
+    session_id: Option<&str>,
+) -> anyhow::Result<OpenedSession> {
+    let created = create_worktree(acp_tx, cwd, spec, &new_worktree_id(session_id))
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    tracing::info!(
+        worktree = %created.worktree_root.display(),
+        session_cwd = %created.session_cwd.display(),
+        copy_mode = ?spec.copy_mode(),
+        "headless: worktree created"
+    );
+    let opened = match session_id {
+        Some(sid) => open_session_with_id(acp_tx, &created.session_cwd, sid).await,
+        None => open_session(acp_tx, &created.session_cwd, None, None).await,
+    };
+    opened.map_err(|e| {
+        anyhow::anyhow!(
+            "{}",
+            note_orphaned_worktree(&e.to_string(), &created.worktree_root)
+        )
+    })
+}
+
+/// Mirrors the `load_session_id` branch of `Effect::CreateWorktreeSession`: the agent creates the
+/// worktree and restores into it, then the session is loaded at the cwd it reports.
+async fn resume_session_in_new_worktree(
+    acp_tx: &AcpAgentTx,
+    cwd: &Path,
+    spec: &WorktreeSpec,
+    session_id: &str,
+    restore_code: Option<bool>,
+    local_miss: bool,
+) -> anyhow::Result<OpenedSession> {
+    let resumed = resume_session_into_worktree(
+        acp_tx,
+        cwd,
+        spec,
+        session_id,
+        restore_code,
+        local_miss.then_some(session_id),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("{e}"))?;
+    tracing::info!(
+        session_id = %resumed.session_id,
+        worktree = %resumed.worktree_root.display(),
+        session_cwd = %resumed.session_cwd.display(),
+        code_restored = resumed.code_restored,
+        "headless: session resumed into worktree"
+    );
+    // resume_session already restored code; asking again on load would redo it.
+    open_session(
+        acp_tx,
+        &resumed.session_cwd,
+        Some(&resumed.session_id),
+        None,
+    )
+    .await
+    .map_err(|e| {
+        anyhow::anyhow!(
+            "{}",
+            note_orphaned_worktree(&e.to_string(), &resumed.worktree_root)
+        )
+    })
+}
+
 /// Apply `-m` / effort after session open. Effort is soft-ignored on a non-supporting
 /// model (still applying `-m`) but hard-fails on a genuinely unknown token.
 async fn apply_headless_model_and_effort(
@@ -1219,8 +1292,7 @@ pub async fn run_single_turn(
     let mut prompt_result = None;
     // Tracked regardless of wait_for_background so the exit reaper always sees running work.
     let mut pending_bg: HashSet<BackgroundWork> = HashSet::new();
-    // Tombstone of completed ids so an out-of-order backgrounded never re-arms them.
-    let mut completed_bg: HashSet<BackgroundWork> = HashSet::new();
+    let mut background_lifecycle = BackgroundLifecycleState::default();
     let mut prompt_done_at: Option<Instant> = None;
     // On mid-turn channel close, break (not bail) so the exit path still drains and reaps.
     let mut connection_closed = false;

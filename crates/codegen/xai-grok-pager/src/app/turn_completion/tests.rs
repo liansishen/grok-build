@@ -1,6 +1,7 @@
 //! Unit tests for the turn-finalize rails in [`super`] (`turn_completion`), split out via `#[path]` to keep the module itself small.
 
 use super::*;
+use crate::app::error_display::WireErrorType;
 use crate::app::agent::AgentState;
 use crate::scrollback::block::RenderBlock;
 use crate::scrollback::blocks::SessionEventBlock;

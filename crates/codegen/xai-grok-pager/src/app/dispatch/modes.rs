@@ -258,6 +258,14 @@ pub(super) fn inherit_auto_mode(app: &AppView) -> bool {
         )
 }
 
+/// Resolve the agent whose permission-mode mirror is being updated.
+fn permission_mode_agent_id(app: &AppView) -> Option<crate::app::agent::AgentId> {
+    match app.active_view {
+        ActiveView::Agent(id) => Some(id),
+        ActiveView::Welcome | ActiveView::AgentDashboard => None,
+    }
+}
+
 /// Keep the active session's `auto_mode` display flag in lockstep with the
 /// applied canonical permission mode. The canonical (`app.current_ui
 /// .permission_mode`) is the single value every mode-change path finalizes —
@@ -265,6 +273,7 @@ pub(super) fn inherit_auto_mode(app: &AppView) -> bool {
 /// the flag from it (and clearing it under yolo, which wins) keeps the prompt
 /// "auto" indicator correct regardless of which seam applied the mode.
 pub(super) fn sync_active_auto_flag(app: &mut AppView) {
+
     let is_auto = app.current_ui.permission_mode.as_deref() == Some("auto");
     if let Some(id) = permission_mode_agent_id(app)
         && let Some(agent) = app.agents.get_mut(&id)

@@ -80,8 +80,6 @@ impl EscStep {
         match self {
             Self::DismissFileSearch => xai_grok_i18n::t("hint.close"),
             Self::LeaveTextInput => xai_grok_i18n::t("hint.back"),
-            Self::DismissFeedbackPane => xai_grok_i18n::t("hint.close"),
-            Self::SkipFeedbackTrace => xai_grok_i18n::t("hint.cancel"),
             Self::DiscardPatternEdit => xai_grok_i18n::t("hint.cancel"),
             Self::ClearSelection => xai_grok_i18n::t("hint.unselect"),
             Self::BackOutOverlay => xai_grok_i18n::t("actions.OpenDashboard.label"),

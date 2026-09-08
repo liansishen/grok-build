@@ -37,7 +37,7 @@ pub fn format_doctor(report: &DiagnosticReport) -> String {
         out.push_str(&format!(
             "  {}        {}\n",
             t("label_color"),
-            color_level.as_str()
+            color_level.as_ref()
         ));
     }
     if color_level.is_some() && facts.color.available_themes.len() == facts.color.total_themes {

@@ -13,7 +13,7 @@ use crate::render::wrapping::word_wrap_lines;
 use crate::scrollback::block::BlockContent;
 use crate::scrollback::types::{AccentStyle, BlockContext, BlockLine, BlockOutput};
 use crate::theme::{Theme, quantize};
-use xai_grok_shell::session::{ContextInfo, count_detail};
+use xai_grok_shell::session::{ContextInfo};
 
 /// Categorical bar: each cell uses its category's glyph and color, filled left-to-right in legend order; free capacity is muted outlines.
 /// The informational rows never enter the bar.
@@ -125,13 +125,9 @@ impl RowLayout {
 
     /// The row's numeric cells: tokens and percent, each right-aligned.
     fn cells(&self, tokens: u64, total: u64) -> String {
-        format!(
-            "{:>tokens_width$} tokens   {:>percent_width$}",
-            fmt_tok(tokens),
-            Self::percent(tokens, total),
-            tokens_width = self.tokens_width,
-            percent_width = self.percent_width,
-        )
+        let token_count = format!("{:>tokens_width$}", fmt_tok(tokens), tokens_width = self.tokens_width);
+        let percent = format!("{:>percent_width$}", Self::percent(tokens, total), percent_width = self.percent_width);
+        xai_grok_i18n::t_fmt("scrollback.context.token_cells", &[("tokens", &token_count), ("percent", &percent)])
     }
 
     /// The detail suffix with the leading count right-aligned so the nouns line up: `" · 25 tools"` over `" ·  1 server"`.
@@ -166,10 +162,9 @@ impl RowLayout {
             let mut second = vec![
                 Span::raw(" "),
                 Span::styled(
-                    format!(
-                        "{} tokens   {}",
-                        fmt_tok(row.tokens),
-                        Self::percent(row.tokens, total)
+                    xai_grok_i18n::t_fmt(
+                        "scrollback.context.token_cells",
+                        &[("tokens", &fmt_tok(row.tokens)), ("percent", &Self::percent(row.tokens, total))],
                     ),
                     muted,
                 ),
@@ -308,14 +303,14 @@ impl ContextInfoBlock {
             LegendRow {
                 glyph: system_glyph,
                 color: system_color,
-                label: "System prompt".to_string(),
+                label: xai_grok_i18n::t("scrollback.system_prompt").to_string(),
                 tokens: system_tokens,
                 detail: None,
             },
             LegendRow {
                 glyph: messages_glyph,
                 color: messages_color,
-                label: "Messages".to_string(),
+                label: xai_grok_i18n::t("scrollback.context.messages").to_string(),
                 tokens: message_tokens,
                 detail: None,
             },
@@ -324,7 +319,7 @@ impl ContextInfoBlock {
             legend_rows.push(LegendRow {
                 glyph: overhead_glyph,
                 color: overhead_color,
-                label: "Reasoning/overhead".to_string(),
+                label: xai_grok_i18n::t("scrollback.reasoning_overhead").to_string(),
                 tokens: overhead_tokens,
                 detail: None,
             });
@@ -332,23 +327,30 @@ impl ContextInfoBlock {
         legend_rows.push(LegendRow {
             glyph: free_glyph,
             color: empty_color,
-            label: "Free".to_string(),
+            label: xai_grok_i18n::t("scrollback.context.free").to_string(),
             tokens: free_tokens,
             detail: None,
         });
         let info_rows: Vec<LegendRow> = std::iter::once(LegendRow {
             glyph: tools_glyph,
             color: tools_color,
-            label: "Tool definitions".to_string(),
+            label: xai_grok_i18n::t("scrollback.tool_definitions").to_string(),
             tokens: tool_tokens,
-            detail: Some(count_detail(tool_count, "tool")),
+            detail: Some(localized_count(
+                tool_count,
+                "scrollback.context.tool_one",
+                "scrollback.context.tool_many",
+            )),
         })
-        .chain(snapshot.usage_categories.iter().map(|c| LegendRow {
-            glyph: tools_glyph,
-            color: tools_color,
-            label: c.label.clone(),
-            tokens: c.tokens,
-            detail: c.detail.clone(),
+        .chain(snapshot.usage_categories.iter().map(|c| {
+            let (label, detail) = localized_usage_category(c);
+            LegendRow {
+                glyph: tools_glyph,
+                color: tools_color,
+                label,
+                tokens: c.tokens,
+                detail,
+            }
         }))
         .collect();
         let layout = RowLayout::measure(legend_rows.iter().chain(info_rows.iter()), total);
@@ -356,18 +358,23 @@ impl ContextInfoBlock {
 
         let mut lines: Vec<Line<'static>> = vec![
             // Header: bold white "Context"
-            Line::from(Span::styled("Context", primary)),
+            Line::from(Span::styled(
+                xai_grok_i18n::t("scrollback.context.title"),
+                primary,
+            )),
             // Blank row between header and the at-a-glance summary
             Line::from(""),
             // Sub-header: token totals and percent. Uses `text_secondary` for a touch more contrast than `muted` so the
             // at-a-glance numbers stand apart from the breakdown/footer rows. The percentage is recomputed from `used / total`
             // so we get two decimal places of precision.
             Line::from(Span::styled(
-                format!(
-                    "{} / {} tokens ({:.2}%)",
-                    fmt_tok_big(used),
-                    fmt_tok_big(total),
-                    precise_usage_percent(used, total),
+                xai_grok_i18n::t_fmt(
+                    "scrollback.context.summary",
+                    &[
+                        ("used", &fmt_tok_big(used)),
+                        ("total", &fmt_tok_big(total)),
+                        ("percent", &format!("{:.2}", precise_usage_percent(used, total))),
+                    ],
                 ),
                 Style::default().fg(theme.text_secondary),
             )),
@@ -399,17 +406,14 @@ impl ContextInfoBlock {
             let remaining = threshold_tokens.saturating_sub(used);
             let (text, style) = if usage_pct >= threshold_percent {
                 (
-                    format!("Auto-compact triggers next turn (at {threshold_percent}%)"),
+                    xai_grok_i18n::t_fmt("scrollback.context.auto_compact_next_turn", &[("percent", &threshold_percent.to_string())]),
                     Style::default().fg(quantize(theme.warning)),
                 )
             } else {
                 // Use `fmt_tok_big` (same as the header) so the remaining count rolls over to `m` for wide context windows
                 // A 4m window at 60% reads `~1.0m tokens remaining`, not `~1000k tokens remaining`
                 (
-                    format!(
-                        "Auto-compact at {threshold_percent}% \u{00b7} ~{} tokens remaining",
-                        fmt_tok_big(remaining)
-                    ),
+                    xai_grok_i18n::t_fmt("scrollback.context.auto_compact_remaining", &[("percent", &threshold_percent.to_string()), ("remaining", &fmt_tok_big(remaining))]),
                     muted,
                 )
             };
@@ -419,9 +423,7 @@ impl ContextInfoBlock {
 
         // Footer stats
         lines.push(Line::from(Span::styled(
-            format!(
-                "Turns: {turn_count} \u{00b7} Tool calls: {tool_call_count} \u{00b7} Compactions: {compaction_count}"
-            ),
+            xai_grok_i18n::t_fmt("scrollback.context.footer", &[("turns", &turn_count.to_string()), ("tool_calls", &tool_call_count.to_string()), ("compactions", &compaction_count.to_string())]),
             muted,
         )));
 
@@ -431,12 +433,30 @@ impl ContextInfoBlock {
         if (80..snapshot.auto_compact_threshold_percent).contains(&usage_pct) {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
-                "Tip: run /compact to free up context space.".to_string(),
+                xai_grok_i18n::t("scrollback.context.compact_tip").to_string(),
                 Style::default().fg(quantize(theme.warning)),
             )));
         }
 
         lines
+    }
+}
+
+fn localized_count(count: u64, one_key: &str, many_key: &str) -> String {
+    xai_grok_i18n::t_fmt(if count == 1 { one_key } else { many_key }, &[("count", &count.to_string())])
+}
+
+fn localized_usage_category(category: &xai_grok_shell::session::TokenUsageCategory) -> (String, Option<String>) {
+    match category.label.as_str() {
+        "Skills" => {
+            let count = category.detail.as_deref().and_then(|d| d.split_whitespace().next()).and_then(|n| n.parse::<u64>().ok());
+            (xai_grok_i18n::t("scrollback.context.skills").to_string(), count.map(|n| localized_count(n, "scrollback.context.skill_one", "scrollback.context.skill_many")))
+        }
+        "MCP servers" => {
+            let count = category.detail.as_deref().and_then(|d| d.split_whitespace().next()).and_then(|n| n.parse::<u64>().ok());
+            (xai_grok_i18n::t("scrollback.context.mcp_servers").to_string(), count.map(|n| localized_count(n, "scrollback.context.server_one", "scrollback.context.server_many")))
+        }
+        _ => (category.label.clone(), category.detail.clone()),
     }
 }
 
