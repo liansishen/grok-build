@@ -355,7 +355,7 @@ pub fn render_completion_output_delivery(
 
             buf.push_str(&t_fmt(
                 "task_completion.poll_full_output",
-                &[("tool", name), ("id", subagent_id)],
+                &[("tool", name), ("id", task_id)],
             ));
         }
         None => match disk_pointer_footer {
@@ -541,6 +541,7 @@ pub fn format_between_turn_completions(
     scheduler_delete_name: Option<&str>,
     scheduler_create_name: Option<&str>,
 ) -> String {
+    use std::fmt::Write as _;
     let n = completions.len();
 
     let label = if n == 1 { "subagent" } else { "subagents" };
