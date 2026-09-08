@@ -22,8 +22,8 @@ use crate::views::agent::AgentViewLayoutParams;
 use crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX;
 use crate::views::modal;
 use crate::views::plan_approval_view::PlanApprovalFocus;
-use crate::views::prompt_widget::{PromptBg, PromptFlag, PromptInfo, PromptStyle};
-use crate::views::question_view::{QUESTION_VIEW_HPAD, feedback_input};
+use crate::views::prompt_widget::{PromptBg, PromptFlag, PromptInfo, PromptStyle, mode_flags};
+use crate::views::question_view::QUESTION_VIEW_HPAD;
 use crate::views::shortcuts_bar::{HintItem, PendingHint, ShortcutsBar};
 use crate::views::{agent, turn_status};
 use ratatui::buffer::Buffer;
@@ -56,6 +56,7 @@ pub struct AppRenderParams<'a> {
     pub esc_owned_before_agent: bool,
     /// The status row this frame paints, or `Off` when this frame has none.
     pub status_line: crate::views::status_line::StatusLineFrame,
+    pub workspace_dashboard_enabled: bool,
 }
 /// What the bottom shortcuts bar renders this frame.
 enum ShortcutsBarContent {
@@ -68,6 +69,16 @@ enum ShortcutsBarContent {
     Hidden,
 }
 impl AgentView {
+    pub(crate) fn live_standalone_subagent_tokens(&self) -> u64 {
+        self.subagent_sessions
+            .values()
+            .filter(|info| info.is_running() && info.attempt.workflow_run_id.is_none())
+            .map(|info| {
+                info.completed_attempt_tokens
+                    .saturating_add(info.attempt.tokens_used.unwrap_or(0))
+            })
+            .fold(0, u64::saturating_add)
+    }
     pub(crate) fn update_scrollback_selection_state(
         &mut self,
         model: ResolvedSelectionModel,
@@ -179,20 +190,6 @@ impl AgentView {
             }
         }
     }
-    /// Rows to give the bare `/feedback` report box: report-sized where the terminal allows it, never past `cap`.
-    /// Its rules plus one text row is the floor, so a squeezed box still shows what the user is typing.
-    fn feedback_editor_h(&self, inner_width: u16, cap: u16, theme: &Theme) -> u16 {
-        let floor = feedback_input::MIN_HEIGHT;
-        let rows = feedback_input::HEIGHT.clamp(floor, cap.max(floor));
-        self.prompt
-            .desired_height(
-                feedback_input::width(inner_width),
-                &feedback_input::style(theme),
-                true,
-                cap.max(rows),
-            )
-            .max(rows)
-    }
     /// The one-line freeform answer row, growing with what the user types.
     fn freeform_editor_h(&self, inner_width: u16, cap: u16, style: &PromptStyle) -> u16 {
         let question_text_w = crate::views::question_view::inline_text_width(inner_width);
@@ -220,11 +217,7 @@ impl AgentView {
                     esc,
                 ]
             }
-            QuestionFocus::InputMode if qv.is_feedback_report() => {
-                vec![HintItem::new(key!(Enter), "send"), esc]
-            }
             QuestionFocus::InputMode => vec![HintItem::new(key!(Enter), "submit"), esc],
-            QuestionFocus::Navigation if qv.is_feedback_trace() => vec![esc],
             QuestionFocus::Navigation if qv.is_prompt_blocked() => {
                 vec![HintItem::new(key!(Tab), "next answer"), esc]
             }
@@ -374,9 +367,7 @@ impl AgentView {
                 HintItem::new(key!(Tab), "next field"),
                 self.card_esc_hint(),
             ]),
-            KeyOwner::Pane => {
-                ShortcutsBarContent::Pane(self.normal_pane_hints(registry, esc_owned_before_agent))
-            }
+            KeyOwner::Pane => ShortcutsBarContent::Pane(self.normal_pane_hints(registry)),
         }
     }
     /// An open line viewer paints its own hints over this row further down
@@ -521,7 +512,16 @@ impl AgentView {
             registry,
             is_editing,
             fold_label,
-            self.scrollback.selected_group_header_fold_label(),
+            if self.active_pane == ActivePane::Dock {
+                self.dock_enter_label()
+            } else {
+                self.scrollback.selected_group_header_fold_label()
+            },
+            if self.active_pane == ActivePane::Dock {
+                self.dock_tab_label()
+            } else {
+                "prompt"
+            },
             thinking_label,
             if self.active_pane == ActivePane::Tasks {
                 self.tasks.show_done()
@@ -538,7 +538,6 @@ impl AgentView {
             self.is_subagent_view,
             (self.session.state.is_turn_running() || self.wake_turn_active())
                 && !self.renders_parked(),
-            self.esc_would_cancel_turn(esc_owned_before_agent),
             !self.visible_queue_is_empty(),
             selected_is_user_prompt,
             selected_is_agent_message,
@@ -553,6 +552,13 @@ impl AgentView {
             hints.push(def.hint());
         }
         if self.in_dashboard_overlay {
+            let stop_label = if self.workspace_dashboard_enabled {
+                crate::app::dispatch::dashboard_stop_readiness(self)
+                    .action()
+                    .label()
+            } else {
+                "stop"
+            };
             hints.insert(
                 0,
                 HintItem::new(
@@ -652,29 +658,29 @@ impl AgentView {
             let tick = self.tasks.tick_count();
             let frame_idx = (tick / 4) as usize % spinner_frames.len();
             spinner_frames[frame_idx]
-        } else if info.and_then(|s| s.status.as_deref()) == Some("completed") {
+        } else if info.and_then(|s| s.attempt.status.as_deref()) == Some("completed") {
             crate::glyphs::check_mark()
         } else {
             crate::glyphs::ballot_x()
         };
         let icon_color = if is_running {
             theme.accent_running
-        } else if info.and_then(|s| s.status.as_deref()) == Some("completed") {
+        } else if info.and_then(|s| s.attempt.status.as_deref()) == Some("completed") {
             theme.accent_success
         } else {
             theme.accent_error
         };
-        let label_color = if info.is_some_and(|s| s.pending_kill) {
+        let label_color = if info.is_some_and(|s| s.attempt.pending_kill) {
             theme.accent_error
         } else if is_running {
             theme.accent_running
-        } else if info.and_then(|s| s.status.as_deref()) == Some("completed") {
+        } else if info.and_then(|s| s.attempt.status.as_deref()) == Some("completed") {
             theme.accent_success
         } else {
             theme.accent_error
         };
         let meta = info
-            .and_then(|s| s.model.as_deref())
+            .and_then(|s| s.attempt.model.as_deref())
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .unwrap_or("")
@@ -836,31 +842,6 @@ impl AgentView {
     pub fn should_show_tip(&mut self) -> bool {
         false
     }
-    /// Left side of the question card footer, which offers different keys for the report box than for the answer rows.
-    fn question_footer_hints(
-        qv: &crate::views::question_view::QuestionViewState,
-        feedback_pane: bool,
-        hint_style: Style,
-        hint_key: Style,
-    ) -> Vec<Span<'static>> {
-        if feedback_pane {
-            Self::feedback_footer_hints(hint_style, hint_key)
-        } else {
-            Self::answer_footer_hints(qv, hint_style, hint_key)
-        }
-    }
-    /// The report box offers only a newline: nothing to navigate or copy, and the shortcuts bar below already carries Esc.
-    fn feedback_footer_hints(hint_style: Style, hint_key: Style) -> Vec<Span<'static>> {
-        let newline_key = if crate::terminal::terminal_context().shift_enter_unavailable() {
-            "Alt+Enter"
-        } else {
-            "Shift+Enter"
-        };
-        vec![
-            Span::styled(newline_key, hint_key),
-            Span::styled(" newline", hint_style),
-        ]
-    }
     /// Walking and copying the answer rows, counter first when the card holds more than one question.
     fn answer_footer_hints(
         qv: &crate::views::question_view::QuestionViewState,
@@ -924,12 +905,13 @@ impl AgentView {
             voice_available,
             voice_listening,
             voice_interim,
-            esc_owned_before_agent,
             status_line,
+            workspace_dashboard_enabled,
         } = app_params;
         self.scrollback.begin_frame();
         self.in_dashboard_overlay = in_dashboard_overlay;
         self.overlay_can_cycle = overlay_can_cycle;
+        self.workspace_dashboard_enabled = workspace_dashboard_enabled;
         let super::BannerSlotParams {
             height: banner_height,
             announcements: banner_announcements,
@@ -967,6 +949,7 @@ impl AgentView {
                 || self.gboom.is_some()
                 || self.block_viewer.is_some()
                 || self.extensions_modal.is_some()
+                || self.feedback_modal.is_some()
                 || self.agents_modal.is_some()
                 || self.btw_state.is_some()
                 || self.line_viewer.is_some()
@@ -992,6 +975,7 @@ impl AgentView {
             self.hit_announcement_cta.clear();
             self.hit_upgrade_cta.clear();
             self.privacy_banner.clear_hits();
+            self.take_dock_row_request();
             return self.draw_subagent_fullscreen(
                 &child_sid.clone(),
                 area,
@@ -1044,6 +1028,7 @@ impl AgentView {
             },
             border_color_override: if effective_plan || casual_commenting {
                 crate::render::color::blend_color(theme.bg_base, theme.accent_plan, 0.4)
+                    .or(Some(theme.accent_plan))
             } else {
                 None
             },
@@ -1227,15 +1212,9 @@ impl AgentView {
             title: None,
             image_preview: !self.resize_hides_prompt_preview(),
         };
-        let feedback_pane = self
-            .question_view
-            .as_ref()
-            .is_some_and(|qv| qv.is_feedback_report());
         let inline_prompt_max = ((area.height as u32) / 3).clamp(3, 15) as u16;
         let question_prompt_body_h = if question_view_h == 0 || !is_question_input_mode {
             0
-        } else if feedback_pane {
-            self.feedback_editor_h(inner_width, inline_prompt_max, &theme)
         } else {
             self.freeform_editor_h(inner_width, inline_prompt_max, &question_input_style)
         };
@@ -1312,27 +1291,18 @@ impl AgentView {
                 }
             }
             for info in self.subagent_sessions.values_mut() {
-                if let Some(requested) = info.kill_requested_at
+                if let Some(requested) = info.attempt.kill_requested_at
                     && now.duration_since(requested).as_secs() >= PENDING_KILL_TIMEOUT_SECS
                 {
-                    info.pending_kill = false;
-                    info.kill_requested_at = None;
+                    info.attempt.pending_kill = false;
+                    info.attempt.kill_requested_at = None;
                 }
             }
         }
-        let queued_cron_ids: HashSet<&str> = self
-            .session
-            .pending_prompts
-            .iter()
-            .filter(|p| p.kind == crate::app::agent::QueueEntryKind::Cron)
-            .filter_map(|p| p.task_id.as_deref())
-            .collect();
         self.tasks.sync(
             &self.session.bg_tasks,
             &self.subagent_sessions,
             &self.session.scheduled_tasks,
-            self.cron_task_id.as_deref(),
-            &queued_cron_ids,
             &self.workflow_runs,
         );
         if self.active_pane == ActivePane::Tasks && !self.tasks.is_visible() {
@@ -1433,40 +1403,11 @@ impl AgentView {
             _ => 1,
         };
         let follow_ups_height = u16::from(self.follow_ups.is_some());
-        let mut dock_data = dock_on.then(|| crate::views::dock::DockData {
-            subagents: self
-                .dock_subagent_rows()
-                .into_iter()
-                .map(|(_, _, row)| row)
-                .collect(),
-            tasks: self
-                .dock_task_rows()
-                .into_iter()
-                .map(|(_, row)| row)
-                .collect(),
-            watchers: self
-                .dock_watcher_rows()
-                .into_iter()
-                .map(|(_, row)| row)
-                .collect(),
-            queued: self.visible_held_queue_len(),
-            subagents_expanded: self.dock_subagents_expanded,
-            tasks_expanded: self.dock_tasks_expanded,
-            watchers_expanded: self.dock_watchers_expanded,
-            focused: self.active_pane == ActivePane::Dock,
-            cursor: 0,
-            queue_body_rows: self.queue.desired_height(),
-        });
-        if let Some(data) = &mut dock_data {
-            let max = crate::views::dock::visible_items(data)
-                .len()
-                .saturating_sub(1);
-            self.dock_cursor = self.dock_cursor.min(max);
-            data.cursor = self.dock_cursor;
-        }
+        let mut dock_data = dock_on.then(|| self.dock_snapshot());
         let dock_height = dock_data
             .as_ref()
             .map_or(0, crate::views::dock::desired_height);
+        self.take_dock_row_request();
         self.dock_shown = dock_height > 0;
         if !self.dock_shown && self.active_pane == ActivePane::Dock {
             self.active_pane = ActivePane::Scrollback;
@@ -1579,6 +1520,17 @@ impl AgentView {
             self.timeline_hover = None;
             self.timeline_hover_preview = None;
         }
+        if let Some(data) = &mut dock_data {
+            if layout.dock.height > 0 {
+                data.max_rows =
+                    crate::views::dock::MaxRows::new(data.max_rows.get().min(layout.dock.height));
+            }
+            self.sync_dock_hover_from_pointer(layout.dock);
+            data.hovered = self.dock_hovered;
+            let (col, row) = self.last_mouse_pos;
+            data.stop_hovered = crate::views::dock::hovered_stop_button_rect(layout.dock, data)
+                .is_some_and(|hit| hit.rect.contains((col, row).into()));
+        }
         if let Some(dock) = &dock_data {
             let body = crate::views::dock::queue_body_rect(layout.dock, dock);
             if body.height > 0 {
@@ -1649,12 +1601,7 @@ impl AgentView {
         }
         if let Some(ref goal) = self.goal_state {
             let tick = self.tasks.tick_count() as usize;
-            let active_subagent_tokens: u64 = self
-                .subagent_sessions
-                .values()
-                .filter(|s| !s.finished && s.workflow_run_id.is_none())
-                .filter_map(|s| s.tokens_used)
-                .sum();
+            let active_subagent_tokens = self.live_standalone_subagent_tokens();
             status.push(
                 "goal",
                 crate::views::agent_status::goal_status_line(
@@ -2208,7 +2155,7 @@ impl AgentView {
                 queue_focused,
                 layout_cfg,
                 Some(layout.scrollback),
-                self.session.state.is_turn_running(),
+                self.can_send_now(),
             );
             let close_rect = agent::render_todo_chrome_with_close_label(
                 buf,
@@ -2225,10 +2172,12 @@ impl AgentView {
         } else {
             self.hit_queue_close.clear();
         }
+        self.dock_stop_button = None;
         if let Some(dock) = &dock_data
             && layout.dock.height > 0
         {
             crate::views::dock::render(buf, layout.dock, &theme, dock);
+            self.cache_dock_stop_at(layout.dock, dock);
             let queue_body = crate::views::dock::queue_body_rect(layout.dock, dock);
             if queue_body.height > 0 {
                 let queue_focused = self.active_pane == ActivePane::Queue && !overlay_focused;
@@ -2238,7 +2187,7 @@ impl AgentView {
                     queue_focused,
                     layout_cfg,
                     Some(layout.scrollback),
-                    self.session.state.is_turn_running(),
+                    self.can_send_now(),
                 );
             }
         }
@@ -2314,7 +2263,11 @@ impl AgentView {
             self.hovered_link_idx = None;
         }
         if turn_status_height > 0 {
-            let pad_left = HorizontalLayout::ACCENT + layout_cfg.block_pad_left.saturating_sub(1);
+            let pad_left = if dock_on {
+                crate::views::welcome::PROMPT_GUTTER
+            } else {
+                HorizontalLayout::ACCENT + layout_cfg.block_pad_left.saturating_sub(1)
+            };
             let turn_area = Rect {
                 x: layout.turn_status.x + pad_left,
                 y: layout.turn_status.y,
@@ -2604,12 +2557,11 @@ impl AgentView {
         let editing_label;
         let commenting_label;
         let theme = Theme::current();
-        let mut mode_flags_vec: Vec<PromptFlag> = Vec::new();
         let approval_is_commenting = self
             .plan_approval_view
             .as_ref()
             .is_some_and(|pav| pav.focus == PlanApprovalFocus::Commenting);
-        if effective_plan || casual_commenting {
+        let plan_label: Option<&str> = if effective_plan || casual_commenting {
             let commenting_range: Option<&std::ops::Range<usize>> = if approval_is_commenting {
                 self.plan_approval_view
                     .as_ref()
@@ -2619,7 +2571,7 @@ impl AgentView {
             } else {
                 None
             };
-            let plan_label: &str = if approval_is_commenting || casual_commenting {
+            Some(if approval_is_commenting || casual_commenting {
                 commenting_label = match commenting_range {
                     Some(r) if r.len() == 1 => xai_grok_i18n::t_fmt(
                         "mode.flag.commenting_line",
@@ -2715,7 +2667,7 @@ impl AgentView {
         let info = match &self.prompt_mode {
             PromptMode::Normal => PromptInfo {
                 model_name: &model_label,
-                flags: mode_flags,
+                flags: &flags,
                 multiline,
                 usage_status,
                 usage_warning,
@@ -2731,7 +2683,7 @@ impl AgentView {
                 .replace("{pos}", &pos);
                 PromptInfo {
                     model_name: &editing_label,
-                    flags: mode_flags,
+                    flags: &flags,
                     multiline,
                     usage_status,
                     usage_warning,
@@ -2888,46 +2840,7 @@ impl AgentView {
                 self.question_scroll_region =
                     Some((render_result.options_start_y, render_result.options_end_y));
             }
-            let mut painted_prompt_h = inline_prompt_h;
-            if is_input_mode && feedback_pane {
-                let box_y = question_area.y + question_area.height;
-                let below_card = (layout.prompt.y + layout.prompt.height).saturating_sub(box_y);
-                let box_h = inline_prompt_h
-                    .min(below_card.saturating_sub(question_footer_h))
-                    .max(below_card.min(1));
-                let input_area = Rect {
-                    x: layout.prompt.x + 3,
-                    y: box_y,
-                    width: feedback_input::width(layout.prompt.width),
-                    height: box_h,
-                };
-                buf.set_style(
-                    Rect {
-                        x: layout.prompt.x + 1,
-                        y: box_y,
-                        width: layout.prompt.width.saturating_sub(1),
-                        height: box_h,
-                    },
-                    Style::default().bg(theme.bg_light),
-                );
-                let outlined = box_h >= feedback_input::MIN_HEIGHT;
-                let style = if outlined {
-                    feedback_input::style(&theme)
-                } else {
-                    feedback_input::flat_style(&theme)
-                };
-                let result = self.prompt.draw(
-                    buf,
-                    input_area,
-                    Some(layout.scrollback),
-                    &style,
-                    outlined.then_some(&PromptInfo::default()),
-                    None,
-                );
-                prompt_cursor_pos = result.cursor_pos;
-                self.inline_prompt_area = Some(input_area);
-                painted_prompt_h = box_h;
-            } else if is_input_mode && inline_prompt_h > 0 {
+            if is_input_mode && inline_prompt_h > 0 {
                 let row_y = question_area.y + question_area.height;
                 let content_x = layout.prompt.x + 3;
                 let content_w = layout.prompt.width.saturating_sub(3);
@@ -3053,7 +2966,7 @@ impl AgentView {
                 self.inline_prompt_area = None;
             }
             if let Some(ref qv) = self.question_view {
-                let footer_y = question_area.y + question_area.height + painted_prompt_h + 1;
+                let footer_y = question_area.y + question_area.height + inline_prompt_h + 1;
                 let footer_x = layout.prompt.x;
                 let footer_w = layout.prompt.width;
                 self.question_nav_buttons.clear();
@@ -3061,7 +2974,7 @@ impl AgentView {
                     use ratatui::style::Modifier;
                     let footer_bg = theme.bg_light;
                     let gap_above = footer_y.saturating_sub(1);
-                    if gap_above >= question_area.y + question_area.height + painted_prompt_h {
+                    if gap_above >= question_area.y + question_area.height + inline_prompt_h {
                         buf.set_style(
                             Rect {
                                 x: footer_x,
@@ -3305,7 +3218,9 @@ impl AgentView {
                         panel_area,
                         Style::default().fg(theme.text_primary).bg(theme.bg_light),
                     );
-                    let border_style = Style::default().fg(theme.bg_highlight).bg(theme.bg_base);
+                    let border_style = Style::default()
+                        .fg(theme.panel_border_fg())
+                        .bg(theme.bg_base);
                     let border_line = Line::styled("─".repeat(panel_width as usize), border_style);
                     buf.set_line_safe(panel_x, top_border_y, &border_line, panel_width);
                     buf.set_line_safe(panel_x, bottom_border_y, &border_line, panel_width);
@@ -3447,11 +3362,14 @@ impl AgentView {
                     panel_area,
                     Style::default().fg(theme.text_primary).bg(theme.bg_light),
                 );
-                let border_style = Style::default().fg(theme.bg_highlight).bg(theme.bg_base);
+                let border_style = Style::default()
+                    .fg(theme.panel_border_fg())
+                    .bg(theme.bg_base);
                 let border_line =
                     Line::styled("\u{2500}".repeat(panel_width as usize), border_style);
                 buf.set_line_safe(panel_x, top_border_y, &border_line, panel_width);
                 buf.set_line_safe(panel_x, bottom_border_y, &border_line, panel_width);
+                let caption_style = theme.muted_over_chrome();
                 {
                     let hint = format!("{result_count}");
                     let hint_w = hint.len() as u16;
@@ -3460,7 +3378,7 @@ impl AgentView {
                         buf.set_line_safe(
                             hint_x,
                             top_border_y,
-                            &Line::styled(hint, Style::default().fg(theme.gray).bg(theme.bg_base)),
+                            &Line::styled(hint, caption_style.bg(theme.bg_base)),
                             hint_w,
                         );
                     }
@@ -3470,7 +3388,7 @@ impl AgentView {
                         buf.set_line_safe(
                             panel_x + 1,
                             top_border_y,
-                            &Line::styled(label, Style::default().fg(theme.gray).bg(theme.bg_base)),
+                            &Line::styled(label, caption_style.bg(theme.bg_base)),
                             label_w,
                         );
                     }
@@ -3497,7 +3415,7 @@ impl AgentView {
                             items_x,
                             msg_y,
                             message,
-                            Style::default().fg(theme.gray).bg(theme.bg_light),
+                            caption_style.bg(theme.bg_light),
                         );
                     }
                 } else {
@@ -3610,6 +3528,17 @@ impl AgentView {
                             }
                             col += cw;
                         }
+                        let row_rect = Rect {
+                            x: items_x,
+                            y: row_y,
+                            width: fill_width,
+                            height: 1,
+                        };
+                        if is_selected {
+                            buf.set_style(row_rect, theme.selection_overlay());
+                        } else if is_hovered {
+                            buf.set_style(row_rect, theme.hover_overlay());
+                        }
                     }
                     if needs_scrollbar {
                         let sb_area = Rect {
@@ -3638,7 +3567,7 @@ impl AgentView {
             self.pane_areas = layout.pane_areas();
             return (None, crate::terminal::overlay::clear().map(Into::into));
         }
-        match self.shortcuts_bar_content(registry, esc_owned_before_agent) {
+        match self.shortcuts_bar_content(registry) {
             ShortcutsBarContent::Hidden => {}
             ShortcutsBarContent::Surface(hints) => {
                 ShortcutsBar::new(&hints)
@@ -4150,10 +4079,39 @@ impl AgentView {
                     crate::scrollback::block::RenderBlock::system(String::new()),
                 ))
             } else {
-                self.scrollback.get_by_id(viewer.entry_id).cloned()
+                self.scrollback
+                    .get_by_id(viewer.entry_id)
+                    .cloned()
+                    .or_else(|| {
+                        if viewer.kind != crate::views::block_viewer::ViewerKind::BgTask {
+                            return None;
+                        }
+                        let task = self.session.bg_tasks.get(viewer.bg_task_id.as_deref()?)?;
+                        use crate::app::agent::BgTaskStatus;
+                        use crate::scrollback::blocks::BgTaskBlock;
+                        let block = match task.status {
+                            BgTaskStatus::Running => {
+                                BgTaskBlock::started(&task.command, &task.task_id)
+                            }
+                            BgTaskStatus::Done => {
+                                BgTaskBlock::completed(&task.command, &task.task_id, task.elapsed())
+                            }
+                            BgTaskStatus::Failed => BgTaskBlock::failed(
+                                &task.command,
+                                &task.task_id,
+                                task.elapsed(),
+                                task.exit_code,
+                                task.signal.clone(),
+                            ),
+                        }
+                        .with_description(task.description.clone());
+                        Some(crate::scrollback::entry::ScrollbackEntry::new(
+                            crate::scrollback::block::RenderBlock::BgTask(block),
+                        ))
+                    })
             };
             let Some(entry) = entry else {
-                self.block_viewer = None;
+                self.clear_block_viewer();
                 self.pane_areas = layout.pane_areas();
                 return (prompt_cursor_pos, prompt_post_flush);
             };
@@ -4326,6 +4284,24 @@ impl AgentView {
             self.pane_areas = layout.pane_areas();
             return (None, crate::terminal::overlay::clear().map(Into::into));
         }
+        if let Some(ref mut modal_state) = self.feedback_modal {
+            let overlay_area = Rect {
+                x: area.x,
+                y: area.y,
+                width: area.width,
+                height: layout.shortcuts.y.saturating_sub(area.y).saturating_sub(1),
+            };
+            let compact = self.scrollback.appearance().prompt.compact;
+            let rendered = modal_state.render(buf, overlay_area, &theme, compact);
+            let (cursor, post_flush) = match rendered {
+                Some(frame) => (frame.cursor, frame.post_flush),
+                None => (None, None),
+            };
+            let post_flush =
+                post_flush.or_else(|| crate::terminal::overlay::clear().map(Into::into));
+            self.pane_areas = layout.pane_areas();
+            return (cursor, post_flush);
+        }
         if let Some(ref mut modal_state) = self.extensions_modal {
             use crate::views::extensions_modal::render_extensions_modal;
             use crate::views::shortcuts_bar::HintItem;
@@ -4353,6 +4329,9 @@ impl AgentView {
                 compact,
                 tick,
             );
+            if crate::hyperlink_route::hyperlink_route().emit_osc8 {
+                Self::push_managed_connectors_wait_link_spans(link_spans_out, modal_state);
+            }
             if modal_state.input.is_some() {
                 let hints = vec![
                     HintItem::new(key!(Enter), xai_grok_i18n::t("auth.submit")),
@@ -4362,7 +4341,9 @@ impl AgentView {
             } else if modal_state.pending_action.is_some() {
                 let hints = vec![HintItem::new(key!(Esc), xai_grok_i18n::t("hint.close"))];
                 ShortcutsBar::new(&hints).render(layout.shortcuts, buf);
-            } else if modal_state.picker_state.search_active {
+            } else if modal_state.picker_state.search_active
+                && !modal_state.is_managed_connectors_wait()
+            {
                 let hints = vec![
                     HintItem::new(key!(Esc), xai_grok_i18n::t("hint.clear")),
                     HintItem::new(key!(Enter), xai_grok_i18n::t("hint.filter")),
@@ -4627,12 +4608,7 @@ impl AgentView {
             let todos = self.todo.todos();
             let overlay_rect = crate::views::goal_detail::goal_detail_area(area, goal, todos);
             let tick = self.tasks.tick_count() as usize;
-            let active_subagent_tokens: u64 = self
-                .subagent_sessions
-                .values()
-                .filter(|s| !s.finished && s.workflow_run_id.is_none())
-                .filter_map(|s| s.tokens_used)
-                .sum();
+            let active_subagent_tokens = self.live_standalone_subagent_tokens();
             let close_rect = crate::views::goal_detail::render_goal_detail(
                 buf,
                 overlay_rect,
@@ -4654,14 +4630,14 @@ impl AgentView {
             let live: crate::views::workflows::WorkflowAgentLiveMap = self
                 .subagent_sessions
                 .iter()
-                .filter(|(_, info)| info.workflow_run_id.is_some())
+                .filter(|(_, info)| info.attempt.workflow_run_id.is_some())
                 .map(|(id, info)| {
                     (
                         id.clone(),
                         crate::views::workflows::WorkflowAgentLiveStatus {
-                            activity: info.activity_label.clone(),
-                            context_tokens: info.tokens_used,
-                            context_window_tokens: info.context_window_tokens,
+                            activity: info.attempt.activity_label.clone(),
+                            context_tokens: info.attempt.tokens_used,
+                            context_window_tokens: info.attempt.context_window_tokens,
                             elapsed_ms: Some(info.display_elapsed().as_millis() as u64),
                         },
                     )
@@ -4883,6 +4859,46 @@ mod toast_fit_tests {
     }
 }
 #[cfg(test)]
+mod goal_subagent_token_tests {
+    use super::super::test_fixtures::make_agent;
+    use crate::app::subagent::{SubagentInfo, test_support::make_info};
+    fn child(child_session_id: &str, tokens: u64, workflow_run_id: Option<&str>) -> SubagentInfo {
+        let mut info = make_info();
+        info.subagent_id = child_session_id.into();
+        info.child_session_id = child_session_id.into();
+        info.attempt.tokens_used = Some(tokens);
+        info.attempt.workflow_run_id = workflow_run_id.map(Into::into);
+        info
+    }
+    #[test]
+    fn live_standalone_subagent_tokens_exclude_workflows_and_finished_attempts() {
+        let mut agent = make_agent();
+        agent
+            .subagent_sessions
+            .insert("standalone".to_string(), child("standalone", 60, None));
+        agent.subagent_sessions.insert(
+            "workflow".to_string(),
+            child("workflow", 90, Some("workflow-1")),
+        );
+        let mut finished = child("finished", 120, None);
+        finished.set_finished_for_test(true);
+        agent
+            .subagent_sessions
+            .insert("finished".to_string(), finished);
+        assert_eq!(agent.live_standalone_subagent_tokens(), 60);
+    }
+    #[test]
+    fn live_standalone_subagent_tokens_include_completed_wake_attempts() {
+        let mut agent = make_agent();
+        let mut standalone = child("standalone", 30, None);
+        standalone.completed_attempt_tokens = 100;
+        agent
+            .subagent_sessions
+            .insert("standalone".to_string(), standalone);
+        assert_eq!(agent.live_standalone_subagent_tokens(), 130);
+    }
+}
+#[cfg(test)]
 mod selection_state_tests {
     use super::super::test_fixtures::make_agent;
     use super::*;
@@ -5000,8 +5016,30 @@ mod overlay_cycle_hint_tests {
     use crate::scrollback::render::ScratchBuffer;
     use ratatui::buffer::Buffer;
     use ratatui::layout::Rect;
-    fn draw_overlay_footer(can_cycle: bool) -> String {
+    fn draw_overlay_footer(
+        can_cycle: bool,
+        workspace_dashboard_enabled: bool,
+        background_work: bool,
+        bound: bool,
+    ) -> String {
         let mut agent = make_agent();
+        if bound {
+            agent.session.session_id = Some("overlay-session".into());
+        }
+        if background_work {
+            agent.session.scheduled_tasks.insert(
+                "loop-1".into(),
+                crate::app::agent::ScheduledTaskInfo {
+                    task_id: "loop-1".into(),
+                    prompt: "keep going".into(),
+                    human_schedule: "every 5m".into(),
+                    created_at: std::time::Instant::now(),
+                    next_fire_at: None,
+                    tag: "loop".into(),
+                    last_subagent_id: None,
+                },
+            );
+        }
         let reg = ActionRegistry::defaults();
         let area = Rect::new(0, 0, 100, 30);
         let mut buf = Buffer::empty(area);
@@ -5018,7 +5056,10 @@ mod overlay_cycle_hint_tests {
             true,
             can_cycle,
             &mut Vec::new(),
-            super::AppRenderParams::default(),
+            super::AppRenderParams {
+                workspace_dashboard_enabled,
+                ..Default::default()
+            },
         );
         (0..area.height)
             .map(|y| {
@@ -5031,7 +5072,7 @@ mod overlay_cycle_hint_tests {
     }
     #[test]
     fn prev_next_hint_shown_when_overlay_can_cycle() {
-        let text = draw_overlay_footer(true);
+        let text = draw_overlay_footer(true, false, false, true);
         assert!(
             text.contains("prev/next agent"),
             "footer must advertise cycle keys when can_cycle:\n{text}"
@@ -5039,7 +5080,7 @@ mod overlay_cycle_hint_tests {
     }
     #[test]
     fn prev_next_hint_hidden_when_overlay_cannot_cycle() {
-        let text = draw_overlay_footer(false);
+        let text = draw_overlay_footer(false, false, false, true);
         assert!(
             !text.contains("prev/next agent"),
             "footer must not advertise cycle keys for a single agent:\n{text}"
@@ -5048,6 +5089,46 @@ mod overlay_cycle_hint_tests {
             text.contains("dashboard"),
             "back-to-dashboard hint still shown:\n{text}"
         );
+    }
+    #[test]
+    fn settled_workspace_overlay_advertises_archive() {
+        let text = draw_overlay_footer(false, true, false, true);
+        assert!(text.contains("Ctrl+x:archive"), "{text}");
+        assert!(!text.contains("Ctrl+x:stop"), "{text}");
+    }
+    #[test]
+    fn unbound_workspace_overlay_advertises_close() {
+        let text = draw_overlay_footer(false, true, false, false);
+        assert!(text.contains("Ctrl+x:close"), "{text}");
+        assert!(!text.contains("Ctrl+x:archive"), "{text}");
+    }
+    #[test]
+    fn workspace_cheatsheet_uses_the_same_ctrl_x_action_as_the_footer() {
+        let registry = ActionRegistry::defaults();
+        let mut agent = make_agent();
+        agent.in_dashboard_overlay = true;
+        agent.workspace_dashboard_enabled = true;
+        let stop_key = registry
+            .find(crate::actions::ActionId::DashboardOverlayStop)
+            .unwrap()
+            .default_key;
+        let ctrl_x_label = |agent: &super::AgentView| {
+            agent
+                .current_shortcut_hints(&registry)
+                .into_iter()
+                .find(|hint| hint.keys.contains(&stop_key))
+                .map(|hint| hint.label)
+        };
+        assert_eq!(ctrl_x_label(&agent).as_deref(), Some("close"));
+        agent.session.session_id = Some("workspace-session".into());
+        assert_eq!(ctrl_x_label(&agent).as_deref(), Some("archive"));
+    }
+    #[test]
+    fn busy_workspace_overlay_and_v1_keep_stop_copy() {
+        let busy_v2 = draw_overlay_footer(false, true, true, true);
+        assert!(busy_v2.contains("Ctrl+x:stop"), "{busy_v2}");
+        let settled_v1 = draw_overlay_footer(false, false, false, true);
+        assert!(settled_v1.contains("Ctrl+x:stop"), "{settled_v1}");
     }
 }
 #[cfg(test)]
@@ -5392,12 +5473,14 @@ mod status_line_draw_tests {
     use crate::actions::ActionRegistry;
     use crate::app::bundle::BundleState;
     use crate::scrollback::render::ScratchBuffer;
-    use crate::views::question_view::{LocalQuestionKind, QuestionViewState};
+    use crate::views::question_view::QuestionViewState;
     use crate::views::status_line::{SanitizedText, StatusLineDisplay, StatusLineFrame};
     use ratatui::buffer::Buffer;
     use ratatui::layout::Rect;
     use ratatui::style::Color;
-    use xai_grok_tools::implementations::grok_build::ask_user_question::Question;
+    use xai_grok_tools::implementations::grok_build::ask_user_question::{
+        Question, QuestionOption,
+    };
     fn draw_script(output: &str, rows: u16) -> Buffer {
         draw_script_for(&mut make_agent(), output, rows)
     }
@@ -5444,6 +5527,7 @@ mod status_line_draw_tests {
     }
     #[test]
     fn script_background_survives_the_pane_fill() {
+        let _guard = crate::theme::cache::pin_theme();
         let buf = draw_script("\x1b[41mRED\x1b[0m", 30);
         let (x, y) = find(&buf, "RED").expect("the script row is on screen");
         assert_eq!(buf[(x, y)].bg, Color::Red);
@@ -5453,19 +5537,24 @@ mod status_line_draw_tests {
     fn question_agent() -> AgentView {
         let mut agent = make_agent();
         let stashed = agent.prompt.stash();
-        let mut state = QuestionViewState::new(
+        let options = (0..12)
+            .map(|i| QuestionOption {
+                label: format!("Option {i}"),
+                description: String::new(),
+                preview: None,
+                id: None,
+            })
+            .collect();
+        let state = QuestionViewState::new(
             "status_line-test".into(),
             vec![Question {
-                question: crate::app::dispatch::FEEDBACK_QUESTION_LABEL.into(),
-                options: vec![],
+                question: "Pick one of many?".into(),
+                options,
                 multi_select: Some(false),
                 id: None,
             }],
             stashed,
-        )
-        .with_local_kind(LocalQuestionKind::Feedback);
-        let freeform = state.activate_freeform_input();
-        agent.prompt.set_text_preserving(&freeform);
+        );
         agent.question_view = Some(state);
         agent
     }
@@ -5518,7 +5607,7 @@ mod status_line_draw_tests {
             "the panel shrinks by the rows the script asks for, got rows at {present:?}\n{screen}"
         );
         assert!(
-            find(&buf, "Esc:dismiss").is_some(),
+            find(&buf, "Esc:scrollback").is_some(),
             "the shortcuts bar keeps its row\n{screen}"
         );
     }
@@ -5529,7 +5618,7 @@ mod status_line_draw_tests {
         let row_y = find(&buf, ONE_ROW_SCRIPT)
             .map(|(_, y)| y)
             .unwrap_or_else(|| panic!("the panel must leave the single row on screen\n{screen}"));
-        let bar_y = find(&buf, "Esc:dismiss")
+        let bar_y = find(&buf, "Esc:scrollback")
             .map(|(_, y)| y)
             .unwrap_or_else(|| panic!("the shortcuts bar keeps its row\n{screen}"));
         assert_eq!(

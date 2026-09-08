@@ -40,45 +40,65 @@ pub fn render_top_bar(
 }
 
 /// Build the `{git branch} {worktree} {cwd}` line for the welcome top bar, reading the live process cwd.
-pub(crate) fn location_line(theme: &Theme) -> Line<'static> {
-    location_line_at(theme, &process_cwd())
-}
-
-/// As [`location_line`], but for an explicit `cwd`.
-/// The dashboard header passes its staged `app.cwd` so the line tracks a `/cd` immediately.
-/// That holds before (or even if) `Effect::SetWorkingDir` moves the process cwd.
-/// Safe to call during render: it reads the per-cwd git cache and never blocks or spawns `git`.
 /// The caller width-truncates the returned line.
-pub(crate) fn location_line_at(theme: &Theme, cwd: &Path) -> Line<'static> {
+pub(crate) fn location_line(theme: &Theme) -> Line<'static> {
     let info_style = Style::default().fg(theme.gray);
+    let parts = location_parts(&process_cwd());
 
-    let info = git_info::cwd_git_info_lazy(cwd);
-
-    let mut parts: Vec<Span> = Vec::new();
-    if let Some(branch) = info.as_ref().and_then(|i| i.branch.as_deref()) {
+    let mut spans: Vec<Span> = Vec::new();
+    if let Some(branch) = parts.branch.as_deref() {
         let icon = git_info::branch_icon();
-        let git_text = if branch.is_empty() {
-            format!("{icon} {}", xai_grok_i18n::t("git.detached"))
-        } else {
-            format!("{icon} {branch}")
-        };
         let git_style = Style::default()
             .fg(theme.text_primary)
             .add_modifier(Modifier::DIM);
-        parts.push(Span::styled(git_text, git_style));
-        parts.push(Span::styled(" ", info_style));
+        spans.push(Span::styled(format!("{icon} {branch}"), git_style));
+        spans.push(Span::styled(" ", info_style));
     }
-    // Worktree badge: matches the session status bar's `worktree ` marker (accent_user) before the path when the cwd is a linked worktree
-    if info.as_ref().is_some_and(|i| i.is_worktree) {
-        parts.push(Span::styled(
-            xai_grok_i18n::t("welcome.picker.worktree").to_string() + " ",
-            Style::default().fg(theme.accent_user),
-        ));
+    if parts.is_worktree {
+        spans.push(worktree_badge(theme));
     }
-    let cwd_display = format_cwd_display(cwd, info.as_ref());
     let cwd_style = Style::default().fg(theme.gray_dim);
-    parts.push(Span::styled(cwd_display, cwd_style));
-    Line::from(parts)
+    spans.push(Span::styled(parts.cwd_display, cwd_style));
+    Line::from(spans)
+}
+
+/// The `worktree ` marker painted before the path of a linked worktree, matching the session status bar (accent_user).
+pub(crate) fn worktree_badge(theme: &Theme) -> Span<'static> {
+    Span::styled("worktree ", Style::default().fg(theme.accent_user))
+}
+
+/// The unstyled pieces of a location line, so each surface (welcome top bar, dashboard header) can style them on its own.
+pub(crate) struct LocationParts {
+    /// The checked-out branch, `detached` for a detached HEAD, `None` outside a git repo.
+    pub branch: Option<String>,
+    pub is_worktree: bool,
+    /// The tilde-collapsed cwd, with a `(worktree of …)` suffix for a linked worktree.
+    pub cwd_display: String,
+}
+
+/// The dashboard header passes its staged `app.cwd` so the line tracks a `/cd` immediately, before (or even if) `Effect::SetWorkingDir` moves the process cwd.
+/// Safe to call during render: it reads the per-cwd git cache and never blocks or spawns `git`.
+pub(crate) fn location_parts(cwd: &Path) -> LocationParts {
+    location_parts_from(cwd, git_info::cwd_git_info_lazy(cwd))
+}
+
+/// Pure mapping from the git probe result to the location pieces; `None` is a cache miss or a non-repo cwd.
+/// Takes `info` by value so the branch moves out instead of being cloned on every frame.
+fn location_parts_from(cwd: &Path, info: Option<git_info::CwdGitInfo>) -> LocationParts {
+    let cwd_display = format_cwd_display(cwd, info.as_ref());
+    let is_worktree = info.as_ref().is_some_and(|i| i.is_worktree);
+    let branch = info.and_then(|i| i.branch).map(|b| {
+        if b.is_empty() {
+            "detached".to_owned()
+        } else {
+            b
+        }
+    });
+    LocationParts {
+        branch,
+        is_worktree,
+        cwd_display,
+    }
 }
 
 fn process_cwd() -> PathBuf {
@@ -97,8 +117,7 @@ fn format_cwd_display(cwd: &Path, info: Option<&git_info::CwdGitInfo>) -> String
 /// Pure formatting for the cwd display; no global state.
 fn format_cwd_parts(display: &str, main_repo: Option<&str>) -> String {
     if let Some(main_repo) = main_repo {
-        let suffix = xai_grok_i18n::t_fmt("git.worktree_of", &[("main_repo", main_repo)]);
-        format!("{display} {suffix}")
+        format!("{display} (worktree of {main_repo})")
     } else {
         display.to_string()
     }
@@ -122,12 +141,10 @@ mod tests {
     /// A linked worktree shows the `(worktree of …)` suffix (matching the session status bar) regardless of the worktree's human label.
     /// The label is no longer shown here; the `worktree ` badge stands in for it.
     #[test]
-    #[serial_test::serial(GROK_UI_LOCALE)]
     fn format_cwd_worktree_shows_main_repo() {
-        let suffix = xai_grok_i18n::t_fmt("git.worktree_of", &[("main_repo", "~/xai")]);
         assert_eq!(
             format_cwd_parts("~/wt/session-1", Some("~/xai")),
-            format!("~/wt/session-1 {suffix}")
+            "~/wt/session-1 (worktree of ~/xai)"
         );
     }
 
@@ -149,7 +166,6 @@ mod tests {
 
     /// A worktree subdirectory shows the `(worktree of …)` suffix (matching the session status bar) while still showing the real subdirectory path.
     #[test]
-    #[serial_test::serial(GROK_UI_LOCALE)]
     fn format_cwd_display_worktree_subdir_shows_main_repo() {
         let info = git_info::CwdGitInfo {
             branch: Some("kevin/x".into()),
@@ -157,10 +173,9 @@ mod tests {
             main_repo: Some("~/xai".into()),
             worktree_label: Some("location-picker".into()),
         };
-        let suffix = xai_grok_i18n::t_fmt("git.worktree_of", &[("main_repo", "~/xai")]);
         assert_eq!(
             format_cwd_display(Path::new("/work/wt/location-picker/frontend"), Some(&info)),
-            format!("/work/wt/location-picker/frontend {suffix}"),
+            "/work/wt/location-picker/frontend (worktree of ~/xai)",
         );
     }
 
@@ -171,6 +186,37 @@ mod tests {
             format_cwd_display(Path::new("/work/xai/frontend/apps"), None),
             "/work/xai/frontend/apps",
         );
+    }
+
+    /// The location pieces per git probe outcome: a named branch, a detached HEAD (`Some("")` from the probe), a repo with no HEAD
+    /// (`branch: None`), and a cache miss. The worktree flag and the `(worktree of …)` suffix travel with the probe.
+    #[test]
+    fn location_parts_from_maps_each_probe_outcome() {
+        let cwd = Path::new("/work/wt/feature");
+        let probe = |branch: Option<&str>, is_worktree: bool| git_info::CwdGitInfo {
+            branch: branch.map(str::to_owned),
+            is_worktree,
+            main_repo: is_worktree.then(|| "~/xai".to_owned()),
+            worktree_label: None,
+        };
+
+        let named = location_parts_from(cwd, Some(probe(Some("main"), false)));
+        assert_eq!(named.branch.as_deref(), Some("main"));
+        assert!(!named.is_worktree);
+        assert_eq!(named.cwd_display, "/work/wt/feature");
+
+        let detached = location_parts_from(cwd, Some(probe(Some(""), true)));
+        assert_eq!(detached.branch.as_deref(), Some("detached"));
+        assert!(detached.is_worktree);
+        assert_eq!(detached.cwd_display, "/work/wt/feature (worktree of ~/xai)");
+
+        let no_head = location_parts_from(cwd, Some(probe(None, false)));
+        assert_eq!(no_head.branch, None);
+
+        let miss = location_parts_from(cwd, None);
+        assert_eq!(miss.branch, None);
+        assert!(!miss.is_worktree);
+        assert_eq!(miss.cwd_display, "/work/wt/feature");
     }
 
     /// String-prefix `strip_prefix($HOME)` would collapse a neighbor profile (`$HOMEbar`) into `~bar`.

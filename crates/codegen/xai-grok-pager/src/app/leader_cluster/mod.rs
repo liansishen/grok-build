@@ -382,7 +382,6 @@ impl PagerLeaderCluster {
         // Abort and drain the generation's agent/bridge tasks (the server task has already run its socket cleanup above)
         // Channel-closure teardown is only eventual
         // Without the drain an old agent task could still run against the same GROK_HOME when the next generation's agent starts
-        // Two writers on one updates.jsonl is the corruption the real leader's flock prevents
         for task in self.generation_tasks.drain(..) {
             task.abort();
             let _ = task.await;
@@ -489,7 +488,13 @@ impl PagerLeaderCluster {
             self.authenticated = true;
         }
 
-        let mut app = AppView::new(tx, ModelState::default(), Vec::new());
+        // Headless leader has no terminal; out-of-band escapes have nowhere to go
+        let mut app = AppView::new(
+            tx,
+            ModelState::default(),
+            Vec::new(),
+            crate::render::draw::EscapeWriter::disconnected(),
+        );
         app.leader_mode = true;
         app.auth_state = AuthState::Done;
         app.trust_state = TrustState::Done;

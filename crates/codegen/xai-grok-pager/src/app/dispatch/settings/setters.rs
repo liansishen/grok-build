@@ -939,7 +939,6 @@ pub(super) fn set_scroll_lines_inner(app: &mut AppView, clamped: u8) {
 }
 
 /// Set the lines-per-tick for both wheel and trackpad scrolling.
-///
 /// SHELL-OWNED: persisted to `[ui].scroll_lines` via `Effect::PersistSetting`.
 /// Clamps to `[1, 10]` to match the registry's `Int { min: 1, max: 10 }`
 /// bounds.
@@ -1373,7 +1372,6 @@ pub(in crate::app::dispatch) fn set_simple_mode(app: &mut AppView, new: bool) ->
     }]
 }
 
-// ---------------------------------------------------------------------------
 // Contextual-hint tips: the `contextual_hints.*` per-tip toggles.
 //
 // SHELL-owned: persisted to `[ui.contextual_hints]`. Each setter writes the
@@ -1546,7 +1544,6 @@ pub(in crate::app::dispatch) fn set_contextual_hint_ssh_wrap(
     )
 }
 
-// ---------------------------------------------------------------------------
 // Theme settings: `theme`, `auto_dark_theme`, `auto_light_theme`.
 //
 // Each has a preview/commit split:
@@ -2050,11 +2047,7 @@ pub(in crate::app::dispatch) fn set_default_model(
     app.show_toast(&save_default_model_toast(&new_display));
 
     // Persist the **model ID** (catalog key), not the display name.
-    // The shell's `resolve_default_model` matches by slug / map key,
-    // so persisting the human-readable name (e.g. "Grok Build")
     // would silently fail to resolve on the next startup.
-    //
-    // Chat (`--chat` / GROK_CHAT_MODE) catalogs use opaque `/rest/modes`
     // slugs that must not become the global Build `default_model`.
     let mut effects: Vec<Effect> = Vec::new();
     if !xai_grok_shell::agent::chat_modes::process_chat_mode_enabled() {

@@ -256,6 +256,10 @@ fn open_prompt_blocked_card(
         return;
     }
 
+    agent.displace_feedback_modal(
+        crate::views::feedback_modal::FeedbackModalDisplacement::HookBlockedPrompt,
+    );
+
     let row_id = blocked.row_id;
     let was_combined = blocked.was_combined;
     let hook_name = blocked
@@ -316,20 +320,19 @@ fn open_prompt_blocked_card(
     ];
 
     let stashed = agent.prompt.stash();
-    agent.question_view = Some(
-        QuestionViewState::new(
-            format!("prompt-blocked-{row_id}"),
-            vec![Question {
-                question,
-                id: None,
-                options,
-                multi_select: Some(false),
-            }],
-            stashed,
-        )
-        .with_local_kind(LocalQuestionKind::PromptBlocked { row_id })
-        .with_no_freeform(),
-    );
+    let state = QuestionViewState::new(
+        format!("prompt-blocked-{row_id}"),
+        vec![Question {
+            question,
+            id: None,
+            options,
+            multi_select: Some(false),
+        }],
+        stashed,
+    )
+    .with_local_kind(LocalQuestionKind::PromptBlocked { row_id })
+    .with_no_freeform();
+    agent.install_local_question(state);
     agent.prompt.set_text("");
 }
 

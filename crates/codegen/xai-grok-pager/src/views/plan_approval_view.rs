@@ -7,20 +7,27 @@ pub use xai_grok_tools::implementations::grok_build::exit_plan_mode::{
 
 use crate::views::prompt_widget::StashedPrompt;
 
-/// Locale-aware placeholder body for the plan-approval preview when
-/// `exit_plan_mode` parks with no plan content (missing/empty `plan.md`, or a
-/// whitespace-only body).
-///
-/// Must be non-empty after trim so `LineViewerState::open_markdown_content`
-/// accepts it — empty bodies are rejected there.
+/// Placeholder body for the plan-approval preview when `exit_plan_mode` parks with no plan content.
+/// No content means a missing/empty `plan.md`, or a whitespace-only body. Must be non-empty after
+/// trim so `LineViewerState::open_markdown_content` accepts it; empty bodies are rejected there.
+pub const EMPTY_PLAN_PLACEHOLDER: &str = "\
+# No plan written yet
+
+The agent exited plan mode without writing a plan.
+
+- **Approve**: leave plan mode and start implementing
+- **Request changes**: send the agent back to planning
+- **Quit**: abandon and turn plan mode off
+";
+
+/// Localized placeholder body retained for callers using the pre-upstream helper API.
 pub fn empty_plan_placeholder() -> String {
     xai_grok_i18n::t("plan.empty_placeholder").to_string()
 }
 
 /// Status-line label while plan approval is parked.
 ///
-/// Empty plans use an active decision prompt instead of "Waiting…", so the
-/// UI doesn't look stuck when there is no preview body to open.
+/// Empty plans use an active decision prompt instead of "Waiting…", so the UI doesn't look stuck when there is no preview body to open.
 pub fn plan_approval_status_label(has_plan: bool) -> &'static str {
     if has_plan {
         xai_grok_i18n::t("plan.waiting_approval")
@@ -40,6 +47,13 @@ pub enum PlanApprovalFocus {
 pub enum PlanReviewSource {
     Inline,
     FileBacked,
+}
+
+/// A revision request is not an outcome: the review reopens and plan mode stays on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlanReviewOutcome {
+    Approved,
+    Abandoned,
 }
 
 #[derive(Debug, Clone)]
@@ -393,15 +407,14 @@ mod tests {
     }
 
     #[test]
-    fn plan_approval_labels_and_placeholder_are_nonempty() {
-        assert!(!plan_approval_status_label(true).trim().is_empty());
-        assert!(!plan_approval_status_label(false).trim().is_empty());
+    fn plan_approval_status_label_distinguishes_empty() {
+        assert_eq!(plan_approval_status_label(true), "Waiting on plan approval");
         assert_eq!(
             plan_approval_status_label(false),
-            xai_grok_i18n::t("plan.no_plan_approve")
+            "No plan written: approve or request changes"
         );
         // Placeholder must be non-empty so the line viewer accepts it.
-        assert!(!empty_plan_placeholder().trim().is_empty());
+        assert!(!EMPTY_PLAN_PLACEHOLDER.trim().is_empty());
     }
 
     #[test]

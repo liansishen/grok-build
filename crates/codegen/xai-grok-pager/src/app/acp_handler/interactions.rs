@@ -59,6 +59,11 @@ pub(crate) fn handle_mcp_elicit(
         cancel_elicitation_request(old_tx);
     }
 
+    // Mandatory ingress wins: evict an open feedback modal before this elicitation installs and stashes its own state.
+    agent.displace_feedback_modal(
+        crate::views::feedback_modal::FeedbackModalDisplacement::McpElicitation,
+    );
+
     if let Some(mut old) = agent.elicitation_view.take() {
         if let Some(old_tx) = old.take_response_tx() {
             cancel_elicitation_request(old_tx);
@@ -135,6 +140,11 @@ pub(crate) fn handle_ask_user_question(
         return false;
     };
 
+    // Mandatory ingress wins: evict an open feedback modal before this question installs and stashes its own state.
+    agent.displace_feedback_modal(
+        crate::views::feedback_modal::FeedbackModalDisplacement::AcpQuestion,
+    );
+
     // If a question is already active, cancel it before replacing.
     if let Some(mut old_qv) = agent.question_view.take() {
         agent.record_question_pause(&old_qv);
@@ -154,8 +164,6 @@ pub(crate) fn handle_ask_user_question(
         // Local question displaced by an ACP ask, so surface why it vanished.
         // Any directive it carried is dropped; the user re-issues the command after answering.
         if let Some(kind) = old_qv.local_kind.take() {
-            use crate::app::actions::FeedbackTraceChoice;
-            use crate::app::dispatch::notes;
             use crate::views::question_view::LocalQuestionKind;
             match kind {
                 LocalQuestionKind::FeedbackTrace { report, images } => {
@@ -211,9 +219,6 @@ pub(crate) fn handle_ask_user_question(
                             xai_grok_i18n::t("question.local.subject.model_switch")
                         }
                         LocalQuestionKind::DeleteCurrentSession => "/delete",
-                        LocalQuestionKind::Feedback | LocalQuestionKind::FeedbackTrace { .. } => {
-                            "/feedback"
-                        }
                         LocalQuestionKind::DoctorFix { .. } => "/doctor fix",
                         // Owned by the dedicated arm above; label kept for
                         // exhaustiveness.
@@ -260,7 +265,6 @@ pub(crate) fn handle_ask_user_question(
 }
 
 /// Handle an `x.ai/exit_plan_mode` ext_method request.
-///
 /// Creates a `PlanApprovalViewState` overlay for interactive approval.
 ///
 /// Flow: parse → guard → cancel old → capture session draft → create state →
@@ -308,6 +312,11 @@ pub(super) fn handle_exit_plan_mode(
         return false;
     };
 
+    // Mandatory ingress wins: evict an open feedback modal before the approval captures the session draft.
+    agent.displace_feedback_modal(
+        crate::views::feedback_modal::FeedbackModalDisplacement::PlanApproval,
+    );
+
     if let Some(mut old) = agent.plan_approval_view.take() {
         tracing::warn!(
             old_tool_call_id = %old.tool_call_id,
@@ -326,7 +335,7 @@ pub(super) fn handle_exit_plan_mode(
     // - block_viewer: draw returns on line_viewer (plan visible) but
     //   handle_scroll prefers block_viewer, so wheel hits the hidden Edit pane.
     agent.active_modal = None;
-    agent.block_viewer = None;
+    agent.dismiss_block_viewer();
 
     let source = plan_review_source_for_tool(&params.tool_call_id, agent);
 

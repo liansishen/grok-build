@@ -649,7 +649,7 @@ fn enable_always_approve_sends_response_and_flips_yolo_and_persists() {
         }
     }
 
-    // (2) The dispatcher returns a PersistPermissionMode effect with
+    // (2) The dispatcher returns a PersistPermissionMode effect with canonical "always-approve". This is the bridge that writes
     //     canonical "always-approve". This is the bridge that writes
     //     ~/.grok/config.toml AND fires x.ai/yolo_mode_changed.
     let persist = effects
@@ -2133,7 +2133,6 @@ fn set_theme_auto_enables_auto_mode_and_persists_auto() {
     });
 }
 
-// ────────────────────────────────────────────────────────────────────
 // set_plan_mode dispatch-level coverage.
 //
 // Mirrors the `coding_data_sharing` and `yolo` test

@@ -17,6 +17,7 @@ mod dashboard;
 mod dashboard_telemetry;
 pub(crate) mod external_editor;
 mod import_claude;
+mod inline_feedback;
 mod interject;
 mod jump;
 mod modes;
@@ -39,6 +40,7 @@ pub(in crate::app) use auth::scrollback_has_recent_error_banner;
 pub(crate) use billing::{
     CREDIT_LIMIT_RETRY_OPTION_ID, UPSELL_URL_PAYG, UPSELL_URL_UPGRADE, is_credit_limit_error,
 };
+pub(crate) use dashboard::{DashboardStopReadiness, dashboard_stop_readiness};
 pub(crate) use modes::{downgrade_displayed_auto_if_gated, effective_auto};
 pub(crate) use notes::feedback_question_label;
 pub(crate) use notes::FEEDBACK_QUESTION_LABEL;
@@ -55,6 +57,7 @@ pub(super) use queue::{
 };
 pub(in crate::app) use rewind::{find_user_prompt_entry_for_shell_index, shell_prompt_index_at};
 pub(crate) use router::dispatch;
+pub(crate) use session::lifecycle::{abandon_unused_home_session, maybe_create_home_session};
 pub(crate) use settings::ui::refresh_open_settings_modals;
 pub(crate) use status::commit_minimal_update_notice;
 pub(crate) use turn::{reconcile_overdue_cancels, reconcile_overdue_turn_ends};

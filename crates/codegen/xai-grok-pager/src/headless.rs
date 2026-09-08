@@ -3,7 +3,11 @@
 //! Runs the agent in-process via `spawn_grok_shell`, drives the ACP lifecycle
 //! (init, auth, session, prompt), streams to stdout, and exits via `CancellationToken`.
 
-use std::collections::HashSet;
+use crate::app::subagent::{
+    SubagentLifecycleEffect, SubagentLifecycleReduction, SubagentLifecycleState,
+    SubagentLifecycleTransition,
+};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -26,6 +30,11 @@ use xai_grok_telemetry::startup::PendingStartup;
 
 use crate::acp::model_state::{EffortTokenError, ModelState};
 use crate::acp::spawn::{AgentShutdownGuard, spawn_grok_shell};
+use crate::app::worktree_session::{
+    WorktreeSpec, create_worktree, new_worktree_id, note_orphaned_worktree,
+    resume_session_into_worktree,
+};
+use crate::best_effort_stderr::eprint_line;
 use crate::client_identity::{HEADLESS_CLIENT_TYPE, PAGER_CLIENT_VERSION};
 use crate::headless::reducer::{
     Lifecycle, McpServer, Reducer, SessionContext, StreamEvent, TurnEnd, map_session_update,
@@ -60,7 +69,10 @@ pub struct HeadlessOptions {
     pub continue_last_session: bool,
     /// Fork on resume/continue (`--fork-session`).
     pub fork_session: bool,
+    /// `-w`; `Some("")` is a bare, unlabeled `-w`.
     pub worktree: Option<String>,
+    /// `--worktree-ref`; set means a clean checkout of that ref, unset overlays the dirty tree.
+    pub worktree_ref: Option<String>,
     pub restore_code: bool,
     pub agent: Option<String>,
     pub agents_json: Option<String>,
@@ -192,9 +204,7 @@ impl HeadlessEmitter {
     /// Render an `x.ai/*` lifecycle notification for the active format.
     fn on_lifecycle(&mut self, event: Lifecycle) {
         match self.format {
-            OutputFormat::Plain => {
-                eprintln!("{}", event.plain_message());
-            }
+            OutputFormat::Plain => eprint_line(&event.plain_message()),
             OutputFormat::Json => {}
             OutputFormat::StreamingJson | OutputFormat::StreamingMessagesJson => {
                 self.reduce_and_emit(StreamEvent::Lifecycle(event));
@@ -360,7 +370,7 @@ impl HeadlessEmitter {
     /// Emit the terminal error; `stop_reason_override` stamps a Messages stop reason (e.g. `max_tokens`).
     fn on_error(&mut self, message: &str, stop_reason_override: Option<&str>) {
         match self.format {
-            OutputFormat::Plain => eprintln!("{message}"),
+            OutputFormat::Plain => eprint_line(message),
             OutputFormat::Json => {
                 let mut err = serde_json::json!({"type":"error","message": message});
                 if let Some(usage) = &self.usage {
@@ -515,6 +525,7 @@ fn build_headless_init_request(
         .meta(meta.as_object().cloned())
 }
 
+#[derive(Debug)]
 struct OpenedSession {
     session_id: acp::SessionId,
     models: ModelState,
@@ -557,6 +568,11 @@ async fn open_session(
         anyhow::bail!(xai_grok_i18n::t("cli.headless.session_not_exists"));
     }
 
+    // Fresh `-p` sessions persist as headless so `/resume` keeps them off its default pages; the load path above never restamps
+    let mut meta = serde_json::json!({ "sessionKind": "headless" })
+        .as_object()
+        .cloned();
+    crate::app::session_startup::stamp_phase_traceparent(&mut meta);
     let new_resp: acp::NewSessionResponse = acp_send(
         acp::NewSessionRequest::new(cwd.to_path_buf())
             .mcp_servers(mcp_servers)
@@ -586,14 +602,14 @@ async fn open_session_with_id(
     crate::app::session_startup::ensure_session_id_available(session_id, &cwd_str)?;
     let mcp_servers =
         cli_config::load_mcp_servers(cwd, &xai_grok_tools::types::compat::CompatConfig::default());
+    let mut meta = serde_json::json!({ "sessionId": session_id, "sessionKind": "headless" })
+        .as_object()
+        .cloned();
+    crate::app::session_startup::stamp_phase_traceparent(&mut meta);
     let new_resp: acp::NewSessionResponse = acp_send(
         acp::NewSessionRequest::new(cwd.to_path_buf())
             .mcp_servers(mcp_servers)
-            .meta(
-                serde_json::json!({ "sessionId": session_id, "sessionKind": "headless" })
-                    .as_object()
-                    .cloned(),
-            ),
+            .meta(meta),
         acp_tx,
     )
     .await?;
@@ -766,9 +782,10 @@ async fn apply_headless_model_and_effort(
 fn headless_materialize_ctx(
     resume_title_pinned: bool,
     restore_code: bool,
+    has_worktree: bool,
 ) -> crate::app::session_startup::MaterializeCtx {
     crate::app::session_startup::MaterializeCtx {
-        has_worktree: false,
+        has_worktree,
         allow_remote_restore:
             crate::app::session_startup::MaterializeCtx::default_allow_remote_restore(),
         chat_mode: false,
@@ -968,14 +985,15 @@ pub async fn run_single_turn(
     use crate::app::session_startup::{self, MaterializedStartup, SessionStartupFlags};
     let has_resume_id = options.resume.as_deref().filter(|s| !s.is_empty());
     let resume_most_recent = options.resume.as_deref() == Some("");
+    let worktree =
+        WorktreeSpec::from_cli(options.worktree.as_deref(), options.worktree_ref.as_deref());
     let intent = session_startup::session_startup_intent_from_flags(SessionStartupFlags {
         session_id: options.session_id.as_deref(),
         resume_session_id: has_resume_id,
         resume_most_recent,
         continue_last_session: options.continue_last_session,
         fork_session: options.fork_session,
-        // Headless never creates a worktree from `-w`.
-        has_worktree: false,
+        has_worktree: worktree.is_some(),
     })
     .map_err(|e| anyhow::anyhow!("{e}"))
     .inspect_err(|_| {
@@ -984,7 +1002,11 @@ pub async fn run_single_turn(
 
     let cwd_str = cwd.to_string_lossy().to_string();
     let materialized = session_startup::materialize_startup_for_cwd(
-        headless_materialize_ctx(options.resume_title_pinned, options.restore_code),
+        headless_materialize_ctx(
+            options.resume_title_pinned,
+            options.restore_code,
+            worktree.is_some(),
+        ),
         intent,
         &cwd_str,
     )
@@ -1006,25 +1028,56 @@ pub async fn run_single_turn(
     };
     let t_session = Instant::now();
     xai_grok_telemetry::startup::enter(crate::acp::StartupPhase::SessionCreate);
-    let opened = match materialized {
-        MaterializedStartup::NewAuto => open_session(&acp_tx, &cwd, None, None).await,
-        MaterializedStartup::NewWithId { session_id } => {
+    let opened = match (materialized, worktree.as_ref()) {
+        (MaterializedStartup::NewAuto, Some(spec)) => {
+            open_session_in_new_worktree(&acp_tx, &cwd, spec, None).await
+        }
+        (MaterializedStartup::NewWithId { session_id }, Some(spec)) => {
+            open_session_in_new_worktree(&acp_tx, &cwd, spec, Some(&session_id)).await
+        }
+        (
+            MaterializedStartup::Resume {
+                session_id,
+                deferred_local_miss,
+                ..
+            },
+            Some(spec),
+        ) => {
+            resume_session_in_new_worktree(
+                &acp_tx,
+                &cwd,
+                spec,
+                &session_id,
+                restore_code,
+                deferred_local_miss,
+            )
+            .await
+        }
+        (MaterializedStartup::NewAuto, None) => open_session(&acp_tx, &cwd, None, None).await,
+        (MaterializedStartup::NewWithId { session_id }, None) => {
             open_session_with_id(&acp_tx, &cwd, &session_id).await
         }
-        MaterializedStartup::Resume {
-            session_id,
-            original_cwd,
-            ..
-        } => {
+        (
+            MaterializedStartup::Resume {
+                session_id,
+                original_cwd,
+                ..
+            },
+            None,
+        ) => {
             let load_cwd = original_cwd.as_deref().unwrap_or(cwd.as_path());
             open_session(&acp_tx, load_cwd, Some(session_id.as_str()), restore_code).await
         }
-        MaterializedStartup::Fork {
-            parent_session_id,
-            parent_cwd,
-            new_session_id,
-            ..
-        } => {
+        // Fork with `-w` never reaches here; the intent check above refuses it.
+        (
+            MaterializedStartup::Fork {
+                parent_session_id,
+                parent_cwd,
+                new_session_id,
+                ..
+            },
+            _,
+        ) => {
             fork_then_open(
                 &acp_tx,
                 &cwd,
@@ -1187,7 +1240,7 @@ pub async fn run_single_turn(
                     &mut ttf_logged,
                     options.yolo,
                     &mut pending_bg,
-                    &mut completed_bg,
+                    &mut background_lifecycle,
                 );
                 if pending_bg.is_empty() {
                     tracing::debug!("headless: no pending background tasks, exiting");
@@ -1239,7 +1292,7 @@ pub async fn run_single_turn(
                         &mut ttf_logged,
                         options.yolo,
                         &mut pending_bg,
-                        &mut completed_bg,
+                        &mut background_lifecycle,
                     );
                 }
                 res = &mut prompt_fut, if prompt_result.is_none() => {
@@ -1254,7 +1307,7 @@ pub async fn run_single_turn(
                             &mut ttf_logged,
                             options.yolo,
                             &mut pending_bg,
-                            &mut completed_bg,
+                            &mut background_lifecycle,
                         )
                         .await;
                         break;
@@ -1267,7 +1320,7 @@ pub async fn run_single_turn(
                         &mut ttf_logged,
                         options.yolo,
                         &mut pending_bg,
-                        &mut completed_bg,
+                        &mut background_lifecycle,
                     );
                 }
                 _ = tokio::time::sleep(timeout_deadline), if options.wait_for_background
@@ -1287,7 +1340,7 @@ pub async fn run_single_turn(
             &mut ttf_logged,
             options.yolo,
             &mut pending_bg,
-            &mut completed_bg,
+            &mut background_lifecycle,
         );
 
         if !pending_bg.is_empty() {
@@ -1310,6 +1363,8 @@ pub async fn run_single_turn(
         anyhow::bail!(xai_grok_i18n::t("cli.headless.connection_closed_unexpectedly"));
     }
     let outcome: Result<()> = match prompt_result {
+        // Mid-turn close skips the partial result; the shared drain below still runs.
+        _ if connection_closed => Err(anyhow::anyhow!("Connection closed unexpectedly")),
         Some(Ok(resp)) => {
             let stop_reason = stop_reason_wire(resp.stop_reason);
             emitter.set_structured_output_from_meta(resp.meta.as_ref());
@@ -1381,9 +1436,8 @@ pub async fn run_single_turn(
         None => Ok(()),
     };
 
-    if options.memory_flush
-        && outcome.is_ok()
-        && let Err(e) = run_headless_memory_flush(
+    let flush_error = if options.memory_flush && outcome.is_ok() {
+        run_headless_memory_flush(
             &acp_tx,
             &mut acp_rx,
             &session_id,
@@ -1391,16 +1445,18 @@ pub async fn run_single_turn(
             options.yolo,
         )
         .await
-    {
-        if let Some(err) = emitter.take_output_error() {
-            return Err(anyhow::Error::new(err).context("headless: stdout write failed"));
-        }
-        return Err(e);
-    }
+        .err()
+    } else {
+        None
+    };
 
-    // A hard stdout write error outranks the normal outcome: output is dead, so exit non-zero.
+    xai_grok_shell::upload::drain_pending_uploads_at_exit().await;
+
     if let Some(err) = emitter.take_output_error() {
         return Err(anyhow::Error::new(err).context("headless: stdout write failed"));
+    }
+    if let Some(e) = flush_error {
+        return Err(e);
     }
     outcome
 }
@@ -1421,7 +1477,7 @@ async fn run_headless_memory_flush(
     let t0 = Instant::now();
     let mut ttf_logged = true;
     let mut pending_bg = HashSet::new();
-    let mut completed_bg = HashSet::new();
+    let mut background_lifecycle = BackgroundLifecycleState::default();
     let response = loop {
         tokio::select! {
             biased;
@@ -1436,7 +1492,7 @@ async fn run_headless_memory_flush(
                     &mut ttf_logged,
                     yolo,
                     &mut pending_bg,
-                    &mut completed_bg,
+                    &mut background_lifecycle,
                 );
             }
             res = &mut flush_fut => break res,
@@ -1449,7 +1505,7 @@ async fn run_headless_memory_flush(
         &mut ttf_logged,
         yolo,
         &mut pending_bg,
-        &mut completed_bg,
+        &mut background_lifecycle,
     );
     let response = response.map_err(|e| anyhow::anyhow!("memory flush failed: {e}"))?;
     let flushed = serde_json::from_str::<serde_json::Value>(response.0.get())
@@ -1467,6 +1523,12 @@ async fn run_headless_memory_flush(
 enum BackgroundWork {
     Task(String),
     Subagent(String),
+}
+
+#[derive(Default)]
+struct BackgroundLifecycleState {
+    completed_tasks: HashSet<String>,
+    subagents: HashMap<String, SubagentLifecycleState>,
 }
 
 /// Ext request that kills one unit of background work (subagent cancel or task kill).
@@ -1527,65 +1589,83 @@ async fn reap_pending_background_tasks(
 fn track_background_lifecycle(
     event: ExtEvent,
     pending_bg: &mut HashSet<BackgroundWork>,
-    completed_bg: &mut HashSet<BackgroundWork>,
+    state: &mut BackgroundLifecycleState,
 ) {
     match event {
         ExtEvent::TaskBackgrounded {
             task_id,
             is_monitor,
         } => {
-            let work = BackgroundWork::Task(task_id);
-            if completed_bg.contains(&work) {
+            if state.completed_tasks.contains(&task_id) {
                 tracing::debug!(
                     is_monitor,
                     "headless: ignoring task_backgrounded for already-completed task"
                 );
             } else {
-                pending_bg.insert(work);
-                tracing::debug!(
-                    pending = pending_bg.len(),
-                    is_monitor,
-                    "headless: tracking background task"
-                );
+                pending_bg.insert(BackgroundWork::Task(task_id));
             }
         }
         ExtEvent::TaskCompleted { task_id } => {
-            let work = BackgroundWork::Task(task_id);
-            let was_pending = pending_bg.remove(&work);
-            completed_bg.insert(work);
-            if was_pending {
-                tracing::debug!(
-                    pending = pending_bg.len(),
-                    "headless: background task completed"
-                );
+            pending_bg.remove(&BackgroundWork::Task(task_id.clone()));
+            state.completed_tasks.insert(task_id);
+        }
+        ExtEvent::SubagentSpawned {
+            subagent_id,
+            attempt_id,
+            event_seq,
+        } => {
+            let lifecycle = state.subagents.entry(subagent_id.clone()).or_default();
+            if let SubagentLifecycleReduction::Accepted(accepted) = lifecycle.reduce(
+                SubagentLifecycleTransition::Spawned,
+                attempt_id.as_deref(),
+                event_seq,
+            ) {
+                let effect = accepted.effect();
+                accepted.commit(lifecycle);
+                match effect {
+                    SubagentLifecycleEffect::Apply | SubagentLifecycleEffect::ApplyNewAttempt => {
+                        pending_bg.insert(BackgroundWork::Subagent(subagent_id));
+                    }
+                    SubagentLifecycleEffect::ApplyWithPendingFinish => {
+                        pending_bg.remove(&BackgroundWork::Subagent(subagent_id));
+                    }
+                    SubagentLifecycleEffect::AwaitSpawn | SubagentLifecycleEffect::RecordOnly => {}
+                }
             }
         }
-        ExtEvent::SubagentSpawned { subagent_id } => {
-            let work = BackgroundWork::Subagent(subagent_id);
-            if completed_bg.contains(&work) {
-                tracing::debug!(
-                    "headless: ignoring subagent_spawned for already-finished subagent"
-                );
-            } else {
-                pending_bg.insert(work);
-                tracing::debug!(
-                    pending = pending_bg.len(),
-                    "headless: tracking background subagent"
-                );
+        ExtEvent::SubagentProgress {
+            subagent_id,
+            attempt_id,
+            event_seq,
+        } => {
+            if let Some(lifecycle) = state.subagents.get_mut(&subagent_id)
+                && let SubagentLifecycleReduction::Accepted(accepted) = lifecycle.reduce(
+                    SubagentLifecycleTransition::Progress,
+                    attempt_id.as_deref(),
+                    event_seq,
+                )
+            {
+                accepted.commit(lifecycle);
             }
         }
-        ExtEvent::SubagentFinished { subagent_id } => {
-            let work = BackgroundWork::Subagent(subagent_id);
-            let was_pending = pending_bg.remove(&work);
-            completed_bg.insert(work);
-            if was_pending {
-                tracing::debug!(
-                    pending = pending_bg.len(),
-                    "headless: background subagent finished"
-                );
+        ExtEvent::SubagentFinished {
+            subagent_id,
+            attempt_id,
+            event_seq,
+        } => {
+            let lifecycle = state.subagents.entry(subagent_id.clone()).or_default();
+            if let SubagentLifecycleReduction::Accepted(accepted) = lifecycle.reduce(
+                SubagentLifecycleTransition::Finished,
+                attempt_id.as_deref(),
+                event_seq,
+            ) {
+                let effect = accepted.effect();
+                accepted.commit(lifecycle);
+                if effect == SubagentLifecycleEffect::Apply {
+                    pending_bg.remove(&BackgroundWork::Subagent(subagent_id));
+                }
             }
         }
-        // Routed to the emitter by the caller, never tracked.
         ExtEvent::MonitorEvent | ExtEvent::None | ExtEvent::Lifecycle(_) | ExtEvent::Stream(_) => {}
     }
 }
@@ -1600,7 +1680,7 @@ fn drain_pending_acp_messages(
     ttf_logged: &mut bool,
     yolo: bool,
     pending_bg: &mut HashSet<BackgroundWork>,
-    completed_bg: &mut HashSet<BackgroundWork>,
+    background_lifecycle: &mut BackgroundLifecycleState,
 ) {
     while let Ok(msg) = acp_rx.try_recv() {
         handle_headless_acp_message(
@@ -1610,7 +1690,7 @@ fn drain_pending_acp_messages(
             ttf_logged,
             yolo,
             pending_bg,
-            completed_bg,
+            background_lifecycle,
         );
     }
 }
@@ -1624,7 +1704,7 @@ async fn drain_acp_with_grace(
     ttf_logged: &mut bool,
     yolo: bool,
     pending_bg: &mut HashSet<BackgroundWork>,
-    completed_bg: &mut HashSet<BackgroundWork>,
+    background_lifecycle: &mut BackgroundLifecycleState,
 ) {
     let deadline = Instant::now() + grace;
     loop {
@@ -1636,7 +1716,7 @@ async fn drain_acp_with_grace(
                 ttf_logged,
                 yolo,
                 pending_bg,
-                completed_bg,
+                background_lifecycle,
             );
         }
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -1654,7 +1734,7 @@ async fn drain_acp_with_grace(
                     ttf_logged,
                     yolo,
                     pending_bg,
-                    completed_bg,
+                    background_lifecycle,
                 );
             }
             _ = tokio::time::sleep(remaining) => {
@@ -1673,7 +1753,7 @@ fn handle_headless_acp_message(
     ttf_logged: &mut bool,
     yolo: bool,
     pending_bg: &mut HashSet<BackgroundWork>,
-    completed_bg: &mut HashSet<BackgroundWork>,
+    background_lifecycle: &mut BackgroundLifecycleState,
 ) {
     match msg {
         AcpClientMessageBox::SessionNotification(boxed) => {
@@ -1745,7 +1825,7 @@ fn handle_headless_acp_message(
             match event {
                 ExtEvent::Lifecycle(l) => emitter.on_lifecycle(l),
                 ExtEvent::Stream(event) => emitter.reduce_and_emit(*event),
-                other => track_background_lifecycle(other, pending_bg, completed_bg),
+                other => track_background_lifecycle(other, pending_bg, background_lifecycle),
             }
         }
         AcpClientMessageBox::WaitForTerminalExit(args) => {
@@ -1759,6 +1839,10 @@ fn handle_headless_acp_message(
         _ => {}
     }
 }
+
+#[cfg(test)]
+#[path = "headless/background_lifecycle_tests.rs"]
+mod background_lifecycle_tests;
 
 #[cfg(test)]
 #[path = "headless_tests.rs"]

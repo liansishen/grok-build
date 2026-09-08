@@ -100,12 +100,12 @@ pub(crate) fn tasks_block_text(agent: &AgentView) -> String {
     let mut subs: Vec<_> = agent
         .subagent_sessions
         .values()
-        .filter(|s| s.workflow_run_id.is_none())
+        .filter(|s| s.attempt.workflow_run_id.is_none())
         .collect();
     subs.sort_by(|a, b| {
         b.is_running()
             .cmp(&a.is_running())
-            .then(b.started_at.cmp(&a.started_at))
+            .then(b.attempt.started_at.cmp(&a.attempt.started_at))
             .then(a.child_session_id.cmp(&b.child_session_id))
     });
     for info in subs {

@@ -1,9 +1,7 @@
 //! Interactive modal for selectively importing Claude settings.
 //!
-//! Shown when the user runs `/import-claude` (in-session) or presses `i` on
-//! the welcome screen with new Claude settings detected. Users review each
-//! discovered item, toggle which to import, and confirm. Only checked items
-//! are written to `.grok/config.toml`.
+//! Shown when the user runs `/import-claude` (in-session) or presses `i` on the welcome screen with new Claude settings detected.
+//! Users review each discovered item, toggle which to import, and confirm. Only checked items are written to `.grok/config.toml`.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::buffer::Buffer;
@@ -16,14 +14,12 @@ use xai_grok_shell::claude_import::{ImportPlan, ImportableItem, PathKind, find_p
 use xai_grok_workspace::permission::types::RuleAction;
 
 use crate::theme::Theme;
-
 use crate::views::modal_window::{
     FoldInfo, ModalSizing, ModalWindowConfig, ModalWindowOutcome, ModalWindowState, Shortcut,
     handle_modal_key, handle_modal_mouse, render_modal_window,
 };
 
-/// Sentinel ID for non-clickable hint shortcuts. Not routable because
-/// only `clickable: true` shortcuts generate hit-test areas.
+/// Sentinel ID for non-clickable hint shortcuts. Not routable because only `clickable: true` shortcuts generate hit-test areas.
 const SHORTCUT_ID_HINT: usize = usize::MAX;
 
 /// Shortcut IDs for the import-claude modal footer.
@@ -44,26 +40,23 @@ pub struct ImportClaudeModalState {
     pub focus: usize,
     /// Top of visible scroll window.
     pub scroll_offset: usize,
-    /// Screen rect where rows are rendered -- populated by the renderer so
-    /// `handle_mouse` can map click coordinates back to row indices. `None`
-    /// until the first draw.
+    /// Screen rect where rows are rendered; populated by the renderer so `handle_mouse` can map click coordinates back to row indices.
+    /// `None` until the first draw.
     pub content_area: Option<ratatui::layout::Rect>,
     /// Shared modal window chrome state (close button, shortcuts, hover).
     pub window: ModalWindowState,
-    /// Whether the mouse is hovering over the fold indicator on the
-    /// focused header row.
+    /// Whether the mouse is hovering over the fold indicator on the focused header row.
     pub fold_indicator_hovered: bool,
-    /// Section keys currently collapsed. Uses stable string keys (not row
-    /// indices) so they survive row-list rebuilds.
+    /// Section keys currently collapsed. Uses stable string keys (not row indices) so they survive row-list rebuilds.
     pub collapsed: std::collections::HashSet<String>,
 }
 
 /// Outcome of an input event for the caller to act on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ImportClaudeModalOutcome {
-    /// User pressed Esc — cancel without importing.
+    /// User pressed Esc: cancel without importing.
     Cancelled,
-    /// User pressed Enter — import the items whose `selected` is true.
+    /// User pressed Enter: import the items whose `selected` is true.
     Confirmed,
     /// State changed; caller should re-render.
     Changed,
@@ -71,19 +64,16 @@ pub enum ImportClaudeModalOutcome {
     Unchanged,
 }
 
-/// One row in the flattened display list. Used for navigation, rendering,
-/// and translating the focused index back to a (scope, item-index) tuple.
+/// One row in the flattened display list. Used for navigation, rendering, and translating the focused index back to a (scope, item-index) tuple.
 #[derive(Debug, Clone)]
 enum Row {
-    /// Top-level scope header (Global / Project). Selectable: toggling toggles
-    /// every item in the scope.
+    /// Top-level scope header (Global / Project). Selectable: toggling toggles every item in the scope.
     ScopeHeader {
         label: String,
         flat_indices: Vec<usize>,
         section_key: String,
     },
-    /// Type subgroup header (Permissions / Env vars / MCP servers / Hooks /
-    /// Paths). Selectable: toggling toggles every item in the subgroup.
+    /// Type subgroup header (Permissions / Env vars / MCP servers / Hooks / Paths). Selectable: toggling toggles every item in the subgroup.
     TypeHeader {
         kind: ItemKind,
         flat_indices: Vec<usize>,
@@ -99,7 +89,7 @@ enum Row {
     Blank,
 }
 
-/// Group items by type for nicer display + bulk-toggle.
+/// Group items by type for nicer display and bulk-toggle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ItemKind {
     Permission,
@@ -122,11 +112,11 @@ impl ItemKind {
 
     fn label(&self) -> &'static str {
         match self {
-            Self::Permission => xai_grok_i18n::t("import.permissions"),
-            Self::EnvVar => xai_grok_i18n::t("import.env_vars"),
-            Self::McpServer => xai_grok_i18n::t("import.mcp_servers"),
-            Self::Hook => xai_grok_i18n::t("extensions.tab.hooks"),
-            Self::PathEntry => xai_grok_i18n::t("import.paths"),
+            Self::Permission => "Permissions",
+            Self::EnvVar => "Env vars",
+            Self::McpServer => "MCP servers",
+            Self::Hook => "Hooks",
+            Self::PathEntry => "Paths",
         }
     }
 
@@ -201,12 +191,7 @@ impl ImportClaudeModalState {
         plan
     }
 
-    /// Handle a mouse event. Recognizes:
-    /// - **Left click on an item row**: focus + toggle that item.
-    /// - **Left click on a section/type header**: focus + tri-state toggle
-    ///   (selects all if any unselected, deselects all if everything selected).
-    /// - **Scroll wheel**: scroll up/down through the content.
-    /// - Clicks outside the content area are ignored.
+    /// Handle a mouse event. Recognizes.
     pub fn handle_mouse(
         &mut self,
         kind: crossterm::event::MouseEventKind,
@@ -215,8 +200,7 @@ impl ImportClaudeModalState {
     ) -> ImportClaudeModalOutcome {
         use crossterm::event::{MouseButton, MouseEventKind};
 
-        // Let the shared modal window chrome handle close button, shortcuts,
-        // and click-outside-to-close first.
+        // Let the shared modal window chrome handle close button, shortcuts, and click-outside-to-close first
         let chrome_outcome = handle_modal_mouse(&mut self.window, kind, column, row);
         match chrome_outcome {
             ModalWindowOutcome::CloseRequested => {
@@ -229,8 +213,7 @@ impl ImportClaudeModalState {
                 return ImportClaudeModalOutcome::Changed;
             }
             _ => {
-                // Mouse handler never returns fold outcomes; fall
-                // through to content handling.
+                // Mouse handler never returns fold outcomes; fall through to content handling
             }
         }
 
@@ -239,10 +222,9 @@ impl ImportClaudeModalState {
         };
         match kind {
             MouseEventKind::Moved => {
-                // Move focus to the selectable row under the cursor for
-                // hover feedback. Clicks outside the content area, header
-                // gaps, or blank spacers don't move focus -- but we still
-                // need to honour any hover-state transition recorded above.
+                // Move focus to the selectable row under the cursor for hover feedback
+                // Clicks outside the content area, header gaps, or blank spacers don't move focus
+                // A hover-state transition recorded above must still be honoured
                 if column < area.x
                     || column >= area.x + area.width
                     || row < area.y
@@ -311,8 +293,7 @@ impl ImportClaudeModalState {
                 self.focus = row_index;
 
                 // Check if the click landed on the fold indicator (▶/▼).
-                // ScopeHeaders have indent=0, TypeHeaders indent=2. The
-                // indicator is 2 chars wide starting at content_area.x + indent.
+                // ScopeHeaders have indent=0, TypeHeaders indent=2. The indicator is 2 chars wide starting at content_area.x + indent.
                 let fold_clicked = match target {
                     Row::ScopeHeader { section_key, .. } => {
                         let indicator_start = area.x;
@@ -385,8 +366,7 @@ impl ImportClaudeModalState {
     }
 
     pub fn handle_key(&mut self, key: &KeyEvent) -> ImportClaudeModalOutcome {
-        // Build fold state from the focused row so handle_modal_key can
-        // decide collapse/expand/jump-to-parent generically.
+        // Build fold state from the focused row so handle_modal_key can decide collapse/expand/jump-to-parent generically
         let rows = build_rows(&self.plan, &self.cwd, &self.collapsed);
         let fold_info = rows.get(self.focus).and_then(|row| match row {
             Row::ScopeHeader { section_key, .. } => Some(FoldInfo {
@@ -423,7 +403,7 @@ impl ImportClaudeModalState {
             Row::Blank => None,
         });
         let config = ModalWindowConfig {
-            title: xai_grok_i18n::t("import.claude_title"),
+            title: "",
             tabs: None,
             shortcuts: &[],
             sizing: Default::default(),
@@ -551,8 +531,7 @@ impl ImportClaudeModalState {
                     _ => None,
                 };
                 if let Some(indices) = group_indices {
-                    // Tri-state toggle for groups: if any item is unselected, select all;
-                    // otherwise (all selected) deselect all.
+                    // Tri-state toggle for groups: if any item is unselected, select all; otherwise (all selected) deselect all
                     let any_unselected = indices
                         .iter()
                         .any(|i| !self.selected.get(*i).copied().unwrap_or(false));
@@ -585,9 +564,8 @@ impl ImportClaudeModalState {
     }
 }
 
-/// Render the modal centered in `area` using the shared `ModalWindow`
-/// chrome. Content (the checkbox tree) is drawn into the content area
-/// returned by [`render_modal_window`].
+/// Render the modal centered in `area` using the shared `ModalWindow` chrome.
+/// Content (the checkbox tree) is drawn into the content area returned by [`render_modal_window`].
 pub fn render_import_claude_modal(
     buf: &mut Buffer,
     area: Rect,
@@ -595,33 +573,30 @@ pub fn render_import_claude_modal(
     theme: &Theme,
     compact: bool,
 ) {
-    let confirm_label = xai_grok_i18n::t_fmt(
-        "import.enter_import_count",
-        &[("count", &state.selected_count().to_string())],
-    );
+    let confirm_label = format!("Enter import {}", state.selected_count());
     let shortcuts = [
         Shortcut {
-            label: xai_grok_i18n::t("import.footer.navigate"),
+            label: "\u{2191}\u{2193} navigate",
             clickable: false,
             id: SHORTCUT_ID_HINT,
         },
         Shortcut {
-            label: xai_grok_i18n::t("import.footer.toggle"),
+            label: "space toggle",
             clickable: false,
             id: SHORTCUT_ID_HINT,
         },
         Shortcut {
-            label: xai_grok_i18n::t("import.footer.fold"),
+            label: "\u{2190}\u{2192} fold",
             clickable: false,
             id: SHORTCUT_ID_HINT,
         },
         Shortcut {
-            label: xai_grok_i18n::t("import.footer.all"),
+            label: "a all",
             clickable: true,
             id: SHORTCUT_ID_SELECT_ALL,
         },
         Shortcut {
-            label: xai_grok_i18n::t("import.footer.none"),
+            label: "n none",
             clickable: true,
             id: SHORTCUT_ID_SELECT_NONE,
         },
@@ -631,13 +606,13 @@ pub fn render_import_claude_modal(
             id: SHORTCUT_ID_CONFIRM,
         },
         Shortcut {
-            label: xai_grok_i18n::t("import.esc_cancel"),
+            label: "Esc cancel",
             clickable: true,
             id: SHORTCUT_ID_CANCEL,
         },
     ];
     let config = ModalWindowConfig {
-        title: xai_grok_i18n::t("import.claude_title"),
+        title: "Import Claude settings",
         tabs: None,
         shortcuts: &shortcuts,
         sizing: ModalSizing::default().with_compact(compact),
@@ -649,11 +624,10 @@ pub fn render_import_claude_modal(
     };
 
     let content_area = areas.content;
-    // Stash the rendered content rect so the mouse handler can map clicks
-    // back to row indices without re-deriving the layout.
+    // Stash the rendered content rect so the mouse handler can map clicks back to row indices without re-deriving the layout
     state.content_area = Some(content_area);
 
-    // Build rows + ensure focus is in viewport.
+    // Build rows and ensure focus is in viewport
     let rows = build_rows(&state.plan, &state.cwd, &state.collapsed);
     if state.focus >= rows.len() {
         state.focus = rows.len().saturating_sub(1);
@@ -665,10 +639,8 @@ pub fn render_import_claude_modal(
         state.scroll_offset = state.focus + 1 - visible;
     }
 
-    // Render visible rows one at a time so each row can pre-fill its full
-    // width with `bg_highlight` when focused. A single Paragraph render
-    // would only colour the text spans; the welcome menu uses the same
-    // per-row fill pattern and we mirror it here for visual consistency.
+    // Render visible rows one at a time so each row can pre-fill its full width with `bg_highlight` when focused
+    // A single Paragraph render would only colour the text spans; the welcome menu uses the same per-row fill pattern
     for (row_idx, (i, row)) in rows
         .iter()
         .enumerate()
@@ -703,6 +675,14 @@ pub fn render_import_claude_modal(
             height: 1,
         };
         Paragraph::new(line).render(row_rect, buf);
+        // Terminal theme (Reset band slots): reverse-video focus cue; RGB
+        // themes keep the bg_highlight underlay painted above.
+        if is_focused && !is_blank && theme.is_bandless() {
+            buf.set_style(
+                row_rect,
+                Style::default().add_modifier(ratatui::style::Modifier::REVERSED),
+            );
+        }
     }
 }
 
@@ -718,10 +698,7 @@ fn build_rows(
     if !plan.global_items.is_empty() {
         let scope_start = flat_index;
         let scope_key = format!("scope:{:?}", Scope::Global);
-        let label = xai_grok_i18n::t_fmt(
-            "import.scope_global",
-            &[("path", "~/.grok/config.toml")],
-        );
+        let label = "Global  ~/.grok/config.toml".to_string();
         // Placeholder header; flat_indices filled after children are pushed.
         let scope_header_pos = rows.len();
         rows.push(Row::ScopeHeader {
@@ -748,11 +725,10 @@ fn build_rows(
     if !plan.project_items.is_empty() {
         let scope_start = flat_index;
         let scope_key = format!("scope:{:?}", Scope::Project);
-        let project_config = find_project_root(cwd).join(".grok").join("config.toml");
-        let label = xai_grok_i18n::t_fmt(
-            "import.scope_project",
-            &[("path", &project_config.display().to_string())],
-        );
+        let project_config = find_project_root(cwd)
+            .join(".grok")
+            .join(xai_grok_config::USER_CONFIG_FILENAME);
+        let label = format!("Project  {}", project_config.display());
         let scope_header_pos = rows.len();
         rows.push(Row::ScopeHeader {
             label,
@@ -777,8 +753,7 @@ fn build_rows(
 }
 
 /// Push a TypeHeader followed by Item rows for each ItemKind present in `items`.
-/// Items keep their original order within each subgroup. The header tracks the
-/// flat_indices of items in its subgroup for bulk-toggle.
+/// Items keep their original order within each subgroup. The header tracks the flat_indices of items in its subgroup for bulk-toggle.
 fn push_grouped_items(
     rows: &mut Vec<Row>,
     flat_index: &mut usize,
@@ -787,12 +762,9 @@ fn push_grouped_items(
     collapsed: &std::collections::HashSet<String>,
     scope_collapsed: bool,
 ) {
-    // The `selected` Vec is indexed by ORIGINAL item position (so
-    // `filtered_plan` can iterate items in their source-vec order and check
-    // `selected[scope_offset + i]`). When we sort items into display groups
-    // here we must therefore use `scope_offset + item_idx` as the flat_index,
-    // not a monotonic counter — otherwise toggling a displayed row would mark
-    // the wrong slot and unrelated items would import (or fail to import).
+    // The `selected` Vec is indexed by ORIGINAL item position, so `filtered_plan` can check `selected[scope_offset + i]` in source-vec order
+    // Sorting items into display groups here must therefore use `scope_offset + item_idx` as the flat_index, not a monotonic counter
+    // Otherwise toggling a displayed row would mark the wrong slot and unrelated items would import (or fail to import)
     let scope_offset = *flat_index;
     let mut indexed: Vec<(usize, ItemKind)> = items
         .iter()
@@ -828,8 +800,7 @@ fn push_grouped_items(
             current_kind = Some(kind);
         }
         let item_flat = scope_offset + item_idx;
-        // Skip item rows when the scope is collapsed, or when the
-        // type-group is collapsed.
+        // Skip item rows when the scope or the type-group is collapsed
         let type_key = format!("type:{:?}:{:?}", scope, current_kind.unwrap_or(kind));
         let type_collapsed = collapsed.contains(&type_key);
         if !scope_collapsed && !type_collapsed {
@@ -914,8 +885,7 @@ fn render_row_dispatch<'a>(
 
 /// Render a group header (scope or type) with tri-state checkbox.
 ///
-/// `bold_label` makes the label BOLD (for top-level scope headers); type
-/// subgroup headers use a lighter style to give visual hierarchy.
+/// `bold_label` makes the label BOLD (for top-level scope headers); type subgroup headers use a lighter style to give visual hierarchy.
 #[allow(clippy::too_many_arguments)]
 fn render_header_line<'a>(
     label: &str,
@@ -933,9 +903,8 @@ fn render_header_line<'a>(
         .filter(|i| selected.get(**i).copied().unwrap_or(false))
         .count();
     let total = flat_indices.len();
-    // Brackets stay gray; only the inner mark is colored. This keeps the
-    // visual weight of an unchecked group identical to a checked one and
-    // lets the colored mark act as the actual signal.
+    // Brackets stay gray; only the inner mark is colored
+    // This keeps the visual weight of an unchecked group identical to a checked one and lets the colored mark act as the signal
     let (mark, mark_style) = if checked == 0 {
         (" ", Style::default().fg(theme.gray_dim))
     } else if checked == total {
@@ -975,7 +944,7 @@ fn render_header_line<'a>(
     ])
 }
 
-/// Render a single item row with checkbox + label + focus highlight.
+/// Render a single item row with checkbox, label, and focus highlight.
 fn render_item_line<'a>(
     item: &'a ImportableItem,
     selected: bool,
@@ -1007,12 +976,9 @@ fn render_item_line<'a>(
     ])
 }
 
-/// Conditionally apply the row-hover background to a span style.
-///
-/// When a row is focused the renderer pre-fills the row's cells with
-/// `bg_highlight`. We also set bg explicitly on each span so the highlight
-/// survives even if a span resets its background, and so that hovering
-/// reads as a continuous bar across the full row width.
+/// Conditionally apply the row-hover background to a span style. When a row is focused the renderer
+/// pre-fills the row's cells with `bg_highlight`. Setting bg explicitly on each span too keeps the
+/// highlight when a span resets its background and makes hovering read as a continuous bar.
 fn with_bg(style: Style, focused: bool, theme: &Theme) -> Style {
     if focused {
         style.bg(theme.bg_highlight)
@@ -1025,9 +991,9 @@ fn format_item_label(item: &ImportableItem) -> String {
     match item {
         ImportableItem::Permission(rule) => {
             let action = match rule.action {
-                RuleAction::Allow => xai_grok_i18n::t("import.permission.allow"),
-                RuleAction::Deny => xai_grok_i18n::t("import.permission.deny"),
-                RuleAction::Ask => xai_grok_i18n::t("import.permission.ask"),
+                RuleAction::Allow => "allow",
+                RuleAction::Deny => "deny",
+                RuleAction::Ask => "ask",
             };
             let pattern = rule.pattern.as_deref().unwrap_or("*");
             let tool = format!("{:?}", rule.tool);
@@ -1044,33 +1010,17 @@ fn format_item_label(item: &ImportableItem) -> String {
             timeout,
         } => {
             let m = matcher.as_deref().unwrap_or("*");
-            let timeout = timeout
-                .map(|seconds| {
-                    xai_grok_i18n::t_fmt(
-                        "import.hook_timeout",
-                        &[("seconds", &seconds.to_string())],
-                    )
-                })
+            let t = timeout
+                .map(|t| format!(" timeout={}s", t))
                 .unwrap_or_default();
-            xai_grok_i18n::t_fmt(
-                "import.hook_label",
-                &[
-                    ("event", event),
-                    ("matcher", m),
-                    ("command", command),
-                    ("timeout", &timeout),
-                ],
-            )
+            format!("{event}  matcher={m} → {command}{t}")
         }
         ImportableItem::PathEntry { kind, path } => {
             let kind_str = match kind {
-                PathKind::Skill => xai_grok_i18n::t("import.path.skill_dir"),
-                PathKind::Rule => xai_grok_i18n::t("import.path.rule_dir"),
+                PathKind::Skill => "skill dir",
+                PathKind::Rule => "rule dir",
             };
-            xai_grok_i18n::t_fmt(
-                "import.path_label",
-                &[("kind", kind_str), ("path", path)],
-            )
+            format!("{kind_str}: {path}")
         }
     }
 }
@@ -1092,8 +1042,7 @@ fn prev_selectable_row(rows: &[Row], from: usize) -> Option<usize> {
         .map(|(i, _)| i)
 }
 
-/// Selectable = focusable for navigation. Includes headers (which can be
-/// bulk-toggled) and items. Excludes Blank spacers.
+/// Selectable means focusable for navigation. Includes headers (which can be bulk-toggled) and items. Excludes Blank spacers.
 fn is_selectable(row: &Row) -> bool {
     matches!(
         row,
@@ -1167,18 +1116,15 @@ mod tests {
         assert_eq!(filtered.project_items.len(), 0);
     }
 
-    /// Regression: when items are sorted into display groups (e.g.
-    /// Permissions before MCP servers), de-selecting an MCP server in the
-    /// modal must actually skip THAT MCP server in `filtered_plan` — not
-    /// some other item that happens to share the deselected slot's index.
+    /// Regression: items are sorted into display groups (e.g. Permissions before MCP servers).
+    /// De-selecting an MCP server must skip THAT MCP server in `filtered_plan`, not another item sharing the deselected slot's index.
     #[test]
     fn filtered_plan_respects_per_item_selection_after_grouping() {
         use xai_grok_shell::claude_import::ImportableItem;
         use xai_grok_shell::util::config::{McpServerConfig, McpServerTransportConfig};
         use xai_grok_workspace::permission::types::{PatternMode, PermissionRule, ToolFilter};
 
-        // Mix Permissions, MCP servers, and EnvVars in a non-sorted order so
-        // the display order (sorted by ItemKind) differs from the source order.
+        // Mix Permissions, MCP servers, and EnvVars in a non-sorted order so the display order (sorted by ItemKind) differs from the source order
         let mcp = |name: &str| ImportableItem::McpServer {
             name: name.into(),
             config: Box::new(McpServerConfig {
@@ -1221,8 +1167,7 @@ mod tests {
         m.selected[2] = false;
         m.selected[4] = false;
         let filtered = m.filtered_plan();
-        // Should contain exactly the Permission (idx 1) and EnvVar (idx 3),
-        // and none of alpha/beta/gamma.
+        // Exactly the Permission (idx 1) and EnvVar (idx 3) remain; none of alpha/beta/gamma
         assert_eq!(filtered.global_items.len(), 2);
         for item in &filtered.global_items {
             assert!(
@@ -1255,17 +1200,15 @@ mod tests {
         m.handle_key(&down);
         assert!(m.focus > initial, "focus should advance");
         let rows = build_rows(&m.plan, &m.cwd, &m.collapsed);
-        // Headers are now selectable too — just verify it's not a Blank.
+        // Headers are selectable too; just verify it's not a Blank
         assert!(matches!(
             rows.get(m.focus),
             Some(Row::Item { .. } | Row::ScopeHeader { .. } | Row::TypeHeader { .. })
         ));
     }
 
-    /// Regression: clicking on an item row with the mouse must toggle that
-    /// item's selection. After the inline-shortcut refactor, the handler
-    /// now consults `state.shortcuts` first; verify a click on a row that
-    /// is NOT a shortcut still falls through to the row-toggle path.
+    /// Regression: clicking on an item row with the mouse must toggle that item's selection.
+    /// The handler consults the shortcut hit areas first; a click on a row that is NOT a shortcut must still fall through to the row-toggle path.
     #[test]
     fn mouse_click_on_item_row_toggles() {
         use crossterm::event::{MouseButton, MouseEventKind};
@@ -1300,7 +1243,7 @@ mod tests {
         );
     }
 
-    /// Regression: clicking on a scope/type header row should bulk-toggle.
+    /// Regression: clicking on a scope/type header row must bulk-toggle.
     #[test]
     fn mouse_click_on_header_row_bulk_toggles() {
         use crossterm::event::{MouseButton, MouseEventKind};
@@ -1316,10 +1259,9 @@ mod tests {
         assert!(matches!(rows.first(), Some(Row::ScopeHeader { .. })));
         let click_y = m.content_area.unwrap().y; // top row
         let click_x = m.content_area.unwrap().x + 5;
-        // All items start selected.
         assert!(m.selected.iter().all(|&s| s));
         m.handle_mouse(MouseEventKind::Down(MouseButton::Left), click_x, click_y);
-        // Global scope items (indices 0, 1) should now be deselected.
+        // Global scope items (indices 0, 1) are now deselected
         assert!(!m.selected[0]);
         assert!(!m.selected[1]);
         // Project item (index 2) untouched.
@@ -1329,11 +1271,11 @@ mod tests {
     #[test]
     fn space_on_scope_header_toggles_all_in_scope() {
         let mut m = ImportClaudeModalState::new(sample_plan(), PathBuf::from("/tmp"));
-        // Focus the first row (should be the Global ScopeHeader).
+        // Focus the first row (the Global ScopeHeader)
         m.focus = 0;
         let rows = build_rows(&m.plan, &m.cwd, &m.collapsed);
         assert!(matches!(rows.first(), Some(Row::ScopeHeader { .. })));
-        // Initially all selected. Space should deselect everything in Global scope.
+        // Initially all selected. Space deselects everything in Global scope.
         let space = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE);
         m.handle_key(&space);
         // Global has 2 items (indices 0, 1). Project has 1 (index 2).
@@ -1404,7 +1346,7 @@ mod tests {
         let left = KeyEvent::new(KeyCode::Left, KeyModifiers::NONE);
         let outcome = m.handle_key(&left);
         assert_eq!(outcome, ImportClaudeModalOutcome::Changed);
-        // Focus should have jumped to the nearest header above the item.
+        // Focus jumped to the nearest header above the item
         assert!(m.focus < item_idx);
         assert!(matches!(
             rows[m.focus],
@@ -1416,7 +1358,7 @@ mod tests {
     fn collapse_from_last_header_clamps_focus() {
         let mut m = ImportClaudeModalState::new(sample_plan(), PathBuf::from("/tmp"));
         let rows = build_rows(&m.plan, &m.cwd, &m.collapsed);
-        // Find the last TypeHeader -- it's the deepest header near the end.
+        // Find the last TypeHeader; it's the deepest header near the end
         let last_type_idx = rows
             .iter()
             .rposition(|r| matches!(r, Row::TypeHeader { .. }))
@@ -1430,19 +1372,18 @@ mod tests {
         let left = KeyEvent::new(KeyCode::Left, KeyModifiers::NONE);
         let outcome = m.handle_key(&left);
         assert_eq!(outcome, ImportClaudeModalOutcome::Changed);
-        // Row count should have shrunk (children hidden).
+        // Row count shrank (children hidden)
         let new_rows = build_rows(&m.plan, &m.cwd, &m.collapsed);
         assert!(
             new_rows.len() < row_count_before,
             "collapsing should remove child rows"
         );
-        // Focus must be valid (within the new row list). The
-        // focus-clamping guard in CollapseGroup ensures this.
+        // Focus must be valid (within the new row list); the focus-clamping guard in CollapseGroup ensures this
         assert!(
             m.focus < new_rows.len(),
             "focus should be within new row bounds"
         );
-        // The focused row should still be the TypeHeader (it survives).
+        // The focused row is still the TypeHeader (it survives)
         assert!(matches!(new_rows[m.focus], Row::TypeHeader { .. }));
     }
 
@@ -1464,7 +1405,6 @@ mod tests {
             collapsed_rows.len() < full_count,
             "collapsed should have fewer rows"
         );
-        // The ScopeHeader itself should still be present
         assert!(matches!(collapsed_rows[0], Row::ScopeHeader { .. }));
     }
 }

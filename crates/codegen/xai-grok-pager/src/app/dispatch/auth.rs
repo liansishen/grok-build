@@ -348,7 +348,7 @@ pub(super) fn handle_auth_complete(
     {
         if let Some(meta_val) = meta.as_ref()
             && let Ok(auth_meta) =
-                serde_json::from_value::<xai_grok_shell::auth::AuthMeta>(meta_val.clone())
+                serde_json::from_value::<xai_grok_login::AuthMeta>(meta_val.clone())
         {
             let _ = app.apply_auth_meta(&auth_meta);
         }

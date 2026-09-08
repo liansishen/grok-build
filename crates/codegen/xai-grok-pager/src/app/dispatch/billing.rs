@@ -88,7 +88,7 @@ pub(crate) fn is_credit_limit_error(http_status: Option<u16>, message: &str) -> 
     }
 }
 
-/// Option id for Try Again. Submit routes on this sentinel, not on
+/// Option id for Try Again. Submit routes on this sentinel, not on position in the telemetry `choices` vec.
 /// position in the telemetry `choices` vec.
 pub(crate) const CREDIT_LIMIT_RETRY_OPTION_ID: &str = "retry-last-prompt";
 
@@ -102,11 +102,8 @@ struct CreditLimitCopy {
 }
 
 /// Open the credit-limit upsell Q&A on the given agent.
-///
 /// Non-max-tier: Upgrade tier + buy-credits (or PAYG) + Try Again.
-/// Max-tier (SuperGrok Heavy): buy-credits (or PAYG) + Try Again — no
-/// upgrade option. URL options carry the target in `id` so the submit
-/// handler is position-independent.
+/// Max-tier (SuperGrok Heavy): buy-credits (or PAYG) + Try Again — no upgrade option. URL options carry the target in `id` so the submit handler is position-independent.
 pub(super) fn open_credit_limit_upsell(
     agent: &mut AgentView,
     mode: CreditLimitUpsellMode,
@@ -197,7 +194,7 @@ pub(super) fn open_credit_limit_upsell(
     )
     .with_local_kind(LocalQuestionKind::CreditLimitUpsell { choices })
     .with_no_freeform();
-    agent.question_view = Some(state);
+    agent.install_local_question(state);
     agent.prompt.set_text("");
 }
 
@@ -308,7 +305,7 @@ fn open_supergrok_upsell(
     )
     .with_local_kind(LocalQuestionKind::FreeUsageUpsell { source })
     .with_no_freeform();
-    agent.question_view = Some(state);
+    agent.install_local_question(state);
     agent.prompt.set_text("");
     true
 }
@@ -447,7 +444,7 @@ pub(super) fn handle_check_subscription_complete(
     let mut billing_refresh_needed = false;
     let applied = match meta {
         Some(meta_val) => {
-            match serde_json::from_value::<xai_grok_shell::auth::AuthMeta>(meta_val) {
+            match serde_json::from_value::<xai_grok_login::AuthMeta>(meta_val) {
                 Ok(auth_meta) => {
                     billing_refresh_needed = app.apply_auth_meta(&auth_meta);
                     true
@@ -521,7 +518,7 @@ pub(super) fn handle_credit_limit_recheck_complete(
     let old_tier = app.subscription_tier.clone();
     let mut billing_refresh_needed = false;
     if let Some(meta_val) = meta
-        && let Ok(auth_meta) = serde_json::from_value::<xai_grok_shell::auth::AuthMeta>(meta_val)
+        && let Ok(auth_meta) = serde_json::from_value::<xai_grok_login::AuthMeta>(meta_val)
     {
         billing_refresh_needed = app.apply_auth_meta(&auth_meta);
     }
@@ -559,7 +556,7 @@ pub(super) fn handle_credit_limit_recheck_complete(
         let mode = credit_limit_upsell_mode(balance);
         let max_tier = is_max_tier(app.subscription_tier.as_deref());
         open_credit_limit_upsell(agent, mode, max_tier);
-        // Keep the stashed prompt so Try Again can resubmit after the
+        // Keep the stashed prompt so Try Again can resubmit after the user buys credits or the limit resets.
         // user buys credits or the limit resets.
     } else {
         agent.credit_limit_stashed_prompt = None;

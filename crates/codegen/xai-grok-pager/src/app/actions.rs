@@ -32,7 +32,6 @@ pub enum SwitchModelError {
     Other(String),
 }
 /// Synchronous, side-effect-free user intent.
-///
 /// Produced by [`super::input`] from key/mouse events.
 /// Consumed by [`super::dispatch::dispatch`] to mutate state and return effects.
 #[derive(Debug)]
@@ -52,6 +51,8 @@ pub enum Action {
     QuitConfirmed,
     /// Create a new session from the welcome screen.
     NewSession,
+    /// Leave the welcome screen for the optimistic home session, or create one if none exists.
+    LeaveHome,
     /// Ask whether the new session should use a git worktree.
     ChooseNewSessionMode,
     /// Exit the current session and return to the welcome screen.
@@ -153,12 +154,8 @@ pub enum Action {
     /// chip must never execute as a command).
     SubmitFollowUp(String),
     /// Execute a slash command without consuming the prompt textarea.
-    ///
-    /// Used by modal-driven slash dispatchers (command palette, ArgPicker)
-    /// where the user's draft text in the prompt should be preserved
-    /// rather than wiped as a side effect of the command. Behaves
-    /// identically to `SendPrompt` otherwise — same registry resolution,
-    /// same effect outputs — but skips the `prompt.set_text("")` calls.
+    /// Used by modal-driven slash dispatchers (command palette, ArgPicker) where the user's draft text in the prompt should survive the command.
+    /// Behaves identically to `SendPrompt` (same registry resolution, same effect outputs) but skips the `prompt.set_text("")` calls.
     SendSlashCommandPreservingDraft(String),
     /// Send a mid-turn interjection without canceling the running turn.
     /// Reserved for text that answers the running turn (plan-review comments,
@@ -270,7 +267,7 @@ pub enum Action {
         /// that vanished from the mirror before Enter: with nothing to remove, no versioned
         /// `x.ai/queue/remove` request is sent.
         server: Option<SharedQueueTarget>,
-        text: String,
+        submission: crate::views::prompt_widget::StashedPrompt,
     },
     /// Resolution of the hard-modal blocked-prompt card.
     PromptBlockAnswered {
@@ -298,9 +295,9 @@ pub enum Action {
     NextTurn,
     /// Jump to previous turn boundary.
     PrevTurn,
-    /// Jump to next assistant response.
+    /// Jump to the next turn at the viewport top.
     NextResponse,
-    /// Jump to previous assistant response.
+    /// Jump to the previous turn at the viewport top.
     PrevResponse,
     /// Scroll up by N lines.
     ScrollUp(u16),
@@ -1151,6 +1148,33 @@ impl PermissionModeKind {
         }
     }
 }
+/// No `Default` arm, unlike [`PermissionModeKind`]: the runtime flags cannot tell `default` from `ask`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PermissionLabel {
+    Ask,
+    Auto,
+    AlwaysApprove,
+}
+impl From<PermissionLabel> for PermissionModeKind {
+    fn from(label: PermissionLabel) -> Self {
+        match label {
+            PermissionLabel::Ask => Self::Ask,
+            PermissionLabel::Auto => Self::Auto,
+            PermissionLabel::AlwaysApprove => Self::AlwaysApprove,
+        }
+    }
+}
+impl PermissionLabel {
+    /// Shares [`PermissionModeKind::as_canonical`] so the info-line flags and the scrollback rows use one string table.
+    pub fn as_canonical(self) -> &'static str {
+        PermissionModeKind::from(self).as_canonical()
+    }
+}
+impl std::fmt::Display for PermissionLabel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_canonical())
+    }
+}
 #[cfg(test)]
 mod permission_mode_kind_tests {
     use super::PermissionModeKind;
@@ -1186,14 +1210,36 @@ pub enum PromptBlockChoice {
     Resend,
     Discard,
 }
-/// What the user chose on the `/feedback` trace-consent question.
+/// Which surface issued a feedback POST, echoed back on its completion.
+/// Every send thanks at send time; the [`FeedbackSubmissionId`](crate::views::feedback_modal::FeedbackSubmissionId)
+/// only correlates a completion with the consent parked for that exact POST.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeedbackSendOrigin {
+    /// Inline `/feedback <text>`: fire-and-forget.
+    Immediate,
+    /// A feedback modal submit; the id correlates the completion with that exact POST attempt.
+    Modal {
+        submission_id: crate::views::feedback_modal::FeedbackSubmissionId,
+        modal_id: crate::views::feedback_modal::FeedbackModalId,
+        is_draft: bool,
+    },
+}
+#[derive(Debug, Clone)]
+pub struct DraftFeedbackBody {
+    pub draft_id: xai_grok_feedback::FeedbackDraftId,
+    pub title: String,
+    pub details: String,
+    pub area: Option<String>,
+    pub r#type: xai_grok_feedback::FeedbackType,
+    pub task_category: Option<xai_grok_feedback::FeedbackTaskCategory>,
+    pub failure_mode: Option<xai_grok_feedback::FeedbackFailureMode>,
+    pub images: Vec<xai_grok_shell::session::FeedbackImage>,
+}
+/// What the user chose on the legacy `/feedback` trace-consent card.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FeedbackTraceChoice {
-    /// Upload with this report and persist `[telemetry] trace_upload = true`.
     AlwaysUpload,
-    /// Send the report alone (also the Esc/skip outcome).
     NoUpload,
-    /// Send the report alone and persist `[features] feedback_trace_card = false`.
     NeverAsk,
 }
 /// Canonical on/off state for `plan_mode`. Binary today (single bit
@@ -1254,7 +1300,6 @@ impl CancelTrigger {
     /// Snake_case wire string sent as `_meta.cancelTrigger`.
     pub fn as_wire_str(self) -> &'static str {
         match self {
-            Self::Esc => "esc",
             Self::CtrlC => "ctrl_c",
             Self::Mouse => "mouse",
             Self::DashboardStop => "dashboard_stop",
@@ -1284,6 +1329,13 @@ pub enum ClipboardPasteTarget {
     DashboardPeek {
         row: crate::views::dashboard::DashboardRowId,
     },
+    /// Feedback modal composer input. Both ids are captured at enqueue time, so a completion is
+    /// dropped after either the modal or its loaded composition changes.
+    FeedbackModal {
+        agent_id: AgentId,
+        modal_id: crate::views::feedback_modal::FeedbackModalId,
+        composition_id: crate::views::feedback_modal::FeedbackCompositionId,
+    },
 }
 impl ClipboardPasteTarget {
     /// Telemetry surface label for the empty-clipboard paste-key event.
@@ -1292,6 +1344,7 @@ impl ClipboardPasteTarget {
             Self::AgentPrompt { .. } => "agent",
             Self::DashboardDispatch => "dashboard",
             Self::DashboardPeek { .. } => "peek",
+            Self::FeedbackModal { .. } => "feedback_modal",
         }
     }
 }
@@ -1481,6 +1534,8 @@ pub enum AfterSessionDelete {
     Welcome,
     /// `/delete` from a dashboard-attached agent, or dashboard row delete.
     Dashboard,
+    /// Unused optimistic home husk: remove on-disk data without a toast or view change.
+    UnusedHusk,
 }
 /// Async side effect produced by [`super::dispatch::dispatch`]. The event
 /// loop spawns these into a `JoinSet`; completions come back through
@@ -1536,7 +1591,6 @@ pub enum Effect {
         chat_kind: bool,
     },
     /// Load (resume) an existing ACP session by ID.
-    ///
     /// `session_cwd` overrides the CWD sent in the `LoadSessionRequest`.
     /// This is needed when resuming a session that was created in a different
     /// CWD (e.g., a worktree) than the one the user is currently in.
@@ -1572,11 +1626,12 @@ pub enum Effect {
         grok_home: std::path::PathBuf,
         launch_token: u64,
     },
-    /// Fetch session list for the welcome screen session picker.
+    /// Fetch a picker session list.
     FetchSessionList {
         /// Surface this fetch was issued for; the result routes back to
         /// this host's storage only.
         host: crate::views::session_picker_surface::SessionPickerHost,
+        cwd_override: Option<std::path::PathBuf>,
         /// Live generation of the requesting picker at dispatch time.
         generation: u64,
         /// Text search pushed down to `x.ai/session/list` as `query` (chat
@@ -1623,7 +1678,12 @@ pub enum Effect {
     /// process-owned store connection.
     UpsertWorkspaceMembers {
         store: xai_grok_dashboard_store::WorkspaceStore,
-        members: Vec<xai_grok_dashboard_store::NewMember>,
+        mutation: WorkspaceMutation,
+    },
+    /// Reads a snapshot only when SQLite's per-connection data version changed.
+    RefreshWorkspace {
+        store: xai_grok_dashboard_store::WorkspaceStore,
+        known_data_version: i64,
     },
     /// Load card detail for a specific session (lazy, reads chat history from disk).
     LoadCardDetail {
@@ -1685,6 +1745,7 @@ pub enum Effect {
     Compact {
         agent_id: AgentId,
         session_id: acp::SessionId,
+        user_context: Option<String>,
     },
     /// Kill a background task.
     KillBgTask {
@@ -1696,6 +1757,7 @@ pub enum Effect {
     KillSubagent {
         session_id: acp::SessionId,
         subagent_id: String,
+        attempt_id: Option<String>,
     },
     DeleteScheduledTask {
         session_id: acp::SessionId,
@@ -1728,6 +1790,9 @@ pub enum Effect {
     },
     /// Persist `[privacy].privacy_banner_acked` (RFC 3339 dismiss time).
     PersistPrivacyBannerAcked { acked_at: String },
+    /// Persist a plugin CTA dismissal to `[plugin_cta].dismissed`; the locked write sleep-polls the config-init flock, so it must run off the render path.
+    /// config-init flock, so it must run off the render path.
+    PersistPluginCtaDismissed { plugin_id: String },
     /// Persist the consent answer to `[consent]` in config.toml.
     PersistConsentAnswer {
         account: Option<String>,
@@ -1772,6 +1837,10 @@ pub enum Effect {
         value: crate::settings::SettingValue,
         rollback_value: crate::settings::SettingValue,
     },
+    /// Toggle mouse reporting off and on to unwedge xterm.js's button tracker
+    /// (see `AgentView::reset_wedged_mouse_reporting`). An effect so it rides the escape
+    /// writer; `process_effects` re-checks capture so a toggle-off in the same batch wins.
+    ResetMouseReporting,
     /// Send structured prompt blocks to the agent.
     /// Used for skill injection where the prompt consists of
     /// multiple content blocks (metadata + skill body).
@@ -2057,16 +2126,35 @@ pub enum Effect {
     /// Fetch a bundled entry's raw content via `x.ai/bundle/entry/get`.
     FetchCatalogEntry { kind: String, name: String },
     /// Send feedback about the current session (fire-and-forget POST).
+    /// `origin` rides through to the completion so a modal send's parked consent can be matched or dropped.
     SendFeedback {
         agent_id: AgentId,
         session_id: acp::SessionId,
         feedback_text: String,
         images: Vec<xai_grok_shell::session::FeedbackImage>,
+        metadata: Option<serde_json::Value>,
+        /// Ask the shell to mint a one-shot upload capability after this report succeeds.
+        request_trace_upload_token: bool,
+        draft: Option<DraftFeedbackBody>,
+        origin: FeedbackSendOrigin,
+    },
+    FeedbackDraftRequest {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+        request: crate::views::feedback_modal::FeedbackDraftRequest,
     },
     /// One-shot session archive for a feedback report (after the text POST).
+    /// Emitted only from the matching successful feedback-POST reduction (modal path)
+    /// or the legacy card's persisted-consent path, never as a sibling of the POST.
     UploadFeedbackTrace {
         agent_id: AgentId,
         session_id: acp::SessionId,
+        /// `Some` for a modal one-shot: correlates the completion with the exact POST attempt that earned it.
+        submission_id: Option<crate::views::feedback_modal::FeedbackSubmissionId>,
+        /// Typed intent for a modal one-shot; legacy persisted-consent uploads carry `None`.
+        intent: Option<crate::views::feedback_modal::FeedbackTraceUploadIntent>,
+        /// Capability minted by the successful feedback POST; absent on the legacy persisted-consent path.
+        trace_upload_token: Option<String>,
     },
     /// Save a remember note to global MEMORY.md (async file write).
     SaveMemoryNote {
@@ -2138,7 +2226,7 @@ pub enum Effect {
     CreditLimitRecheck { agent_id: AgentId },
     /// Schedule a 5s timer that fires `TaskResult::PaywallCheckTick`.
     SchedulePaywallCheck,
-    /// Schedule `TaskResult::GateVerifyTimeout { generation }` after
+    /// Schedule `TaskResult::GateVerifyTimeout { generation }` after [`crate::app::subscription::GATE_VERIFY_TIMEOUT`].
     /// [`crate::app::subscription::GATE_VERIFY_TIMEOUT`].
     ScheduleGateVerifyTimeout { generation: u64 },
     /// Log out then authenticate sequentially in one task.
@@ -2335,6 +2423,13 @@ pub enum Effect {
         /// racing paste can't attach the wrong image.
         change_count: Option<u64>,
     },
+    /// Bounded disk read for an adopted feedback image. The original file remains until completion installs the bytes.
+    RehydrateFeedbackImage {
+        agent_id: AgentId,
+        modal_id: crate::views::feedback_modal::FeedbackModalId,
+        image_identity: u64,
+        path: std::path::PathBuf,
+    },
     /// Prepare terminal preview bytes off the event-loop thread.
     PreparePromptImagePreview {
         preparation: crate::prompt_images::PromptImagePreviewPreparation,
@@ -2433,10 +2528,33 @@ impl TaskResult {
     }
 }
 #[derive(Debug)]
-pub struct WorkspaceMemberUpsertFailure {
-    pub session_id: String,
+pub enum WorkspaceMutation {
+    Upsert(Vec<xai_grok_dashboard_store::NewMember>),
+    Remove(Vec<xai_grok_dashboard_store::MemberKey>),
+    Layout(xai_grok_dashboard_store::LayoutPatch),
+}
+#[derive(Debug)]
+pub struct WorkspaceMutationFailure {
+    pub key: xai_grok_dashboard_store::MemberKey,
     pub error: String,
     pub retryable: bool,
+}
+#[derive(Debug)]
+pub enum WorkspaceWriteCompletion {
+    Upsert {
+        members: Vec<xai_grok_dashboard_store::NewMember>,
+        snapshot: Result<xai_grok_dashboard_store::WorkspaceSnapshot, String>,
+        failures: Vec<WorkspaceMutationFailure>,
+    },
+    Remove {
+        keys: Vec<xai_grok_dashboard_store::MemberKey>,
+        snapshot: Result<xai_grok_dashboard_store::WorkspaceSnapshot, String>,
+        failures: Vec<WorkspaceMutationFailure>,
+    },
+    Layout {
+        patch: xai_grok_dashboard_store::LayoutPatch,
+        outcome: xai_grok_dashboard_store::LayoutApplyOutcome,
+    },
 }
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -2472,8 +2590,7 @@ pub enum TaskResult {
         /// Effective cwd inside the worktree (preserves subdirectory offset).
         session_cwd: std::path::PathBuf,
         models: Option<acp::SessionModelState>,
-        /// See [`TaskResult::SessionCreated::scheduler_background_loops`].
-        scheduler_background_loops: Option<bool>,
+        strategy_summary: Option<String>,
     },
     /// Worktree created and session forked, but not yet loaded.
     /// The dispatch handler sets session_id eagerly, then emits LoadSession.
@@ -2488,6 +2605,7 @@ pub enum TaskResult {
         /// Resume/parent id this worktree was created from (`load_session_id`).
         /// Used to retarget one-shot restore-code suppress onto the child.
         resume_session_id: Option<String>,
+        strategy_summary: Option<String>,
     },
     /// Worktree session creation failed.
     WorktreeSessionFailed {
@@ -2617,13 +2735,12 @@ pub enum TaskResult {
     /// Dashboard v2 store open or initial snapshot failed.
     WorkspaceSnapshotFailed {
         error: String,
+        /// Only SQLite lock contention is expected to clear without user action.
+        retryable: bool,
     },
-    /// A dashboard-v2 write batch finished and returned the sole store handle.
-    WorkspaceMembersUpserted {
+    WorkspaceWriteCompleted {
         store: xai_grok_dashboard_store::WorkspaceStore,
-        snapshot: Result<xai_grok_dashboard_store::WorkspaceSnapshot, String>,
-        failures: Vec<WorkspaceMemberUpsertFailure>,
-        attempted: Vec<xai_grok_dashboard_store::NewMember>,
+        completion: WorkspaceWriteCompletion,
     },
     /// The blocking workspace writer panicked or was cancelled, losing its
     /// moved handle; reopen the store before any further writes.
@@ -2706,6 +2823,7 @@ pub enum TaskResult {
     KillSubagentComplete {
         session_id: acp::SessionId,
         subagent_id: String,
+        attempt_id: Option<String>,
         outcome: SubagentKillOutcome,
     },
     PreferredModelPersisted {
@@ -2987,17 +3105,48 @@ pub enum TaskResult {
         nonce: u64,
     },
     /// Feedback submitted successfully (fire-and-forget).
+    /// A modal-origin completion only takes the consent parked for its exact submission; anything else is stale and a no-op.
     FeedbackComplete {
         agent_id: AgentId,
+        origin: FeedbackSendOrigin,
+        outcome: xai_grok_shell::session::FeedbackOutcome,
+        /// Present only when the shell consumed explicit modal consent and minted a one-shot capability.
+        trace_upload_token: Option<String>,
     },
     /// Feedback submission failed. The shell already persisted the report locally, so only the error is surfaced.
+    /// A modal-origin failure additionally drops its parked consent so a failed report never uploads a trace.
     FeedbackFailed {
         agent_id: AgentId,
+        origin: FeedbackSendOrigin,
         error: String,
     },
+    FeedbackDraftListComplete {
+        agent_id: AgentId,
+        modal_id: crate::views::feedback_modal::FeedbackModalId,
+        generation: u64,
+        result: Result<Vec<xai_grok_feedback::FeedbackDraft>, String>,
+    },
+    FeedbackDraftLoadComplete {
+        agent_id: AgentId,
+        load: crate::views::feedback_modal::FeedbackDraftLoad,
+        result: Result<xai_grok_feedback::FeedbackDraft, String>,
+    },
+    FeedbackDraftDeleteComplete {
+        agent_id: AgentId,
+        delete: crate::views::feedback_modal::FeedbackDraftDelete,
+        result: Result<(), String>,
+    },
+    FeedbackDraftUpdateComplete {
+        agent_id: AgentId,
+        update: crate::views::feedback_modal::FeedbackDraftUpdate,
+        result: Result<(), String>,
+    },
     /// One-shot feedback trace archive finished (or was skipped).
+    /// `submission_id` echoes the effect's correlation: a modal one-shot completion only ever
+    /// touches its registered pending submission, never a later modal.
     FeedbackTraceUploaded {
         agent_id: AgentId,
+        submission_id: Option<crate::views::feedback_modal::FeedbackSubmissionId>,
         error: Option<String>,
     },
     /// Memory note saved to global MEMORY.md.
@@ -3168,6 +3317,14 @@ pub enum TaskResult {
         /// restrictions when AuthMeta still had an unknown tier.
         subscription_tier: Option<String>,
         autotopup: crate::views::credit_bar::AutoTopupFetch,
+        /// Usage-modal fetch generation (`0` means a background refresh).
+        nonce: u64,
+    },
+    /// App-level billing fetch failed (transport or parse); the cached balance is kept.
+    AppBillingError {
+        error: String,
+        /// Usage-modal fetch generation (`0` means a background refresh).
+        nonce: u64,
     },
     /// App-level billing transport or payload parsing failed. The last-known-good
     /// cache is retained and periodic refresh remains armed for a later retry.
@@ -3247,6 +3404,12 @@ pub enum TaskResult {
         image: ProbedAttachment,
         /// File URL(s) the completion resolves via the existing path handling.
         file_urls: Option<String>,
+    },
+    FeedbackImageRehydrated {
+        agent_id: AgentId,
+        modal_id: crate::views::feedback_modal::FeedbackModalId,
+        image_identity: u64,
+        result: Result<Vec<u8>, String>,
     },
     /// Shared prompt-image preview state was resolved off-thread.
     PromptImagePreviewPrepared,

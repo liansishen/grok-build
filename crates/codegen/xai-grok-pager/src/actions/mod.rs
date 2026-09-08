@@ -144,7 +144,6 @@ pub enum ActionId {
     DashboardToggleWorktree,
 }
 /// When an action is available / visible.
-///
 /// Used for **exact** matching in `registry.lookup()`.
 /// Each layer in the input chain queries its own context.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -466,7 +465,6 @@ impl ActionRegistry {
     }
 
     /// Get hints for the shortcuts bar, filtered by contexts and sorted by priority.
-    ///
     /// Pass multiple contexts to collect hints from all applicable levels.
     /// E.g., for scrollback mode: `&[ScrollbackFocused, AgentScreen, Always]`.
     pub fn hints(&self, contexts: &[When]) -> Vec<&ActionDef> {
@@ -492,7 +490,6 @@ impl ActionRegistry {
     }
 
     /// Get the effective hint key for an action, accounting for vim mode.
-    ///
     /// In non-vim mode, bare-letter scrollback bindings are suppressed.
     /// This returns the first non-letter alt key instead (e.g. arrow keys),
     /// so hints show a key that actually works.

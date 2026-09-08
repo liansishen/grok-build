@@ -123,7 +123,7 @@ fn credit_limit_retry_preserves_image_submission_state() {
 #[test]
 fn subscription_check_returning_to_personal_auth_immediately_fetches_billing() {
     let mut app = test_app_with_agent();
-    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let _ = app.apply_auth_meta(&xai_grok_login::AuthMeta {
         auth_mode: Some("ApiKey".into()),
         ..Default::default()
     });
@@ -813,7 +813,7 @@ fn show_usage_without_session_still_surfaces_credits() {
 
 #[test]
 fn team_auth_disables_agent_billing_surface() {
-    let meta = xai_grok_shell::auth::AuthMeta {
+    let meta = xai_grok_login::AuthMeta {
         team_id: Some("team-uuid".into()),
         principal_type: Some("Team".into()),
         ..Default::default()
@@ -830,7 +830,7 @@ fn team_auth_disables_agent_billing_surface() {
 
 #[test]
 fn personal_user_with_workspace_team_id_keeps_billing_surface() {
-    let meta = xai_grok_shell::auth::AuthMeta {
+    let meta = xai_grok_login::AuthMeta {
         team_id: Some("workspace-uuid".into()),
         principal_type: Some("User".into()),
         ..Default::default()
@@ -1308,6 +1308,7 @@ fn app_billing_fetched_stores_autotopup_and_arms_polling() {
             autotopup: crate::views::credit_bar::AutoTopupFetch::Resolved(
                 crate::views::credit_bar::AutoTopupInfo::disabled(),
             ),
+            nonce: 0,
         }),
         &mut app,
     );
@@ -1420,7 +1421,7 @@ fn older_app_failure_does_not_change_cadence_after_newer_success() {
 #[test]
 fn stable_user_id_changes_billing_owner_without_email() {
     let mut app = test_app_with_agent();
-    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let _ = app.apply_auth_meta(&xai_grok_login::AuthMeta {
         user_id: Some("old-user".into()),
         email: Some("shared@example.com".into()),
         ..Default::default()
@@ -1429,7 +1430,7 @@ fn stable_user_id_changes_billing_owner_without_email() {
     app.sync_billing_cache_to_agents();
     let generation = app.billing_generation;
 
-    let refresh_needed = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let refresh_needed = app.apply_auth_meta(&xai_grok_login::AuthMeta {
         user_id: Some("new-user".into()),
         ..Default::default()
     });
@@ -1445,11 +1446,11 @@ fn stable_user_id_changes_billing_owner_without_email() {
 fn old_account_result_is_ignored_after_billing_surface_returns() {
     let mut app = test_app_with_agent();
     let old_request = next_billing_request(&mut app);
-    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let _ = app.apply_auth_meta(&xai_grok_login::AuthMeta {
         auth_mode: Some("ApiKey".into()),
         ..Default::default()
     });
-    let refresh_needed = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let refresh_needed = app.apply_auth_meta(&xai_grok_login::AuthMeta {
         email: Some("new@example.com".into()),
         ..Default::default()
     });
@@ -1477,7 +1478,7 @@ fn hidden_billing_surface_stops_polling_and_ignores_late_result() {
     assert!(app.billing_poll_wanted);
     let old_request = next_billing_request(&mut app);
 
-    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let _ = app.apply_auth_meta(&xai_grok_login::AuthMeta {
         auth_mode: Some("ApiKey".into()),
         ..Default::default()
     });
@@ -1505,6 +1506,22 @@ fn hidden_billing_surface_stops_polling_and_ignores_late_result() {
         &mut app,
     );
     assert!(!app.billing_poll_wanted);
+}
+
+/// A failed app-level fetch is not a "no billing data" answer: the cached balance behind the welcome warning stays put.
+#[test]
+fn app_billing_error_keeps_cached_balance() {
+    let mut app = test_app_with_agent();
+    app.credit_balance = Some(test_bal(77.0));
+    let effects = dispatch(
+        Action::TaskComplete(TaskResult::AppBillingError {
+            error: "timeout".to_string(),
+            nonce: 0,
+        }),
+        &mut app,
+    );
+    assert!(effects.is_empty());
+    assert_eq!(app.credit_balance.as_ref().map(|b| b.usage_pct), Some(77.0));
 }
 
 // ── BillingError dispatch tests ─────────────────────────────────────
@@ -1535,11 +1552,11 @@ fn old_account_billing_error_is_ignored() {
     let mut app = test_app_with_agent();
     let before = agent_scrollback_len(&app);
     let old_request = next_billing_request(&mut app);
-    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let _ = app.apply_auth_meta(&xai_grok_login::AuthMeta {
         auth_mode: Some("ApiKey".into()),
         ..Default::default()
     });
-    let _ = app.apply_auth_meta(&xai_grok_shell::auth::AuthMeta {
+    let _ = app.apply_auth_meta(&xai_grok_login::AuthMeta {
         email: Some("new@example.com".into()),
         ..Default::default()
     });
@@ -1592,6 +1609,23 @@ fn free_usage_error_detected_by_embedded_code() {
     assert!(!is_free_usage_exhausted_error(
         "unauthorized:missing-acl: nope"
     ));
+}
+
+#[test]
+fn free_usage_upsell_displaces_feedback_before_opening_question() {
+    let mut app = test_app_with_agent();
+    let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+    agent.feedback_modal = Some(crate::views::feedback_modal::FeedbackModalState::new(
+        crate::views::feedback_modal::OpenFeedbackModal {
+            text: Some("unsent report".to_owned()),
+            ..Default::default()
+        },
+    ));
+
+    open_free_usage_upsell(agent, None);
+
+    assert!(agent.feedback_modal.is_none());
+    assert!(agent.question_view.is_some());
 }
 
 #[test]

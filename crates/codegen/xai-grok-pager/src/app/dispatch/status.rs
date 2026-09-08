@@ -47,6 +47,9 @@ pub(super) fn open_usage_info_modal(
     use crate::views::modal::ActiveModal;
     use crate::views::usage_modal::{UsageInfoContext, UsageInfoModalState};
 
+    if matches!(app.active_view, ActiveView::AgentDashboard) {
+        return open_dashboard_usage_modal(app, tab);
+    }
     let ActiveView::Agent(id) = app.active_view else {
         return vec![];
     };
@@ -232,18 +235,10 @@ pub(super) fn set_coding_data_sharing(
     opted_in: bool,
     source: xai_grok_telemetry::events::CodingDataConsentSource,
 ) -> Vec<Effect> {
-    set_coding_data_sharing_tracked(app, opted_in, source).0
-}
-
-pub(super) fn set_coding_data_sharing_tracked(
-    app: &mut AppView,
-    opted_in: bool,
-    source: xai_grok_telemetry::events::CodingDataConsentSource,
-) -> (Vec<Effect>, SharingWriteOutcome) {
     // ── Guard 1: Enterprise ZDR ──────────────────────────────────────
     if app.is_zdr {
-        app.show_toast(xai_grok_i18n::t("toast.zdr_enabled"));
-        return (vec![], SharingWriteOutcome::Refused);
+        app.show_toast("\u{2717} Cannot change: Zero Data Retention enabled");
+        return vec![];
     }
     // ── Guard 2: Non-admin team member ───────────────────────────────
     if app.is_team_principal {
@@ -252,8 +247,8 @@ pub(super) fn set_coding_data_sharing_tracked(
             .as_deref()
             .is_some_and(|r| r.eq_ignore_ascii_case("admin"));
         if !is_admin {
-            app.show_toast(xai_grok_i18n::t("toast.data_sharing_admin"));
-            return (vec![], SharingWriteOutcome::Refused);
+            app.show_toast("\u{2717} Data sharing is controlled by your team admin");
+            return vec![];
         }
     }
     let agent_id = coding_data_sharing_agent_id(app);
@@ -267,7 +262,7 @@ pub(super) fn set_coding_data_sharing_tracked(
         effects.extend(ack_privacy_banner(app));
     }
     if prev == opted_in {
-        return (effects, SharingWriteOutcome::AlreadySet);
+        return effects;
     }
 
     if opted_in {
@@ -293,7 +288,7 @@ pub(super) fn set_coding_data_sharing_tracked(
         rollback_to_opted_in: prev,
         seq,
     });
-    (effects, SharingWriteOutcome::Claimed(seq))
+    effects
 }
 
 /// Scrub an untrusted error string for toast display. Substitutes a

@@ -1,5 +1,4 @@
-//! Default settings catalog — declares every user-tunable preference
-//! registered in the settings modal.
+//! Default settings catalog: every user-tunable preference registered in the settings modal.
 //!
 //! Defaults come from `UiConfig::default()` for SHELL/SHARED settings.
 //! The `defaults_match_ui_config_default` test enforces this.
@@ -15,18 +14,12 @@ use xai_grok_shell::agent::config::UiConfig;
 use xai_grok_shell::util::config::DISPLAY_REFRESH_DEFAULT_AUTO_CADENCE_ENABLED;
 use xai_grok_tools::implementations::grok_build::ask_user_question;
 
-// ---------------------------------------------------------------------------
-// Int bounds for `max_thoughts_width`.
-//
-// Stored as `u16` in `UiConfig`, exposed as `i64` for registry uniformity.
-// 40 = min readable width on 80-col terminal; 500 = max before
-// "obviously wrong" territory. `pub(crate)` so the dispatcher's clamp
-// and the shell helper's defensive clamp share these bounds.
+// Int bounds for `max_thoughts_width`. `pub(crate)` so the dispatcher's clamp and the shell helper's defensive
+// clamp share these bounds.
 pub(crate) const MAX_THOUGHTS_WIDTH_MIN: i64 = 40;
 pub(crate) const MAX_THOUGHTS_WIDTH_MAX: i64 = 500;
 
-/// Registry key for `max_thoughts_width`. Shared between the registry
-/// definition and the live-wrap-preview gate in the int stepper.
+/// Registry key for `max_thoughts_width`; it is shared between the registry definition and the live-wrap-preview gate in the int stepper.
 pub(crate) const MAX_THOUGHTS_WIDTH_KEY: &str = "max_thoughts_width";
 
 /// Registry key for usage-refresh interval (minutes).
@@ -36,35 +29,11 @@ pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT: i64 = 5;
 pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_MIN: i64 = 1;
 pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_MAX: i64 = 60;
 
-// ---------------------------------------------------------------------------
-// Theme choice catalogs.
-//
-// Canonical names MUST match `ThemeKind::display_name()`.
-// Shared by `theme`, `auto_dark_theme`, and `auto_light_theme`;
-// auto-* sub-pickers drop "auto" to avoid circular reference.
-// Bounded by `MAX_PICKER_CHOICES`.
-// ---------------------------------------------------------------------------
+// Theme choice catalogs. Canonical names MUST match `ThemeKind::display_name()`. The catalogs are shared by
+// `theme`, `auto_dark_theme`, and `auto_light_theme`; the auto-* sub-pickers drop "auto" to avoid a circular
+// reference.
 
-/// UI language catalog (`[ui].language`). Product names stay as-is.
-const UI_LANGUAGE_CHOICES: &[EnumChoice] = &[
-    EnumChoice {
-        canonical: "auto",
-        display: "System",
-        description: "Follow the operating system language.",
-    },
-    EnumChoice {
-        canonical: "en",
-        display: "English",
-        description: "English interface.",
-    },
-    EnumChoice {
-        canonical: "zh-CN",
-        display: "简体中文",
-        description: "Simplified Chinese interface.",
-    },
-];
-
-/// Full theme catalog including the "auto" meta-variant. Used by `theme` only.
+/// Full theme catalog including the "auto" meta-variant; only `theme` uses it.
 const THEME_CHOICES: &[EnumChoice] = &[
     EnumChoice {
         canonical: "auto",
@@ -86,7 +55,7 @@ const THEME_CHOICES: &[EnumChoice] = &[
         display: "Tokyo Night",
         description: "Dark + blue-tinted; needs truecolor.",
     },
-    // ASCII "Rose Pine Moon" (not "Rosé") for cross-terminal compatibility.
+    // The display name is ASCII "Rose Pine Moon" (not "Rosé") for cross-terminal compatibility
     EnumChoice {
         canonical: "rosepine-moon",
         display: "Rose Pine Moon",
@@ -97,33 +66,21 @@ const THEME_CHOICES: &[EnumChoice] = &[
         display: "Oscura Midnight",
         description: "Deep dark with warm accents; needs truecolor.",
     },
+    EnumChoice {
+        canonical: "terminal",
+        display: "Terminal",
+        description: "Terminal's own background and text colors.",
+    },
 ];
 
-// ---------------------------------------------------------------------------
-// Permission-mode catalog.
-//
-// Persisted values map onto runtime flags:
-//   "always-approve" ↔ yolo_mode = true  (auto-approve all)
-//   "auto"           ↔ auto_mode = true  (LLM classifier; not full yolo)
-//   "ask"            ↔ both false (interactive prompts)
-//   "default"        ↔ both false (agent's default — currently Ask)
-//
-// Canonical strings match `load_permission_mode`. `supports_preview:
-// false` because toggling YOLO drains the permission queue (unsafe
-// for per-keystroke preview).
-//
-// Adding new modes requires: (1) `PermissionModeKind` variant,
-// (2) `EnumChoice` here, (3) `set_yolo_mode_inner` update,
-// (4) `load_permission_mode` arm, (5) tests. `Plan` is excluded —
-// it lives on its own `plan_mode` setting.
-// ---------------------------------------------------------------------------
+// Permission-mode catalog. Persisted values map onto runtime flags: "always-approve" ↔ yolo_mode = true
+// (auto-approve all). `supports_preview: false` because toggling YOLO drains the permission queue (unsafe for
+// per-keystroke preview).
 
-// Choice order: safe → classifier → unsafe (Default → Ask → Auto → Always approve).
-// "Always approve" at the end creates a speed bump against
-// accidental selection.
+// Choice order runs safe to unsafe: Default, Ask, Auto, Always approve
+// "Always approve" at the end creates a speed bump against accidental selection
 const PERMISSION_MODE_CHOICES: &[EnumChoice] = &[
-    // "default" = agent's default behavior. Same as "ask" at runtime;
-    // distinct on disk and in the modal indicator.
+    // "default" is the agent's default behavior: the same as "ask" at runtime, but distinct on disk and in the modal indicator
     EnumChoice {
         canonical: "default",
         display: "Default",
@@ -146,19 +103,10 @@ const PERMISSION_MODE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-// ---------------------------------------------------------------------------
-// Coding-data-sharing catalog.
-//
-// Persisted in auth metadata (`AuthEntry::coding_data_retention_opt_out`),
-// NOT config.toml. Two choices only — the pager has no `Option`/`Unset`
-// representation for this field.
-//
-// `supports_preview: false` — toggling fires an async ACP call that
-// can fail. Commit on Enter only.
-// ---------------------------------------------------------------------------
+// Coding-data-sharing catalog. Two choices only: the pager has no `Option`/`Unset` representation for this field.
+// `supports_preview: false` because toggling fires an async ACP call that can fail. Commit on Enter only.
 
-// The setting's own description carries the full explanation, so the choices
-// are bare labels — an empty description collapses each to a single line.
+// The setting's own description carries the full explanation, so the choices are bare labels; an empty description collapses each to a single line
 const CODING_DATA_SHARING_CHOICES: &[EnumChoice] = &[
     EnumChoice {
         canonical: "opt-in",
@@ -172,42 +120,16 @@ const CODING_DATA_SHARING_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-// ---------------------------------------------------------------------------
-// Plan-mode catalog.
-//
-// PAGER-owned, per-session, ACP-mediated via `session/set_mode`.
-// NOT persisted to config.toml — resets every session start.
-//
-// Uses `on`/`off` canonical strings (not the shell's `plan`/`default`
-// wire ids). `Ask` mode is intentionally not exposed here — it's
-// only reachable via Shift+Tab.
-//
-// `supports_preview: false` — toggling fires an ACP request that
-// gates tool dispatch. Commit on Enter only.
-// ---------------------------------------------------------------------------
+// Plan-mode catalog. `Ask` mode is not exposed here; it is only reachable via Shift+Tab. `supports_preview: false`
+// because toggling fires an ACP request that gates tool dispatch. Commit on Enter only.
 
-// ---------------------------------------------------------------------------
-// Default-selected-permission catalog.
-//
-// Persisted to `[ui].default_selected_permission` in config.toml. Controls
-// which row the cursor preselects on the FIRST permission prompt of a
-// session; after the user confirms any prompt, the cursor sticks to the
-// last-used option kind. `always_allow_all_sessions` (the effective default)
-// lands the cursor on the "Always allow on all sessions" / enable-always-approve
-// row explicitly, via `is_enable_always_approve_option` — not via index 0; the
-// other three map onto `acp::PermissionOptionKind::{AllowOnce, AllowAlways,
-// Reject*}`.
-//
-// `supports_preview: false` — permission prompts aren't open in the modal
-// background, so there's no live preview surface.
-// ---------------------------------------------------------------------------
+// Default-selected-permission catalog. `always_allow_all_sessions` (the effective default) lands the cursor on the
+// "Always allow on all sessions" (enable-always-approve) row. `supports_preview: false` because permission prompts
+// aren't open in the modal background, so there is nothing to live-preview.
 
-// Order matches the live permission prompt rendering (YOLO -> always-allow
-// -> allow-once -> reject) so the picker mirrors what the user sees on the
-// real prompt.
-// Canonicals + display labels come from `DefaultSelectedPermission` (the
-// single source of truth) so this table can never drift from the parser,
-// the dispatch toast, or the cursor logic.
+// Order matches the live permission prompt rendering (YOLO, always-allow, allow-once, reject) so the picker mirrors the real prompt
+// Canonicals and display labels come from `DefaultSelectedPermission`, the single source of truth
+// This table therefore can never drift from the parser, the dispatch toast, or the cursor logic
 const DEFAULT_SELECTED_PERMISSION_CHOICES: &[EnumChoice] = &[
     EnumChoice {
         canonical: DefaultSelectedPermission::AlwaysAllowAllSessions.as_canonical(),
@@ -244,8 +166,8 @@ const PLAN_MODE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-// Mid-turn follow-up routing. SHARED-owned, persisted to
-// `[ui].follow_up_behavior`. Canonicals match `FollowUpBehavior::as_canonical`.
+// Mid-turn follow-up routing. SHARED-owned, persisted to `[ui].follow_up_behavior`.
+// Canonicals match `FollowUpBehavior::as_canonical`
 const FOLLOW_UP_BEHAVIOR_CHOICES: &[EnumChoice] = &[
     EnumChoice {
         canonical: "queue",
@@ -259,13 +181,9 @@ const FOLLOW_UP_BEHAVIOR_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-// ---------------------------------------------------------------------------
-// Mermaid-rendering catalog.
-//
-// SHELL-owned: persisted to `[ui].render_mermaid`, with a pager-side
-// process-wide cache mirror (`appearance::cache::*_render_mermaid`) for the
-// render hot path. Canonicals match `RenderMermaid::as_canonical`.
-// ---------------------------------------------------------------------------
+// Mermaid-rendering catalog. SHELL-owned: persisted to `[ui].render_mermaid`. A pager-side process-wide cache
+// mirror (`appearance::cache::*_render_mermaid`) serves the render hot path. Canonicals match
+// `RenderMermaid::as_canonical`.
 
 const RENDER_MERMAID_CHOICES: &[EnumChoice] = &[
     EnumChoice {
@@ -324,8 +242,7 @@ const TEXT_SELECTION_CHOICES: &[EnumChoice] = &[
 ];
 
 // Hunk-tracker-mode catalog. SHELL-owned, persisted to `[ui].hunk_tracker_mode`.
-// `disabled` is accepted as an alias for `off` at parse time but not surfaced
-// as a choice.
+// `disabled` is accepted as an alias for `off` at parse time but not shown as a choice
 const HUNK_TRACKER_MODE_CHOICES: &[EnumChoice] = &[
     EnumChoice {
         canonical: "agent_only",
@@ -357,11 +274,8 @@ const SCREEN_MODE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-// Voice-capture-mode catalog. SHELL-owned, persisted to `[ui].voice_capture_mode`.
-// `hold` is gated on `kitty_releases_reported`; `effective_enum_choices` hides it
-// elsewhere, and it falls back to `toggle` at runtime. "Kitty-protocol terminal"
-// in the copy below is a deliberate user-facing simplification: Alacritty <= 0.14
-// negotiates the protocol yet never reports releases, so hold stays hidden there.
+// Voice-capture-mode catalog. Alacritty 0.14 and earlier negotiates the protocol yet never reports releases, so
+// hold stays hidden there.
 const VOICE_CAPTURE_MODE_CHOICES: &[EnumChoice] = &[
     EnumChoice {
         canonical: "toggle",
@@ -375,13 +289,9 @@ const VOICE_CAPTURE_MODE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-// Voice STT language choices for the settings modal.
-//
-// Concrete codes must match `xai_grok_voice::STT_LANGUAGES` (official Grok STT
-// catalog — https://docs.x.ai/developers/model-capabilities/audio/speech-to-text).
-// `auto` is client-only; the voice crate resolves it to a concrete code before
-// the STT handshake. Order: English (default), System, then remaining languages
-// A–Z by English name. A registry unit test locks this list to the voice crate.
+// Voice STT language choices for the settings modal. Concrete codes must match `xai_grok_voice::STT_LANGUAGES`,
+// the official Grok STT catalog. `auto` is client-only; the voice crate resolves it to a concrete code before the
+// STT handshake.
 const VOICE_STT_LANGUAGE_CHOICES: &[EnumChoice] = &[
     EnumChoice {
         canonical: "en",
@@ -515,9 +425,8 @@ const VOICE_STT_LANGUAGE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-/// Concrete-only theme catalog (excludes "auto"). Used by both
-/// `auto_dark_theme` and `auto_light_theme`. No dark/light filtering —
-/// the user can pair any theme with any system-appearance bucket.
+/// Concrete-only theme catalog (excludes "auto"), used by both `auto_dark_theme` and `auto_light_theme`.
+/// There is no dark/light filtering: the user can pair any theme with any system-appearance bucket.
 const CONCRETE_THEME_CHOICES: &[EnumChoice] = &[
     EnumChoice {
         canonical: "groknight",
@@ -544,13 +453,15 @@ const CONCRETE_THEME_CHOICES: &[EnumChoice] = &[
         display: "Oscura Midnight",
         description: "Deep dark with warm accents; needs truecolor.",
     },
+    EnumChoice {
+        canonical: "terminal",
+        display: "Terminal",
+        description: "Terminal's own background and text colors.",
+    },
 ];
 
-/// Child settings shown inside the "Show contextual hints" group sub-sheet.
-/// Keys match the `[ui.contextual_hints]` serde fields (namespaced so they stay
-/// globally unique — bare `plan_mode` collides with the plan-mode enum row).
-/// They are registered as normal Bool settings but hidden from the top-level
-/// list (`build_rows` skips any key that is a group child).
+/// Child settings shown inside the "Show contextual hints" group sub-sheet. Keys match the `[ui.contextual_hints]`
+/// serde fields. The namespace keeps them globally unique: bare `plan_mode` collides with the plan-mode enum row.
 const CONTEXTUAL_HINTS_CHILDREN: &[&str] = &[
     "contextual_hints.undo",
     "contextual_hints.plan_mode",
@@ -562,10 +473,9 @@ const CONTEXTUAL_HINTS_CHILDREN: &[&str] = &[
     "contextual_hints.ssh_wrap",
 ];
 
-/// Build the catalog. Called once at process start via
-/// `SettingsRegistry::defaults()`.
+/// Build the catalog; called once at process start via `SettingsRegistry::defaults()`.
 pub fn default_settings() -> Vec<SettingMeta> {
-    // Shell schema defaults, used as registry source of truth.
+    // The shell schema defaults are the registry's source of truth
     let ui_default = UiConfig::default();
 
     vec![
@@ -621,7 +531,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             description: "Show clock time next to user messages and agent responses.",
             keywords: &["timestamps", "time", "clock", "date"],
             kind: SettingKind::Bool {
-                // `Option<bool>` — `None` treated as `true`.
+                // `Option<bool>`: `None` is treated as `true`
                 default: ui_default.show_timestamps.unwrap_or(true),
             },
             restart_required: false,
@@ -716,9 +626,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             hidden_in_minimal: false,
         },
         SettingMeta {
-            // Persisted key stays `simple_mode`; the user-facing label
-            // distinguishes the PROMPT vim-mode (this setting) from the
-            // scrollback `vim_mode` keybindings below.
+            // The persisted key stays `simple_mode`
+            // The user-facing label distinguishes the PROMPT vim-mode (this setting) from the scrollback `vim_mode` keybindings below
             key: "simple_mode",
             category: SettingCategory::Appearance,
             owner: SettingOwner::Shared,
@@ -737,17 +646,15 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 "prompt",
             ],
             kind: SettingKind::Bool {
-                // `Option<bool>` — `None` treated as `true`.
+                // `Option<bool>`: `None` is treated as `true`
                 default: ui_default.simple_mode.unwrap_or(true),
             },
             restart_required: false,
             hidden_in_minimal: false,
         },
         // SHELL-owned, persisted to `[ui].vim_mode` in config.toml.
-        // Defaults to the same value main's `appearance::persist::VIM_MODE_DEFAULT`
-        // shipped with. Bundled next to `simple_mode` because they pair up:
-        // simple_mode controls the input editor's vim behaviour,
-        // vim_mode controls the scrollback's vim behaviour.
+        // Defaults to the same value main's `appearance::persist::VIM_MODE_DEFAULT` shipped with
+        // Bundled next to `simple_mode` because they pair up: simple_mode controls the input editor's vim behaviour, vim_mode controls the scrollback's
         SettingMeta {
             key: "vim_mode",
             category: SettingCategory::Appearance,
@@ -769,27 +676,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // --- UI language -----------------------------------------------------
-        // SHELL-owned, persisted to `[ui].language`. Live-applied via
-        // `xai_grok_i18n::set_locale` (no restart). Distinct from voice STT.
-        SettingMeta {
-            key: "language",
-            category: SettingCategory::Appearance,
-            owner: SettingOwner::Shell,
-            label: "UI language",
-            description: "Language for the Grok Build interface. System follows your OS locale when Chinese or English is detected.",
-            keywords: &[
-                "language", "locale", "i18n", "l10n", "chinese", "english", "中文", "ui",
-            ],
-            kind: SettingKind::Enum {
-                default: "auto",
-                choices: UI_LANGUAGE_CHOICES,
-                supports_preview: false,
-            },
-            restart_required: false,
-            hidden_in_minimal: false,
-        },
-        // --- theme + auto themes ---------------------------------------------
+        // --- theme and auto themes -------------------------------------------
         SettingMeta {
             key: "theme",
             category: SettingCategory::Appearance,
@@ -806,7 +693,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 "light",
             ],
             kind: SettingKind::Enum {
-                // `Option<String>` — `None` resolved to "groknight".
+                // `Option<String>`: `None` resolves to "groknight"
                 default: "groknight",
                 choices: THEME_CHOICES,
                 supports_preview: true,
@@ -822,7 +709,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             description: "Theme to use when the system is in dark mode (only with theme=auto).",
             keywords: &["auto", "dark", "theme", "system", "appearance", "night"],
             kind: SettingKind::Enum {
-                // `Option<String>` — `None` falls back to "groknight".
+                // `Option<String>`: `None` falls back to "groknight"
                 default: "groknight",
                 choices: CONCRETE_THEME_CHOICES,
                 supports_preview: true,
@@ -838,7 +725,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             description: "Theme to use when the system is in light mode (only with theme=auto).",
             keywords: &["auto", "light", "theme", "system", "appearance", "day"],
             kind: SettingKind::Enum {
-                // `Option<String>` — `None` falls back to "grokday".
+                // `Option<String>`: `None` falls back to "grokday"
                 default: "grokday",
                 choices: CONCRETE_THEME_CHOICES,
                 supports_preview: true,
@@ -846,9 +733,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: true,
         },
-        // SHELL-owned: persisted to `[ui].render_mermaid`, with a pager-side
-        // process-wide cache mirror (like `vim_mode`). Default pinned to "auto"
-        // by `defaults_match_ui_config_default`.
+        // SHELL-owned: persisted to `[ui].render_mermaid`, with a pager-side process-wide cache mirror (like `vim_mode`)
+        // The default is pinned to "auto" by `defaults_match_ui_config_default`
         SettingMeta {
             key: "render_mermaid",
             category: SettingCategory::Appearance,
@@ -874,8 +760,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             hidden_in_minimal: false,
         },
         // Security-relevant: "always-approve" bypasses all permission prompts.
-        // Modal reads live state from `PagerLocalSnapshot.yolo_mode`
-        // (not `ui.permission_mode`) to reflect Ctrl+O toggles immediately.
+        // The modal reads live state from `PagerLocalSnapshot.yolo_mode` (not `ui.permission_mode`) to reflect Ctrl+O toggles immediately
         SettingMeta {
             key: "permission_mode",
             category: SettingCategory::Agent,
@@ -905,9 +790,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned `[ui].remember_tool_approvals`. Gates the per-tool
-        // "Always allow …" prompt options. `restart_required` — resolved at
-        // permission-manager spawn (also fed by env/requirements/managed/remote settings).
+        // SHELL-owned `[ui].remember_tool_approvals`. It gates the per-tool "Always allow …" prompt options.
+        // `restart_required` because the value is resolved at permission-manager spawn (also fed by env/requirements/managed/remote settings)
         SettingMeta {
             key: "remember_tool_approvals",
             category: SettingCategory::Agent,
@@ -931,8 +815,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 "whitelist",
             ],
             kind: SettingKind::Bool {
-                // Resolver-shared const, so the modal shows the effective
-                // default when the user layer is unset.
+                // The const is shared with the resolver, so the modal shows the effective default when the user layer is unset
                 default: xai_grok_shell::util::config::DEFAULT_REMEMBER_TOOL_APPROVALS,
             },
             restart_required: true,
@@ -950,9 +833,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned. Reads from `pager.current_model_name` (not
-        // `cfg.models.default`) so the modal reflects `/model` switches.
-        // Empty-string default = "no opinion" / use shell's resolution.
+        // SHELL-owned. It reads from `pager.current_model_name` (not `cfg.models.default`) so the modal reflects `/model` switches.
+        // The empty-string default means "no opinion": the shell's resolution applies
         SettingMeta {
             key: "default_model",
             category: SettingCategory::Models,
@@ -966,23 +848,6 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 supports_preview: false,
             },
             restart_required: false,
-            hidden_in_minimal: false,
-        },
-        // SHELL-owned. Independent from the active chat model; an empty value
-        // means the Web Search default-resolution chain remains in control.
-        SettingMeta {
-            key: "web_search_model",
-            category: SettingCategory::Models,
-            owner: SettingOwner::Shell,
-            label: "Web Search model",
-            description: "Model used by Web Search. This is independent from the active chat model. Pick `(no override)` to use the configured default. Restart required to apply.",
-            keywords: &["web", "search", "model", "tool", "research"],
-            kind: SettingKind::DynamicEnum {
-                default: "",
-                source: DynamicEnumSource::ActiveModelCatalog,
-                supports_preview: false,
-            },
-            restart_required: true,
             hidden_in_minimal: false,
         },
         // SHARED. `u16` in UiConfig, widened to `i64` for registry.
@@ -1010,6 +875,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+
         // SHELL-owned: how often to refresh usage data shown left of the model name.
         SettingMeta {
             key: USAGE_REFRESH_INTERVAL_MINUTES_KEY,
@@ -1017,10 +883,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             owner: SettingOwner::Shell,
             label: "Usage refresh interval",
             description: "How often to refresh weekly/monthly usage in the prompt (1–60 minutes, default 5). Also refreshes when a turn completes.",
-            keywords: &[
-                "usage", "billing", "credit", "limit", "refresh", "interval", "poll", "weekly",
-                "reset",
-            ],
+            keywords: &["usage", "billing", "credit", "limit", "refresh", "interval", "poll", "weekly", "reset"],
             kind: SettingKind::Int {
                 default: USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT,
                 min: USAGE_REFRESH_INTERVAL_MINUTES_MIN,
@@ -1029,7 +892,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned: `[ui].show_thinking_blocks` + process-wide cache. Default ON.
+        // SHELL-owned: `[ui].show_thinking_blocks` with a process-wide cache. Default ON.
         SettingMeta {
             key: "show_thinking_blocks",
             category: SettingCategory::Appearance,
@@ -1050,58 +913,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned: `[ui].show_session_usage_bar`. Default OFF.
-        SettingMeta {
-            key: "show_session_usage_bar",
-            category: SettingCategory::Appearance,
-            owner: SettingOwner::Shell,
-            label: "Live session usage on prompt",
-            description: "Show this session's total tokens (and estimated cost when \
-                          model prices are configured) to the left of the model name \
-                          on the prompt line. Cost uses server stamps when present, \
-                          otherwise local [model.*] price fields.",
-            keywords: &[
-                "usage",
-                "tokens",
-                "cost",
-                "price",
-                "session",
-                "billing",
-                "status",
-                "bar",
-            ],
-            kind: SettingKind::Bool {
-                default: ui_default.show_session_usage_bar.unwrap_or(false),
-            },
-            restart_required: false,
-            hidden_in_minimal: false,
-        },
-        // SHELL-owned: `[ui].show_request_metrics`. Default ON.
-        SettingMeta {
-            key: "show_request_metrics",
-            category: SettingCategory::Appearance,
-            owner: SettingOwner::Shell,
-            label: "Per-request metrics in scrollback",
-            description: "After each model response, show first-token time, generation \
-                          rate, duration, and token counts in the conversation.",
-            keywords: &[
-                "metrics",
-                "ttft",
-                "tps",
-                "first",
-                "token",
-                "latency",
-                "speed",
-                "request",
-                "usage",
-            ],
-            kind: SettingKind::Bool {
-                default: ui_default.show_request_metrics_enabled(),
-            },
-            restart_required: false,
-            hidden_in_minimal: false,
-        },
-        // SHELL-owned: `[ui].prompt_suggestions` + process-wide cache. Default ON.
+        // SHELL-owned: `[ui].prompt_suggestions` with a process-wide cache. Default ON.
         // The `GROK_PROMPT_SUGGESTIONS` env var overrides at runtime.
         SettingMeta {
             key: "prompt_suggestions",
@@ -1127,10 +939,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // PAGER-owned, persisted to `[scrollback.scroll].respect_manual_folds`
-        // in pager.toml (NOT config.toml). Live value is the appearance
-        // config (`AppView::set_appearance` fans changes out to every agent);
-        // the flag is read at use time, so no restart.
+        // PAGER-owned, persisted to `[scrollback.scroll].respect_manual_folds` in pager.toml (NOT config.toml)
+        // The live value is the appearance config (`AppView::set_appearance` fans changes out to every agent)
+        // The flag is read at use time, so no restart
         SettingMeta {
             key: "respect_manual_folds",
             category: SettingCategory::Appearance,
@@ -1147,7 +958,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned: `[ui].group_tool_verbs` + process-wide cache. Default ON.
+        // SHELL-owned: `[ui].group_tool_verbs` with a process-wide cache. Default ON.
         SettingMeta {
             key: "group_tool_verbs",
             category: SettingCategory::Appearance,
@@ -1165,7 +976,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned: `[ui].collapsed_edit_blocks` + process-wide cache.
+        // SHELL-owned: `[ui].collapsed_edit_blocks` with a process-wide cache
         // Default OFF (rollout flag; remote settings / managed config can enable).
         SettingMeta {
             key: "collapsed_edit_blocks",
@@ -1194,8 +1005,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned: `[ui.display_refresh].auto_cadence_enabled`. Restart-
-        // required (cadence pinned at startup); hidden in minimal.
+        // SHELL-owned: `[ui.display_refresh].auto_cadence_enabled`. Restart-required (cadence pinned at startup); hidden in minimal.
         SettingMeta {
             key: "display_refresh_auto_cadence",
             category: SettingCategory::Appearance,
@@ -1260,10 +1070,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned, persisted to `[ui].scroll_lines`. One knob for BOTH
-        // wheel and trackpad lines-per-tick; the registered default 3 matches
-        // most terminal profiles, but until the user first commits a value
-        // the per-terminal profile stays in charge (cache unset → no override).
+        // SHELL-owned, persisted to `[ui].scroll_lines`. One knob covers BOTH wheel and trackpad lines-per-tick.
+        // The registered default 3 matches most terminal profiles
+        // Until the user first commits a value, the per-terminal profile stays in charge (an unset cache means no override)
         SettingMeta {
             key: "scroll_lines",
             category: SettingCategory::Mouse,
@@ -1282,7 +1091,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned: `[ui].invert_scroll` + process-wide cache. Default OFF.
+        // SHELL-owned: `[ui].invert_scroll` with a process-wide cache. Default OFF.
         SettingMeta {
             key: "invert_scroll",
             category: SettingCategory::Mouse,
@@ -1304,9 +1113,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned `flash` | `hold` | `word_select` on `[ui].keep_text_selection`. Compile-time
-        // default `flash`; the default can be set remotely via the `keep_text_selection_default`
-        // soft-default (a staged rollout applied at startup, not in this static default).
+        // SHELL-owned `flash` | `hold` | `word_select` on `[ui].keep_text_selection`. The compile-time default is `flash`.
+        // The default can be set remotely via the `keep_text_selection_default` soft-default
+        // That staged rollout applies at startup and is not reflected in this static default
         SettingMeta {
             key: "keep_text_selection",
             category: SettingCategory::Mouse,
@@ -1336,13 +1145,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned. Persisted in auth metadata (not config.toml).
-        // Reads from `PagerLocalSnapshot.coding_data_sharing_opt_out`.
-        // Default "opt-out" matches `AuthEntry::coding_data_retention_opt_out = true`
-        // (safer consumer default; server enrichment may still opt the user in).
-        // ZDR / non-admin guards are enforced at dispatch time.
-        // Do not put "telemetry" in keywords — that word is the config-file
-        // analytics toggle (Monitoring / Configuration docs).
+        // SHELL-owned. Do not put "telemetry" in keywords: that word is the config-file analytics toggle (Monitoring /
+        // Configuration docs).
         SettingMeta {
             key: "coding_data_sharing",
             category: SettingCategory::Privacy,
@@ -1370,11 +1174,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned, persisted to `[ui].default_selected_permission` in
-        // config.toml. Read by the pager via `appearance::permission_cursor`.
-        // Canonical `always_allow_all_sessions` (the effective default) lands
-        // the first prompt's cursor on the enable-always-approve row;
-        // subsequent prompts stick to the last-used kind.
+        // SHELL-owned, persisted to `[ui].default_selected_permission` in config.toml. Canonical
+        // `always_allow_all_sessions` (the effective default) lands the first prompt's cursor on the enable-always-approve
+        // row.
         SettingMeta {
             key: "default_selected_permission",
             category: SettingCategory::Agent,
@@ -1403,11 +1205,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned `[toolset.ask_user_question].timeout_enabled`. Surfaces
-        // the user-config layer of the tiered timeout gate (requirements/env/
-        // managed/remote settings feed the effective value at agent build); the
-        // default is the resolver-shared const. `restart_required` — resolved
-        // when an agent is built, like `remember_tool_approvals`.
+        // SHELL-owned `[toolset.ask_user_question].timeout_enabled`. `restart_required` because the value is resolved when
+        // an agent is built, like `remember_tool_approvals`.
         SettingMeta {
             key: "toolset.ask_user_question.timeout_enabled",
             category: SettingCategory::Agent,
@@ -1432,9 +1231,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: true,
             hidden_in_minimal: false,
         },
-        // PAGER-owned, ACP-mediated. Reads from
-        // `PagerLocalSnapshot.plan_mode_active`. Default "off" matches
-        // `AgentView::new`'s `plan_mode_active = false`.
+        // PAGER-owned, set over ACP. Reads from `PagerLocalSnapshot.plan_mode_active`.
+        // The default "off" matches `AgentView::new`'s `plan_mode_active = false`
         SettingMeta {
             key: "plan_mode",
             category: SettingCategory::Agent,
@@ -1467,9 +1265,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: true,
             hidden_in_minimal: false,
         },
-        // Contextual hints: one Advanced row that opens a sub-sheet of per-tip
-        // toggles. Applies live (restart_required: false); the group carries no
-        // value and its children are hidden from the top-level list.
+        // Contextual hints: one Advanced row that opens a sub-sheet of per-tip toggles
+        // It applies live (restart_required: false); the group carries no value and its children are hidden from the top-level list
         SettingMeta {
             key: "contextual_hints",
             category: SettingCategory::Advanced,
@@ -1490,9 +1287,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 "send",
                 "interject",
                 "queue",
-                // Child-specific terms: the per-tip children are hidden from the
-                // top-level list, so mirror their search words here to keep a
-                // query like "ctrl+z" or "shift+tab" from dead-ending.
+                // Child-specific terms: the per-tip children are hidden from the top-level list, so their search words are mirrored here
+                // A query like "ctrl+z" or "shift+tab" would otherwise dead-end
                 "ctrl+z",
                 "draft",
                 "wipe",
@@ -1530,8 +1326,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: true,
             hidden_in_minimal: false,
         },
-        // SHELL-owned, persisted to `[ui].hunk_tracker_mode`. Restart-required:
-        // the mode is read once when the session connects.
+        // SHELL-owned, persisted to `[ui].hunk_tracker_mode`. Restart-required: the mode is read once when the session connects.
         SettingMeta {
             key: "hunk_tracker_mode",
             category: SettingCategory::Advanced,
@@ -1551,9 +1346,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: true,
             hidden_in_minimal: false,
         },
-        // SHELL-owned, persisted to `[ui].voice_keybind_enabled`. Default ON —
-        // `None` (inherit) reads as `true`. Disables only the Ctrl+Space / F8
-        // chord; `/voice` (and Esc / the recording-row `[stop]`) keep working.
+        // SHELL-owned, persisted to `[ui].voice_keybind_enabled`. Default ON: `None` (inherit) reads as `true`.
+        // Off disables only the Ctrl+Space / F8 chord; `/voice` (and Esc / the recording-row `[stop]`) keep working
         SettingMeta {
             key: "voice_keybind_enabled",
             category: SettingCategory::Editor,
@@ -1581,9 +1375,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned, persisted to `[ui].voice_capture_mode`. The `hold` choice
-        // is hidden on terminals without key-release reporting (see
-        // `effective_enum_choices`) and falls back to `toggle` at runtime.
+        // SHELL-owned, persisted to `[ui].voice_capture_mode`
+        // The `hold` choice is hidden on terminals without key-release reporting (see `effective_enum_choices`)
+        // It falls back to `toggle` at runtime
         SettingMeta {
             key: "voice_capture_mode",
             category: SettingCategory::Editor,
@@ -1614,10 +1408,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // SHELL-owned, persisted to `[ui].voice_stt_language`. Live-applied to
-        // the next voice capture (no restart). Default English; System (`auto`)
-        // follows the process locale when it maps to a Grok STT language.
-        // Catalog = official STT languages (see xai_grok_voice::STT_LANGUAGES).
+        // SHELL-owned, persisted to `[ui].voice_stt_language`. Applied live to the next voice capture (no restart).
+        // Default English; System (`auto`) follows the process locale when it maps to a Grok STT language
+        // The catalog is the official STT languages (see xai_grok_voice::STT_LANGUAGES)
         SettingMeta {
             key: "voice_stt_language",
             category: SettingCategory::Editor,
@@ -1635,8 +1428,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // Contextual-hint children (hidden from the top-level list; reached via
-        // the group sub-sheet). Default ON — `None` (inherit) reads as `true`.
+        // Contextual-hint children (hidden from the top-level list; reached via the group sub-sheet)
+        // Default ON: `None` (inherit) reads as `true`
         SettingMeta {
             key: "contextual_hints.undo",
             category: SettingCategory::Advanced,
@@ -1774,16 +1567,8 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
-        // ── TodoGate (runtime turn-end backstop) ──────────────────────
-        //
-        // Only the CLI flag (`--todo-gate`) is wired. Settings-modal
-        // entries for `[reminder.todo_gate]` are deferred — the modal
-        // dispatcher requires per-key action arms in
-        // `settings_modal.rs` + `app/dispatch.rs` + `settings/registry.rs`
-        // that don't yet have a place to land.
-        // SHELL-owned. `restart_required: false` — the config-reloader
-        // rebroadcasts UI changes; mid-session forks pick up new values.
-        // Empty-string default = "no opinion" / use shell's resolution.
+        // Only the CLI flag (`--todo-gate`) is wired. Those arms don't yet have a place to land. `restart_required: false`
+        // because the config-reloader rebroadcasts UI changes.
         SettingMeta {
             key: "fork_secondary_model",
             category: SettingCategory::Models,
@@ -1802,31 +1587,6 @@ pub fn default_settings() -> Vec<SettingMeta> {
             kind: SettingKind::DynamicEnum {
                 default: "",
                 source: DynamicEnumSource::ActiveModelCatalog,
-                supports_preview: false,
-            },
-            restart_required: false,
-            hidden_in_minimal: false,
-        },
-        // LOCAL-PATCH(upstream-fork-secondary-model): effort menu depends on
-        // the effective secondary model (override or current session model).
-        SettingMeta {
-            key: "fork_secondary_reasoning_effort",
-            category: SettingCategory::Models,
-            owner: SettingOwner::Shell,
-            label: "Fork secondary reasoning effort",
-            description: "Reasoning effort for forked/secondary agents. Options follow the secondary model (or the current model when no secondary model is set). Pick `(no override)` to clear.",
-            keywords: &[
-                "fork",
-                "secondary",
-                "reasoning",
-                "effort",
-                "thinking",
-                "subagent",
-                "model",
-            ],
-            kind: SettingKind::DynamicEnum {
-                default: "",
-                source: DynamicEnumSource::ForkSecondaryReasoningEffort,
                 supports_preview: false,
             },
             restart_required: false,

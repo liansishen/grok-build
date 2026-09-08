@@ -115,7 +115,7 @@ pub(super) fn dispatch_send_prompt_now(
         return vec![];
     };
     agent.release_hook_block_hold();
-    // Composer / queue-row / paste Send now all land here, not in
+    // Composer / queue-row / paste Send now all land here, not in dispatch_send_prompt_inner. Drop the credit-limit stash so Try Again cannot resubmit the blocked prompt after the user has moved on.
     // dispatch_send_prompt_inner. Drop the credit-limit stash so Try Again
     // cannot resubmit the blocked prompt after the user has moved on.
     agent.credit_limit_stashed_prompt = None;

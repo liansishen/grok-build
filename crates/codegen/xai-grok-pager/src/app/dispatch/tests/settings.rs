@@ -3886,3 +3886,31 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
     );
     reset_mouse_capture_enabled(true);
 }
+/// The toggle's capture sequences must ride the writer queue (see `EscapeWriter`).
+#[cfg(not(windows))]
+#[serial_test::serial(MOUSE_CAPTURE_ENABLED)]
+#[test]
+fn mouse_reporting_toggle_enqueues_capture_escapes_on_the_writer_queue() {
+    reset_mouse_capture_enabled(true);
+    let mut app = test_app_with_agent();
+    app.registry = crate::actions::ActionRegistry::defaults_with_config(true);
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.escape_writer =
+        crate::render::draw::EscapeWriter::new(tx, crate::render::draw::WriterSync::new());
+    let _ = dispatch(Action::ToggleMouseCapture, &mut app);
+    assert!(!mouse_capture_is_enabled());
+    let disable = rx.try_recv().expect("disable escape queued");
+    assert!(String::from_utf8_lossy(disable.data()).contains("\x1b[?1000l"));
+    assert!(
+        rx.try_recv().is_err(),
+        "toggle-off queues exactly one payload"
+    );
+    let _ = dispatch(Action::ToggleMouseCapture, &mut app);
+    assert!(mouse_capture_is_enabled());
+    let enable = rx.try_recv().expect("enable escape queued");
+    assert!(String::from_utf8_lossy(enable.data()).contains("\x1b[?1000h"));
+    assert!(
+        rx.try_recv().is_err(),
+        "toggle-on queues exactly one payload"
+    );
+}

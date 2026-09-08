@@ -17,19 +17,9 @@ pub(super) fn active_agent_session_id(app: &AppView) -> Option<acp::SessionId> {
 }
 
 /// Apply a closure to the active agent (if any).
-///
-/// When a subagent view is active, resolves to the **child** view so
-/// actions like SelectNext, GotoBottom, etc. target the visible view.
+/// When a subagent view is active, resolves to the **child** view so actions like SelectNext, GotoBottom, etc. target the visible view.
 pub(super) fn with_active_agent(app: &mut AppView, f: impl FnOnce(&mut AgentView)) {
-    if let ActiveView::Agent(id) = app.active_view
-        && let Some(agent) = app.agents.get_mut(&id)
-    {
-        if let Some(child_sid) = agent.active_subagent.clone()
-            && let Some(child) = agent.subagent_views.get_mut(&child_sid)
-        {
-            f(child);
-            return;
-        }
+    if let Some(agent) = get_active_agent_mut(app) {
         f(agent);
     }
 }
@@ -58,38 +48,39 @@ pub(super) fn open_url_or_show(app: &mut AppView, url: &str) {
     }
 }
 
-/// Get a shared reference to the active agent view (if any).
+/// Get a shared reference to the visible agent view (if any).
+/// The unused home session on Welcome is not this (see `home_session_agent`); the first interaction reveals it and then acts on it as the active agent.
+/// The dashboard has its own dispatch box and must not inherit that session.
 pub(super) fn get_active_agent(app: &AppView) -> Option<&AgentView> {
-    if let ActiveView::Agent(id) = app.active_view
-        && let Some(agent) = app.agents.get(&id)
+    let ActiveView::Agent(id) = app.active_view else {
+        return None;
+    };
+    let agent = app.agents.get(&id)?;
+    if let Some(ref child_sid) = agent.active_subagent
+        && let Some(child) = agent.subagent_views.get(child_sid)
     {
-        if let Some(ref child_sid) = agent.active_subagent
-            && let Some(child) = agent.subagent_views.get(child_sid)
-        {
-            return Some(child);
-        }
-        return Some(agent);
+        return Some(child);
     }
-    None
+    Some(agent)
 }
 
-/// Get a mutable reference to the active agent view (if any).
+/// Get a mutable reference to the visible agent view (if any).
 pub(super) fn get_active_agent_mut(app: &mut AppView) -> Option<&mut AgentView> {
-    if let ActiveView::Agent(id) = app.active_view
-        && let Some(agent) = app.agents.get_mut(&id)
+    let id = match app.active_view {
+        ActiveView::Agent(id) => id,
+        ActiveView::Welcome | ActiveView::AgentDashboard => return None,
+    };
+    let agent = app.agents.get_mut(&id)?;
+    if matches!(app.active_view, ActiveView::Agent(_))
+        && let Some(child_sid) = agent.active_subagent.clone()
+        && agent.subagent_views.contains_key(&child_sid)
     {
-        if let Some(child_sid) = agent.active_subagent.clone()
-            && agent.subagent_views.contains_key(&child_sid)
-        {
-            return agent.subagent_views.get_mut(&child_sid).map(|b| &mut **b);
-        }
-        return Some(agent);
+        return agent.subagent_views.get_mut(&child_sid).map(|b| &mut **b);
     }
-    None
+    Some(agent)
 }
 
 /// Child view when a fullscreen subagent overlay is open.
-///
 /// Unlike [`get_active_agent_mut`], never falls back to the parent.
 /// Overlay cancel uses this so the overlay-open check and cancel target cannot disagree.
 pub(super) fn active_subagent_view_mut(app: &mut AppView) -> Option<&mut AgentView> {
@@ -123,7 +114,6 @@ pub(super) fn navigate_clearing_selection(app: &mut AppView, f: impl FnOnce(&mut
 }
 
 /// Synchronize the sleep inhibitor with the aggregate agent state.
-///
 /// Inhibits idle sleep when any agent is busy; releases when all are idle.
 /// Called after every `AgentState` transition in dispatch.
 pub(super) fn sync_sleep_inhibitor(app: &AppView) {
@@ -287,6 +277,15 @@ pub(crate) fn switch_to_agent(app: &mut AppView, target: AgentId, cause: SwitchC
     }
     if matches!(app.active_view, ActiveView::Agent(current) if current == target) {
         return;
+    }
+    // Unused home is only unused while hidden. Switching to it promotes
+    // it (dashboard attach, settings fallback). Switching elsewhere
+    // abandons it so Ctrl+N cannot delete a live conversation.
+    if app.home_session_agent == Some(target) {
+        app.home_session_agent = None;
+    } else if app.home_session_agent.is_some() {
+        let abandoned = super::session::lifecycle::abandon_unused_home_session(app);
+        app.pending_effects.extend(abandoned);
     }
     // Capture before mutating active_view (subagent views are not top-level ids).
     let previous_top_level = match app.active_view {

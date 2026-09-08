@@ -7,7 +7,6 @@ use crate::app::agent_view::{AgentView, PromptInputMode};
 use crate::app::app_view::{ActiveView, AppView};
 use crate::scrollback::block::RenderBlock;
 use crate::scrollback::blocks::{SessionEvent, ToolCallBlock};
-use crate::views::question_view::{LocalQuestionKind, QuestionViewState};
 use std::sync::atomic::{AtomicU64, Ordering};
 use xai_grok_i18n::{t, t_fmt};
 use xai_grok_tools::implementations::grok_build::ask_user_question::Question;
@@ -65,34 +64,134 @@ fn feedback_pane_blocked(agent: &AgentView) -> Option<&'static str> {
 /// cleans up the staged temp files.
 pub(super) fn dispatch_open_feedback_pane(
     app: &mut AppView,
-    prefill: Option<String>,
-    mut images: crate::views::prompt_widget::FeedbackImages,
+    open: crate::views::feedback_modal::OpenFeedbackModal,
 ) -> Vec<Effect> {
     let ActiveView::Agent(id) = app.active_view else {
+        if matches!(app.active_view, ActiveView::AgentDashboard)
+            && let Some(dashboard) = app.dashboard.as_mut()
+        {
+            dashboard.dispatch.set_text("");
+            dashboard.set_error_toast(NO_SESSION_NOTICE);
+        }
         return vec![];
     };
-
+    // Minimal mode has no renderer for the modal; an invisible input owner would swallow every key.
+    if app.screen_mode.is_minimal() {
+        with_active_agent(app, |agent| {
+            agent.scrollback.push_block(RenderBlock::system(
+                "Use `/feedback <text>` in minimal mode, or run without --minimal to open the feedback form."
+                    .to_string(),
+            ));
+        });
+        return vec![];
+    }
+    if matches!(
+        app.voice_recording_target(),
+        Some(crate::app::app_view::VoiceTarget::Agent(target)) if target == id
+    ) {
+        feedback_notice(app, "Stop voice input before opening the feedback form");
+        return vec![];
+    }
     let blocked = {
         let Some(agent) = app.agents.get(&id) else {
             return vec![];
         };
-        feedback_pane_blocked(agent)
+        agent.feedback_modal_open_blocker().or_else(|| {
+            agent
+                .session
+                .session_id
+                .is_none()
+                .then_some(NO_SESSION_NOTICE)
+        })
     };
     if let Some(message) = blocked {
         feedback_notice(app, message);
         return vec![];
     }
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+    let prefill_chars = open.text.as_deref().map_or(0, |t| t.chars().count());
+    let prefill_images = open.images.len();
+    crate::unified_log::info(
+        "feedback.modal_open",
+        agent.session.session_id.as_ref().map(|s| s.0.as_ref()),
+        Some(serde_json::json!({
+            "prefill_chars": prefill_chars,
+            "prefill_images": prefill_images,
+            // Fixed taxonomy labels only, never user-authored text.
+            "type": open.r#type.as_ref().map(crate::views::feedback_modal::FeedbackType::label),
+            "task_category": open
+                .task_category
+                .as_ref()
+                .map(crate::views::feedback_modal::FeedbackTaskCategory::label),
+            "failure_mode": open
+                .failure_mode
+                .as_ref()
+                .map(crate::views::feedback_modal::FeedbackFailureMode::label),
+            "has_draft_id": open.draft_id.is_some(),
+        })),
+    );
+    let draft_id = open.draft_id.clone();
+    let modal = crate::views::feedback_modal::FeedbackModalState::new(open);
+    let modal_id = modal.id();
+    let rehydrations = modal.image_rehydration_requests();
+    agent.feedback_modal = Some(modal);
+    let mut effects = rehydrations
+        .into_iter()
+        .map(|(image_identity, path)| Effect::RehydrateFeedbackImage {
+            agent_id: id,
+            modal_id,
+            image_identity,
+            path,
+        })
+        .collect::<Vec<_>>();
+    if draft_id.is_none()
+        && let Some(modal) = agent.feedback_modal.as_mut()
+    {
+        modal.start_open_draft_list();
+        if let Some(request) = modal.take_pending_request()
+            && let Some(session_id) = agent.session.session_id.clone()
+        {
+            effects.push(Effect::FeedbackDraftRequest {
+                agent_id: id,
+                session_id,
+                request,
+            });
+        }
+    }
+    if let Some(draft_id) = draft_id
+        && let Some(modal) = agent.feedback_modal.as_mut()
+    {
+        modal.start_external_draft_load(draft_id);
+        if let Some(request) = modal.take_pending_request() {
+            let Some(session_id) = agent.session.session_id.clone() else {
+                return effects;
+            };
+            effects.push(Effect::FeedbackDraftRequest {
+                agent_id: id,
+                session_id,
+                request,
+            });
+        }
+    }
+    effects
+}
 
     // An individual coding-data opt-out does not suppress the offer: the card
     // is how opted-out users switch sharing back on. ZDR/team locks have no
     // self-serve path, so they still suppress it. Minimal mode never offers:
     // its `/feedback <text>` path documents sends without a consent card.
     let offer_trace = app.feedback_trace_offer()
+        && !app.feedback_trace_choice_latched
+        && !app.coding_data_retention_opt_out
         && app.coding_data_sharing_lock().is_none()
         && app.team_name.is_none()
         && !app.is_zdr
         && !app.screen_mode.is_minimal();
-    let offer_reenables_sharing = app.coding_data_retention_opt_out;
+    // Modal copy never discloses re-enabling coding-data sharing (one archive, this report only).
+    // Unlike the legacy AlwaysUpload card, this path does not call `set_coding_data_sharing`.
+    let trace_reenables_sharing = false;
     let Some(agent) = app.agents.get_mut(&id) else {
         return vec![];
     };
@@ -102,20 +201,10 @@ pub(super) fn dispatch_open_feedback_pane(
         multi_select: Some(false),
         id: None,
     };
-    let stashed = agent.prompt.stash();
-    let mut state = QuestionViewState::new(
-        format!("feedback-{}", uuid::Uuid::new_v4()),
-        vec![question],
-        stashed,
-    )
-    .with_local_kind(LocalQuestionKind::Feedback);
-    state.feedback_offer_trace = offer_trace;
-    state.feedback_offer_reenables_sharing = offer_reenables_sharing;
-    let prefill_text = prefill.filter(|s| !s.is_empty());
-    if let Some(text) = prefill_text.as_ref()
-        && let Some(slot) = state.per_question_freeform.get_mut(0)
-    {
-        *slot = text.clone();
+    // A stale submit (deferred behind a paste, or replayed) must never send a different modal's
+    // draft; a duplicate after the send-time close finds no modal at all and already returned.
+    if !modal.matches_id(modal_id) {
+        return vec![];
     }
     let freeform = state.activate_freeform_input();
     agent.prompt.set_text_preserving(&freeform);
@@ -187,18 +276,22 @@ pub(crate) fn feedback_send_effect(
     text: String,
     images: Vec<xai_grok_shell::session::FeedbackImage>,
     trace: Option<FeedbackTraceChoice>,
-    displaced: bool,
+    trace_log: Option<String>,
+    metadata: Option<serde_json::Value>,
+    request_trace_upload_token: bool,
+    draft: Option<crate::app::actions::DraftFeedbackBody>,
+    origin: FeedbackSendOrigin,
 ) -> Effect {
     let mut payload = serde_json::json!({
         "chars": text.chars().count(),
         "images": images.len(),
-        "trace": match trace {
+        "trace": trace_log.unwrap_or_else(|| match trace {
             Some(choice) => format!("{choice:?}"),
             None => "NotOffered".to_string(),
-        },
+        }),
     });
-    if displaced {
-        payload["displaced"] = serde_json::Value::Bool(true);
+    if matches!(origin, FeedbackSendOrigin::Modal { .. }) {
+        payload["modal"] = serde_json::Value::Bool(true);
     }
     crate::unified_log::info("feedback.send", Some(session_id.0.as_ref()), Some(payload));
     Effect::SendFeedback {
@@ -206,6 +299,10 @@ pub(crate) fn feedback_send_effect(
         session_id,
         feedback_text: text,
         images,
+        metadata,
+        request_trace_upload_token,
+        draft,
+        origin,
     }
 }
 
@@ -222,7 +319,6 @@ pub(crate) fn commit_feedback(
     text: String,
     images: crate::views::prompt_widget::FeedbackImages,
     trace: Option<FeedbackTraceChoice>,
-    displaced: bool,
 ) -> Option<Effect> {
     // Encode before the emptiness check: encoding can drop attachments, and
     // a report left with no text and no images must not go out blank.
@@ -231,7 +327,7 @@ pub(crate) fn commit_feedback(
         agent.scrollback.push_block(RenderBlock::system(notice));
     }
 
-    // A shown consent card closes its funnel exactly once, sent or not.
+    // A collected consent closes its funnel exactly once, sent or not.
     if let Some(choice) = trace {
         log_trace_consent_selected(coding_data_retention_opt_out, choice);
     }
@@ -264,7 +360,12 @@ pub(crate) fn commit_feedback(
         trimmed,
         encoded_images,
         trace,
-        displaced,
+        /*trace_log*/ None,
+        // Direct actions carry no taxonomy enums.
+        /*metadata*/ None,
+        /* request_trace_upload_token */ false,
+        /*draft*/ None,
+        FeedbackSendOrigin::Immediate,
     ))
 }
 
@@ -301,7 +402,6 @@ pub(super) fn dispatch_send_feedback(
         text,
         images,
         trace,
-        false,
     ) else {
         // Nothing went out, so no trace-upload side effects either.
         return vec![];
@@ -325,7 +425,7 @@ pub(super) fn dispatch_send_feedback(
             // sharing first and parks the upload on that write generation.
             let mut park_seq = None;
             if app.coding_data_retention_opt_out {
-                let (sharing, outcome) = super::status::set_coding_data_sharing_tracked(
+                effects.extend(super::status::set_coding_data_sharing(
                     app,
                     true,
                     xai_grok_telemetry::events::CodingDataConsentSource::FeedbackTraceCard,
@@ -365,6 +465,19 @@ pub(super) fn dispatch_send_feedback(
                     effects.push(persist_trace_upload_consent());
                 }
             }
+            effects.push(Effect::UploadFeedbackTrace {
+                agent_id: id,
+                session_id,
+                submission_id: None,
+                intent: None,
+                trace_upload_token: None,
+            });
+            // The `[telemetry] trace_upload = true` write an `AlwaysUpload` consent collects.
+            effects.push(Effect::PersistSetting {
+                key: "trace_upload",
+                value: crate::settings::SettingValue::Bool(true),
+                rollback_value: crate::settings::SettingValue::Bool(false),
+            });
         }
     }
     effects
@@ -383,14 +496,11 @@ pub(super) fn dispatch_send_remember_note_from_command(
     send_remember_note(app, text, false)
 }
 
-fn encode_feedback_images(
-    images: crate::views::prompt_widget::FeedbackImages,
+/// Encode a borrowed image snapshot for the POST.
+fn encode_feedback_image_slice(
+    images: &[crate::prompt_images::PastedImage],
 ) -> (Vec<xai_grok_shell::session::FeedbackImage>, Option<String>) {
     use base64::Engine as _;
-    use xai_grok_shell::session::{
-        MAX_FEEDBACK_IMAGE_BYTES, MAX_FEEDBACK_IMAGE_TOTAL_BYTES, MAX_FEEDBACK_IMAGES,
-        feedback_image_extension,
-    };
 
     let mut encoded = Vec::new();
     let mut over_count = 0usize;
@@ -582,11 +692,7 @@ pub(super) fn dispatch_save_remember_note_from_modal(app: &mut AppView) -> Vec<E
 }
 
 /// Extract session context for the LLM memory rewrite request.
-///
-/// Walks scrollback in reverse, collecting:
-/// - Last 5 user prompts
-/// - File paths from recent tool calls (Read, Edit, ListDir)
-/// - CWD and git branch
+/// File paths from recent tool calls (Read, Edit, ListDir)
 fn extract_session_context(agent: &AgentView) -> String {
     let mut user_prompts: Vec<String> = Vec::new();
     let mut file_paths: Vec<String> = Vec::new();

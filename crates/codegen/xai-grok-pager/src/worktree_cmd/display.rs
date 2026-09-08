@@ -63,7 +63,7 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
             out,
             "  {} {} {} {} {} {:<AGE_WIDTH$} {}",
             pad_to_width(&rec.id, id_width),
-            cell(rec.kind.as_str(), type_width),
+            cell(rec.kind.as_ref(), type_width),
             cell(&rec.repo_name, REPO_WIDTH),
             cell(label, label_width),
             cell(branch, BRANCH_WIDTH),
@@ -76,7 +76,7 @@ pub fn print_table(records: &[WorktreeRecord], out: &mut impl Write) -> std::io:
         records
             .iter()
             .fold(std::collections::BTreeMap::new(), |mut m, r| {
-                *m.entry(r.kind.as_str()).or_default() += 1;
+                *m.entry(r.kind.as_ref()).or_default() += 1;
                 m
             });
     let breakdown: Vec<String> = by_kind.iter().map(|(k, v)| format!("{v} {k}")).collect();

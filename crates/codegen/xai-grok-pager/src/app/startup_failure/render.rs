@@ -1,15 +1,11 @@
+use super::{ConnectAttempt, Context, EarlierAttempt, Reason, StartupFailure};
+use crate::app::connect_timeout::CONNECT_UI_TIMEOUT_TRY_COMMAND;
 use std::fmt::Write as _;
 use std::time::Duration;
 
 use xai_grok_i18n::{t, t_fmt};
 use xai_grok_telemetry::startup::{AgentKind, PhaseSnapshot, StartupPhase, format_duration};
-
-use crate::app::connect_timeout::CONNECT_UI_TIMEOUT_TRY_COMMAND;
-
-use super::{ConnectAttempt, Context, EarlierAttempt, Reason, StartupFailure};
-
 const WRAP_WIDTH: usize = 76;
-
 pub(super) fn render(failure: &StartupFailure) -> String {
     let context = &failure.context;
     let mut rows = vec![
@@ -44,7 +40,6 @@ pub(super) fn render(failure: &StartupFailure) -> String {
     let _ = write!(report, "\n\n{}", label_rows(&rows));
     report
 }
-
 struct Advice {
     doing: Option<&'static str>,
     earlier: Option<EarlierAttempt>,
@@ -66,7 +61,6 @@ fn advice_for(timings: &PhaseSnapshot, attempt: ConnectAttempt) -> Advice {
         },
     }
 }
-
 impl Advice {
     fn explanation(&self) -> String {
         let mut explanation = match self.doing {
@@ -103,7 +97,6 @@ impl Advice {
         explanation
     }
 }
-
 fn format_steps(timings: &PhaseSnapshot) -> String {
     let completed = timings
         .completed
@@ -125,7 +118,6 @@ fn format_steps(timings: &PhaseSnapshot) -> String {
     }
     steps.join(", ")
 }
-
 /// Values hang under their label, so a wrapped one never reads as a new field.
 fn label_rows(rows: &[(&str, String)]) -> String {
     let column_width = rows
@@ -142,8 +134,6 @@ fn label_rows(rows: &[(&str, String)]) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
-
-// A path or a command has to survive a paste, so words are never split.
 fn fill_indented(text: &str, initial_indent: &str, subsequent_indent: &str) -> String {
     textwrap::fill(
         text,
@@ -154,14 +144,12 @@ fn fill_indented(text: &str, initial_indent: &str, subsequent_indent: &str) -> S
             .wrap_algorithm(textwrap::WrapAlgorithm::FirstFit),
     )
 }
-
 #[derive(Clone, Copy)]
 enum NextStep {
     Retry,
     CheckNetworkThenRetry,
     RestartSharedLeader,
 }
-
 impl NextStep {
     fn text(self) -> &'static str {
         match self {
@@ -170,7 +158,6 @@ impl NextStep {
             Self::RestartSharedLeader => t("startup.failure.next.restart_leader"),
         }
     }
-
     /// Kept out of the prose so wrapping can never split it.
     fn command(self) -> Option<&'static str> {
         match self {
@@ -179,7 +166,6 @@ impl NextStep {
         }
     }
 }
-
 /// Reads as the object of "The longest step was".
 fn step_advice(phase: StartupPhase) -> (&'static str, NextStep) {
     use NextStep::{CheckNetworkThenRetry as Network, RestartSharedLeader, Retry};
@@ -198,7 +184,6 @@ fn step_advice(phase: StartupPhase) -> (&'static str, NextStep) {
         StartupPhase::SessionCreate => (t("startup.failure.step.session_create"), Retry),
     }
 }
-
 fn attempted_agents(context: &Context) -> String {
     let target = agent_name(context.target);
     match context.attempt {
@@ -209,14 +194,12 @@ fn attempted_agents(context: &Context) -> String {
         ),
     }
 }
-
 fn agent_name(agent: AgentKind) -> &'static str {
     match agent {
         AgentKind::Embedded => t("startup.failure.agent.local"),
         AgentKind::Leader => t("startup.failure.agent.leader"),
     }
 }
-
 /// Rounded: a truncated total can print smaller than the steps it sums.
 pub(super) fn whole_seconds(wait: Duration) -> String {
     format!("{}s", (wait.as_millis() + 500) / 1000)

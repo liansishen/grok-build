@@ -59,6 +59,7 @@ impl InferenceLatencyStats {
         }
     }
 
+
     /// Compute latency stats from the first model output and text chunk timestamps.
     ///
     /// # Arguments

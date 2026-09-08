@@ -266,7 +266,7 @@ pub(super) fn inherit_auto_mode(app: &AppView) -> bool {
 /// "auto" indicator correct regardless of which seam applied the mode.
 pub(super) fn sync_active_auto_flag(app: &mut AppView) {
     let is_auto = app.current_ui.permission_mode.as_deref() == Some("auto");
-    if let ActiveView::Agent(id) = app.active_view
+    if let Some(id) = permission_mode_agent_id(app)
         && let Some(agent) = app.agents.get_mut(&id)
     {
         agent.session.auto_mode = effective_auto(agent.session.is_yolo(), is_auto);
@@ -289,7 +289,7 @@ pub(super) fn set_yolo_mode_inner(app: &mut AppView, new: bool) {
     // Write-only mirror — see fn doc-comment.
     app.current_ui.permission_mode = Some(if new { "always-approve" } else { "ask" }.to_string());
 
-    let ActiveView::Agent(id) = app.active_view else {
+    let Some(id) = permission_mode_agent_id(app) else {
         return;
     };
     let Some(agent) = app.agents.get_mut(&id) else {
@@ -766,9 +766,16 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
                 }
             }
         };
+        // ACP notify needs a session id, so stash the canonical before the `app` reborrow below. SessionCreated replays it against the bound id.
+        // `app` reborrow below. SessionCreated replays it against the bound id.
+        if let Some(canonical) = persist_canonical {
+            agent.deferred_permission_mode = Some(canonical);
+        }
         refresh_open_settings_modals(app);
         let mut effects = Vec::new();
-        // Persist the displayed mode for the next launch; the pending CreateSession snapshots this mutation before execution.
+        // Persist the displayed mode for the next launch. A not-yet-executed CreateSession snapshots
+        // this mutation; a revealed home session (session/new already sent at startup) gets it via
+        // the `deferred_permission_mode` replay in SessionCreated.
         if let Some(canonical) = persist_canonical {
             effects.push(Effect::PersistPermissionMode {
                 canonical,

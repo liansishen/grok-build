@@ -14,6 +14,7 @@ use tokio::time::{Instant, sleep_until};
 
 use crate::appearance::ConfigWatcher;
 use crate::client_identity::{PAGER_CLIENT_TYPE, PAGER_CLIENT_VERSION};
+use crate::render::draw::{EscapeWriter, WriterDrain, WriterEvent};
 use crate::theme::system_appearance::{self, SystemAppearanceWatcher};
 use crate::theme::{Theme, ThemeKind, cache as theme_cache};
 
@@ -62,8 +63,6 @@ impl TimedInputEvent {
 ///
 /// Text is what the live composer's [`is_text_input_key`](crate::input::key::is_text_input_key) accepts, plus Backspace and bracketed Paste.
 /// Shift+Enter is kept so the live composer inserts a newline. Bare Enter is handled separately as a submission only after non-empty text.
-/// Arrows, Esc, function keys, and other chording modifiers are dropped.
-/// A terminal query reply (DA2/OSC) that leaks as raw key events decodes as an Esc followed by printable bytes.
 /// The Esc is non-text, and [`filter_startup_typeahead`] truncates the batch at the first Esc key, so such residue is unlikely to reach the composer.
 fn is_typeahead_event(event: &Event) -> bool {
     match event {
@@ -84,11 +83,8 @@ fn is_typeahead_event(event: &Event) -> bool {
 }
 
 /// Apply the type-ahead policy to one ordered drain batch: keep only genuine typing (see [`is_typeahead_event`]), truncating at the first Esc key.
-/// A terminal query reply (DA2/OSC) leaks as an Esc followed by printable bytes.
 /// After `EnableMouseCapture`/`EnableFocusChange` it is often prefixed by mouse/focus reports in the same drain, so the Esc is not necessarily first.
 /// Dropping from the Esc onward discards the printable tail the per-event filter would keep as ghost text, while keeping typing that came before it.
-/// The leading reports are dropped by the per-event filter regardless.
-/// Pure, so ordering and filtering are unit-testable without touching the tty.
 fn is_startup_submission_enter(event: &Event) -> bool {
     matches!(event, Event::Key(key)
         if key.kind == KeyEventKind::Press
@@ -145,7 +141,6 @@ pub(super) fn normalize_startup_submissions(events: &mut Vec<TimedInputEvent>) {
 /// Poll-drain the terminal input queue, returning the events `keep` selects and discarding the rest.
 /// `poll_timeout` is the quiet window and restarts after each event.
 /// Startup capture uses [`capture_startup_typeahead`] for an absolute deadline.
-/// Startup type-ahead capture keeps typing (see [`capture_startup_typeahead`]); the teardown/handoff drains keep nothing.
 fn drain_deadline_reached(poll_timeout: Duration, deadline: std::time::Instant) -> bool {
     !poll_timeout.is_zero() && std::time::Instant::now() >= deadline
 }
@@ -187,10 +182,6 @@ pub(super) fn drain_pending_events(
 }
 
 /// Capture keyboard type-ahead pending in the terminal input queue.
-///
-/// Keeps genuine typing (printable keys, Backspace, Paste, Shift+Enter) and a bare Enter that submits non-empty captured text.
-/// Drops terminal noise (mouse/focus/resize reports, query replies, other control keys). A batch that begins with an Esc is dropped whole.
-/// [`run`] replays the captured events into the composer when it is already the active consumer at launch (authed and trusted).
 /// A prompt typed while the app was still loading is therefore not lost.
 /// If a login/trust/paywall screen is still up, [`run`] drops the events rather than let that screen swallow (or be answered by) the keys.
 fn normalize_startup_event(event: Event) -> Event {
@@ -204,7 +195,7 @@ fn normalize_startup_event(event: Event) -> Event {
     }
 }
 pub(super) fn capture_startup_typeahead(poll_timeout: Duration) -> Vec<TimedInputEvent> {
-    // A queued legacy carriage return carries no modifier history. Treat it as
+    // A queued legacy carriage return carries no modifier history. Treat it as bare Enter; retroactively sampling current OS modifiers can misclassify it.
     // bare Enter; retroactively sampling current OS modifiers can misclassify it.
     let captured =
         filter_startup_typeahead(drain_pending_events_with(poll_timeout, true, |event| {
@@ -375,7 +366,7 @@ fn plan_reconnect_load(
 fn reconnect_restore_outcome(
     init_ok: bool,
     pending_agent_ids: &[super::agent::AgentId],
-    loads: &std::collections::HashMap<super::agent::AgentId, (bool, Option<String>, Option<bool>)>,
+    loads: &std::collections::HashMap<super::agent::AgentId, (bool, Option<String>)>,
     active_agent_id: Option<super::agent::AgentId>,
 ) -> (bool, bool) {
     let load_ok =
@@ -494,8 +485,8 @@ fn suspend_for_child(
     }
     let writer_sync = terminal.backend_mut().writer_mut().writer_sync().clone();
     match writer_sync.wait_drained(Duration::from_millis(750)) {
-        Ok(crate::render::draw::WriterDrain::Drained) => {}
-        Ok(crate::render::draw::WriterDrain::TimedOut) => {
+        Ok(WriterDrain::Drained) => {}
+        Ok(WriterDrain::TimedOut) => {
             input_paused.store(false, Ordering::Release);
             return Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
@@ -585,12 +576,36 @@ fn suspend_for_child(
     Ok(moved_cursor)
 }
 
+/// How long the writer thread may sit on unwritten payloads before it is reported blocked.
+/// Healthy writes land in milliseconds; seconds mean the terminal stopped reading the pty.
+const WRITER_BLOCKED_WARN_AFTER: Duration = Duration::from_secs(5);
+
+/// What one [`Presenter::observe_writer_progress`] observation concluded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WriterProgress {
+    /// No backlog, or the backlog is draining: nothing to report.
+    Flowing,
+    /// A backlog with zero written progress; the stall episode is running (or just began).
+    Stalled,
+    /// Progress ended an episode that had already been reported blocked.
+    Recovered { blocked_for: Duration },
+}
+
 /// Coalesces draw requests, gates in-flight frames, and owns draw cadence.
 #[derive(Debug)]
 struct Presenter {
     dirty: bool,
     force_full_repaint: bool,
     in_flight_target: Option<u64>,
+    /// Start of the current zero-progress stall episode ([`Self::observe_writer_progress`]).
+    /// Covers frames and out-of-band escapes alike; drives the blocked-writer report.
+    writer_stalled_since: Option<Instant>,
+    /// Written watermark at the previous observation; progress re-anchors the episode so a slowly-draining terminal never accrues into a false blocked report.
+    /// a slowly-draining terminal never accrues into a false blocked report.
+    last_written_observed: u64,
+    /// Latched once the current stall episode has been reported blocked, so one episode
+    /// emits exactly one report. Cleared when the writer makes progress.
+    blocked_reported: bool,
     last_draw_at: Instant,
     draw_scheduled_at: Option<Instant>,
 }
@@ -601,26 +616,83 @@ impl Presenter {
             dirty: false,
             force_full_repaint: false,
             in_flight_target: None,
+            writer_stalled_since: None,
+            last_written_observed: 0,
+            blocked_reported: false,
             last_draw_at: Instant::now(),
             draw_scheduled_at: None,
         }
     }
 
-    fn acknowledge(&mut self, sequence: u64) {
+    /// Clears the in-flight gate once `sequence` covers the target.
+    fn acknowledge(&mut self, sequence: u64) -> bool {
         if self
             .in_flight_target
             .is_some_and(|target| sequence >= target)
         {
             self.in_flight_target = None;
+            return true;
         }
+        false
+    }
+
+    /// Track writer progress from the queue watermarks, once per loop iteration: a backlog
+    /// with zero written progress starts/continues a stall episode, any progress ends it.
+    fn observe_writer_progress(
+        &mut self,
+        queued: u64,
+        written: u64,
+        now: Instant,
+    ) -> WriterProgress {
+        let progressed = written > self.last_written_observed;
+        self.last_written_observed = written;
+        if written < queued && !progressed {
+            self.writer_stalled_since.get_or_insert(now);
+            return WriterProgress::Stalled;
+        }
+        let since = self.writer_stalled_since.take();
+        let reported = std::mem::take(&mut self.blocked_reported);
+        if written < queued {
+            // Progress with a remaining backlog: the old episode (if any) ends and a fresh anchor starts, so only zero-progress time accrues toward the report.
+            // fresh anchor starts, so only zero-progress time accrues toward the report.
+            self.writer_stalled_since = Some(now);
+        }
+        if !reported {
+            return WriterProgress::Flowing;
+        }
+        let blocked_for = since.map_or(Duration::ZERO, |s| now.duration_since(s));
+        WriterProgress::Recovered { blocked_for }
+    }
+
+    /// Deadline for reporting the current stall episode as blocked, if unreported.
+    fn blocked_report_deadline(&self) -> Option<Instant> {
+        if self.blocked_reported {
+            return None;
+        }
+        self.writer_stalled_since
+            .map(|since| since + WRITER_BLOCKED_WARN_AFTER)
+    }
+
+    /// Latch the blocked report for this episode and return its duration so far.
+    fn mark_blocked_reported(&mut self) -> Duration {
+        self.blocked_reported = true;
+        self.writer_stalled_since
+            .map_or(Duration::ZERO, |since| since.elapsed())
     }
 
     fn try_present(
         &mut self,
+        written: u64,
         queued_before: u64,
         draw: impl FnOnce(bool),
         queued_after: impl FnOnce() -> u64,
     ) -> bool {
+        // Never draw while the writer trails its queue, even with no frame in flight:
+        // (kitty media clears, native-selection sync) that would deadlock on it.
+        // `dirty` stays set, so the frame lands on the Written wakeup after catch-up.
+        if written < queued_before {
+            return false;
+        }
         if self.in_flight_target.is_some() || !self.dirty {
             return false;
         }
@@ -660,6 +732,7 @@ impl Presenter {
         let sync = terminal.backend_mut().writer_mut().writer_sync().clone();
         let queued_before = sync.queued();
         let drew = self.try_present(
+            sync.written(),
             queued_before,
             |force| {
                 if force {
@@ -689,10 +762,17 @@ impl Presenter {
     }
 }
 
-fn writer_event_sequence(event: crate::render::draw::WriterEvent) -> std::io::Result<u64> {
+fn writer_event_sequence(event: WriterEvent) -> std::io::Result<u64> {
     match event {
-        crate::render::draw::WriterEvent::Written(sequence) => Ok(sequence),
-        crate::render::draw::WriterEvent::Failed(error) => Err(error),
+        WriterEvent::Written(sequence) => Ok(sequence),
+        WriterEvent::Failed(error) => Err(error),
+    }
+}
+
+/// Re-assert mouse capture on refocus: ConPTY-backed relays can strip DEC private modes, downgrading SGR mouse reports to X10, which corrupts into typed characters. Gated so a deliberate capture-off is never undone. Must ride the queue — refocusing a frozen tab was the field trigger of the mid-turn freeze (see [`EscapeWriter`](crate::render::draw::EscapeWriter)).
+fn reassert_mouse_capture_on_focus(escape_writer: &EscapeWriter) {
+    if crate::app::MOUSE_CAPTURE_ENABLED.load(std::sync::atomic::Ordering::Acquire) {
+        escape_writer.emit_command(crossterm::event::EnableMouseCapture);
     }
 }
 
@@ -1029,7 +1109,9 @@ fn run_pending_mode_switch(
                 };
             *status_line_refresh_at = status_line_refresh_interval.map(|iv| Instant::now() + iv);
             if target.is_minimal() {
-                crate::theme::reset_cursor_color();
+                // Cursor color: the loop-top OSC 12/112 tracker reacts to the locked palette next iteration; an inline reset here would race it into a double, unprompted OSC 112 (Ghostty latch).
+                // locked palette next iteration; an inline reset here would
+                // race it into a double, unprompted OSC 112 (Ghostty latch).
                 crate::app::mode_switch::dismiss_fullscreen_only_surfaces(app);
                 super::MINIMAL_SHOW_SWITCH_BACK_TO_FULLSCREEN
                     .store(true, std::sync::atomic::Ordering::Release);
@@ -1045,7 +1127,6 @@ fn run_pending_mode_switch(
                     );
                 }
             } else {
-                crate::theme::apply_cursor_color();
                 super::MINIMAL_SHOW_SWITCH_BACK_TO_FULLSCREEN
                     .store(false, std::sync::atomic::Ordering::Release);
                 // Capture is back on: clear the mouse-off banner like the toggle-on path.
@@ -1140,16 +1221,20 @@ pub(crate) async fn run(
     bg_update_rx: Option<
         tokio::sync::oneshot::Receiver<Option<xai_grok_update::auto_update::UpdateAvailable>>,
     >,
-    mut writer_event_rx: tokio::sync::mpsc::UnboundedReceiver<crate::render::draw::WriterEvent>,
+    mut writer_event_rx: tokio::sync::mpsc::UnboundedReceiver<WriterEvent>,
 ) -> anyhow::Result<RunResult> {
     crate::unified_log::init(connection.tx.clone());
     crate::unified_log::info("pager started", None, None);
     xai_grok_telemetry::startup::enter(xai_grok_telemetry::startup::StartupPhase::AppInit);
-    let mut app = AppView::new(
-        connection.tx,
-        connection.models,
-        connection.available_commands,
-    );
+    let mut app = {
+        let _t = xai_grok_telemetry::instrumentation::timer("startup.app_init.app_view_new");
+        AppView::new(
+            connection.tx,
+            connection.models,
+            connection.available_commands,
+            terminal.backend_mut().writer_mut().escape_writer(),
+        )
+    };
     app.pending_startup = Some(pending_startup);
     app.tracing_rx = Some(tracing_handle.rx);
     // Startup terminal height for the auto-compact derivation; kept fresh by
@@ -1425,7 +1510,7 @@ pub(crate) async fn run(
         crate::slash::commands::usage::detect_external_auth_provider(&app.auth_methods);
 
     if let Some(meta) = connection.auth_meta.as_ref() {
-        match serde_json::from_value::<xai_grok_shell::auth::AuthMeta>(meta.clone()) {
+        match serde_json::from_value::<xai_grok_login::AuthMeta>(meta.clone()) {
             Ok(auth_meta) => {
                 let _ = app.apply_auth_meta(&auth_meta);
             }
@@ -1482,11 +1567,14 @@ pub(crate) async fn run(
     let managed_config = xai_grok_shell::config::load_managed_config().ok();
 
     // Full merge when every layer parses; partial merge below if any layer fails.
-    let effective_config = match xai_grok_shell::config::load_effective_config() {
-        Ok(raw) => Some(raw),
-        Err(e) => {
-            tracing::debug!(error = %e, "failed to load effective config, using partial layers");
-            None
+    let effective_config = {
+        let _t = xai_grok_telemetry::instrumentation::timer("startup.app_init.effective_config");
+        match xai_grok_shell::config::load_effective_config() {
+            Ok(raw) => Some(raw),
+            Err(e) => {
+                tracing::debug!(error = %e, "failed to load effective config, using partial layers");
+                None
+            }
         }
     };
     let compat = xai_grok_shell::agent::config::resolve_compat_sessions_from_raw(
@@ -1503,6 +1591,7 @@ pub(crate) async fn run(
     if let Some(ref raw) = effective_config {
         app.notification_service = crate::notifications::NotificationService::new(
             crate::notifications::load_notification_config(raw),
+            app.escape_writer.clone(),
         );
         if let Some(table) = raw.as_table() {
             // Voice inherits the same resolved endpoints base as chat
@@ -1799,10 +1888,8 @@ pub(crate) async fn run(
     // Seed `/auto` feature-gate visibility from the resolved gate (so `/auto`
     // is offered on the welcome prompt when available).
     app.sync_permission_mode_slash_gate();
-    // Settings UI language (`[ui].voice_stt_language`) overrides `[voice].language`
-    // when set. Store the preference (including client-only `auto`); the voice
-    // crate resolves the wire code at STT connect. When unset, keep whatever
-    // `from_config_table` loaded (default `en`, or an explicit `[voice].language`).
+    // Settings UI language (`[ui].voice_stt_language`) overrides `[voice].language` when set
+    // Store the preference (including client-only `auto`); the voice crate resolves the wire code at STT connect
     // Must run after `load_initial_ui_config()` hydrates `current_ui` from disk.
     if let Some(ref pref) = app.current_ui.voice_stt_language {
         app.voice_config.language =
@@ -2300,6 +2387,16 @@ pub(crate) async fn run(
         }
     }
 
+    // Optimistic home session. `maybe_create_home_session` no-ops when a CLI prompt / resume / worktree / dashboard will leave home.
+    // CLI prompt / resume / worktree / dashboard will leave home.
+    if should_create_home_on_authenticated_startup(&app) {
+        let effs = dispatch::maybe_create_home_session(&mut app);
+        if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+            return Ok(finish_run(&mut app));
+        }
+        presenter.request_presentation(&mut app, terminal, false);
+    }
+
     // Startup intents are now fully classified; only an untouched welcome can nudge.
     if let Some(effect) = app.begin_foreign_resume_detection()
         && process_effects(vec![effect], &mut tasks, &mut app, &progress_tx)
@@ -2512,7 +2609,7 @@ pub(crate) async fn run(
         let want_gboom_keyboard = app.gboom_active();
         if want_gboom_keyboard {
             if !gboom_keyboard_pushed {
-                super::push_gboom_keyboard_flags();
+                super::push_gboom_keyboard_flags(&app.escape_writer);
                 gboom_keyboard_pushed = true;
             }
             // Only the active game receives release events; any other open
@@ -2520,7 +2617,7 @@ pub(crate) async fn run(
             // no key down when reopened after a tab/view switch.
             app.gboom_release_backgrounded_games();
         } else if gboom_keyboard_pushed {
-            super::pop_gboom_keyboard_flags();
+            super::pop_gboom_keyboard_flags(&app.escape_writer);
             gboom_keyboard_pushed = false;
             // No game is the active input target now (switched to a non-game
             // view); clear every game's holds for the same reason.
@@ -2638,8 +2735,8 @@ pub(crate) async fn run(
             }
         };
 
-        let roster_poll = async {
-            match roster_poll_at {
+        let dashboard_poll = async {
+            match dashboard_poll_at {
                 Some(at) => sleep_until(at).await,
                 None => std::future::pending().await,
             }
@@ -2667,6 +2764,28 @@ pub(crate) async fn run(
         let stall_flush_at = stall_rollup.deadline().map(tokio::time::Instant::from_std);
         let stall_flush = async {
             match stall_flush_at {
+                Some(at) => sleep_until(at).await,
+                None => std::future::pending().await,
+            }
+        };
+
+        // Blocked-writer watermark check. Recovery detects here, not in the ack arm: an escape-only stall's final payload produces a Written wakeup but no gate ack.
+        // escape-only stall's final payload produces a Written wakeup but no gate ack.
+        let writer_progress_sync = terminal.backend_mut().writer_mut().writer_sync().clone();
+        if let WriterProgress::Recovered { blocked_for } = presenter.observe_writer_progress(
+            writer_progress_sync.queued(),
+            writer_progress_sync.written(),
+            Instant::now(),
+        ) {
+            crate::unified_log::info(
+                "term.writer.recovered",
+                None,
+                Some(serde_json::json!({ "blocked_ms": blocked_for.as_millis() as u64 })),
+            );
+        }
+        let writer_blocked_report_at = presenter.blocked_report_deadline();
+        let writer_blocked_report = async {
+            match writer_blocked_report_at {
                 Some(at) => sleep_until(at).await,
                 None => std::future::pending().await,
             }
@@ -2706,7 +2825,12 @@ pub(crate) async fn run(
                         return Err(e);
                     }
                 };
-                presenter.acknowledge(sequence);
+                if presenter.acknowledge(sequence) {
+                    let first_frame = xai_grok_telemetry::startup::record_interactive_frame();
+                    if first_frame && xai_grok_telemetry::startup::exit_after_first_render() {
+                        break;
+                    }
+                }
             }
 
             // Biased order: cancellation/quit, writer acks/failures, ACP,
@@ -2908,11 +3032,8 @@ pub(crate) async fn run(
                         // Debounce: schedule a single draw after the size stabilizes.
                         // Each new resize resets the timer so we only rebuild layout once.
                         resize_debounce_at = Some(Instant::now() + RESIZE_DEBOUNCE);
-                        // One immediate draw repaints the (now hidden) preview
-                        // cells — the erase on iTerm2, which smears committed
-                        // pixels during a drag (see resize_hides_prompt_preview).
-                        // Ownership then clears, so later drag events fall back
-                        // to pure debounce.
+                        // One immediate draw repaints the (now hidden) preview cells — the erase on iTerm2, which smears committed pixels during a drag (see resize_hides_prompt_preview).
+                        // Ownership then clears, so later drag events fall back to pure debounce.
                         if crate::terminal::overlay::has_committed_owner()
                             && crate::terminal::image::prompt_preview_graphics_protocol()
                                 == crate::terminal::image::GraphicsProtocol::ITerm2
@@ -3073,16 +3194,18 @@ pub(crate) async fn run(
                 // roster; outside leader mode we poll the local on-disk
                 // idle-session list so the dashboard still shows idle sessions.
                 let dashboard_open = matches!(app.active_view, ActiveView::AgentDashboard);
-                if dashboard_open && !app.workspace_dashboard_enabled {
-                    let eff = if leader_status_rx.is_some() {
-                        Effect::FetchRoster
+                if dashboard_open {
+                    let effects = if app.workspace_dashboard_enabled {
+                        super::workspace_sync::refresh(&mut app)
+                    } else if leader_status_rx.is_some() {
+                        vec![Effect::FetchRoster]
                     } else {
-                        Effect::FetchDashboardSessions
+                        vec![Effect::FetchDashboardSessions]
                     };
-                    if process_effects(vec![eff], &mut tasks, &mut app, &progress_tx) {
+                    if process_effects(effects, &mut tasks, &mut app, &progress_tx) {
                         break;
                     }
-                    roster_poll_at = Some(Instant::now() + ROSTER_POLL_INTERVAL);
+                    dashboard_poll_at = Some(Instant::now() + DASHBOARD_POLL_INTERVAL);
                 }
             }
 
@@ -3332,10 +3455,6 @@ pub(crate) async fn run(
                                                     effects::parse_session_load_running_prompt_id(
                                                         resp.meta.as_ref(),
                                                     ),
-                                                scheduler_background_loops:
-                                                    effects::parse_session_scheduler_background_loops(
-                                                        resp.meta.as_ref(),
-                                                    ),
                                             });
                                         }
                                         Err(e) => {
@@ -3346,7 +3465,6 @@ pub(crate) async fn run(
                                                 agent_id,
                                                 success: false,
                                                 running_prompt_id: None,
-                                                scheduler_background_loops: None,
                                             });
                                         }
                                     }
@@ -3428,7 +3546,7 @@ pub(crate) async fn run(
                     .map(|l| {
                         (
                             l.agent_id,
-                            (l.success, l.running_prompt_id, l.scheduler_background_loops),
+                            (l.success, l.running_prompt_id),
                         )
                     })
                     .collect();
@@ -3446,8 +3564,7 @@ pub(crate) async fn run(
                 );
                 restore_dashboard_peek_before_reload(&mut app.dashboard, &mut app.agents);
                 for id in &pending.agent_ids {
-                    let (ok, running_prompt_id, scheduler_background_loops) =
-                        loads.remove(id).unwrap_or((false, None, None));
+                    let (ok, running_prompt_id) = loads.remove(id).unwrap_or((false, None));
                     if let Some(agent) = app.agents.get_mut(id) {
                         // The reloaded actor re-pinned the fire mode; a failed
                         // load leaves the previous value rather than guessing.
@@ -3806,6 +3923,7 @@ fn finish_run(app: &mut AppView) -> RunResult {
     RunResult {
         exit_info,
         quit_for_update: app.quit_for_update,
+        trust_quit_error: app.trust_quit_error.clone(),
         relaunch: app.relaunch.clone(),
     }
 }
@@ -4202,7 +4320,7 @@ const PASTE_CONTINUE_TIMEOUT: Duration = Duration::from_millis(10);
 /// Safety cap on events accumulated in one extension pass.
 const PASTE_EXTEND_MAX_EVENTS: usize = 5_000;
 
-/// Returns `true` when the batch contains pasteable key events but no
+/// Returns `true` when the batch contains pasteable key events but no `Event::Paste` (i.e. bracketed paste is not handling it).
 /// `Event::Paste` (i.e. bracketed paste is not handling it).
 fn should_extend_for_paste(events: &[TimedInputEvent]) -> bool {
     !events.iter().any(|e| matches!(e.event, Event::Paste(_)))
@@ -4308,6 +4426,10 @@ fn is_paste_lf(ev: &Event) -> bool {
         if ke.kind == KeyEventKind::Press
             && ke.code == KeyCode::Char('j')
             && ke.modifiers == KeyModifiers::CONTROL)
+}
+
+fn active_feedback_modal_open(app: &AppView) -> bool {
+    matches!(app.active_view, ActiveView::Agent(id) if app.agents.get(&id).is_some_and(|agent| agent.feedback_modal.is_some()))
 }
 
 /// Map a voice-chord key event to its action (pure, so it's unit-testable).
@@ -4770,7 +4892,8 @@ pub(crate) fn session_flags_for_effects(
 
 /// Dispatch `action`, re-process `event` through the updated view, return one combined effect list.
 /// Shared by the event-loop `ActionThenForward` arm and tests (batches; no effect barrier between).
-fn dispatch_then_forward(
+/// The forward is meant for an agent composer. If the action left Welcome up (it opened the local-workspace ACK prompt instead of a session), the event lands in the welcome composer as a draft, which the eventual leave-home carries across, instead of answering that prompt.
+pub(crate) fn dispatch_then_forward(
     action: Action,
     event: &Event,
     arrived_at: std::time::Instant,
@@ -4778,6 +4901,18 @@ fn dispatch_then_forward(
     app: &mut AppView,
 ) -> Vec<Effect> {
     let mut effects = dispatch::dispatch(action, app);
+    if matches!(app.active_view, ActiveView::Welcome) {
+        match event {
+            Event::Key(key) => {
+                let _ = app.welcome_prompt.handle_key(key);
+            }
+            Event::Paste(text) => {
+                let _ = app.welcome_prompt.handle_paste(text);
+            }
+            _ => {}
+        }
+        return effects;
+    }
     if let InputOutcome::Action(follow_up) =
         app.handle_input_at_with_paste_provenance(event, arrived_at, paste_provenance)
     {
@@ -4830,6 +4965,7 @@ fn process_effects(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::render::draw::WriterSync;
     use crossterm::event::{KeyEvent, KeyEventState};
 
     #[test]
@@ -5248,9 +5384,10 @@ mod tests {
             let mut app = crate::app::app_view::tests::test_app();
             app.default_yolo = initial_yolo;
             app.current_ui.permission_mode = Some(initial_mode.into());
+            // No optimistic session in this fixture: Shift+Tab creates one and cycles it before session/new goes out.
             let event = Event::Key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
             let effects = dispatch_then_forward(
-                Action::NewSession,
+                Action::LeaveHome,
                 &event,
                 std::time::Instant::now(),
                 PasteProvenance::Terminal,
@@ -5319,6 +5456,11 @@ mod tests {
             acp_rx.recv().await.expect("session/new request"),
             xai_acp_lib::AcpAgentMessage::NewSession(_)
         ));
+        assert!(
+            matches!(app.active_view, crate::app::app_view::ActiveView::Agent(_)),
+            "paste must leave the home screen, got {:?}",
+            app.active_view
+        );
         assert_eq!(
             app.agents[&crate::app::agent::AgentId(0)].prompt.text(),
             "fix the bug"
@@ -5539,6 +5681,21 @@ mod tests {
     // ── voice_chord_action ───────────────────────────────────────────────
 
     #[test]
+    fn feedback_modal_blocks_voice_chord_targeting() {
+        let mut app = crate::app::app_view::tests::test_app_with_agent();
+        assert!(!active_feedback_modal_open(&app));
+        let ActiveView::Agent(id) = app.active_view else {
+            panic!("test app must start on an agent");
+        };
+        app.agents.get_mut(&id).unwrap().feedback_modal = Some(
+            crate::views::feedback_modal::FeedbackModalState::new(Default::default()),
+        );
+        assert!(active_feedback_modal_open(&app));
+        app.active_view = ActiveView::AgentDashboard;
+        assert!(!active_feedback_modal_open(&app));
+    }
+
+    #[test]
     fn voice_chord_action_cases() {
         use crate::app::actions::Action;
         // (hold_mode, releases_reported, kind, listening, hold_owned) -> action
@@ -5736,8 +5893,8 @@ mod tests {
         let active = AgentId(0);
         let background = AgentId(1);
         let mut loads = std::collections::HashMap::new();
-        loads.insert(active, (true, None, None));
-        loads.insert(background, (false, None, None));
+        loads.insert(active, (true, None));
+        loads.insert(background, (false, None));
         let pending = vec![active, background];
 
         let (all_restored, active_restored) =
@@ -5760,8 +5917,8 @@ mod tests {
         let active = AgentId(0);
         let background = AgentId(1);
         let mut loads = std::collections::HashMap::new();
-        loads.insert(active, (false, None, None));
-        loads.insert(background, (true, None, None));
+        loads.insert(active, (false, None));
+        loads.insert(background, (true, None));
         let pending = vec![active, background];
 
         let (all_restored, active_restored) =
@@ -5780,7 +5937,7 @@ mod tests {
         use super::super::agent::AgentId;
         let active = AgentId(0);
         let mut loads = std::collections::HashMap::new();
-        loads.insert(active, (true, None, None));
+        loads.insert(active, (true, None));
         let pending = vec![active];
 
         let (all_restored, active_restored) =
@@ -5810,7 +5967,7 @@ mod tests {
         use super::super::agent::AgentId;
         let background = AgentId(1);
         let mut loads = std::collections::HashMap::new();
-        loads.insert(background, (true, None, None));
+        loads.insert(background, (true, None));
         let pending = vec![background];
 
         let (all_restored, active_restored) =
@@ -6042,9 +6199,9 @@ mod tests {
 
     #[test]
     fn writer_failure_event_returns_original_error() {
-        let error = writer_event_sequence(crate::render::draw::WriterEvent::Failed(
-            std::io::Error::other("injected writer failure"),
-        ))
+        let error = writer_event_sequence(WriterEvent::Failed(std::io::Error::other(
+            "injected writer failure",
+        )))
         .expect_err("writer failure must terminate the event loop");
 
         assert_eq!(error.to_string(), "injected writer failure");
@@ -6056,17 +6213,17 @@ mod tests {
         let mut draws = 0;
 
         presenter.request(false);
-        assert!(presenter.try_present(0, |_| draws += 1, || 1));
+        assert!(presenter.try_present(0, 0, |_| draws += 1, || 1));
         assert_eq!(presenter.in_flight_target, Some(1));
         for _ in 0..5 {
             presenter.request(false);
-            assert!(!presenter.try_present(1, |_| draws += 1, || 2));
+            assert!(!presenter.try_present(1, 1, |_| draws += 1, || 2));
         }
         assert_eq!(draws, 1);
         assert!(presenter.dirty);
 
         presenter.acknowledge(1);
-        assert!(presenter.try_present(1, |_| draws += 1, || 2));
+        assert!(presenter.try_present(1, 1, |_| draws += 1, || 2));
         assert_eq!(draws, 2);
         assert_eq!(presenter.in_flight_target, Some(2));
     }
@@ -6076,12 +6233,12 @@ mod tests {
         let mut presenter = Presenter::new();
         presenter.request(false);
 
-        assert!(presenter.try_present(4, |_| {}, || 4));
+        assert!(presenter.try_present(4, 4, |_| {}, || 4));
         assert_eq!(presenter.in_flight_target, None);
         assert!(!presenter.dirty);
 
         presenter.request(false);
-        assert!(presenter.try_present(4, |_| {}, || 5));
+        assert!(presenter.try_present(4, 4, |_| {}, || 5));
         assert_eq!(presenter.in_flight_target, Some(5));
     }
 
@@ -6096,7 +6253,7 @@ mod tests {
         let mut forced = false;
 
         presenter.acknowledge(8);
-        assert!(presenter.try_present(8, |force| forced = force, || 9));
+        assert!(presenter.try_present(8, 8, |force| forced = force, || 9));
         assert!(forced);
         assert!(!presenter.force_full_repaint);
     }
@@ -6110,7 +6267,7 @@ mod tests {
         presenter.acknowledge(3);
         presenter.request(false);
 
-        assert!(presenter.try_present(3, |_| {}, || 4));
+        assert!(presenter.try_present(3, 3, |_| {}, || 4));
         assert_eq!(presenter.in_flight_target, Some(4));
     }
 
@@ -6126,18 +6283,237 @@ mod tests {
         assert_eq!(presenter.in_flight_target, None);
     }
 
+    // The event loop records the interactive frame only when `acknowledge` returns true, so the
+    // covers-the-in-flight-target return contract is load-bearing.
+    #[test]
+    fn presenter_acknowledge_reports_target_coverage() {
+        let mut presenter = Presenter {
+            in_flight_target: Some(5),
+            ..Presenter::new()
+        };
+
+        assert!(!presenter.acknowledge(4), "below target: not yet covered");
+        assert_eq!(presenter.in_flight_target, Some(5));
+
+        assert!(presenter.acknowledge(5), "covers target: acknowledged");
+        assert_eq!(presenter.in_flight_target, None);
+
+        assert!(
+            !presenter.acknowledge(6),
+            "no target in flight: nothing to cover"
+        );
+    }
+
     #[test]
     fn presenter_waits_for_last_payload_in_turn() {
         let mut presenter = Presenter::new();
         presenter.request(false);
-        assert!(presenter.try_present(10, |_| {}, || 13));
+        assert!(presenter.try_present(10, 10, |_| {}, || 13));
         presenter.request(false);
 
         presenter.acknowledge(11);
-        assert!(!presenter.try_present(13, |_| panic!("target not acknowledged"), || 14));
+        assert!(!presenter.try_present(13, 13, |_| panic!("target not acknowledged"), || 14));
         presenter.acknowledge(13);
-        assert!(presenter.try_present(13, |_| {}, || 14));
+        assert!(presenter.try_present(13, 13, |_| {}, || 14));
         assert_eq!(presenter.in_flight_target, Some(14));
+    }
+
+    /// The wedged-mouse-reporting reset rides the escape writer via `Effect::ResetMouseReporting`, re-checking capture at process time.
+    /// `Effect::ResetMouseReporting`, re-checking capture at process time.
+    // On Windows the mouse-capture pair dispatches to SetConsoleMode, not the queue.
+    #[cfg(not(windows))]
+    #[serial_test::serial(MOUSE_CAPTURE_ENABLED)]
+    #[test]
+    fn reset_mouse_reporting_effect_rides_the_writer_queue() {
+        use std::sync::atomic::Ordering;
+
+        let mut app = crate::app::app_view::tests::test_app();
+        let (tx, rx) = std::sync::mpsc::channel();
+        app.escape_writer = EscapeWriter::new(tx, WriterSync::new());
+        let mut tasks = JoinSet::new();
+        let (progress_tx, _progress_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let was = crate::app::MOUSE_CAPTURE_ENABLED.swap(true, Ordering::AcqRel);
+        let quit = process_effects(
+            vec![super::super::actions::Effect::ResetMouseReporting],
+            &mut tasks,
+            &mut app,
+            &progress_tx,
+        );
+        crate::app::MOUSE_CAPTURE_ENABLED.store(was, Ordering::Release);
+
+        assert!(!quit);
+        let disable = rx.try_recv().expect("disable escape queued");
+        let enable = rx.try_recv().expect("enable escape queued");
+        assert!(String::from_utf8_lossy(disable.data()).contains("\x1b[?1000l"));
+        assert!(String::from_utf8_lossy(enable.data()).contains("\x1b[?1000h"));
+        assert!(rx.try_recv().is_err(), "exactly one toggle pair expected");
+    }
+
+    /// Refocus enqueues the enable sequence (SGR included) and never undoes capture-off.
+    // On Windows the mouse-capture command dispatches to SetConsoleMode, not the queue.
+    #[cfg(not(windows))]
+    #[serial_test::serial(MOUSE_CAPTURE_ENABLED)]
+    #[test]
+    fn focus_gained_reassert_enqueues_enable_mouse_capture() {
+        use std::sync::atomic::Ordering;
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let writer = EscapeWriter::new(tx, WriterSync::new());
+
+        let was = crate::app::MOUSE_CAPTURE_ENABLED.swap(true, Ordering::AcqRel);
+        super::reassert_mouse_capture_on_focus(&writer);
+        let enable = rx.try_recv().expect("enable escape queued");
+        let bytes = String::from_utf8_lossy(enable.data()).into_owned();
+        assert!(bytes.contains("\x1b[?1000h"));
+        assert!(
+            bytes.contains("\x1b[?1006h"),
+            "SGR mode must be re-asserted"
+        );
+        assert!(rx.try_recv().is_err(), "exactly one payload expected");
+
+        crate::app::MOUSE_CAPTURE_ENABLED.store(false, Ordering::Release);
+        super::reassert_mouse_capture_on_focus(&writer);
+        crate::app::MOUSE_CAPTURE_ENABLED.store(was, Ordering::Release);
+        assert!(
+            rx.try_recv().is_err(),
+            "refocus must not undo a deliberate capture-off"
+        );
+    }
+
+    /// An escape-only backlog (frame ack gate open) must still gate draws: the render
+    /// path's residual inline stderr writers would otherwise deadlock on the lock.
+    #[test]
+    fn presenter_escape_backlog_gates_draws_until_caught_up() {
+        let mut presenter = Presenter::new();
+        presenter.request(false);
+
+        assert!(!presenter.try_present(0, 1, |_| panic!("drew during writer backlog"), || 1));
+        assert!(presenter.dirty, "request must survive the gated draw");
+        assert_eq!(presenter.in_flight_target, None);
+
+        // Writer caught up: the deferred frame draws on the next attempt.
+        assert!(presenter.try_present(1, 1, |_| {}, || 2));
+        assert_eq!(presenter.in_flight_target, Some(2));
+    }
+
+    /// The blocked-writer report arms on any backlog (frames or escapes), fires once
+    /// per episode, and the catch-up observation reports the recovery duration.
+    #[test]
+    fn presenter_blocked_report_lifecycle() {
+        let mut presenter = Presenter::new();
+        let t0 = Instant::now();
+        assert_eq!(presenter.blocked_report_deadline(), None);
+
+        // Writer trails the queue: an episode starts and arms the report.
+        // No frame gate involved — this is exactly the escape-only case too.
+        assert_eq!(
+            presenter.observe_writer_progress(1, 0, t0),
+            WriterProgress::Stalled
+        );
+        assert_eq!(
+            presenter.blocked_report_deadline(),
+            Some(t0 + WRITER_BLOCKED_WARN_AFTER)
+        );
+
+        // The anchor holds while the stall continues, even as more payloads queue.
+        assert_eq!(
+            presenter.observe_writer_progress(3, 0, t0 + Duration::from_secs(1)),
+            WriterProgress::Stalled
+        );
+        assert_eq!(
+            presenter.blocked_report_deadline(),
+            Some(t0 + WRITER_BLOCKED_WARN_AFTER)
+        );
+
+        // A prompt catch-up ends the episode without a recovery report.
+        assert_eq!(
+            presenter.observe_writer_progress(3, 3, t0 + Duration::from_secs(2)),
+            WriterProgress::Flowing
+        );
+        assert_eq!(presenter.blocked_report_deadline(), None);
+
+        // Reported episode: report latches (no re-arm), catch-up returns the duration.
+        let t1 = t0 + Duration::from_secs(10);
+        assert_eq!(
+            presenter.observe_writer_progress(4, 3, t1),
+            WriterProgress::Stalled
+        );
+        presenter.mark_blocked_reported();
+        assert_eq!(presenter.blocked_report_deadline(), None);
+        assert_eq!(
+            presenter.observe_writer_progress(4, 4, t1 + Duration::from_secs(7)),
+            WriterProgress::Recovered {
+                blocked_for: Duration::from_secs(7)
+            }
+        );
+
+        // Next episode starts clean.
+        assert_eq!(
+            presenter.observe_writer_progress(5, 4, t1 + Duration::from_secs(8)),
+            WriterProgress::Stalled
+        );
+        assert!(presenter.blocked_report_deadline().is_some());
+    }
+
+    /// A slowly-draining terminal (writes flowing, backlog persisting) re-anchors on each progress step and never accrues into a false blocked report.
+    /// each progress step and never accrues into a false blocked report.
+    #[test]
+    fn presenter_slow_drain_progress_reanchors_episode() {
+        let mut presenter = Presenter::new();
+        let t0 = Instant::now();
+        // First observation already shows progress (0 -> 1 written) with a backlog left:
+        // flowing, but the backlog anchors an episode from now.
+        assert_eq!(
+            presenter.observe_writer_progress(2, 1, t0),
+            WriterProgress::Flowing
+        );
+        assert_eq!(
+            presenter.blocked_report_deadline(),
+            Some(t0 + WRITER_BLOCKED_WARN_AFTER)
+        );
+
+        // One payload written per observation, backlog never empty: the anchor
+        // follows the progress instead of accruing toward the report.
+        let t1 = t0 + Duration::from_secs(4);
+        assert_eq!(
+            presenter.observe_writer_progress(3, 2, t1),
+            WriterProgress::Flowing
+        );
+        assert_eq!(
+            presenter.blocked_report_deadline(),
+            Some(t1 + WRITER_BLOCKED_WARN_AFTER)
+        );
+        let t2 = t1 + Duration::from_secs(4);
+        assert_eq!(
+            presenter.observe_writer_progress(4, 3, t2),
+            WriterProgress::Flowing
+        );
+        assert_eq!(
+            presenter.blocked_report_deadline(),
+            Some(t2 + WRITER_BLOCKED_WARN_AFTER)
+        );
+
+        // A reported episode ends on progress even with a backlog remaining.
+        presenter.mark_blocked_reported();
+        assert_eq!(
+            presenter.observe_writer_progress(5, 4, t2 + Duration::from_secs(6)),
+            WriterProgress::Recovered {
+                blocked_for: Duration::from_secs(6)
+            }
+        );
+        assert!(presenter.blocked_report_deadline().is_some());
+    }
+
+    /// A caught-up writer must not arm the blocked-writer report.
+    #[test]
+    fn presenter_caught_up_writer_does_not_arm_blocked_report() {
+        let mut presenter = Presenter::new();
+        assert_eq!(
+            presenter.observe_writer_progress(4, 4, Instant::now()),
+            WriterProgress::Flowing
+        );
+        assert_eq!(presenter.blocked_report_deadline(), None);
     }
 
     #[test]
@@ -6954,6 +7330,36 @@ mod tests {
             app.active_view = view;
             assert!(finish_run(&mut app).exit_info.is_none());
         }
+    }
+
+    #[test]
+    fn authenticated_startup_hook_creates_home() {
+        let mut app = crate::app::app_view::tests::test_app();
+        assert!(should_create_home_on_authenticated_startup(&app));
+        let effects = crate::app::dispatch::maybe_create_home_session(&mut app);
+        assert!(
+            effects
+                .iter()
+                .any(|e| matches!(e, crate::app::actions::Effect::CreateSession { .. })),
+            "removing the event-loop startup hook must fail this test"
+        );
+        assert!(matches!(app.active_view, ActiveView::Welcome));
+    }
+
+    #[test]
+    fn finish_run_unused_home_session_has_no_exit_info() {
+        let mut app = crate::app::app_view::tests::test_app();
+        app.screen_mode = crate::app::ScreenMode::Fullscreen;
+        crate::app::dispatch::maybe_create_home_session(&mut app);
+        let home = app.home_session_agent.expect("home session");
+        app.agents.get_mut(&home).unwrap().session.session_id =
+            Some(acp::SessionId::new("unused-home"));
+        assert!(matches!(app.active_view, ActiveView::Welcome));
+        assert!(
+            finish_run(&mut app).exit_info.is_none(),
+            "quit from home must not hint an unused optimistic session"
+        );
+        assert!(app.active_session_id().is_none());
     }
 
     #[test]

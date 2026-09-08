@@ -146,64 +146,40 @@ impl SearchToolCallBlock {
     }
 
     /// Build the match summary string, adapted by output mode.
-    ///
-    /// - `Content`:            `(3 matches in 2 files)` / `(1 match)` / `(no matches)`
-    /// - `FilesWithMatches`:   `(3 files)` / `(1 file)` / `(no matches)`
-    /// - `Count`:              `(42 matches across 5 files)` / `(no matches)`
     fn match_summary(&self) -> String {
         if self.match_count == 0 {
             return match self.meta.output_mode {
-                SearchOutputMode::FilesWithMatches => {
-                    xai_grok_i18n::t("tool.search.no_files").to_string()
-                }
-                _ => xai_grok_i18n::t("tool.search.no_matches").to_string(),
+                SearchOutputMode::FilesWithMatches => "(no files)".to_string(),
+                _ => "(no matches)".to_string(),
             };
         }
         match self.meta.output_mode {
             SearchOutputMode::Content => {
                 let file_count = self.file_matches.len();
                 if file_count > 1 {
-                    xai_grok_i18n::t_fmt(
-                        "tool.search.matches_in_files",
-                        &[
-                            ("matches", &self.match_count.to_string()),
-                            ("files", &file_count.to_string()),
-                        ],
-                    )
+                    format!("({} matches in {} files)", self.match_count, file_count)
                 } else if self.match_count == 1 {
-                    xai_grok_i18n::t("tool.search.one_match").to_string()
+                    "(1 match)".to_string()
                 } else {
-                    xai_grok_i18n::t_fmt(
-                        "tool.search.many_matches",
-                        &[("count", &self.match_count.to_string())],
-                    )
+                    format!("({} matches)", self.match_count)
                 }
             }
             SearchOutputMode::FilesWithMatches => {
                 let n = self.match_count; // match_count = # of files in this mode
                 if n == 1 {
-                    xai_grok_i18n::t("tool.search.one_file").to_string()
+                    "(1 file)".to_string()
                 } else {
-                    xai_grok_i18n::t_fmt("tool.search.many_files", &[("count", &n.to_string())])
+                    format!("({n} files)")
                 }
             }
             SearchOutputMode::Count => {
                 let file_count = self.file_paths.len().max(self.file_matches.len());
                 if file_count > 1 {
-                    xai_grok_i18n::t_fmt(
-                        "tool.search.matches_across_files",
-                        &[
-                            ("matches", &self.match_count.to_string()),
-                            ("files", &file_count.to_string()),
-                        ],
-                    )
+                    format!("({} matches across {} files)", self.match_count, file_count)
                 } else if self.match_count == 1 {
-                    xai_grok_i18n::t("tool.search.one_match").to_string()
+                    "(1 match)".to_string()
                 } else {
-                    xai_grok_i18n::t_fmt(
-                        "tool.search.many_matches",
-                        &[("count", &self.match_count.to_string())],
-                    )
+                    format!("({} matches)", self.match_count)
                 }
             }
         }
@@ -214,12 +190,8 @@ impl SearchToolCallBlock {
         self.pattern.is_empty() || self.pattern == "."
     }
 
-    /// Three cases:
-    /// 1. Trivial pattern + glob → `Search glob in path (summary)`
-    ///    glob is string-styled without quotes (it IS the search term).
-    /// 2. Real pattern + glob → `Search "pattern" in glob in path (summary)`
-    ///    glob shown as path scope after first "in".
-    /// 3. No glob → `Search "pattern" in path (summary)`
+    /// Trivial pattern + glob → `Search glob in path (summary)` glob is string-styled without quotes (it IS the search
+    /// term). No glob → `Search "pattern" in path (summary)`.
     fn header_line(
         &self,
         theme: &Theme,
@@ -249,10 +221,7 @@ impl SearchToolCallBlock {
             theme.fg(theme.path)
         };
 
-        let mut spans = vec![Span::styled(
-            xai_grok_i18n::t("tool.prefix.search").to_string(),
-            bold_style,
-        )];
+        let mut spans = vec![Span::styled("Search ".to_string(), bold_style)];
 
         // The search term: the glob when it replaces a trivial pattern, otherwise the quoted pattern
         if self.is_trivial_pattern()
@@ -266,10 +235,7 @@ impl SearchToolCallBlock {
 
             // Case 2: glob shown as the first "in" scope (string-styled, not path-styled)
             if let Some(ref glob) = self.meta.glob {
-                spans.push(Span::styled(
-                    xai_grok_i18n::t("tool.search.in_scope").to_string(),
-                    text_style,
-                ));
+                spans.push(Span::styled(" in ".to_string(), text_style));
                 spans.push(Span::styled(glob.to_string(), pattern_style));
             }
         }
@@ -277,10 +243,7 @@ impl SearchToolCallBlock {
         // Path scope (always after glob if both present).
         // When width is constrained, shorten the path the way the fish shell does
         if let Some(ref path) = self.meta.path {
-            spans.push(Span::styled(
-                xai_grok_i18n::t("tool.search.in_scope").to_string(),
-                text_style,
-            ));
+            spans.push(Span::styled(" in ".to_string(), text_style));
             if let Some(w) = width {
                 let used: usize = spans
                     .iter()
@@ -330,8 +293,7 @@ impl SearchToolCallBlock {
         }
     }
 
-    /// Header line with only the search term span selectable (exclude xai_grok_i18n::t("tool.prefix.search") prefix).
-    ///
+    /// Header line with only the search term span selectable (exclude "Search " prefix).
     /// Span 0 is always the label; span 1 is the pattern/glob.
     /// Later "in path" and summary spans stay non-selectable so copy yields the search term.
     fn header_block_line(&self, line: Line<'static>) -> BlockLine {
@@ -345,11 +307,8 @@ impl SearchToolCallBlock {
         }
     }
 
-    /// Build a single comma-separated metadata line.
-    ///
-    /// Always present (at minimum shows `mode: pattern`).
-    /// Glob is never shown here (always inline in header).
-    /// All flags use `key: value` form, with values in the primary fg and keys muted.
+    /// Build a single comma-separated metadata line. Always present (at minimum shows `mode: pattern`). Glob is never
+    /// shown here (always inline in header).
     fn metadata_line(&self, theme: &Theme) -> Line<'static> {
         let label_style = theme.muted();
         let value_style = theme.primary();
@@ -358,34 +317,31 @@ impl SearchToolCallBlock {
 
         // Mode comes first so the user sees what kind of search this is
         let mode_str = match self.meta.output_mode {
-            SearchOutputMode::Content => xai_grok_i18n::t("tool.search.mode_pattern"),
-            SearchOutputMode::FilesWithMatches => xai_grok_i18n::t("tool.search.mode_files"),
-            SearchOutputMode::Count => xai_grok_i18n::t("tool.search.mode_count"),
+            SearchOutputMode::Content => "pattern",
+            SearchOutputMode::FilesWithMatches => "files",
+            SearchOutputMode::Count => "count",
         };
         parts.push(vec![
-            Span::styled(xai_grok_i18n::t("tool.search.mode_label"), label_style),
+            Span::styled("mode: ", label_style),
             Span::styled(mode_str.to_string(), value_style),
         ]);
 
         if let Some(ref ft) = self.meta.file_type {
             parts.push(vec![
-                Span::styled(xai_grok_i18n::t("tool.search.type_label"), label_style),
+                Span::styled("type: ", label_style),
                 Span::styled(ft.to_string(), value_style),
             ]);
         }
         if self.meta.case_insensitive {
             parts.push(vec![
-                Span::styled(
-                    xai_grok_i18n::t("tool.search.case_insensitive_label"),
-                    label_style,
-                ),
-                Span::styled(xai_grok_i18n::t("tool.search.true_value"), value_style),
+                Span::styled("case-insensitive: ", label_style),
+                Span::styled("true", value_style),
             ]);
         }
         if self.meta.multiline {
             parts.push(vec![
-                Span::styled(xai_grok_i18n::t("tool.search.multiline_label"), label_style),
-                Span::styled(xai_grok_i18n::t("tool.search.true_value"), value_style),
+                Span::styled("multiline: ", label_style),
+                Span::styled("true", value_style),
             ]);
         }
 
@@ -439,11 +395,8 @@ impl BlockContent for SearchToolCallBlock {
                     // No results: show a hint
                     lines.push(Line::from("").into());
                     lines.push(
-                        Line::from(Span::styled(
-                            xai_grok_i18n::t("tool.search.no_results").to_string(),
-                            theme.muted(),
-                        ))
-                        .into(),
+                        Line::from(Span::styled("  (no results)".to_string(), theme.muted()))
+                            .into(),
                     );
                 }
 

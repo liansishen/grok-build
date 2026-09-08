@@ -991,7 +991,7 @@ pub fn color_support_warning(
         return None;
     }
 
-    let level_label = level.as_str();
+    let level_label = level.as_ref();
 
     if brand == TerminalName::AppleTerminal {
         let mut warning = TerminalWarning::new(

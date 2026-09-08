@@ -148,6 +148,7 @@ async fn gcs_pointer_preserves_path_in_base_url() {
     assert_eq!(v, "0.1.181");
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Public GitHub Releases backend for this fork.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -402,9 +403,8 @@ async fn gcs_pointer_connection_refused_is_retried_and_returns_error() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// download_silent — same body shape as download_with_progress but no
-// progress bar to capture.
+// ───────────────────────────────────────────────────────────────────────────── download_silent — same body shape as
+// download_with_progress but no progress bar to capture.
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -617,9 +617,8 @@ async fn download_silent_to_nonexistent_parent_dir_fails() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// download_with_progress — same contract; covers the spinner path
-// (no Content-Length) and the progress-bar path (with Content-Length).
+// ───────────────────────────────────────────────────────────────────────────── download_with_progress — same contract;
+// covers the spinner path (no Content-Length) and the progress-bar path (with Content-Length).
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -680,9 +679,8 @@ async fn download_with_progress_atomic_rename() {
     assert!(!dest.with_extension("tmp").exists());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Parallel byte-range path — exercises the HEAD + 206 Partial Content code path
-// in download_silent / download_with_progress for files >= 16 MiB.
+// ─────────────────────────────────────────────────────────────────────────────. Parallel byte-range path — exercises
+// the HEAD + 206 Partial Content code path in download_silent / download_with_progress for files >= 16 MiB.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Wiremock responder for `GET` that honors `Range: bytes=A-B` with `206`.

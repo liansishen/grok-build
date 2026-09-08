@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use xai_grok_config_types::DisplayRefreshSettings;
+use xai_grok_config::DisplayRefreshSettings;
 
 use xai_grok_status_line::StatusLineConfig;
 
@@ -45,11 +45,9 @@ pub struct UiConfig {
     /// Legacy name for `permission_mode`. Declared for `serde_ignored`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval_mode: Option<String>,
-    /// Which permission option the cursor preselects on the **first** permission prompt of a session.
-    /// One of `allow_once`, `allow_always`, or `reject`.
-    /// After the first prompt, the cursor sticks to the user's last-used option kind.
-    /// When unset, the first prompt preselects the "Always allow on all sessions" (enable-always-approve) row.
-    /// Read by the pager's permission view.
+    /// Which permission option the cursor preselects on the first permission prompt of a session. One of `allow_once`,
+    /// `allow_always`, or `reject`. After the first prompt, the cursor sticks to the user's last-used option kind. When
+    /// unset, the first prompt preselects the "Always allow on all sessions" (enable-always-approve) row.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_selected_permission: Option<String>,
     /// Written by the pager's appearance persist module.
@@ -103,10 +101,9 @@ pub struct UiConfig {
     /// Written by the settings modal; unset defaults to `hold`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voice_capture_mode: Option<String>,
-    /// Speech-to-text language preference for voice dictation.
-    /// A Grok STT catalog code (`en`, `es`, `ja`, …; see xAI STT supported languages) or `auto` (system locale, resolved at connect).
-    /// Written by the settings modal; unset leaves `[voice].language` / default `en`.
-    /// When set, overrides `[voice].language` for the session.
+    /// Speech-to-text language preference for voice dictation. A Grok STT catalog code (`en`, `es`, `ja`, …; see xAI STT
+    /// supported languages) or `auto` (system locale, resolved at connect). Written by the settings modal; unset leaves
+    /// `[voice].language` / default `en`. When set, overrides `[voice].language` for the session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voice_stt_language: Option<String>,
     /// UI language for the TUI (`auto` | `en` | `zh-CN`). Distinct from
@@ -124,10 +121,9 @@ pub struct UiConfig {
     /// When `false` the chord is ignored; `/voice` still starts dictation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voice_keybind_enabled: Option<bool>,
-    /// When `true`, registers `Ctrl+R` (while scrollback is focused) to toggle terminal mouse reporting (mouse capture).
-    /// That hands selection back to the terminal for native click-drag copy/paste.
-    /// Opt-in only; unset/false leaves mouse reporting always on with no toggle shortcut.
-    /// The prompt keeps `Ctrl+R` for history search; focus scrollback (Esc/Tab) first.
+    /// When `true`, registers `Ctrl+R` (while scrollback is focused) to toggle terminal mouse reporting (mouse capture). That
+    /// hands selection back to the terminal for native click-drag copy/paste. Opt-in only; unset/false leaves mouse reporting
+    /// always on with no toggle shortcut. The prompt keeps `Ctrl+R` for history search; focus scrollback (Esc/Tab) first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mouse_reporting_toggle: Option<bool>,
     /// When cancelling a parent turn with running subagents: `always_stop` stops them without prompting, `always_continue` leaves them running.
@@ -236,7 +232,7 @@ pub struct ContextualHints {
     /// Clipboard-image input tip.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_input: Option<bool>,
-    /// Send-now tip after queuing a mid-turn follow-up (InterjectPrompt chord).
+    /// Send-now tip after queuing a mid-turn follow-up.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub send_now: Option<bool>,
     /// Small-screen tip (`/compact-mode` hint on smallish terminals).
@@ -358,12 +354,9 @@ impl Default for UiConfig {
 }
 
 impl UiConfig {
-    /// The single source of truth for the timeline-sidebar default (opt-in).
-    /// Flip this one line to change the default everywhere.
-    ///
-    // TODO: migrate the other boolean UI settings (show_timestamps, simple_mode, show_thinking_blocks, …) to the same const and resolver pattern
-    // They currently duplicate their default literal across cache.rs / config.rs / defs.rs / setters.rs / registry.rs
-    // They rely on the registry drift-guard test to catch mismatches
+    /// The single source of truth for the timeline-sidebar default (opt-in). TODO: migrate the other boolean UI settings
+    /// (show_timestamps, simple_mode, show_thinking_blocks, …) to the same const and resolver pattern. They currently
+    /// duplicate their default literal across cache.rs / config.rs / defs.rs / setters.rs / registry.rs.
     pub const SHOW_TIMELINE_DEFAULT: bool = false;
 
     /// Resolved timeline-sidebar setting: the configured value, or [`Self::SHOW_TIMELINE_DEFAULT`] when unset.

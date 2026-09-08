@@ -220,9 +220,15 @@ pub(super) fn parse_worktree_restore_payload(
         .and_then(|v| serde_json::from_value(v).ok());
     (code_restored, restore_summary, restore_degree)
 }
-/// CANONICAL wire parser for `LoadSessionResponse._meta.codeRestore`. Any
-/// other code consuming this shape MUST go through this function — do not
-/// re-implement.
+pub(crate) fn parse_worktree_strategy_summary(
+    result_obj: &serde_json::Value,
+) -> Option<String> {
+    use serde::Deserialize;
+    let strategy = result_obj.get("strategy")?;
+    xai_grok_workspace::worktree::StrategyReport::deserialize(strategy).ok()?.notice()
+}
+/// CANONICAL wire parser for `LoadSessionResponse._meta.codeRestore`.
+/// Any other code consuming this shape MUST go through this function; do not re-implement.
 pub(super) fn parse_session_load_restore_meta(
     resp_meta: Option<&acp::Meta>,
 ) -> (bool, Option<String>, Option<xai_grok_workspace::session::git::RestoreDegree>) {
@@ -1590,19 +1596,11 @@ pub(crate) async fn persist_permission_mode_and_notify(
     persist: PermissionModePersist,
     tx: AcpAgentTx,
 ) -> TaskResult {
-    let enabled = canonical == "always-approve";
-    let auto_mode = canonical == "auto";
     let config_str: &'static str = canonical;
-    let disk_result = xai_grok_shell::util::config::update_config(|cfg| {
-            cfg.ui.permission_mode = Some(config_str.to_string());
-        })
-        .await;
-    let disk_outcome: Result<(), String> = disk_result.map_err(|e| e.to_string());
-    if should_send_yolo_acp_notification(&disk_outcome, persist) && session_id.is_some()
-    {
+    let notify = |tx: AcpAgentTx| async move {
         let params = serde_json::json!({
-            "yolo_mode": enabled,
-            "auto_mode": auto_mode,
+            "yolo_mode": canonical == "always-approve",
+            "auto_mode": canonical == "auto",
             "permission_mode": config_str,
         });
         let notification = acp::ExtNotification::new(
@@ -1614,6 +1612,21 @@ pub(crate) async fn persist_permission_mode_and_notify(
         if let Err(e) = acp_send(notification, &tx).await {
             tracing::warn!("Failed to send yolo_mode_changed notification: {e}");
         }
+    };
+    let notify_first = session_id.is_some()
+        && matches!(persist, PermissionModePersist::BestEffort);
+    if notify_first {
+        notify(tx.clone()).await;
+    }
+    let disk_result = xai_grok_shell::util::config::update_config(|cfg| {
+            cfg.ui.permission_mode = Some(config_str.to_string());
+        })
+        .await;
+    let disk_outcome: Result<(), String> = disk_result.map_err(|e| e.to_string());
+    if !notify_first && session_id.is_some()
+        && should_send_yolo_acp_notification(&disk_outcome, persist)
+    {
+        notify(tx).await;
     }
     route_permission_mode_result(disk_outcome, persist, config_str)
 }

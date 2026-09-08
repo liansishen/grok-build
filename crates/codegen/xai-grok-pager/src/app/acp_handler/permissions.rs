@@ -492,7 +492,7 @@ fn cli_is_idle_for_recap(agent: &crate::app::agent_view::AgentView) -> bool {
     if agent.session.in_flight_prompt.is_some() || agent.has_held_user_queue() {
         return false;
     }
-    if agent.subagent_sessions.values().any(|s| !s.finished) {
+    if agent.subagent_sessions.values().any(|s| s.is_running()) {
         return false;
     }
     if agent

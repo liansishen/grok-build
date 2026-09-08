@@ -274,24 +274,25 @@ pub(super) fn handle_session_notification_with_origin(
         &session_notif.update,
         XaiSessionUpdate::WorkflowUpdated { .. }
     );
+    let mut committed_subagent_lifecycle = None;
     let is_subagent_lifecycle =
         if let Some(lifecycle) = classify_subagent_lifecycle(&session_notif.update, origin) {
-            match gate_subagent_lifecycle(
-                &agent.subagent_sessions,
-                &agent.scrollback,
-                &mut agent.deferred_subagent_finishes,
+            let Some(action) = prepare_tui_subagent_lifecycle(
+                agent,
                 &lifecycle,
                 meta.is_replay,
-                session_notif.session_id.0.as_ref(),
-                meta.event_id.as_deref(),
+                meta.event_seq,
                 &session_notif,
                 std::time::Instant::now(),
-            ) {
-                LifecycleDelivery::Apply => true,
-                LifecycleDelivery::DropDuplicate | LifecycleDelivery::AwaitSpawn => {
-                    return false;
-                }
+            ) else {
+                return false;
+            };
+            let should_render = action.should_render();
+            committed_subagent_lifecycle = action.commit(agent, std::time::Instant::now());
+            if !should_render {
+                return false;
             }
+            true
         } else {
             false
         };
@@ -315,7 +316,7 @@ pub(super) fn handle_session_notification_with_origin(
     let mut plugins_changed_needs_skills_refetch = false;
     let mut status_snapshot_applied = false;
     let mut terminal_outcome: Option<super::super::turn_completion::TerminalApply> = None;
-    let mut deferred_subagent_finish: Option<SessionNotification> = None;
+    let mut pending_finish_for_spawn = None;
     let root_session_id: &str = session_notif.session_id.0.as_ref();
     let changed = match session_notif.update {
         ref update @ (XaiSessionUpdate::AutoCompactStarted { .. }
@@ -505,6 +506,7 @@ pub(super) fn handle_session_notification_with_origin(
         }
         XaiSessionUpdate::SubagentSpawned {
             subagent_id,
+            attempt_id: _,
             child_session_id,
             subagent_type,
             description,
@@ -524,78 +526,122 @@ pub(super) fn handle_session_notification_with_origin(
                 subagent_type = %subagent_type,
                 "Subagent spawned"
             );
+            let committed_lifecycle = committed_subagent_lifecycle.take();
+            let is_new_attempt = committed_lifecycle
+                .as_ref()
+                .is_some_and(|action| action.is_new_attempt);
+            let is_wake = committed_lifecycle
+                .as_ref()
+                .is_some_and(|action| action.is_wake);
+            let prior_background = (!is_new_attempt)
+                .then(|| {
+                    agent
+                        .subagent_sessions
+                        .get(&child_session_id)
+                        .map(|info| info.attempt.is_background)
+                })
+                .flatten();
             let is_background = agent
                 .session
                 .tracker
                 .task_tool_background
                 .remove(&subagent_id)
-                .unwrap_or(false);
+                .or(prior_background)
+                .unwrap_or(is_wake);
             let persona_display = persona.clone();
             let role_display = role.clone();
             let model_display = model.clone();
-            let retained_terminal_finish = agent
-                .subagent_sessions
-                .get(&child_session_id)
-                .filter(|info| info.finished)
-                .map(|info| SessionNotification {
-                    session_id: session_notif.session_id.clone(),
-                    update: XaiSessionUpdate::SubagentFinished {
-                        subagent_id: info.subagent_id.to_string(),
-                        child_session_id: child_session_id.clone(),
-                        status: info.status.as_deref().unwrap_or("cancelled").to_owned(),
-                        error: info.error.as_deref().map(str::to_owned),
-                        tool_calls: info.tool_calls.unwrap_or(0),
-                        turns: info.turns.unwrap_or(0),
-                        duration_ms: info.duration_ms.unwrap_or(0),
-                        tokens_used: info.tokens_used.unwrap_or(0),
-                        output: None,
-                        will_wake: false,
-                    },
-                    meta: session_notif.meta.clone(),
-                });
-            agent.subagent_sessions.insert(
-                child_session_id.clone(),
-                SubagentInfo {
-                    subagent_id: Arc::from(subagent_id),
-                    child_session_id: Arc::from(child_session_id.clone()),
-                    description: Arc::from(description.clone()),
-                    subagent_type: Arc::from(subagent_type.clone()),
-                    persona: persona.map(Arc::from),
-                    role: role.map(Arc::from),
-                    model: model.map(Arc::from),
-                    context_source: effective_context_source.map(Arc::from),
-                    resumed_from: resumed_from.map(Arc::from),
-                    capability_mode: capability_mode.map(Arc::from),
-                    workflow_run_id: workflow_run_id.clone().map(Arc::from),
-                    context_normalized,
-                    parent_prompt_id: parent_prompt_id.map(Arc::from),
-                    started_at: std::time::Instant::now(),
-                    last_progress_at: std::time::Instant::now(),
-                    finished: false,
-                    status: None,
-                    error: None,
-                    duration_ms: None,
-                    tool_calls: None,
-                    turns: None,
-                    turn_count: None,
-                    tool_call_count: None,
-                    tokens_used: None,
-                    context_window_tokens: None,
-                    context_usage_pct: None,
-                    tools_used: Vec::new(),
-                    error_count: None,
-                    activity_label: None,
-                    is_background,
-                    pending_kill: false,
-                    kill_requested_at: None,
-                    scrollback_entry_id: None,
-                    prompt: None,
-                    child_cwd: None,
-                    worktree_path: None,
-                    transcript: Default::default(),
+            let retained_terminal_finish = if meta.is_replay
+                && committed_lifecycle
+                    .as_ref()
+                    .is_some_and(|action| action.rebuilt_current_attempt)
+            {
+                agent
+                    .subagent_sessions
+                    .get(&child_session_id)
+                    .and_then(|info| {
+                        info.is_finished().then(|| SessionNotification {
+                            session_id: session_notif.session_id.clone(),
+                            update: info.attempt.terminal_update(
+                                &info.subagent_id,
+                                &child_session_id,
+                                "cancelled",
+                            ),
+                            meta: session_notif.meta.clone(),
+                        })
+                    })
+            } else {
+                None
+            };
+            let lifecycle = committed_lifecycle
+                .as_ref()
+                .map(|action| action.lifecycle.clone())
+                .unwrap_or_default();
+            let pending_finish = committed_lifecycle
+                .as_ref()
+                .and_then(|action| action.pending_finish.clone());
+            let now = std::time::Instant::now();
+            let prior_info = agent.subagent_sessions.remove(&child_session_id);
+            let had_prior_info = prior_info.is_some();
+            let terminal_entry_id = if is_new_attempt {
+                None
+            } else {
+                prior_info
+                    .as_ref()
+                    .and_then(|info| info.attempt.terminal_entry_id)
+                    .filter(|eid| agent.scrollback.get_by_id(*eid).is_some())
+            };
+            let attempt = crate::app::subagent::SubagentAttemptInfo {
+                lifecycle,
+                persona: persona.map(Arc::from),
+                role: role.map(Arc::from),
+                model: model.map(Arc::from),
+                context_source: effective_context_source.map(Arc::from),
+                resumed_from: resumed_from.map(Arc::from),
+                capability_mode: capability_mode.map(Arc::from),
+                workflow_run_id: workflow_run_id.clone().map(Arc::from),
+                context_normalized,
+                parent_prompt_id: parent_prompt_id.map(Arc::from),
+                started_at: now,
+                last_progress_at: now,
+                status: None,
+                error: None,
+                duration_ms: None,
+                tool_calls: None,
+                turns: None,
+                turn_count: None,
+                tool_call_count: None,
+                tokens_used: None,
+                context_window_tokens: None,
+                context_usage_pct: None,
+                tools_used: Vec::new(),
+                error_count: None,
+                activity_label: None,
+                is_background,
+                pending_kill: false,
+                kill_requested_at: None,
+                scrollback_entry_id: None,
+                terminal_entry_id,
+            };
+            let mut info = SubagentInfo::from_spawn(
+                prior_info,
+                crate::app::subagent::SubagentChildInfo {
+                    subagent_id,
+                    child_session_id: child_session_id.clone(),
+                    description: description.clone(),
+                    subagent_type: subagent_type.clone(),
                 },
+                attempt,
+                is_new_attempt,
             );
-            if let Some(ref sid) = agent.session.session_id
+            if meta.is_replay && agent.session.loading_replay {
+                info.transcript.begin_parent_replay();
+            }
+            agent
+                .subagent_sessions
+                .insert(child_session_id.clone(), info);
+            if !had_prior_info
+                && let Some(ref sid) = agent.session.session_id
                 && let Some(info) = agent.subagent_sessions.get_mut(&child_session_id)
             {
                 crate::app::subagent::enrich_from_meta(info, &agent.session.cwd, sid.0.as_ref());
@@ -604,101 +650,93 @@ pub(super) fn handle_session_notification_with_origin(
                 &agent.session.cwd,
                 agent.subagent_sessions.get(&child_session_id),
             );
-            let child_session = AgentSession {
-                id: AgentId(0),
-                acp_tx: agent.session.acp_tx.clone(),
-                session_id: Some(acp::SessionId::new(child_session_id.clone())),
-                models: agent.session.models.clone(),
-                state: AgentState::TurnRunning,
-                tracker: AcpUpdateTracker::new(),
-                cwd: effective_child_cwd,
-                is_worktree: effective_is_worktree,
-                forked_from: None,
-                pending_prompts: std::collections::VecDeque::new(),
-                next_queue_id: 0,
-                yolo_mode: true,
-                auto_mode: false,
-                prompt_history: Vec::new(),
-                prompt_history_loading: false,
-                loading_replay: false,
-                restore_degree: None,
-                rate_limited: false,
-                model_incompatible: false,
-                credit_limit_blocked: false,
-                free_usage_blocked: false,
-                bg_tasks: std::collections::BTreeMap::new(),
-                bg_tool_call_to_task: std::collections::HashMap::new(),
-                scheduled_tasks: std::collections::HashMap::new(),
-                available_commands: Vec::new(),
-                available_commands_generation: 0,
-                available_tools: None,
-                model_switch_pending: false,
-                hook_block_hold: false,
-                blocked_prompt: None,
-                user_model_preference: None,
-                deferred_model_switch: None,
-                in_flight_prompt: None,
-                compact_held_prompt: None,
-                current_prompt_id: None,
-                created_via_new: false,
-            };
-            let mut child_scrollback = crate::scrollback::state::ScrollbackState::new();
-            child_scrollback.set_appearance(agent.scrollback.appearance().clone());
-            let mut child_view = AgentView::new(child_session, child_scrollback);
-            child_view.set_input_mode(InputMode::Vim);
-            child_view.active_pane = crate::views::agent::ActivePane::Scrollback;
-            child_view.set_sharing_enabled(agent.sharing_enabled);
-            child_view.set_billing_surface_visible(agent.billing_surface_visible);
-            child_view.set_usage_command_visible(agent.usage_command_visible);
-            let dashboard_visible = agent
-                .prompt
-                .slash_controller
-                .registry()
-                .get("dashboard")
-                .is_some();
-            child_view.set_dashboard_visible(dashboard_visible);
-            child_view.set_has_session_announcements(
-                agent.prompt.slash_controller.has_session_announcements(),
-            );
-            child_view
-                .prompt
-                .set_screen_mode(agent.prompt.slash_controller.screen_mode());
-            child_view.app_chat_mode = agent.app_chat_mode;
-            let recap_visible = agent
-                .prompt
-                .slash_controller
-                .registry()
-                .get("recap")
-                .is_some();
-            child_view.set_session_recap_available(recap_visible);
-            let voice_visible = agent
-                .prompt
-                .slash_controller
-                .registry()
-                .get("voice")
-                .is_some();
-            child_view.set_voice_mode_available(voice_visible);
-            let restricted = agent
-                .prompt
-                .slash_controller
-                .registry()
-                .restricted_commands();
-            child_view.set_restricted_commands(&restricted);
-            agent.insert_subagent_view(child_session_id.clone(), Box::new(child_view));
-            let prompt_to_inject = agent
-                .subagent_sessions
-                .get(&child_session_id)
-                .and_then(|info| info.prompt.as_deref())
-                .filter(|p| !p.trim().is_empty())
-                .map(str::to_owned);
-            if let (Some(prompt), Some(child_view)) = (
-                prompt_to_inject,
-                agent.subagent_views.get_mut(&child_session_id),
-            ) {
+            if let Some(child_view) = agent.subagent_views.get_mut(&child_session_id) {
+                child_view.session.state = AgentState::TurnRunning;
+                if is_new_attempt {
+                    child_view.session.tracker = AcpUpdateTracker::new();
+                }
+            } else {
+                let child_session = AgentSession {
+                    id: AgentId(0),
+                    acp_tx: agent.session.acp_tx.clone(),
+                    session_id: Some(acp::SessionId::new(child_session_id.clone())),
+                    models: agent.session.models.clone(),
+                    state: AgentState::TurnRunning,
+                    tracker: AcpUpdateTracker::new(),
+                    cwd: effective_child_cwd,
+                    is_worktree: effective_is_worktree,
+                    forked_from: None,
+                    pending_prompts: std::collections::VecDeque::new(),
+                    next_queue_id: 0,
+                    yolo_mode: true,
+                    auto_mode: false,
+                    prompt_history: Vec::new(),
+                    prompt_history_loading: false,
+                    loading_replay: false,
+                    restore_degree: None,
+                    rate_limited: false,
+                    model_incompatible: false,
+                    credit_limit_blocked: false,
+                    free_usage_blocked: false,
+                    bg_tasks: std::collections::BTreeMap::new(),
+                    bg_tool_call_to_task: std::collections::HashMap::new(),
+                    scheduled_tasks: std::collections::HashMap::new(),
+                    available_commands: Vec::new(),
+                    available_commands_generation: 0,
+                    available_tools: None,
+                    model_switch_pending: false,
+                    hook_block_hold: false,
+                    blocked_prompt: None,
+                    user_model_preference: None,
+                    deferred_model_switch: None,
+                    in_flight_prompt: None,
+                    compact_held_prompt: None,
+                    current_prompt_id: None,
+                    created_via_new: false,
+                };
+                let mut child_scrollback = crate::scrollback::state::ScrollbackState::new();
+                child_scrollback.set_appearance(agent.scrollback.appearance().clone());
+                let mut child_view = AgentView::new(child_session, child_scrollback);
+                child_view.set_input_mode(InputMode::Vim);
+                child_view.active_pane = crate::views::agent::ActivePane::Scrollback;
+                child_view.set_sharing_enabled(agent.sharing_enabled);
+                child_view.set_billing_surface_visible(agent.billing_surface_visible);
+                child_view.set_usage_command_visible(agent.usage_command_visible);
+                let dashboard_visible = agent
+                    .prompt
+                    .slash_controller
+                    .registry()
+                    .get("dashboard")
+                    .is_some();
+                child_view.set_dashboard_visible(dashboard_visible);
+                child_view.set_has_session_announcements(
+                    agent.prompt.slash_controller.has_session_announcements(),
+                );
                 child_view
-                    .scrollback
-                    .push_block(RenderBlock::user_prompt(prompt));
-                child_view.session.tracker.expect_user_echo();
+                    .prompt
+                    .set_screen_mode(agent.prompt.slash_controller.screen_mode());
+                child_view.app_chat_mode = agent.app_chat_mode;
+                let recap_visible = agent
+                    .prompt
+                    .slash_controller
+                    .registry()
+                    .get("recap")
+                    .is_some();
+                child_view.set_session_recap_available(recap_visible);
+                let voice_visible = agent
+                    .prompt
+                    .slash_controller
+                    .registry()
+                    .get("voice")
+                    .is_some();
+                child_view.set_voice_mode_available(voice_visible);
+                let restricted = agent
+                    .prompt
+                    .slash_controller
+                    .registry()
+                    .restricted_commands();
+                child_view.set_restricted_commands(&restricted);
+                agent.insert_subagent_view(child_session_id.clone(), Box::new(child_view));
             }
             if workflow_run_id.is_none() {
                 let block = crate::scrollback::blocks::SubagentBlock::started(
@@ -713,28 +751,19 @@ pub(super) fn handle_session_notification_with_origin(
                 let entry_id = agent.scrollback.push_block(RenderBlock::Subagent(block));
                 agent.scrollback.set_last_running(true);
                 if let Some(info) = agent.subagent_sessions.get_mut(&child_session_id) {
-                    info.scrollback_entry_id = Some(entry_id);
-                    info.is_background = is_background;
+                    info.attempt.scrollback_entry_id = Some(entry_id);
+                    info.attempt.is_background = is_background;
                 }
             } else if let Some(info) = agent.subagent_sessions.get_mut(&child_session_id) {
-                info.is_background = is_background;
+                info.attempt.is_background = is_background;
             }
-            let taken_deferred = take_deferred_subagent_finish(
-                &mut agent.deferred_subagent_finishes,
-                &child_session_id,
-                std::time::Instant::now(),
-            );
-            if retained_terminal_finish.is_some() && taken_deferred.is_some() {
-                tracing::debug!(
-                    child_session_id = %child_session_id,
-                    reason = "retained_terminal_preferred",
-                    "dropping deferred subagent finish"
-                );
-            }
-            deferred_subagent_finish = retained_terminal_finish.or(taken_deferred);
+            pending_finish_for_spawn = retained_terminal_finish
+                .or(pending_finish)
+                .map(|payload| (payload, LifecycleOrigin::Reconciliation));
             true
         }
         XaiSessionUpdate::SubagentProgress {
+            attempt_id: _,
             child_session_id,
             duration_ms,
             turn_count,
@@ -747,15 +776,15 @@ pub(super) fn handle_session_notification_with_origin(
             ..
         } => {
             if let Some(info) = agent.subagent_sessions.get_mut(&child_session_id) {
-                info.duration_ms = Some(duration_ms);
-                info.turn_count = Some(turn_count);
-                info.tool_call_count = Some(tool_call_count);
-                info.tokens_used = Some(tokens_used);
-                info.context_window_tokens = Some(context_window_tokens);
-                info.context_usage_pct = Some(context_usage_pct);
-                info.tools_used = tools_used.into_iter().map(Arc::from).collect();
-                info.error_count = Some(error_count);
-                info.last_progress_at = std::time::Instant::now();
+                info.attempt.duration_ms = Some(duration_ms);
+                info.attempt.turn_count = Some(turn_count);
+                info.attempt.tool_call_count = Some(tool_call_count);
+                info.attempt.tokens_used = Some(tokens_used);
+                info.attempt.context_window_tokens = Some(context_window_tokens);
+                info.attempt.context_usage_pct = Some(context_usage_pct);
+                info.attempt.tools_used = tools_used.into_iter().map(Arc::from).collect();
+                info.attempt.error_count = Some(error_count);
+                info.attempt.last_progress_at = std::time::Instant::now();
             }
             if let Some(child_view) = agent.subagent_views.get_mut(&child_session_id)
                 && context_window_tokens > 0
@@ -773,6 +802,7 @@ pub(super) fn handle_session_notification_with_origin(
             true
         }
         XaiSessionUpdate::SubagentFinished {
+            attempt_id: _,
             child_session_id,
             status,
             error,
@@ -792,30 +822,16 @@ pub(super) fn handle_session_notification_with_origin(
             );
             let elapsed_dur = std::time::Duration::from_millis(duration_ms);
             let info_ref = agent.subagent_sessions.get(&child_session_id);
-            let entry_id = info_ref.and_then(|s| s.scrollback_entry_id);
-            let is_background = info_ref.is_some_and(|s| s.is_background);
+            let entry_id = info_ref.and_then(|s| s.attempt.scrollback_entry_id);
+            let is_background = info_ref.is_some_and(|s| s.attempt.is_background);
             let description = info_ref.map(|s| s.description.clone()).unwrap_or_default();
+            let existing_terminal = info_ref.and_then(|info| info.attempt.terminal_entry_id);
             if let Some(eid) = entry_id {
                 agent.scrollback.finish_running(eid);
             }
             sync_subagent_activity(agent, &child_session_id, None);
             if is_background {
-                let existing_terminal = (0..agent.scrollback.len()).rev().find_map(|idx| {
-                    let entry = agent.scrollback.entry(idx)?;
-                    match &entry.block {
-                        RenderBlock::Subagent(sb)
-                            if sb.child_session_id == child_session_id
-                                && !matches!(
-                                    sb.kind,
-                                    crate::scrollback::blocks::SubagentBlockKind::Started
-                                ) =>
-                        {
-                            Some(entry.id)
-                        }
-                        _ => None,
-                    }
-                });
-                if let Some(eid) = existing_terminal
+                let terminal_entry_id = if let Some(eid) = existing_terminal
                     && let Some(entry) = agent.scrollback.get_by_id_mut(eid)
                 {
                     if let RenderBlock::Subagent(ref mut sb) = entry.block {
@@ -837,6 +853,7 @@ pub(super) fn handle_session_notification_with_origin(
                         };
                     }
                     entry.invalidate_cache();
+                    Some(eid)
                 } else {
                     let block = match status.as_str() {
                         "completed" => RenderBlock::Subagent(
@@ -862,7 +879,10 @@ pub(super) fn handle_session_notification_with_origin(
                             ))
                         }
                     };
-                    agent.scrollback.push_block(block);
+                    Some(agent.scrollback.push_block(block))
+                };
+                if let Some(info) = agent.subagent_sessions.get_mut(&child_session_id) {
+                    info.attempt.terminal_entry_id = terminal_entry_id;
                 }
             } else if let Some(eid) = entry_id
                 && let Some(entry) = agent.scrollback.get_by_id_mut(eid)
@@ -890,18 +910,18 @@ pub(super) fn handle_session_notification_with_origin(
                 entry.invalidate_cache();
             }
             if let Some(info) = agent.subagent_sessions.get_mut(&child_session_id) {
-                info.finished = true;
-                info.status = Some(Arc::from(status));
-                info.error = error.map(Arc::from);
-                info.duration_ms = Some(duration_ms);
-                info.tool_calls = Some(tool_calls);
-                info.turns = Some(turns);
+                info.attempt.status = Some(Arc::from(status));
+                info.attempt.error = error.map(Arc::from);
+                info.attempt.duration_ms = Some(duration_ms);
+                info.attempt.tool_calls = Some(tool_calls);
+                info.attempt.turns = Some(turns);
                 if tokens_used > 0 {
-                    info.tokens_used = Some(tokens_used);
+                    info.attempt.tokens_used = Some(tokens_used);
                 }
-                info.pending_kill = false;
-                info.kill_requested_at = None;
-                info.last_progress_at = std::time::Instant::now();
+                info.seal_current_attempt_tokens();
+                info.attempt.pending_kill = false;
+                info.attempt.kill_requested_at = None;
+                info.attempt.last_progress_at = std::time::Instant::now();
                 info.transcript.retry_disk_after_finish();
             }
             let resuming = agent.session.loading_replay;
@@ -1407,15 +1427,11 @@ pub(super) fn handle_session_notification_with_origin(
             agent.advance_last_seen_event_id(id, meta.event_seq);
         }
     }
-    if let Some(payload) = deferred_subagent_finish {
-        if let Some(deferred) = redispatched_subagent_finish(payload) {
-            let _ = handle_session_notification(&deferred, app);
-        } else {
-            tracing::warn!(
-                session_id = session_notif.session_id.0.as_ref(),
-                "Failed to serialize deferred subagent finish"
-            );
-        }
+    if let Some((payload, origin)) = pending_finish_for_spawn
+        && let Ok(params) = serde_json::value::to_raw_value(&payload)
+    {
+        let deferred = acp::ExtNotification::new("x.ai/session/update", params.into());
+        let _ = handle_session_notification_with_origin(&deferred, app, origin);
     }
     if !app.reconnect_pending
         && let Some(agent) = app.agents.get(&parent_id)
@@ -1490,9 +1506,9 @@ pub(super) fn handle_child_session_notification(
             if let XaiSessionUpdate::AutoCompactCompleted { tokens_after, .. } = update
                 && let Some(info) = agent.subagent_sessions.get_mut(child_sid)
             {
-                info.tokens_used = Some(tokens_after);
-                if let Some(cw) = info.context_window_tokens.filter(|&cw| cw > 0) {
-                    info.context_usage_pct =
+                info.attempt.tokens_used = Some(tokens_after);
+                if let Some(cw) = info.attempt.context_window_tokens.filter(|&cw| cw > 0) {
+                    info.attempt.context_usage_pct =
                         Some(xai_token_estimation::usage_percentage_u8(tokens_after, cw));
                 }
             }
@@ -1531,7 +1547,7 @@ pub(super) fn handle_child_session_notification(
             let row_live = agent
                 .subagent_sessions
                 .get(child_sid)
-                .is_some_and(|info| !info.finished);
+                .is_some_and(|info| info.is_running());
             if !row_live {
                 return false;
             }
@@ -1858,11 +1874,12 @@ pub(super) fn apply_retry_state(
 pub(super) fn detect_plan_mode_change(update: &acp::SessionUpdate, agent: &mut AgentView) -> bool {
     use xai_grok_tools::types::SessionMode;
     let acp::SessionUpdate::CurrentModeUpdate(cmu) = update else {
-        return false;
+        return None;
     };
     let mode = SessionMode::from_id(cmu.current_mode_id.0.as_ref());
     let was_active = agent.plan_mode_active;
     let now_active = mode.is_plan();
+    let user_requested = agent.plan_mode_pending.is_some();
     agent.plan_mode_active = now_active;
     agent.plan_mode_pending = None;
     if was_active != now_active {
@@ -1872,5 +1889,10 @@ pub(super) fn detect_plan_mode_change(update: &acp::SessionUpdate, agent: &mut A
             "Plan mode state updated (from CurrentModeUpdate)"
         );
     }
-    true
+    Some(match (was_active, now_active) {
+        (false, true) if user_requested => PlanModeTransition::EnteredByUser,
+        (false, true) => PlanModeTransition::EnteredByAgent,
+        (true, false) => PlanModeTransition::Exited,
+        (false, false) | (true, true) => PlanModeTransition::Unchanged,
+    })
 }

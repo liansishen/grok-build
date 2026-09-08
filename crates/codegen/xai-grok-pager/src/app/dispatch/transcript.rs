@@ -408,8 +408,8 @@ pub(super) fn dispatch_open_block_viewer(app: &mut AppView) {
             _ => None,
         };
 
-        if viewer.is_some() {
-            agent.block_viewer = viewer;
+        if let Some(pane) = viewer {
+            agent.install_block_viewer(pane);
             return;
         }
 
