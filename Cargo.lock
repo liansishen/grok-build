@@ -13898,6 +13898,7 @@ dependencies = [
  "xai-grok-env",
  "xai-grok-extra-ca",
  "xai-grok-http",
+ "xai-grok-i18n",
  "xai-grok-memory",
  "xai-grok-sampler",
  "xai-grok-shell-base",

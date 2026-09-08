@@ -17,6 +17,8 @@ use super::system_appearance;
 /// Loaded from disk once at startup via `load_from_disk()`, then kept in sync by `set()`.
 static CURRENT: AtomicU8 = AtomicU8::new(ThemeKind::GrokNight as u8);
 static LOADED: AtomicBool = AtomicBool::new(false);
+static TRANSPARENT_BG: AtomicBool = AtomicBool::new(false);
+static TRANSPARENT_BG_LOADED: AtomicBool = AtomicBool::new(false);
 #[cfg(any(test, feature = "test-support"))]
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 

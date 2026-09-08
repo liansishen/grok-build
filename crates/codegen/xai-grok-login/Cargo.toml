@@ -57,6 +57,7 @@ xai-grok-config = { workspace = true }
 xai-grok-config-types = { workspace = true }
 xai-grok-env = { workspace = true }
 xai-grok-http = { workspace = true }
+xai-grok-i18n = { workspace = true }
 xai-grok-memory = { workspace = true }
 xai-grok-sampler = { workspace = true }
 xai-grok-shell-base = { workspace = true }
