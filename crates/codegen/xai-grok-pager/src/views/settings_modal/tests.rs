@@ -7435,3 +7435,102 @@ fn locked_coding_data_sharing_expanded_description_replaces_with_reason() {
         "unlocked expansion must not mention the team-admin lock: {text:?}"
     );
 }
+
+/// Pseudo-locale markers prove that settings chrome reaches the catalog in each core sub-pane.
+#[test]
+fn settings_render_uses_pseudo_locale_for_core_modes() {
+    let snapshots = xai_grok_i18n_test::with_pseudo_locale(|| {
+        let area = Rect {
+            x: 0,
+            y: 0,
+            width: 160,
+            height: 50,
+        };
+        let render = |state: &mut SettingsModalState| {
+            let mut buf = Buffer::empty(area);
+            render_settings_modal(&mut buf, area, state, false, None);
+            (0..area.height)
+                .map(|y| buf_row_text(&buf, y, area.x, area.width))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+
+        let mut browse = make_state();
+        let browse_text = render(&mut browse);
+
+        let mut filter = make_state();
+        filter.set_query("no-such-setting");
+        filter.focus_filter();
+        let filter_text = render(&mut filter);
+
+        let mut picker = enter_picker_for("theme");
+        let picker_text = render(&mut picker);
+
+        let mut group = make_state();
+        let group_idx = group
+            .rows
+            .iter()
+            .position(|row| matches!(row, RowEntry::Setting { key, .. } if *key == "contextual_hints"))
+            .expect("contextual_hints group must be registered");
+        group.selected = group_idx;
+        assert!(group.try_enter_picking_group());
+        let group_text = render(&mut group);
+
+        let int_text = render(&mut int_stepper_fixture(120));
+        let string_text = render(&mut editor_render_fixture("not-known", 0));
+
+        (
+            browse_text,
+            filter_text,
+            picker_text,
+            group_text,
+            int_text,
+            string_text,
+        )
+    });
+
+    let (browse, filter, picker, group, int, string) = snapshots;
+    assert!(browse.contains("⟦settings.modal.title⟧"), "modal title was not localized:\n{browse}");
+    assert!(
+        browse.contains("⟦settings.category.appearance⟧"),
+        "category label was not localized:\n{browse}"
+    );
+    assert!(
+        browse.contains("⟦settings.compact_mode.label⟧"),
+        "setting label was not localized:\n{browse}"
+    );
+    assert!(!browse.contains("Settings"), "browse output bypassed the pseudo-locale:\n{browse}");
+    assert!(!browse.contains("Appearance"), "category output bypassed the pseudo-locale:\n{browse}");
+
+    assert!(
+        filter.contains("⟦settings.modal.no_matches_for⟧"),
+        "empty-filter output was not localized:\n{filter}"
+    );
+
+    assert!(
+        picker.contains("⟦settings.theme.label⟧"),
+        "picker title was not localized:\n{picker}"
+    );
+    assert!(
+        picker.contains("⟦settings.theme.choice_groknight⟧"),
+        "picker choice label was not localized:\n{picker}"
+    );
+    assert!(!picker.contains("Grok Night"), "picker output bypassed the pseudo-locale:\n{picker}");
+
+    assert!(
+        group.contains("⟦settings.contextual_hints.label⟧"),
+        "group title was not localized:\n{group}"
+    );
+    assert!(
+        int.contains("⟦settings.max_thoughts_width.label⟧"),
+        "integer editor title was not localized:\n{int}"
+    );
+    assert!(
+        string.contains("⟦settings.default_model.label⟧"),
+        "string editor title was not localized:\n{string}"
+    );
+    assert!(
+        string.contains("⟦settings.modal.err_unknown_model⟧"),
+        "string editor validation was not localized:\n{string}"
+    );
+}

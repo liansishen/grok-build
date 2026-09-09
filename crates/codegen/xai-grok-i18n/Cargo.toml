@@ -5,8 +5,15 @@ version = "0.1.0"
 edition.workspace = true
 description = "UI localization (message catalogs) for Grok Build"
 
+[features]
+test-support = []
+
 [dependencies]
 toml = { workspace = true }
+
+[dev-dependencies]
+tree-sitter = "0.25.10"
+tree-sitter-rust = "0.24.0"
 
 [lints]
 workspace = true

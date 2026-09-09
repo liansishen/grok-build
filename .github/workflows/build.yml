@@ -56,6 +56,50 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Build version: $version"
 
+  i18n_audit:
+    name: Localization audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source and history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.92.0 --profile minimal --no-self-update
+          rustup default 1.92.0
+          rustc --version
+
+      - name: Run localization audit
+        shell: bash
+        env:
+          AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          base="${AUDIT_BASE:-}"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          fi
+          test -n "$base"
+          export GROK_I18N_AUDIT_BASE="$base"
+
+          old_source_rev="$(git show "$base:SOURCE_REV" 2>/dev/null | tr -d '[:space:]' || true)"
+          new_source_rev="$(tr -d '[:space:]' < SOURCE_REV)"
+          if [[ "$old_source_rev" =~ ^[0-9a-f]{40}$ \
+                && "$new_source_rev" =~ ^[0-9a-f]{40}$ \
+                && "$old_source_rev" != "$new_source_rev" ]]; then
+            git fetch --no-tags https://github.com/xai-org/grok-build.git \
+              "$old_source_rev" "$new_source_rev"
+            export GROK_I18N_UPSTREAM_OLD="$old_source_rev"
+            export GROK_I18N_UPSTREAM_NEW="$new_source_rev"
+          fi
+
+          cargo test --locked -p xai-grok-i18n --lib
+          cargo test --locked -p xai-grok-i18n --test i18n_audit
+
   build:
     name: ${{ matrix.name }}
     needs: version
@@ -140,6 +184,10 @@ jobs:
         shell: bash
         run: cargo check --locked -p xai-grok-pager-bin
 
+      - name: Test settings localization
+        if: runner.os == 'Linux'
+        shell: bash
+        run: cargo test --locked -p xai-grok-pager --lib settings_render_uses_pseudo_locale_for_core_modes
       - name: Test sampler library
         if: runner.os == 'Linux'
         shell: bash
@@ -176,6 +224,7 @@ jobs:
     needs:
       - version
       - build
+      - i18n_audit
     runs-on: ubuntu-24.04
     permissions:
       contents: write

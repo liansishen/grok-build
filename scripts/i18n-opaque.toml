@@ -1,0 +1,93 @@
+# User-visible strings that are intentionally kept verbatim by the i18n audit.
+#
+# Exact values are preferred. Prefixes are limited to protocol and command
+# namespaces; do not add a whole module or file as an exception.
+
+[scan]
+roots = [
+  "crates/codegen/xai-grok-pager/src",
+  "crates/codegen/xai-grok-shell/src",
+  "crates/codegen/xai-grok-workspace/src",
+]
+sinks = [
+  "show_toast",
+  "show_toast_ticks",
+  "Span::raw",
+  "Span::styled",
+  "Span::from",
+  "Line::from",
+  "Line::raw",
+  "Line::styled",
+  "Line::from_iter",
+  "Text::from",
+  "Paragraph::new",
+  "Block::title",
+  "Block::title_bottom",
+  "ListItem::new",
+  "Cell::from",
+  "Table::new",
+  "set_string",
+  "set_span",
+  "println",
+  "eprintln",
+  "print",
+]
+translation_functions = [
+  "t",
+  "t_for",
+  "t_fmt",
+  "t_or",
+  "intern_key",
+  "label_t",
+  "description_t",
+  "display_t",
+]
+excluded_path_fragments = [
+  "/tests/",
+  "/tests.rs",
+  "/examples/",
+  "/bin/",
+  "/testkit/",
+  "_tests.rs",
+]
+settings_files = [
+  "crates/codegen/xai-grok-pager/src/views/settings_modal/render.rs",
+  "crates/codegen/xai-grok-pager/src/views/settings_modal/state.rs",
+]
+
+[allow]
+# Keyboard names, product/protocol names, and slash-command tokens are opaque
+# values rather than prose to translate.
+exact = [
+  "Alt",
+  "Backspace",
+  "Ctrl",
+  "Enter",
+  "Esc",
+  "F1",
+  "F2",
+  "Grok Build",
+  "MCP",
+  "PageDown",
+  "PageUp",
+  "Shift",
+  "Space",
+  "Tab",
+  "URL",
+  "XAI_API_KEY",
+  "n",
+  "q",
+  "y",
+]
+prefix = [
+  "/",
+  "./",
+  "../",
+  "http://",
+  "https://",
+  "ws://",
+  "wss://",
+  "file://",
+  "mailto:",
+  "git@",
+]

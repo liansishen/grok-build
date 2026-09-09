@@ -1111,10 +1111,10 @@ pub(super) fn render_picking_enum(
             y_cursor = y_cursor.saturating_add(layout.height);
             continue;
         }
-        let display_text: std::borrow::Cow<'_, str> = if choice.display.width() <= display_room {
-            std::borrow::Cow::Borrowed(choice.display.as_str())
+        let display_text: std::borrow::Cow<'_, str> = if choice.display_text().width() <= display_room {
+            std::borrow::Cow::Borrowed(choice.display_text())
         } else {
-            std::borrow::Cow::Owned(truncate_str(&choice.display, display_room))
+            std::borrow::Cow::Owned(truncate_str(choice.display_text(), display_room))
         };
         let display_w =
             (display_text.width() as u16).min(area.width.saturating_sub(PICKER_PREFIX_W));
@@ -1125,7 +1125,7 @@ pub(super) fn render_picking_enum(
             display_w,
         );
 
-        let has_choice_desc = !choice.description.trim().is_empty();
+        let has_choice_desc = !choice.description_text().trim().is_empty();
         if !has_choice_desc {
             y_cursor = y_cursor.saturating_add(layout.height);
             continue;
@@ -1153,10 +1153,10 @@ pub(super) fn render_picking_enum(
 
         // Narrow fallback: truncate on one line if wrapping fails.
         if layout.wrap_lines.is_empty() {
-            let desc_text: std::borrow::Cow<'_, str> = if choice.description.width() <= desc_room {
-                std::borrow::Cow::Borrowed(choice.description.as_str())
+            let desc_text: std::borrow::Cow<'_, str> = if choice.description_text().width() <= desc_room {
+                std::borrow::Cow::Borrowed(choice.description_text())
             } else {
-                std::borrow::Cow::Owned(truncate_str(&choice.description, desc_room))
+                std::borrow::Cow::Owned(truncate_str(choice.description_text(), desc_room))
             };
             let desc_w = (desc_text.width() as u16).min(area.x + area.width - desc_x);
             buf.set_span(
@@ -1393,7 +1393,7 @@ struct PickerChoiceLayout {
 /// Compute layout for one picker choice: its height and wrapped description lines.
 fn compute_picker_choice_layout(choice: &OwnedEnumChoice, area_width: u16) -> PickerChoiceLayout {
     // No description means 1 line, symbol and display only
-    if choice.description.trim().is_empty() {
+    if choice.description_text().trim().is_empty() {
         return PickerChoiceLayout {
             height: 1,
             wrap_lines: Vec::new(),
@@ -1403,7 +1403,7 @@ fn compute_picker_choice_layout(choice: &OwnedEnumChoice, area_width: u16) -> Pi
     // The desc column is PICKER_PREFIX_W + display_width + PICKER_SEPARATOR_W
     // Display gets truncated if it'd overflow; mirror that for layout math.
     let display_room = (area_width as usize).saturating_sub(PICKER_PREFIX_W as usize);
-    let display_w = choice.display.width().min(display_room) as u16;
+    let display_w = choice.display_text().width().min(display_room) as u16;
     let after_display = PICKER_PREFIX_W.saturating_add(display_w);
     let after_sep = after_display.saturating_add(PICKER_SEPARATOR_W);
 
@@ -1423,7 +1423,7 @@ fn compute_picker_choice_layout(choice: &OwnedEnumChoice, area_width: u16) -> Pi
         };
     }
 
-    let line = Line::from(Span::raw(choice.description.as_str()));
+    let line = Line::from(Span::raw(choice.description_text()));
     let wrapped = crate::render::wrapping::word_wrap_line(&line, desc_width);
 
     let wrap_lines: Vec<String> = wrapped

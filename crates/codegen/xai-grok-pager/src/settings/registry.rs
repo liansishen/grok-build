@@ -88,6 +88,18 @@ pub struct OwnedEnumChoice {
     pub description: String,
 }
 
+impl OwnedEnumChoice {
+    /// Borrow the runtime display label without exposing the storage field to renderers.
+    pub(crate) fn display_text(&self) -> &str {
+        &self.display
+    }
+
+    /// Borrow the runtime description without exposing the storage field to renderers.
+    pub(crate) fn description_text(&self) -> &str {
+        &self.description
+    }
+}
+
 /// Source of runtime choices for a `SettingKind::DynamicEnum`.
 /// `#[non_exhaustive]` allows adding new sources without breaking matches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

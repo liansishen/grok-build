@@ -13838,6 +13838,8 @@ name = "xai-grok-i18n"
 version = "0.1.0"
 dependencies = [
  "toml",
+ "tree-sitter",
+ "tree-sitter-rust",
 ]
 
 [[package]]
