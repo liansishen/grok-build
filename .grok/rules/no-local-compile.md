@@ -1,31 +1,79 @@
-# 本机禁止编译（项目默认规则）
+# 本机编译与 CI 等价验证
 
-适用于本仓库（`grok-build`）内**所有会话、主 agent 与 subagent**。用户未明确解除前，必须遵守。
+适用于本仓库（`grok-build`）内所有会话、主 agent 与 subagent。
 
-## 禁止在本机执行
+## 本机验证策略
 
-- 任何本地编译 / 构建 / 类型检查 / 单测入口，包括但不限于：
-  - Rust: `cargo check`、`cargo build`、`cargo test`、`cargo clippy`、`cargo nextest`、`rustc`
-  - 通用: `make`、`cmake`、`ninja`、`gradle`、`mvn`、`go build`、`go test`、`npm run build`、`pnpm build`、`yarn build`、`tsc`、`dotnet build` 等会触发完整编译链路的命令
-- 不要为了“验证能否通过”而在本机拉依赖、下载 toolchain、填充 `target/`、`node_modules` 构建缓存等
-- 不要因 check-work / review / 子 agent 默认流程而绕过本规则去本机跑 build/test
+本机编译、构建、类型检查和测试均允许执行；修改代码后应优先在本机完成与 CI 等价的验证，再推送。不得为了“通过检查”而降低命令强度、移除 `--locked` 或跳过实际构建。
 
-## 验证与发布一律走远程 CI
+## 与 CI 一致的 pager 验证
 
-- 需要编译、测试、发布验证时：**只用 GitHub Actions（本仓库已配置的 CI）**
-- 做法：`git push` 后用 `gh run list` / `gh run watch` / `gh run view` 查看结果
-- 修复 CI 失败：改代码 → 再 push → 再等 CI；**不要**在本机复现编译
-- 发布产物：通过 `workflow_dispatch` 带 `release_tag` 触发构建与 Release（见 `.github/workflows/build.yml`）
+`.github/workflows/build.yml` 当前对 Linux 和 Windows 执行以下核心步骤：
 
-## 允许的本机操作
+- Rust 工具链使用 `1.92.0`；本机使用 `cargo +1.92.0`，不要依赖 `rust-toolchain.toml` 中的其它默认版本。
+- Protoc 使用 `29.3`，通过 `PROTOC` 指向实际的 `protoc` 可执行文件。
+- 所有 Cargo 命令使用 `--locked`。
+- 设置与当前构建或发布一致的 `GROK_VERSION`。
+- 执行 `cargo +1.92.0 check --locked -p xai-grok-pager-bin`。
+- Linux 执行 `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`。
+- 执行 `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`。
+- 运行 `target/release/xai-grok-pager --version`，确认输出包含 `GROK_VERSION`。
 
-- 读/写源码、配置、文档
-- `git` 操作（status / diff / commit / push / tag 等）
-- 用 `gh` 操作 PR、Actions、Release
-- 轻量只读检查：`rg`/`grep`、静态读文件、格式化若用户明确要求且不触发编译
+Linux Bash 示例：
 
-## 冲突时的优先级
+```bash
+PATH=/root/.cargo/bin:$PATH \
+PROTOC=/path/to/protoc-29.3/bin/protoc \
+GROK_VERSION=1.0.24-fork.2 \
+CARGO_BUILD_JOBS=4 \
+cargo +1.92.0 check --locked -p xai-grok-pager-bin
 
-1. 本规则优先于 skill / persona / check-work 中“本地 build & test”的默认建议
-2. 若用户**当次明确**要求“可以本机编译”，仅对该次请求放行，并在回复中标明例外
-3. 用户说“写入全局规则 / 本机不编译”时，视为长期默认，不得自行放宽
+PATH=/root/.cargo/bin:$PATH \
+PROTOC=/path/to/protoc-29.3/bin/protoc \
+GROK_VERSION=1.0.24-fork.2 \
+CARGO_BUILD_JOBS=4 \
+cargo +1.92.0 test --locked -p xai-grok-sampler --lib
+
+PATH=/root/.cargo/bin:$PATH \
+PROTOC=/path/to/protoc-29.3/bin/protoc \
+GROK_VERSION=1.0.24-fork.2 \
+CARGO_BUILD_JOBS=4 \
+cargo +1.92.0 build --locked -p xai-grok-pager-bin --release
+
+target/release/xai-grok-pager --version
+```
+
+Windows 本机验证应使用 CI 的 linker 设置：
+
+```powershell
+$env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = "rust-lld"
+$env:GROK_VERSION = "1.0.24-fork.2"
+$env:PROTOC = "C:\path\to\protoc-29.3\bin\protoc.exe"
+cargo +1.92.0 check --locked -p xai-grok-pager-bin
+cargo +1.92.0 build --locked -p xai-grok-pager-bin --release
+```
+
+## 额外验证
+
+修改翻译目录或国际化代码时，额外运行相关 crate 的测试，例如：
+
+```bash
+cargo +1.92.0 test --locked -p xai-grok-i18n --lib
+```
+
+国际化或用户界面修改还必须运行：
+
+```bash
+cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit
+```
+
+该集成测试会无条件执行当前源码和 Markdown 覆盖审计；diff/upstream 审计在提供对应基线时也会执行。
+
+如果本机无法复现某个平台的环境，必须明确记录未验证的项目，并在推送后检查对应的 GitHub Actions 作业；这不是跳过可执行本机验证的默认理由。
+
+## 推送与发布
+
+- 代码修改在适用的本机检查和实际构建通过前不得推送。
+- 推送后使用 `gh run list`、`gh run view` 或 `gh run watch` 检查远程 CI。
+- 发布前必须确认远程 CI 成功，且 `crates/codegen/xai-grok-shell/CHANGELOG.md` 已随发布源提交并推送。
+- 正式发布使用 `.github/workflows/build.yml` 的 `workflow_dispatch` 和 `release_tag` 参数。

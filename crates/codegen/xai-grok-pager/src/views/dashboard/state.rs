@@ -222,12 +222,12 @@ impl RowState {
         match self {
             // Shorter, punchier labels
             // "Done" reads cleaner as a group header than the past-tense "Completed" did
-            Self::NeedsInput => "Awaiting",
-            Self::Working => "Working",
-            Self::Idle => "Idle",
-            Self::Inactive => "Inactive",
-            Self::Completed => "Done",
-            Self::Failed => "Failed",
+            Self::NeedsInput => xai_grok_i18n::t("dashboard.group.awaiting"),
+            Self::Working => xai_grok_i18n::t("dashboard.group.working"),
+            Self::Idle => xai_grok_i18n::t("dashboard.group.idle"),
+            Self::Inactive => xai_grok_i18n::t("dashboard.group.inactive"),
+            Self::Completed => xai_grok_i18n::t("dashboard.group.done"),
+            Self::Failed => xai_grok_i18n::t("dashboard.group.failed"),
         }
     }
 }
@@ -242,17 +242,17 @@ pub(crate) enum DashboardStopAction {
 impl DashboardStopAction {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Stop => "stop",
-            Self::Archive => "archive",
-            Self::Close => "close",
+            Self::Stop => xai_grok_i18n::t("dashboard.hint.stop"),
+            Self::Archive => xai_grok_i18n::t("dashboard.hint.archive"),
+            Self::Close => xai_grok_i18n::t("dashboard.hint.close"),
         }
     }
 
     pub(crate) fn confirmation_label(self) -> Option<&'static str> {
         match self {
             Self::Stop => None,
-            Self::Archive => Some("archive this session"),
-            Self::Close => Some("close this session"),
+            Self::Archive => Some(xai_grok_i18n::t("dashboard.archive_this_session")),
+            Self::Close => Some(xai_grok_i18n::t("dashboard.close_this_session")),
         }
     }
 }

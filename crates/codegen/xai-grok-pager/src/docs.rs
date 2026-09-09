@@ -36,19 +36,50 @@ impl From<&Doc> for DocEntry {
 /// Content for the requested UI locale.
 ///
 /// Keep `Doc::content` English so model-facing lookups and extracted files
-/// retain their existing behavior; only explicitly translated TUI guides are
-/// switched here.
+/// retain their existing behavior; switch every guide that has a zh-CN
+/// counterpart for the TUI picker.
 fn doc_content_for_locale(d: &Doc, locale: xai_grok_i18n::Locale) -> &'static str {
     if !matches!(locale, xai_grok_i18n::Locale::ZhCn) {
         return d.content;
     }
-    match d.filename {
-        "23-dashboard.md" => include_str!("../docs/user-guide/zh-CN/23-dashboard.md"),
-        "24-monitoring-usage.md" => {
-            include_str!("../docs/user-guide/zh-CN/24-monitoring-usage.md")
+    localized_guide_content(d.filename).unwrap_or(d.content)
+}
+
+fn localized_guide_content(filename: &str) -> Option<&'static str> {
+    Some(match filename {
+        "01-getting-started.md" => include_str!("../docs/user-guide/zh-CN/01-getting-started.md"),
+        "02-authentication.md" => include_str!("../docs/user-guide/zh-CN/02-authentication.md"),
+        "03-keyboard-shortcuts.md" => {
+            include_str!("../docs/user-guide/zh-CN/03-keyboard-shortcuts.md")
         }
-        _ => d.content,
-    }
+        "04-slash-commands.md" => include_str!("../docs/user-guide/zh-CN/04-slash-commands.md"),
+        "05-configuration.md" => include_str!("../docs/user-guide/zh-CN/05-configuration.md"),
+        "06-theming.md" => include_str!("../docs/user-guide/zh-CN/06-theming.md"),
+        "07-mcp-servers.md" => include_str!("../docs/user-guide/zh-CN/07-mcp-servers.md"),
+        "08-skills.md" => include_str!("../docs/user-guide/zh-CN/08-skills.md"),
+        "09-plugins.md" => include_str!("../docs/user-guide/zh-CN/09-plugins.md"),
+        "10-hooks.md" => include_str!("../docs/user-guide/zh-CN/10-hooks.md"),
+        "11-custom-models.md" => include_str!("../docs/user-guide/zh-CN/11-custom-models.md"),
+        "12-project-rules.md" => include_str!("../docs/user-guide/zh-CN/12-project-rules.md"),
+        "13-memory.md" => include_str!("../docs/user-guide/zh-CN/13-memory.md"),
+        "14-headless-mode.md" => include_str!("../docs/user-guide/zh-CN/14-headless-mode.md"),
+        "15-agent-mode.md" => include_str!("../docs/user-guide/zh-CN/15-agent-mode.md"),
+        "16-subagents.md" => include_str!("../docs/user-guide/zh-CN/16-subagents.md"),
+        "17-sessions.md" => include_str!("../docs/user-guide/zh-CN/17-sessions.md"),
+        "18-sandbox.md" => include_str!("../docs/user-guide/zh-CN/18-sandbox.md"),
+        "19-plan-mode.md" => include_str!("../docs/user-guide/zh-CN/19-plan-mode.md"),
+        "20-background-tasks.md" => include_str!("../docs/user-guide/zh-CN/20-background-tasks.md"),
+        "21-terminal-support.md" => include_str!("../docs/user-guide/zh-CN/21-terminal-support.md"),
+        "22-permissions-and-safety.md" => {
+            include_str!("../docs/user-guide/zh-CN/22-permissions-and-safety.md")
+        }
+        "23-dashboard.md" => include_str!("../docs/user-guide/zh-CN/23-dashboard.md"),
+        "24-monitoring-usage.md" => include_str!("../docs/user-guide/zh-CN/24-monitoring-usage.md"),
+        "25-status-line.md" => include_str!("../docs/user-guide/zh-CN/25-status-line.md"),
+        "26-config-reference.md" => include_str!("../docs/user-guide/zh-CN/26-config-reference.md"),
+        "27-grok-clone.md" => include_str!("../docs/user-guide/zh-CN/27-grok-clone.md"),
+        _ => return None,
+    })
 }
 
 fn localized_doc_meta(d: &Doc) -> (&'static str, &'static str) {
@@ -274,9 +305,8 @@ pub fn list_howto_titles() -> Vec<String> {
 
 /// Returns all docs as owned `DocEntry` values for the TUI doc picker.
 ///
-/// Titles and descriptions follow the active UI catalog. Full translated
-/// markdown is currently embedded for guides 23 and 24; other entries retain
-/// their canonical English content.
+/// Titles and descriptions follow the active UI catalog. Guides with a
+/// zh-CN counterpart use the translated markdown in the TUI picker.
 pub fn default_howto_entries() -> Vec<DocEntry> {
     USER_GUIDE
         .iter()
@@ -292,7 +322,8 @@ pub(crate) fn find_localized_doc(title: &str) -> Option<DocEntry> {
         .chain(REFERENCE_DOCS.iter())
         .find_map(|doc| {
             let localized = DocEntry::from(doc);
-            if doc.title.eq_ignore_ascii_case(title) || localized.title.eq_ignore_ascii_case(title) {
+            if doc.title.eq_ignore_ascii_case(title) || localized.title.eq_ignore_ascii_case(title)
+            {
                 Some(localized)
             } else {
                 None
@@ -376,7 +407,16 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn default_howto_entries_includes_all_user_guide_docs() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
         let entries = default_howto_entries();
         assert_eq!(entries.len(), USER_GUIDE.len() + REFERENCE_DOCS.len());
         for (i, doc) in USER_GUIDE.iter().enumerate() {
@@ -392,45 +432,78 @@ mod tests {
     }
 
     #[test]
-    fn localized_content_only_replaces_translated_guides() {
-        let dashboard = find_doc("Agent Dashboard").expect("dashboard guide");
-        let monitoring = find_doc("Monitoring Usage (External OpenTelemetry)")
-            .expect("monitoring guide");
-        let getting_started = find_doc("Getting Started").expect("getting-started guide");
+    fn localized_content_covers_every_zh_cn_guide() {
+        assert_eq!(
+            USER_GUIDE.len(),
+            27,
+            "update the locale map when adding a guide"
+        );
+        for doc in USER_GUIDE {
+            let localized = localized_guide_content(doc.filename)
+                .unwrap_or_else(|| panic!("missing zh-CN guide for {}", doc.filename));
+            assert!(
+                !localized.trim().is_empty(),
+                "{} has empty zh-CN content",
+                doc.filename
+            );
+            assert!(
+                localized.starts_with('#') || localized.starts_with('<'),
+                "{} has no markdown heading",
+                doc.filename
+            );
+        }
+    }
 
-        assert_eq!(
-            doc_content_for_locale(dashboard, xai_grok_i18n::Locale::En),
-            dashboard.content
-        );
-        assert_eq!(
-            doc_content_for_locale(monitoring, xai_grok_i18n::Locale::En),
-            monitoring.content
-        );
-        assert!(dashboard.content.starts_with("# Agent Dashboard"));
-        assert!(monitoring.content.starts_with("# Monitoring Usage"));
-        assert_eq!(get_howto_doc("Agent Dashboard"), Some(dashboard.content));
-        assert_eq!(
-            get_howto_doc("Monitoring Usage (External OpenTelemetry)"),
-            Some(monitoring.content)
-        );
+    #[test]
+    fn localized_guides_preserve_section_and_code_block_shape() {
+        fn shape(markdown: &str) -> (usize, usize) {
+            let mut in_code = false;
+            let mut headings = 0;
+            let mut fences = 0;
+            for line in markdown.lines() {
+                if line.starts_with("```") {
+                    in_code = !in_code;
+                    fences += 1;
+                } else if !in_code && line.starts_with('#') {
+                    headings += 1;
+                }
+            }
+            (headings, fences)
+        }
 
-        assert_eq!(
-            doc_content_for_locale(dashboard, xai_grok_i18n::Locale::ZhCn),
-            include_str!("../docs/user-guide/zh-CN/23-dashboard.md")
-        );
-        assert_eq!(
-            doc_content_for_locale(monitoring, xai_grok_i18n::Locale::ZhCn),
-            include_str!("../docs/user-guide/zh-CN/24-monitoring-usage.md")
-        );
-        assert_eq!(
-            doc_content_for_locale(getting_started, xai_grok_i18n::Locale::ZhCn),
-            getting_started.content
-        );
+        for doc in USER_GUIDE {
+            let localized = localized_guide_content(doc.filename).expect("covered guide");
+            let (english_headings, english_fences) = shape(doc.content);
+            let (localized_headings, localized_fences) = shape(localized);
+            assert!(localized_headings > 0, "{} has no sections", doc.filename);
+            assert!(
+                localized_headings + 2 >= english_headings,
+                "{} lost sections during translation",
+                doc.filename
+            );
+            assert_eq!(
+                localized_fences % 2,
+                0,
+                "{} has unbalanced code blocks",
+                doc.filename
+            );
+            assert!(
+                localized_fences >= english_fences,
+                "{} lost code blocks during translation",
+                doc.filename
+            );
+            assert_eq!(
+                english_fences % 2,
+                0,
+                "{} has unbalanced source code blocks",
+                doc.filename
+            );
+        }
     }
 
     #[test]
     #[serial_test::serial(GROK_UI_LOCALE)]
-    fn default_howto_entries_localizes_translated_guide_content() {
+    fn default_howto_entries_localizes_all_guide_content() {
         struct RestoreLocale(xai_grok_i18n::Locale);
         impl Drop for RestoreLocale {
             fn drop(&mut self) {
@@ -441,22 +514,11 @@ mod tests {
         let _restore = RestoreLocale(xai_grok_i18n::current_locale());
         xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
         let entries = default_howto_entries();
-
-        for (english_title, expected_content) in [
-            (
-                "Agent Dashboard",
-                include_str!("../docs/user-guide/zh-CN/23-dashboard.md"),
-            ),
-            (
-                "Monitoring Usage (External OpenTelemetry)",
-                include_str!("../docs/user-guide/zh-CN/24-monitoring-usage.md"),
-            ),
-        ] {
-            let index = USER_GUIDE
-                .iter()
-                .position(|doc| doc.title == english_title)
-                .expect("translated guide");
-            assert_eq!(entries[index].content, expected_content);
+        for (index, doc) in USER_GUIDE.iter().enumerate() {
+            assert_eq!(
+                entries[index].content,
+                localized_guide_content(doc.filename).unwrap()
+            );
         }
     }
 

@@ -5488,7 +5488,16 @@ fn chevron_column_aligns_across_one_and_two_line_layouts() {
 /// SHORT-fallback path (LONG doesn't fit) and the truncation path (even SHORT doesn't fit). A
 /// regression that moved the centering math into the LONG branch only would then fail.
 #[test]
+#[serial_test::serial(GROK_UI_LOCALE)]
 fn docs_footer_tip_is_centered() {
+    struct RestoreLocale(xai_grok_i18n::Locale);
+    impl Drop for RestoreLocale {
+        fn drop(&mut self) {
+            xai_grok_i18n::set_locale(self.0);
+        }
+    }
+    let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+    xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
     let theme = Theme::current();
     // Helper: render at `width` and return (full row text, tip start col, leading_ws, trailing_ws)
     let render = |width: u16| -> (String, usize, usize) {
@@ -7470,7 +7479,9 @@ fn settings_render_uses_pseudo_locale_for_core_modes() {
         let group_idx = group
             .rows
             .iter()
-            .position(|row| matches!(row, RowEntry::Setting { key, .. } if *key == "contextual_hints"))
+            .position(
+                |row| matches!(row, RowEntry::Setting { key, .. } if *key == "contextual_hints"),
+            )
             .expect("contextual_hints group must be registered");
         group.selected = group_idx;
         assert!(group.try_enter_picking_group());
@@ -7490,7 +7501,10 @@ fn settings_render_uses_pseudo_locale_for_core_modes() {
     });
 
     let (browse, filter, picker, group, int, string) = snapshots;
-    assert!(browse.contains("⟦settings.modal.title⟧"), "modal title was not localized:\n{browse}");
+    assert!(
+        browse.contains("⟦settings.modal.title⟧"),
+        "modal title was not localized:\n{browse}"
+    );
     assert!(
         browse.contains("⟦settings.category.appearance⟧"),
         "category label was not localized:\n{browse}"
@@ -7499,8 +7513,14 @@ fn settings_render_uses_pseudo_locale_for_core_modes() {
         browse.contains("⟦settings.compact_mode.label⟧"),
         "setting label was not localized:\n{browse}"
     );
-    assert!(!browse.contains("Settings"), "browse output bypassed the pseudo-locale:\n{browse}");
-    assert!(!browse.contains("Appearance"), "category output bypassed the pseudo-locale:\n{browse}");
+    assert!(
+        !browse.contains("Settings"),
+        "browse output bypassed the pseudo-locale:\n{browse}"
+    );
+    assert!(
+        !browse.contains("Appearance"),
+        "category output bypassed the pseudo-locale:\n{browse}"
+    );
 
     assert!(
         filter.contains("⟦settings.modal.no_matches_for⟧"),
@@ -7515,7 +7535,10 @@ fn settings_render_uses_pseudo_locale_for_core_modes() {
         picker.contains("⟦settings.theme.choice_groknight⟧"),
         "picker choice label was not localized:\n{picker}"
     );
-    assert!(!picker.contains("Grok Night"), "picker output bypassed the pseudo-locale:\n{picker}");
+    assert!(
+        !picker.contains("Grok Night"),
+        "picker output bypassed the pseudo-locale:\n{picker}"
+    );
 
     assert!(
         group.contains("⟦settings.contextual_hints.label⟧"),

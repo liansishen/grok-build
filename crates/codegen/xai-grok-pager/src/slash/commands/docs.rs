@@ -226,19 +226,21 @@ mod tests {
         let models = ModelState::default();
         let mut ctx = make_ctx(&models);
 
-        for (requested, expected_content) in [
+        for (requested, expected_title, expected_content) in [
             (
                 "Agent Dashboard",
+                xai_grok_i18n::t("docs.23.title"),
                 include_str!("../../../docs/user-guide/zh-CN/23-dashboard.md"),
             ),
             (
                 "Monitoring Usage (External OpenTelemetry)",
+                xai_grok_i18n::t("docs.24.title"),
                 include_str!("../../../docs/user-guide/zh-CN/24-monitoring-usage.md"),
             ),
         ] {
             match DocsCommand.run(&mut ctx, requested) {
                 CommandResult::Action(Action::ShowReleaseNotes { title, content }) => {
-                    assert_eq!(title, requested);
+                    assert_eq!(title, expected_title);
                     assert_eq!(content, expected_content);
                 }
                 other => panic!("expected ShowReleaseNotes for {requested:?}, got {other:?}"),
@@ -266,7 +268,16 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn suggest_args_includes_web_and_titles() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
         let models = ModelState::default();
         let cwd = std::path::Path::new(".");
         let ctx = AppCtx {

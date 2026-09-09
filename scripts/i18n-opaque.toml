@@ -9,6 +9,19 @@ roots = [
   "crates/codegen/xai-grok-shell/src",
   "crates/codegen/xai-grok-workspace/src",
 ]
+
+# Full-prose UI modules are scanned even when strings flow through locals or format!.
+current_full_scan_roots = [
+  "crates/codegen/xai-grok-pager/src/views/tasks_pane.rs",
+  "crates/codegen/xai-grok-pager/src/views/dashboard",
+]
+# Markdown trees are checked by relative path against their translation trees.
+docs_roots = [
+  "crates/codegen/xai-grok-pager/docs/user-guide",
+]
+translated_docs_roots = [
+  "crates/codegen/xai-grok-pager/docs/user-guide/zh-CN",
+]
 sinks = [
   "show_toast",
   "show_toast_ticks",
@@ -31,6 +44,8 @@ sinks = [
   "println",
   "eprintln",
   "print",
+  "HintItem::new",
+  "HintItem::paired",
 ]
 translation_functions = [
   "t",
@@ -76,6 +91,7 @@ exact = [
   "URL",
   "XAI_API_KEY",
   "n",
+  "h",
   "q",
   "y",
 ]

@@ -1,5 +1,21 @@
 # AGENTS.md
 
+## Local Verification Requirements
+
+Local compilation, tests, and type checks are allowed and should be used before pushing code changes. When validating the pager, match `.github/workflows/build.yml`:
+
+- Use Rust `1.92.0` explicitly (`cargo +1.92.0`) and Protoc `29.3`.
+- Set `GROK_VERSION` to the version being validated and use `--locked` for every Cargo command.
+- Run `cargo +1.92.0 check --locked -p xai-grok-pager-bin`.
+- On Linux, run `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`.
+- Run `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`.
+- Run the resulting `target/release/xai-grok-pager --version` and verify that it contains `GROK_VERSION`.
+- For internationalization or user-interface changes, also run `cargo +1.92.0 test --locked -p xai-grok-i18n --lib` and `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`; the latter performs the unconditional current-source and Markdown coverage audit.
+- On Windows, use the CI linker setting `CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=rust-lld`; platform-specific verification still runs in GitHub Actions when the host cannot reproduce it locally.
+- Do not push a code change until the applicable local checks pass. If a check cannot run locally, state the reason and rely on the corresponding remote CI job.
+
+The local environment may use repository and toolchain caches. Keep lockfile verification enabled and do not weaken CI-equivalent commands merely to make a check pass.
+
 ## Release Requirements
 
 Every release must include a written changelog entry in the repository's existing changelog before the release is published.

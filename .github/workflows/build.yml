@@ -97,8 +97,9 @@ jobs:
             export GROK_I18N_UPSTREAM_NEW="$new_source_rev"
           fi
 
-          cargo test --locked -p xai-grok-i18n --lib
-          cargo test --locked -p xai-grok-i18n --test i18n_audit
+          cargo +1.92.0 test --locked -p xai-grok-i18n --lib
+          cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit current_full_scan_and_markdown_coverage_are_unconditional
+          cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit
 
   build:
     name: ${{ matrix.name }}
