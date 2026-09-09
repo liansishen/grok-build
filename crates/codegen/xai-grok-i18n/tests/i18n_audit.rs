@@ -675,6 +675,17 @@ fn fixture_flags_direct_output_but_allows_translation_and_opaque_values() {
             literal: "Waiting for approval".to_owned(),
         }]
     );
+
+    let missing_key_source = br#"
+        fn render() {
+            show_toast(xai_grok_i18n::t("i18n.audit.missing_fixture"));
+        }
+    "#;
+    let missing = scan_missing_translation_keys("missing_key_fixture.rs", missing_key_source, &config, None)
+        .expect("missing-key fixture parses");
+    assert_eq!(missing.len(), 1);
+    assert_eq!(missing[0].sink, "missing translation key");
+    assert_eq!(missing[0].literal, "i18n.audit.missing_fixture");
 }
 
 #[test]
