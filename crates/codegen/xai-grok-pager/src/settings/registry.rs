@@ -56,14 +56,14 @@ impl SettingCategory {
     /// Section-header label as rendered in the modal.
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Appearance => "Appearance",
-            Self::Mouse => "Mouse",
-            Self::Editor => "Editor & Input",
-            Self::Agent => "Agent & Approval",
-            Self::Privacy => "Privacy",
-            Self::Models => "Models",
-            Self::Session => "Session",
-            Self::Advanced => "Advanced",
+            Self::Appearance => xai_grok_i18n::t_or("settings.category.appearance", "Appearance"),
+            Self::Mouse => xai_grok_i18n::t_or("settings.category.mouse", "Mouse"),
+            Self::Editor => xai_grok_i18n::t_or("settings.category.editor", "Editor & Input"),
+            Self::Agent => xai_grok_i18n::t_or("settings.category.agent", "Agent & Approval"),
+            Self::Privacy => xai_grok_i18n::t_or("settings.category.privacy", "Privacy"),
+            Self::Models => xai_grok_i18n::t_or("settings.category.models", "Models"),
+            Self::Session => xai_grok_i18n::t_or("settings.category.session", "Session"),
+            Self::Advanced => xai_grok_i18n::t_or("settings.category.advanced", "Advanced"),
         }
     }
 }
@@ -128,7 +128,8 @@ pub fn dynamic_enum_choices(
             out.push(OwnedEnumChoice {
                 canonical: String::new(),
                 display: xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string(),
-                description: xai_grok_i18n::t("settings.dynamic_enum.no_override_effort_desc").to_string(),
+                description: xai_grok_i18n::t("settings.dynamic_enum.no_override_effort_desc")
+                    .to_string(),
             });
             for (canonical, display, description) in &snapshot.fork_secondary_effort_options {
                 out.push(OwnedEnumChoice {
@@ -218,20 +219,55 @@ pub struct SettingMeta {
 }
 
 impl SettingMeta {
-    /// Localized setting label from the fork's settings catalog.
+    /// Localized setting label with the English metadata as fallback.
     pub fn label_t(&self) -> &'static str {
-        let key = format!("settings.{}.label", self.key);
-        xai_grok_i18n::t_for(xai_grok_i18n::current_locale(), &key)
+        let key = xai_grok_i18n::intern_key(&format!("settings.{}.label", self.key));
+        xai_grok_i18n::t_or(key, self.label)
+    }
+
+    /// Localized setting description with the English metadata as fallback.
+    pub fn description_t(&self) -> &'static str {
+        let key = xai_grok_i18n::intern_key(&format!("settings.{}.description", self.key));
+        xai_grok_i18n::t_or(key, self.description)
     }
 }
 
 impl EnumChoice {
-    /// Localized choice label, falling back to the metadata display text.
+    /// Localized choice label with the English metadata as fallback.
     pub fn display_t(&self, setting_key: SettingKey) -> &'static str {
-        let key = format!("settings.{setting_key}.choice_{}", self.canonical);
-        let translated = xai_grok_i18n::t_for(xai_grok_i18n::current_locale(), &key);
-        if translated == key { self.display } else { translated }
+        localized_choice(setting_key, self.canonical, "", self.display)
     }
+
+    /// Localized choice description with the English metadata as fallback.
+    pub fn description_t(&self, setting_key: SettingKey) -> &'static str {
+        localized_choice(setting_key, self.canonical, "_desc", self.description)
+    }
+}
+
+/// Resolve a static choice translation, reusing the shared theme catalog for the auto-theme pickers.
+fn localized_choice(
+    setting_key: SettingKey,
+    canonical: &'static str,
+    suffix: &'static str,
+    fallback: &'static str,
+) -> &'static str {
+    let canon = canonical.to_ascii_lowercase().replace('-', "_");
+    let key = xai_grok_i18n::intern_key(&format!("settings.{setting_key}.choice_{canon}{suffix}"));
+    let translated = xai_grok_i18n::t_for(xai_grok_i18n::current_locale(), key);
+    if translated != key {
+        return translated;
+    }
+
+    if matches!(setting_key, "auto_dark_theme" | "auto_light_theme") {
+        let theme_key =
+            xai_grok_i18n::intern_key(&format!("settings.theme.choice_{canon}{suffix}"));
+        let theme_translated = xai_grok_i18n::t_for(xai_grok_i18n::current_locale(), theme_key);
+        if theme_translated != theme_key {
+            return theme_translated;
+        }
+    }
+
+    fallback
 }
 
 /// A typed value carried by `Action::Set*` payloads, modal preview state, and the rollback path on persist failure.
@@ -256,8 +292,14 @@ pub enum CodingDataSharingLock {
 impl CodingDataSharingLock {
     pub fn reason(self) -> &'static str {
         match self {
-            Self::Zdr => "Your team has Zero Data Retention.",
-            Self::TeamManaged => "Managed by your team admin.",
+            Self::Zdr => xai_grok_i18n::t_or(
+                "settings.coding_data_sharing.lock_reason_zdr",
+                "Your team has Zero Data Retention.",
+            ),
+            Self::TeamManaged => xai_grok_i18n::t_or(
+                "settings.coding_data_sharing.lock_reason_team_managed",
+                "Managed by your team admin.",
+            ),
         }
     }
 }
@@ -490,6 +532,10 @@ fn assert_unique_keys(entries: &[SettingMeta]) {
 
 fn build_search_haystack(m: &SettingMeta) -> String {
     let mut s = String::new();
+    s.push_str(&m.label_t().to_lowercase());
+    s.push(' ');
+    s.push_str(&m.description_t().to_lowercase());
+    s.push(' ');
     s.push_str(&m.label.to_lowercase());
     s.push(' ');
     s.push_str(&m.description.to_lowercase());
@@ -522,9 +568,7 @@ pub fn current_value_for(
         "show_session_usage_bar" => Some(SettingValue::Bool(
             ui.show_session_usage_bar.unwrap_or(false),
         )),
-        "show_request_metrics" => Some(SettingValue::Bool(
-            ui.show_request_metrics_enabled(),
-        )),
+        "show_request_metrics" => Some(SettingValue::Bool(ui.show_request_metrics_enabled())),
         // The cache is the send-path source of truth (same pattern as group_tool_verbs)
         "page_flip_on_send" => Some(SettingValue::Bool(
             crate::appearance::cache::load_page_flip_on_send(),

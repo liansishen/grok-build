@@ -377,6 +377,10 @@ mod tests {
     fn catalog_values_are_not_empty() {
         for (locale, catalog) in [("en", &*EN), ("zh-CN", &*ZH_CN)] {
             for (key, value) in catalog {
+                // Optional lifecycle suffixes use an empty translation when no target qualifier is needed.
+                if *key == "tool.description.lifecycle.target_suffix.none" {
+                    continue;
+                }
                 assert!(
                     !value.trim().is_empty(),
                     "{locale} catalog has an empty value for `{key}`"
@@ -391,6 +395,9 @@ mod tests {
             "welcome.quit",
             "settings.category.appearance",
             "settings.language.label",
+            "settings.theme.choice_terminal",
+            "settings.modal.overflow_more",
+            "settings.modal.footer.step_generic",
             "toast.language_set",
         ] {
             assert!(EN.contains_key(key), "en missing {key}");
