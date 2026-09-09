@@ -164,7 +164,8 @@ impl SessionEvent {
             SessionEvent::TurnCompleted {
                 elapsed: Some(elapsed),
             } => {
-                format!("Worked for {}", format_duration(*elapsed))
+                let duration = format_duration(*elapsed);
+                xai_grok_i18n::t_fmt("session.worked_for", &[("duration", &duration)])
             }
             SessionEvent::TurnCompleted { elapsed: None } => "Turn completed.".to_string(),
             SessionEvent::TurnCancelled { elapsed } => {

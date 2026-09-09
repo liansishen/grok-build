@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use xai_chat_state::UsageLedger;
+use xai_chat_state::{UsageLedger, UsageTotals};
 use xai_grok_sampling_types::reported_cost_ticks;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -73,6 +73,35 @@ impl UsageSummary {
         summary.primary_model_id = primary_model(&model_usage);
         summary.model_usage = model_usage;
         summary
+    }
+
+    /// Restore the persisted session snapshot as a live ledger for a resumed process.
+    pub fn to_ledger(&self) -> UsageLedger {
+        let by_model = self
+            .model_usage
+            .iter()
+            .map(|(model, summary)| (model.clone(), summary.to_totals()))
+            .collect();
+        UsageLedger {
+            totals: self.to_totals(),
+            by_model,
+            main_loop_model_calls: self.turn_count,
+            incomplete: self.usage_is_incomplete,
+        }
+    }
+
+    fn to_totals(&self) -> UsageTotals {
+        UsageTotals {
+            input_tokens: self.input_tokens,
+            output_tokens: self.output_tokens,
+            cached_read_tokens: self.cached_read_tokens,
+            cache_creation_tokens: self.cache_creation_tokens,
+            reasoning_tokens: self.reasoning_tokens,
+            model_calls: self.model_calls,
+            api_duration_ms: 0,
+            cost_usd_ticks: self.cost_usd_ticks,
+            cost_missing_calls: u64::from(self.cost_is_partial && self.cost_usd_ticks.is_some()),
+        }
     }
 
     fn from_totals(totals: &xai_chat_state::UsageTotals, incomplete: bool) -> Self {

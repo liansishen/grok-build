@@ -838,6 +838,14 @@ pub fn prompt_focus_hint() -> HintItem {
         pinned: false,
     }
 }
+
+fn fold_hint_label(label: &'static str) -> &'static str {
+    match label {
+        "expand" => xai_grok_i18n::t("hint.expand"),
+        "collapse" => xai_grok_i18n::t("hint.collapse"),
+        _ => label,
+    }
+}
 /// A pinned one leads the bar and is offered once; an unpinned one is offered only in the selection
 /// states where moving on is the useful next step.
 #[allow(clippy::too_many_arguments)]
@@ -884,14 +892,19 @@ pub fn build_hints(
             let mut hints = vec![HintItem::paired(
                 crate::key!('j'),
                 crate::key!('k'),
-                "navigate",
+                xai_grok_i18n::t("hint.navigate"),
             )];
             hints.push(HintItem::new(
                 crate::key!(Enter),
-                group_header_label.unwrap_or("open"),
+                group_header_label
+                    .map(fold_hint_label)
+                    .unwrap_or_else(|| xai_grok_i18n::t("hint.open")),
             ));
             if group_header_label.is_none() {
-                hints.push(HintItem::new(crate::key!('x'), "kill"));
+                hints.push(HintItem::new(
+                    crate::key!('x'),
+                    xai_grok_i18n::t("hint.kill"),
+                ));
             }
             hints.push(HintItem::new(crate::key!(Tab), tab_label));
             hints
@@ -1122,7 +1135,7 @@ pub fn build_hints(
                 selected_is_user_prompt && fold_label == Some("expand");
             if let Some(label) = group_header_label {
                 if let Some(key) = registry.key_for(ActionId::OpenBlockViewer) {
-                    hints.push(HintItem::new(key, label));
+                    hints.push(HintItem::new(key, fold_hint_label(label)));
                 }
             } else if !user_collapsed_already_pushed && let Some(label) = fold_label {
                 let directional = if label == "expand" {
@@ -1134,7 +1147,7 @@ pub fn build_hints(
                     .key_for_mode(ActionId::ToggleFold, vim_mode)
                     .or_else(|| registry.key_for_mode(directional, vim_mode));
                 if let Some(key) = key {
-                    hints.push(HintItem::new(key, label));
+                    hints.push(HintItem::new(key, fold_hint_label(label)));
                 }
             }
             if group_header_label.is_none()
@@ -1170,7 +1183,7 @@ pub fn build_hints(
                     registry.key_for(ActionId::GotoBottom),
                 )
             {
-                hints.push(HintItem::paired(g, bg, "top/btm"));
+                hints.push(HintItem::paired(g, bg, xai_grok_i18n::t("hint.top_bottom")));
             }
             if vim_mode
                 && !selected_is_agent_message
@@ -1192,7 +1205,11 @@ pub fn build_hints(
                 ));
             }
             if is_subagent_view {
-                hints.push(HintItem::paired(crate::key!('q'), crate::key!(Esc), "back"));
+                hints.push(HintItem::paired(
+                    crate::key!('q'),
+                    crate::key!(Esc),
+                    xai_grok_i18n::t("hint.back"),
+                ));
             }
             hints
         }

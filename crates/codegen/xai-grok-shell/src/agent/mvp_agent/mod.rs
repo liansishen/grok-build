@@ -1662,15 +1662,21 @@ impl MvpAgent {
         result
     }
 
-    /// Extract the persisted session usage ledger from the tail of the
-    /// updates file (`_meta.sessionUsage`), mirroring
-    /// [`Self::extract_initial_tokens_from_updates`]. `None` on fresh
-    /// sessions or any read/parse failure (restore is best-effort).
+    /// Extract the persisted session usage ledger from `usage.json`, falling back
+    /// to the tail of the updates file (`_meta.sessionUsage`) for older sessions.
+    /// `None` means this is a fresh session or restore data could not be read.
     pub(super) fn extract_initial_session_usage_from_updates(
         updates_file_path: &Option<PathBuf>,
     ) -> Option<xai_chat_state::UsageLedger> {
         use std::io::{Read, Seek, SeekFrom};
         let updates_path = updates_file_path.as_ref()?;
+        let usage_path = updates_path.parent()?.join("usage.json");
+        if let Ok(bytes) = std::fs::read(&usage_path)
+            && let Ok(file) = serde_json::from_slice::<crate::session::usage_file::SessionUsageFile>(&bytes)
+            && (file.session.model_calls > 0 || !file.session.model_usage.is_empty())
+        {
+            return Some(file.session.to_ledger());
+        }
         let mut file = std::fs::File::open(updates_path).ok()?;
         let file_len = file.metadata().ok()?.len();
         const TAIL_SIZE: u64 = 256 * 1024;

@@ -22,6 +22,24 @@ fn live(calls: &[(&str, u32, u32, Option<i64>)]) -> UsageSummary {
 }
 
 #[test]
+fn persisted_session_summary_restores_a_cumulative_ledger() {
+    let mut summary = live(&[
+        ("grok-4", 100, 20, Some(50)),
+        ("grok-fast", 30, 5, Some(10)),
+    ]);
+    summary.turn_count = 2;
+
+    let ledger = summary.to_ledger();
+    assert_eq!(ledger.totals.input_tokens, 130);
+    assert_eq!(ledger.totals.output_tokens, 25);
+    assert_eq!(ledger.totals.model_calls, 2);
+    assert_eq!(ledger.main_loop_model_calls, 2);
+    assert_eq!(ledger.by_model["grok-4"].input_tokens, 100);
+    assert_eq!(ledger.by_model["grok-fast"].output_tokens, 5);
+    assert_eq!(ledger.totals.cost_usd_ticks, Some(60));
+}
+
+#[test]
 fn first_turn_writes_session_and_one_turn() {
     let mut file = SessionUsageFile::new("sess-1");
     let first = live(&[("grok-4", 100, 20, Some(50))]);

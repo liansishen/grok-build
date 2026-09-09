@@ -623,9 +623,9 @@ impl ScrollbackState {
                 && entry.display_mode == DisplayMode::Collapsed
         });
         if any_collapsed {
-            "expand thinking"
+            xai_grok_i18n::t("hint.expand_thinking")
         } else {
-            "collapse thinking"
+            xai_grok_i18n::t("hint.collapse_thinking")
         }
     }
 

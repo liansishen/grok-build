@@ -8,6 +8,7 @@
 //! They stay that way because renaming one silently breaks every script that reads it.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// This number names the payload's shape, which a script branches on instead of the release in `version`.
 /// Adding a field never bumps it; removing or retyping one does.
@@ -31,6 +32,8 @@ pub struct StatusLineContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<String>,
     pub model: StatusLineModel,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_usage: Option<BTreeMap<String, StatusLineModelUsage>>,
     pub workspace: StatusLineWorkspace,
     pub version: String,
     pub cost: StatusLineCost,
@@ -63,6 +66,7 @@ impl Default for StatusLineContext {
             prompt_id: None,
             transcript_path: None,
             model: StatusLineModel::default(),
+            model_usage: None,
             workspace: StatusLineWorkspace::default(),
             version: String::new(),
             cost: StatusLineCost::default(),
@@ -101,6 +105,26 @@ pub struct StatusLineModel {
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StatusLineModelUsage {
+    /// Uncached prompt tokens. Add both cache buckets for the full prompt.
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub reasoning_tokens: u64,
+    pub total_tokens: u64,
+    pub cache_creation_input_tokens: u64,
+    pub cache_read_input_tokens: u64,
+    pub model_calls: u64,
+    pub api_duration_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_usd: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_usd_ticks: Option<i64>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub cost_is_partial: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

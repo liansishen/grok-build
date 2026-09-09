@@ -1,7 +1,8 @@
 use super::{
-    build_context_window, emit_loop, live_turn, split_normalized_remote, strip_trailing_separator,
+    build_context_window, build_model_usage, emit_loop, live_turn, split_normalized_remote,
+    strip_trailing_separator,
 };
-use crate::extensions::notification::PromptUsageModel;
+use crate::extensions::notification::{PromptUsage, PromptUsageModel};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -32,6 +33,37 @@ fn session_usage_splits_fresh_input_from_the_cache_buckets() {
     assert_eq!(usage.cache_read_input_tokens, 8_000);
     // The billed total keeps the cache buckets the fresh count sheds.
     assert_eq!(window.session_input_tokens, Some(30_000));
+}
+
+#[test]
+fn model_usage_exposes_disjoint_tokens_and_exact_cost() {
+    let mut usage = PromptUsage::default();
+    usage.model_usage.insert(
+        "grok-4.5".into(),
+        PromptUsageModel {
+            input_tokens: 30_000,
+            output_tokens: 900,
+            reasoning_tokens: 100,
+            total_tokens: 30_900,
+            cached_read_tokens: 8_000,
+            cache_creation_tokens: 5_000,
+            model_calls: 1,
+            api_duration_ms: 2_300,
+            cost_usd_ticks: Some(5_000_000_000),
+            ..Default::default()
+        },
+    );
+
+    let rows = build_model_usage(Some(&usage)).unwrap();
+    let row = &rows["grok-4.5"];
+    assert_eq!(row.input_tokens, 17_000);
+    assert_eq!(row.cache_read_input_tokens, 8_000);
+    assert_eq!(row.cache_creation_input_tokens, 5_000);
+    assert_eq!(row.total_tokens, 30_900);
+    assert_eq!(row.reasoning_tokens, 100);
+    assert_eq!(row.api_duration_ms, 2_300);
+    assert_eq!(row.cost_usd, Some(0.5));
+    assert_eq!(row.cost_usd_ticks, Some(5_000_000_000));
 }
 
 #[test]

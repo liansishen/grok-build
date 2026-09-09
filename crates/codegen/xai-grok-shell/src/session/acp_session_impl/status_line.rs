@@ -1,5 +1,6 @@
 //! Building the status-line payload and pushing it to clients.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 
@@ -8,8 +9,8 @@ use super::*;
 use crate::extensions::notification::{PromptUsage, PromptUsageModel, ticks_to_usd};
 use xai_grok_status_line::{
     STATUS_LINE_SCHEMA_VERSION, StatusLineContext, StatusLineContextWindow, StatusLineCost,
-    StatusLineEffort, StatusLineModel, StatusLineRepo, StatusLineSessionUsage, StatusLineTurn,
-    StatusLineWorkspace, StatusLineWorktree,
+    StatusLineEffort, StatusLineModel, StatusLineModelUsage, StatusLineRepo,
+    StatusLineSessionUsage, StatusLineTurn, StatusLineWorkspace, StatusLineWorktree,
 };
 use xai_grok_workspace::session::git::normalize_repo_url;
 
@@ -104,6 +105,44 @@ fn build_context_window(
     }
 }
 
+fn build_model_usage(
+    usage: Option<&PromptUsage>,
+) -> Option<BTreeMap<String, StatusLineModelUsage>> {
+    let usage = usage?;
+    if usage.model_usage.is_empty() {
+        return None;
+    }
+
+    Some(
+        usage
+            .model_usage
+            .iter()
+            .map(|(model, totals)| {
+                let input_tokens = totals
+                    .input_tokens
+                    .saturating_sub(totals.cached_read_tokens)
+                    .saturating_sub(totals.cache_creation_tokens);
+                (
+                    model.clone(),
+                    StatusLineModelUsage {
+                        input_tokens,
+                        output_tokens: totals.output_tokens,
+                        reasoning_tokens: totals.reasoning_tokens,
+                        total_tokens: totals.total_tokens,
+                        cache_creation_input_tokens: totals.cache_creation_tokens,
+                        cache_read_input_tokens: totals.cached_read_tokens,
+                        model_calls: totals.model_calls,
+                        api_duration_ms: totals.api_duration_ms,
+                        cost_usd: totals.cost_usd_ticks.map(ticks_to_usd),
+                        cost_usd_ticks: totals.cost_usd_ticks,
+                        cost_is_partial: totals.cost_is_partial,
+                    },
+                )
+            })
+            .collect(),
+    )
+}
+
 /// The turn in flight, `None` between turns.
 /// Chat state keeps the start stamp after a turn ends because the laziness classifier reads it.
 /// The prompt id is what a guard clears when the turn does.
@@ -144,6 +183,7 @@ impl SessionActor {
             .ok()
             .map(|ledger| PromptUsage::from(&ledger));
         let totals = usage.as_ref().map(|u| &u.totals);
+        let model_usage = build_model_usage(usage.as_ref());
 
         let cwd = self.tool_context.cwd.as_path().to_path_buf();
         // Both stats run on the blocking pool, off the actor's thread.
@@ -194,6 +234,7 @@ impl SessionActor {
                 id: model_id,
                 display_name,
             },
+            model_usage,
             workspace: StatusLineWorkspace {
                 current_dir: cwd,
                 repo_root,

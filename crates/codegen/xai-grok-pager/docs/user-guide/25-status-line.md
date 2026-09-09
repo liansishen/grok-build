@@ -89,6 +89,9 @@ Nothing outside the table below is sent. A ported script that reads counts of li
 | `prompt_id` | UUID of the prompt being processed. Present only during a turn |
 | `transcript_path` | Path to the session's `updates.jsonl`. The file is Grok's own update stream, so a script that parses another tool's transcript format will not read it |
 | `model.id`, `model.display_name` | Model identifier and display name. Omitted when the agent cannot read the session's model |
+| `model_usage` | A map keyed by model id. It includes every model recorded in the session, including main-agent, subagent, and side-call usage. Omitted before the first billed call or when the ledger cannot be read |
+| `model_usage.<model_id>.{input_tokens,output_tokens,reasoning_tokens,total_tokens,cache_creation_input_tokens,cache_read_input_tokens,model_calls,api_duration_ms}` | Cumulative usage and API time for that model. `input_tokens` is uncached input; `input_tokens + cache_creation_input_tokens + cache_read_input_tokens + output_tokens = total_tokens` |
+| `model_usage.<model_id>.{cost_usd,cost_usd_ticks,cost_is_partial}` | Cost for that model when known. `cost_usd_ticks` is exact at 1 USD = 10^10 ticks; cost fields can be absent when unpriced or partial, and `cost_is_partial` marks an untrustworthy partial cost |
 | `workspace.current_dir` | Current directory |
 | `workspace.repo_root` | The repository root, absent outside one. Not `project_dir`, a name used elsewhere for a launch directory |
 | `workspace.branch` | Checked-out branch, in any repo. Absent on a detached HEAD |

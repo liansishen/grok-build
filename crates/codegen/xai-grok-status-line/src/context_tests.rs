@@ -33,6 +33,22 @@ fn every_field_survives_a_round_trip_through_the_shared_fixture() {
             id: Some("grok-4.5".into()),
             display_name: Some("Grok 4.5".into()),
         },
+        model_usage: Some(std::collections::BTreeMap::from([(
+            "grok-4.5".into(),
+            StatusLineModelUsage {
+                input_tokens: 3000,
+                output_tokens: 1000,
+                reasoning_tokens: 100,
+                total_tokens: 9500,
+                cache_creation_input_tokens: 500,
+                cache_read_input_tokens: 5000,
+                model_calls: 2,
+                api_duration_ms: 2300,
+                cost_usd: Some(0.0123),
+                cost_usd_ticks: Some(123_000_000),
+                cost_is_partial: true,
+            },
+        )])),
         workspace: StatusLineWorkspace {
             current_dir: DIR.into(),
             repo_root: Some(DIR.into()),

@@ -2435,6 +2435,13 @@ impl SessionPersistence {
             .unwrap_or_else(|| {
                 crate::session::usage_file::SessionUsageFile::new(self.info.id.to_string())
             });
+        if self.last_usage_live.is_none()
+            && (file.session.model_calls > 0 || !file.session.model_usage.is_empty())
+        {
+            // The resumed live ledger already includes this persisted snapshot. Use it as the
+            // first delta baseline so the first post-resume turn is not written twice.
+            self.last_usage_live = Some(file.session.clone());
+        }
         // Fork copies parent usage.json verbatim; always restamp so the child is not attributed to the parent after new turns
         file.session_id = self.info.id.to_string();
         file.restore_apply_cursor(self.last_incoming_turn, self.last_usage_turn);

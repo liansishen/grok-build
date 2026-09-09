@@ -1,5 +1,51 @@
 # Changelog
 
+# 1.0.24-fork.4 — 2026-09-10
+
+本版为 Fork 功能与问题修复更新，产品版本仍为 **1.0.24**，不包含新的上游同步。
+
+### 问题修复
+
+- 修复状态栏按模型显示的用量在会话恢复后只反映当前进程的问题；恢复时重新装载 `usage.json` 中的累计账本，并在持久化首个恢复回合时以历史快照建立增量基线，避免历史用量被重复计入。
+- 扩展状态栏上下文的 `model_usage`，按模型提供累计输入、输出、推理、缓存、调用次数、API 时间和费用字段，使脚本能够分别显示主模型、子代理模型和辅助调用的用量。
+- 修复回合结束标记 `Worked for {duration}` 未经过国际化的问题；简体中文现在显示为“工作了 {duration}”。
+- 修复快捷键栏中的 `expand/collapse thinking`、`expand`、`collapse`、`navigate`、`top/btm`、`open`、`kill` 和 `back` 等硬编码英文提示未翻译的问题。
+
+### 本 Fork
+
+- `model_usage` 是状态栏协议的新增可选字段，保持现有协议版本和旧脚本兼容；缺少该字段时脚本可继续使用原有总用量字段。
+- 恢复后的会话继续使用历史按模型用量和费用作为累计基础；新回合只写入相对于历史快照的增量，避免恢复后重复计费或重复显示。
+- 状态栏协议文档同步更新英文和简体中文说明，明确缓存输入、总词元、费用 ticks 和不完整费用的含义。
+
+### 兼容性
+
+- 不改变现有配置段、配置键、模型 ID、会话落盘文件格式的已有字段或命令行用法；`model_usage` 为向后兼容的新增状态栏字段。
+- 旧版本状态栏脚本继续读取已有字段；支持新字段的脚本可以按模型分别显示累计用量和费用。
+- 不新增外部服务、鉴权流程或运行时依赖；发布仍使用现有 Linux/Windows x86_64 构建流程。
+
+### 国际化
+
+- 英文与简体中文目录新增并接入思考块及快捷键提示翻译。
+- `session.worked_for` 已接入回合结束标记渲染，简体中文文案为“工作了 {duration}”；未选择简体中文时继续使用英文目录和英文回退。
+- 本版未扩展其它语种翻译。
+
+### 验证
+
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：9 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`：9 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib scrollback::blocks::session_event`：41 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：256 项通过。
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`、release 构建和版本输出检查通过；Protoc 29.3、`GROK_VERSION=1.0.24-fork.4` 环境下验证完成。
+- 状态栏脚本 Python 语法检查、子会话 `updates.jsonl` 实时用量解析夹具和差异空白检查通过。
+
+### 产物
+
+- `grok-1.0.24-fork.4-linux-x86_64`
+- `grok-1.0.24-fork.4-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.24-fork.3...v1.0.24-fork.4
+
 # 1.0.24-fork.3 — 2026-09-09
 
 本版为 Fork 功能与问题修复更新，产品版本仍为 **1.0.24**，不包含新的上游同步。
