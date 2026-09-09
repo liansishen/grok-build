@@ -7439,7 +7439,7 @@ fn locked_coding_data_sharing_expanded_description_replaces_with_reason() {
 /// Pseudo-locale markers prove that settings chrome reaches the catalog in each core sub-pane.
 #[test]
 fn settings_render_uses_pseudo_locale_for_core_modes() {
-    let snapshots = xai_grok_i18n_test::with_pseudo_locale(|| {
+    let snapshots = xai_grok_i18n::with_pseudo_locale(|| {
         let area = Rect {
             x: 0,
             y: 0,

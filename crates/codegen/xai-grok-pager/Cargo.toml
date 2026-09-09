@@ -184,7 +184,6 @@ core-foundation = { workspace = true }
 windows-sys = { version = "0.59", features = ["Win32_System_Console"] }
 
 [dev-dependencies]
-xai-grok-i18n-test = { package = "xai-grok-i18n", path = "../xai-grok-i18n", features = ["test-support"] }
 # The fixture that builds a `[ui.status_line]` section field by field.
 xai-grok-status-line = { workspace = true, features = ["test-support"] }
 xai-grok-pager-render = { path = "../xai-grok-pager-render", features = ["test-support"] }

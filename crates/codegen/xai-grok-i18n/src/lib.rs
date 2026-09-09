@@ -50,17 +50,14 @@ impl Locale {
 
 static CURRENT: AtomicU8 = AtomicU8::new(Locale::En as u8);
 
-#[cfg(feature = "test-support")]
 thread_local! {
     static PSEUDO_LOCALE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-#[cfg(feature = "test-support")]
 struct PseudoLocaleGuard {
     previous: bool,
 }
 
-#[cfg(feature = "test-support")]
 impl Drop for PseudoLocaleGuard {
     fn drop(&mut self) {
         PSEUDO_LOCALE.with(|enabled| enabled.set(self.previous));
@@ -68,7 +65,6 @@ impl Drop for PseudoLocaleGuard {
 }
 
 /// Render catalog lookups as unique keys while testing a consumer's UI path.
-#[cfg(feature = "test-support")]
 #[doc(hidden)]
 pub fn with_pseudo_locale<R>(f: impl FnOnce() -> R) -> R {
     let previous = PSEUDO_LOCALE.with(|enabled| enabled.replace(true));
@@ -78,7 +74,6 @@ pub fn with_pseudo_locale<R>(f: impl FnOnce() -> R) -> R {
     result
 }
 
-#[cfg(feature = "test-support")]
 fn pseudo_locale_enabled() -> bool {
     PSEUDO_LOCALE.with(std::cell::Cell::get)
 }
@@ -263,7 +258,6 @@ pub fn has_en(key: &str) -> bool {
 }
 
 fn lookup_optional(locale: Locale, key: &str) -> Option<&'static str> {
-    #[cfg(feature = "test-support")]
     if pseudo_locale_enabled() {
         return Some(leak_fallback(&format!("⟦{key}⟧")));
     }
