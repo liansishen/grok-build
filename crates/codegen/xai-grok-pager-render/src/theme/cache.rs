@@ -6,12 +6,13 @@
 //!
 //! Disk writes live in `xai_grok_shell::util::config::set_theme()` (and friends), invoked via `Effect::PersistSetting` from the dispatcher.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
-use super::ThemeKind;
+use super::custom::{self, LoadedTheme, ThemeAppearance};
 use super::system_appearance;
+use super::ThemeKind;
 
 /// In-memory theme kind, encoded as a `u8` matching the `ThemeKind` discriminants.
 /// Loaded from disk once at startup via `load_from_disk()`, then kept in sync by `set()`.
@@ -19,6 +20,11 @@ static CURRENT: AtomicU8 = AtomicU8::new(ThemeKind::GrokNight as u8);
 static LOADED: AtomicBool = AtomicBool::new(false);
 static TRANSPARENT_BG: AtomicBool = AtomicBool::new(false);
 static TRANSPARENT_BG_LOADED: AtomicBool = AtomicBool::new(false);
+static CUSTOM_THEMES: Mutex<BTreeMap<String, LoadedTheme>> = Mutex::new(BTreeMap::new());
+static CURRENT_CUSTOM_NAME: Mutex<Option<String>> = Mutex::new(None);
+static CUSTOM_THEMES_LOADED: AtomicBool = AtomicBool::new(false);
+static AUTO_DARK_CUSTOM_NAME: Mutex<Option<String>> = Mutex::new(None);
+static AUTO_LIGHT_CUSTOM_NAME: Mutex<Option<String>> = Mutex::new(None);
 #[cfg(any(test, feature = "test-support"))]
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -44,6 +50,7 @@ fn theme_kind_from_u8(byte: u8) -> ThemeKind {
         x if x == ThemeKind::OscuraMidnight as u8 => ThemeKind::OscuraMidnight,
         x if x == ThemeKind::Terminal as u8 => ThemeKind::Terminal,
         x if x == ThemeKind::Auto as u8 => ThemeKind::Auto,
+        x if x == ThemeKind::Custom as u8 => ThemeKind::Custom,
         _ => ThemeKind::GrokNight,
     }
 }
@@ -61,6 +68,38 @@ pub struct AutoThemeConfig {
     pub light_theme: Option<ThemeKind>,
 }
 
+fn set_auto_custom_name(dark: bool, name: Option<String>) {
+    let slot = if dark {
+        &AUTO_DARK_CUSTOM_NAME
+    } else {
+        &AUTO_LIGHT_CUSTOM_NAME
+    };
+    *slot.lock().unwrap_or_else(|e| e.into_inner()) = name;
+}
+
+fn auto_custom_name(dark: bool) -> Option<String> {
+    let slot = if dark {
+        &AUTO_DARK_CUSTOM_NAME
+    } else {
+        &AUTO_LIGHT_CUSTOM_NAME
+    };
+    slot.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+fn parse_configured_theme(value: Option<&str>, dark: bool) -> Option<ThemeKind> {
+    set_auto_custom_name(dark, None);
+    let value = value?.trim();
+    if let Some(kind) = ThemeKind::from_name(value) {
+        return (!kind.is_auto()).then_some(kind);
+    }
+    let canonical = custom::canonicalize_name(value)?;
+    if !is_custom_theme(&canonical) {
+        return None;
+    }
+    set_auto_custom_name(dark, Some(canonical));
+    Some(ThemeKind::Custom)
+}
+
 /// On the first call, reads from `~/.grok/config.toml` (via the shell's
 /// `load_effective_config`).
 /// After that, returns the in-memory value (updated by [`set`]).
@@ -76,6 +115,7 @@ pub fn current_kind() -> ThemeKind {
 /// The rollout kill switch checks the real selection: under the lock `current_kind()` reports a nominal GrokNight even when the stored kind is `Terminal`, which would let a gated-off theme resurface when the lock lifts.
 #[must_use]
 pub fn selected_kind() -> ThemeKind {
+    ensure_custom_themes_loaded();
     if !LOADED.load(Ordering::Acquire) {
         // Two threads racing into the seed path is harmless: the disk read is idempotent and `store` is atomic
         // Worst case both threads call `load_from_disk` once
@@ -89,6 +129,9 @@ pub fn selected_kind() -> ThemeKind {
 
 /// In-memory only. Disk write is `Effect::PersistSetting`, not here — picker preview must not persist.
 pub fn set(kind: ThemeKind) {
+    if kind != ThemeKind::Custom {
+        clear_custom_name();
+    }
     store_kind(kind);
     LOADED.store(true, Ordering::Release);
 }
@@ -99,6 +142,227 @@ pub fn set(kind: ThemeKind) {
 fn store_kind(kind: ThemeKind) {
     CURRENT.store(kind as u8, Ordering::Relaxed);
     sync_markdown_polarity();
+}
+
+/// Reload bundled and user-supplied theme files.
+///
+/// User files win over bundled files with the same canonical name. The map is
+/// intentionally replaced as one unit so a picker never observes a half-loaded catalog.
+pub fn reload_custom_themes() {
+    let mut themes = BTreeMap::new();
+    for theme in custom::bundled() {
+        themes.insert(theme.canonical.clone(), theme);
+    }
+    if let Some(home) = xai_grok_config::user_grok_home() {
+        for theme in custom::load_directory(&home.join("theme")) {
+            themes.insert(theme.canonical.clone(), theme);
+        }
+    }
+    let current = CURRENT_CUSTOM_NAME
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let current_missing = current
+        .as_deref()
+        .is_some_and(|name| !themes.contains_key(name));
+    *CUSTOM_THEMES.lock().unwrap_or_else(|e| e.into_inner()) = themes;
+    CUSTOM_THEMES_LOADED.store(true, Ordering::Release);
+    if current_missing {
+        clear_custom_name();
+        store_kind(ThemeKind::GrokNight);
+    }
+    invalidate_auto_theme_config();
+}
+
+fn ensure_custom_themes_loaded() {
+    if !CUSTOM_THEMES_LOADED.load(Ordering::Acquire) {
+        reload_custom_themes();
+    }
+}
+
+fn clear_custom_name() {
+    *CURRENT_CUSTOM_NAME
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = None;
+}
+
+pub fn set_custom_name(name: &str) -> bool {
+    ensure_custom_themes_loaded();
+    let Some(canonical) = custom::canonicalize_name(name) else {
+        return false;
+    };
+    if !CUSTOM_THEMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .contains_key(&canonical)
+    {
+        return false;
+    }
+    *CURRENT_CUSTOM_NAME
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some(canonical);
+    true
+}
+
+pub fn custom_theme(name: &str) -> Option<super::Theme> {
+    ensure_custom_themes_loaded();
+    let canonical = custom::canonicalize_name(name)?;
+    CUSTOM_THEMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&canonical)
+        .map(|theme| theme.theme)
+}
+
+pub fn current_custom_theme() -> Option<super::Theme> {
+    let name = CURRENT_CUSTOM_NAME
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()?;
+    custom_theme(&name)
+}
+
+/// Appearance metadata for the active custom theme.
+#[must_use]
+pub fn current_custom_appearance() -> Option<ThemeAppearance> {
+    let name = CURRENT_CUSTOM_NAME
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()?;
+    ensure_custom_themes_loaded();
+    CUSTOM_THEMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&name)
+        .map(|theme| theme.appearance)
+}
+
+/// Appearance metadata for a loaded custom theme name.
+#[must_use]
+pub fn custom_appearance(name: &str) -> Option<ThemeAppearance> {
+    ensure_custom_themes_loaded();
+    let canonical = custom::canonicalize_name(name)?;
+    CUSTOM_THEMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&canonical)
+        .map(|theme| theme.appearance)
+}
+
+pub fn is_custom_theme(name: &str) -> bool {
+    ensure_custom_themes_loaded();
+    custom::canonicalize_name(name).is_some_and(|canonical| {
+        CUSTOM_THEMES
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains_key(&canonical)
+    })
+}
+
+pub fn canonical_name(name: &str) -> Option<String> {
+    if let Some(kind) = ThemeKind::from_name(name) {
+        return Some(kind.display_name().to_string());
+    }
+    let canonical = custom::canonicalize_name(name)?;
+    is_custom_theme(&canonical).then_some(canonical)
+}
+
+pub fn display_name_for_name(name: &str) -> String {
+    if let Some(kind) = ThemeKind::from_name(name) {
+        return super::display_name_for_canonical(kind.display_name()).to_string();
+    }
+    let Some(canonical) = custom::canonicalize_name(name) else {
+        return name.to_string();
+    };
+    ensure_custom_themes_loaded();
+    CUSTOM_THEMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&canonical)
+        .map(|theme| theme.display_name.clone())
+        .unwrap_or(canonical)
+}
+
+pub fn current_name() -> String {
+    if current_kind() == ThemeKind::Custom {
+        return CURRENT_CUSTOM_NAME
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+            .unwrap_or_else(|| "custom".to_string());
+    }
+    current_kind().display_name().to_string()
+}
+
+fn builtin_theme(kind: ThemeKind) -> Option<LoadedTheme> {
+    let (display_name, description, appearance, theme) = match kind {
+        ThemeKind::GrokNight => (
+            "Grok Night",
+            "Neutral dark with magenta accent.",
+            ThemeAppearance::Dark,
+            super::Theme::groknight(),
+        ),
+        ThemeKind::GrokDay => (
+            "Grok Day",
+            "Light theme for bright environments.",
+            ThemeAppearance::Light,
+            super::Theme::grokday(),
+        ),
+        ThemeKind::TokyoNight => (
+            "Tokyo Night",
+            "Dark + blue-tinted; needs truecolor.",
+            ThemeAppearance::Dark,
+            super::Theme::tokyonight(),
+        ),
+        ThemeKind::RosePineMoon => (
+            "Rose Pine Moon",
+            "Muted dark with mauve accents; needs truecolor.",
+            ThemeAppearance::Dark,
+            super::Theme::rosepine_moon(),
+        ),
+        ThemeKind::OscuraMidnight => (
+            "Oscura Midnight",
+            "Deep dark with warm accents; needs truecolor.",
+            ThemeAppearance::Dark,
+            super::Theme::oscura_midnight(),
+        ),
+        ThemeKind::Terminal => (
+            "Terminal",
+            "Use the terminal's own background and text colors.",
+            ThemeAppearance::Dark,
+            super::Theme::terminal(),
+        ),
+        ThemeKind::Auto | ThemeKind::Custom => return None,
+    };
+    Some(LoadedTheme {
+        canonical: kind.display_name().to_string(),
+        display_name: display_name.to_string(),
+        description: description.to_string(),
+        appearance,
+        theme,
+    })
+}
+
+pub fn theme_choices(filter: Option<ThemeAppearance>) -> Vec<LoadedTheme> {
+    ensure_custom_themes_loaded();
+    let mut choices = BTreeMap::new();
+    for kind in ThemeKind::available() {
+        if let Some(theme) = builtin_theme(*kind) {
+            choices.insert(theme.canonical.clone(), theme);
+        }
+    }
+    for theme in CUSTOM_THEMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .values()
+        .cloned()
+    {
+        choices.insert(theme.canonical.clone(), theme);
+    }
+    choices
+        .into_values()
+        .filter(|theme| filter.is_none_or(|expected| theme.appearance == expected))
+        .collect()
 }
 
 // -- Terminal-native palette (minimal-mode lock + `terminal` theme) ----------
@@ -217,12 +481,14 @@ pub fn invalidate_auto_theme_config() {
 /// Concrete kind, never `Auto`. Env (`GROK_THEME` / `LC_GROK_THEME`), then `[ui].theme`, then `GrokNight`.
 #[must_use]
 pub fn resolve_initial_theme() -> ThemeKind {
+    reload_custom_themes();
     resolve_initial_theme_from(env_theme_name().as_deref(), load_from_disk(), true)
 }
 
 /// Variant of [`resolve_initial_theme`] without the OSC 11 startup fallback, for resolution after the terminal is initialized.
 #[must_use]
 pub fn resolve_initial_theme_no_osc11() -> ThemeKind {
+    reload_custom_themes();
     resolve_initial_theme_from(env_theme_name().as_deref(), load_from_disk(), false)
 }
 
@@ -239,7 +505,7 @@ fn env_theme_name_from(env: &HashMap<String, String>) -> Option<&str> {
         else {
             continue;
         };
-        if ThemeKind::from_name(raw).is_some() {
+        if ThemeKind::from_name(raw).is_some() || is_custom_theme(raw) {
             return Some(raw);
         }
     }
@@ -253,6 +519,11 @@ fn resolve_initial_theme_from(
 ) -> ThemeKind {
     if let Some(kind) = env_theme.and_then(ThemeKind::from_name) {
         return resolve_from_config(Some(kind), osc11_fallback);
+    }
+    if let Some(name) = env_theme.filter(|name| is_custom_theme(name)) {
+        let _ = set_custom_name(name);
+        set_auto_mode(false);
+        return ThemeKind::Custom;
     }
     resolve_from_config(config_theme, osc11_fallback)
 }
@@ -277,9 +548,28 @@ fn resolve_from_config(config_theme: Option<ThemeKind>, osc11_fallback: bool) ->
 
 fn resolve_from_appearance(appearance: Option<system_appearance::SystemAppearance>) -> ThemeKind {
     let config = auto_theme_config();
-    appearance
-        .map(|a| system_appearance::to_theme_kind(a, config.dark_theme, config.light_theme))
-        .unwrap_or(ThemeKind::GrokNight)
+    let Some(appearance) = appearance else {
+        return ThemeKind::GrokNight;
+    };
+    let kind = system_appearance::to_theme_kind(appearance, config.dark_theme, config.light_theme);
+    if kind == ThemeKind::Custom {
+        let dark = matches!(appearance, system_appearance::SystemAppearance::Dark);
+        if let Some(name) = auto_custom_name(dark) {
+            if set_custom_name(&name) {
+                return kind;
+            }
+        }
+        return if dark { ThemeKind::GrokNight } else { ThemeKind::GrokDay };
+    }
+    kind
+}
+/// Resolve an already-detected system appearance and select its configured theme.
+///
+/// This also updates the active custom-theme name before rendering. The event loop uses this
+/// instead of calling `to_theme_kind` directly so dark/light custom themes switch correctly.
+#[must_use]
+pub fn resolve_for_appearance(appearance: system_appearance::SystemAppearance) -> ThemeKind {
+    resolve_from_appearance(Some(appearance))
 }
 
 /// Desktop APIs and env hints only (no OSC 11), so it is safe while `EventStream` is active. Detection failure is `GrokNight`.
@@ -302,7 +592,14 @@ fn load_from_disk() -> Option<ThemeKind> {
         .and_then(|v| v.as_str())
         // Fallback: top-level `theme` key (legacy)
         .or_else(|| table.get("theme").and_then(|v| v.as_str()));
-    value.and_then(ThemeKind::from_name)
+    value.and_then(|value| {
+        ThemeKind::from_name(value).or_else(|| {
+            is_custom_theme(value).then(|| {
+                let _ = set_custom_name(value);
+                ThemeKind::Custom
+            })
+        })
+    })
 }
 
 /// Reads `[ui].auto_dark_theme` and `[ui].auto_light_theme` from the effective config, parsing them as theme names.
@@ -315,17 +612,15 @@ fn load_auto_theme_config() -> AutoThemeConfig {
         return AutoThemeConfig::default();
     };
     let ui = table.get("ui");
+    let dark_value = ui
+        .and_then(|u| u.get("auto_dark_theme"))
+        .and_then(|v| v.as_str());
+    let light_value = ui
+        .and_then(|u| u.get("auto_light_theme"))
+        .and_then(|v| v.as_str());
     AutoThemeConfig {
-        dark_theme: ui
-            .and_then(|u| u.get("auto_dark_theme"))
-            .and_then(|v| v.as_str())
-            .and_then(ThemeKind::from_name)
-            .filter(|k| !k.is_auto()),
-        light_theme: ui
-            .and_then(|u| u.get("auto_light_theme"))
-            .and_then(|v| v.as_str())
-            .and_then(ThemeKind::from_name)
-            .filter(|k| !k.is_auto()),
+        dark_theme: parse_configured_theme(dark_value, true),
+        light_theme: parse_configured_theme(light_value, false),
     }
 }
 
@@ -340,7 +635,16 @@ pub fn reset_for_test() {
     set_terminal_native_lock(false);
     TRANSPARENT_BG.store(false, Ordering::Relaxed);
     TRANSPARENT_BG_LOADED.store(false, Ordering::Release);
+    CUSTOM_THEMES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clear();
+    CUSTOM_THEMES_LOADED.store(false, Ordering::Release);
+    clear_custom_name();
+    set_auto_custom_name(true, None);
+    set_auto_custom_name(false, None);
     *AUTO_THEME_CONFIG.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    super::set_cursor_color_applied_for_test(false);
 }
 
 /// Seed `AUTO_THEME_CONFIG` with explicit defaults so `auto_theme_config()` never falls through to `load_auto_theme_config()`.
@@ -452,11 +756,11 @@ mod tests {
     #[test]
     fn terminal_gate_flip_invalidates_auto_theme_config() {
         with_test_env(|| {
+            set_terminal_theme_enabled(true);
             set_test_auto_config(AutoThemeConfig {
                 dark_theme: Some(ThemeKind::Terminal),
                 light_theme: None,
             });
-            set_terminal_theme_enabled(true);
             assert!(
                 AUTO_THEME_CONFIG.lock().unwrap().is_some(),
                 "same-value seed keeps the cache"
@@ -497,6 +801,82 @@ mod tests {
             if !matches!(solid.bg_hover, Color::Reset) {
                 assert!(!matches!(theme.bg_hover, Color::Reset));
             }
+        });
+    }
+
+    #[test]
+    fn custom_theme_catalog_filters_by_appearance() {
+        with_test_env(|| {
+            reload_custom_themes();
+            let all = theme_choices(None);
+            assert!(all.iter().any(|theme| theme.canonical == "opencode"));
+            assert!(all.iter().any(|theme| theme.canonical == "opencode-day"));
+            let dark = theme_choices(Some(ThemeAppearance::Dark));
+            let light = theme_choices(Some(ThemeAppearance::Light));
+            assert!(dark.iter().any(|theme| theme.canonical == "opencode"));
+            assert!(!dark.iter().any(|theme| theme.canonical == "opencode-day"));
+            assert!(light.iter().any(|theme| theme.canonical == "opencode-day"));
+            assert!(!light.iter().any(|theme| theme.canonical == "opencode"));
+        });
+    }
+
+    #[test]
+    fn auto_mode_resolves_custom_dark_and_light_themes() {
+        with_test_env(|| {
+            reload_custom_themes();
+            set_auto_custom_name(true, Some("opencode".to_string()));
+            set_test_auto_config(AutoThemeConfig {
+                dark_theme: Some(ThemeKind::Custom),
+                light_theme: None,
+            });
+            system_appearance::set_mock(Some(system_appearance::SystemAppearance::Dark));
+            assert_eq!(resolve_auto(), ThemeKind::Custom);
+            assert_eq!(current_custom_appearance(), Some(ThemeAppearance::Dark));
+
+            set_auto_custom_name(false, Some("opencode-day".to_string()));
+            set_test_auto_config(AutoThemeConfig {
+                dark_theme: None,
+                light_theme: Some(ThemeKind::Custom),
+            });
+            system_appearance::set_mock(Some(system_appearance::SystemAppearance::Light));
+            assert_eq!(resolve_auto(), ThemeKind::Custom);
+            assert_eq!(current_custom_appearance(), Some(ThemeAppearance::Light));
+        });
+    }
+
+    #[test]
+    fn resolving_auto_appearance_updates_the_active_custom_name() {
+        with_test_env(|| {
+            reload_custom_themes();
+            set_auto_custom_name(true, Some("opencode".to_string()));
+            set_auto_custom_name(false, Some("opencode-day".to_string()));
+            set_test_auto_config(AutoThemeConfig {
+                dark_theme: Some(ThemeKind::Custom),
+                light_theme: Some(ThemeKind::Custom),
+            });
+
+            let dark = resolve_for_appearance(system_appearance::SystemAppearance::Dark);
+            assert_eq!(dark, ThemeKind::Custom);
+            super::super::Theme::apply_kind(dark);
+            assert_eq!(current_name(), "opencode");
+
+            let light = resolve_for_appearance(system_appearance::SystemAppearance::Light);
+            assert_eq!(light, ThemeKind::Custom);
+            super::super::Theme::apply_kind(light);
+            assert_eq!(current_name(), "opencode-day");
+        });
+    }
+
+    #[test]
+    fn missing_custom_auto_theme_falls_back_to_default_polarity() {
+        with_test_env(|| {
+            set_auto_custom_name(true, Some("missing-theme".to_string()));
+            set_test_auto_config(AutoThemeConfig {
+                dark_theme: Some(ThemeKind::Custom),
+                light_theme: None,
+            });
+            system_appearance::set_mock(Some(system_appearance::SystemAppearance::Dark));
+            assert_eq!(resolve_auto(), ThemeKind::GrokNight);
         });
     }
 

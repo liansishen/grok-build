@@ -25,6 +25,28 @@
       "cost_is_partial": true
     }
   },
+  "billing": {
+    "usage_percentage": 42.5,
+    "effective_usage_percentage": 40.0,
+    "period_type": "USAGE_PERIOD_TYPE_MONTHLY",
+    "period_end": "Mar 31, 12:00",
+    "pay_as_you_go": true,
+    "on_demand_cap_cents": 500,
+    "on_demand_used_cents": 125,
+    "prepaid_balance_cents": 2500
+  },
+  "quota": {
+    "model_id": "gpt-4.5",
+    "accounts": [
+      {
+        "email": "acct@example.com",
+        "used_percentage": 24.0,
+        "remaining_percentage": 76.0,
+        "reset_at": 1785903012,
+        "plan_type": "pro"
+      }
+    ]
+  },
   "workspace": {
     "current_dir": "/home/user/project",
     "repo_root": "/home/user/project",

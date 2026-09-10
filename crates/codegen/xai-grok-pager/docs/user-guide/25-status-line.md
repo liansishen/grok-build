@@ -19,6 +19,9 @@ This renders, for example, `grok-shell-status-line │ Grok 4.5 │ 12% ctx`. It
 | `cwd` | Current directory (basename) |
 | `model` | Model display name |
 | `context` | Context-window percent, amber at the auto-compaction threshold or at 80% when the agent reports none |
+| `usage` | Cumulative session tokens, including cache creation and cache reads |
+| `billing` | Account usage percentage and billing-period metadata, when available |
+| `quota` | Remaining CPA quota percentage for the current model, when available |
 | `cost` | Session cost, hidden below $0.005 so it never shows a misleading `$0.00` |
 | `turn-timer` | Elapsed time of the running turn, from one second in |
 | `session-name` | Session name, when set |
@@ -92,6 +95,11 @@ Nothing outside the table below is sent. A ported script that reads counts of li
 | `model_usage` | A map keyed by model id. It includes every model recorded in the session, including main-agent, subagent, and side-call usage. Omitted before the first billed call or when the ledger cannot be read |
 | `model_usage.<model_id>.{input_tokens,output_tokens,reasoning_tokens,total_tokens,cache_creation_input_tokens,cache_read_input_tokens,model_calls,api_duration_ms}` | Cumulative usage and API time for that model. `input_tokens` is uncached input; `input_tokens + cache_creation_input_tokens + cache_read_input_tokens + output_tokens = total_tokens` |
 | `model_usage.<model_id>.{cost_usd,cost_usd_ticks,cost_is_partial}` | Cost for that model when known. `cost_usd_ticks` is exact at 1 USD = 10^10 ticks; cost fields can be absent when unpriced or partial, and `cost_is_partial` marks an untrustworthy partial cost |
+| `billing` | Account billing snapshot. Omitted when account billing is unavailable. |
+| `billing.{usage_percentage,effective_usage_percentage,period_type,period_end,pay_as_you_go,on_demand_cap_cents,on_demand_used_cents,prepaid_balance_cents}` | Account allowance and credit metadata. Percentages are numeric; cents are integer hundredths of a dollar; fields can be absent when the account does not provide them |
+| `quota` | CPA quota snapshot for the current model. Omitted when no management quota is available |
+| `quota.model_id` | Model id used for the quota lookup |
+| `quota.accounts[]` | Per-account quota records with `email`, `used_percentage`, `remaining_percentage`, `reset_at` (Unix seconds), and optional `plan_type` |
 | `workspace.current_dir` | Current directory |
 | `workspace.repo_root` | The repository root, absent outside one. Not `project_dir`, a name used elsewhere for a launch directory |
 | `workspace.branch` | Checked-out branch, in any repo. Absent on a detached HEAD |

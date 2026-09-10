@@ -1399,7 +1399,7 @@ fn dispatch_confirm_reset_setting_reset_dispatches_typed_setter_for_shared_enum(
         match &effects[0] {
             Effect::PersistSetting { key, value, .. } => {
                 assert_eq!(*key, "theme");
-                assert_eq!(value, &SettingValue::Enum("groknight"));
+                assert_eq!(value, &SettingValue::String("groknight".to_string()));
             }
             other => panic!("expected PersistSetting, got {other:?}"),
         }

@@ -696,6 +696,9 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 }
             }
             app.sync_billing_cache_to_agents();
+            if let Some(agent_id) = app.active_view.agent_id() {
+                app.refresh_status_line_for(agent_id);
+            }
             vec![]
         }
         TaskResult::AppBillingFetchFailed { request } => {
@@ -1755,6 +1758,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     .scrollback
                     .push_block(crate::scrollback::block::RenderBlock::system(text));
             }
+            app.refresh_status_line_for(agent_id);
             vec![]
         }
         TaskResult::SessionUsageComplete {

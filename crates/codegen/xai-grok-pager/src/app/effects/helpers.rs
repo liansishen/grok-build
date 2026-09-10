@@ -1255,26 +1255,42 @@ pub(crate) async fn persist_setting(
                 .map_err(|e| e.to_string())
         }
         "theme" => {
-            let SettingValue::Enum(s) = value else {
-                return Err(kind_mismatch("theme", "Enum", &value));
+            let SettingValue::String(s) = value else {
+                return Err(kind_mismatch("theme", "String", &value));
             };
-            xai_grok_shell::util::config::set_theme(s.to_string())
+            xai_grok_shell::util::config::set_theme(s)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "transparent_bg" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("transparent_bg", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_transparent_bg(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "show_shortcuts_bar" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("show_shortcuts_bar", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_show_shortcuts_bar(b)
                 .await
                 .map_err(|e| e.to_string())
         }
         "auto_dark_theme" => {
-            let SettingValue::Enum(s) = value else {
-                return Err(kind_mismatch("auto_dark_theme", "Enum", &value));
+            let SettingValue::String(s) = value else {
+                return Err(kind_mismatch("auto_dark_theme", "String", &value));
             };
-            xai_grok_shell::util::config::set_auto_dark_theme(s.to_string())
+            xai_grok_shell::util::config::set_auto_dark_theme(s)
                 .await
                 .map_err(|e| e.to_string())
         }
         "auto_light_theme" => {
-            let SettingValue::Enum(s) = value else {
-                return Err(kind_mismatch("auto_light_theme", "Enum", &value));
+            let SettingValue::String(s) = value else {
+                return Err(kind_mismatch("auto_light_theme", "String", &value));
             };
-            xai_grok_shell::util::config::set_auto_light_theme(s.to_string())
+            xai_grok_shell::util::config::set_auto_light_theme(s)
                 .await
                 .map_err(|e| e.to_string())
         }
@@ -1391,22 +1407,6 @@ pub(crate) async fn persist_setting(
                 return Err(kind_mismatch("show_thinking_blocks", "Bool", &value));
             };
             xai_grok_shell::util::config::set_show_thinking_blocks(b)
-                .await
-                .map_err(|e| e.to_string())
-        }
-        "show_session_usage_bar" => {
-            let SettingValue::Bool(b) = value else {
-                return Err(kind_mismatch("show_session_usage_bar", "Bool", &value));
-            };
-            xai_grok_shell::util::config::set_show_session_usage_bar(b)
-                .await
-                .map_err(|e| e.to_string())
-        }
-        "show_request_metrics" => {
-            let SettingValue::Bool(b) = value else {
-                return Err(kind_mismatch("show_request_metrics", "Bool", &value));
-            };
-            xai_grok_shell::util::config::set_show_request_metrics(b)
                 .await
                 .map_err(|e| e.to_string())
         }

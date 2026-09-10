@@ -513,10 +513,6 @@ pub enum Action {
     /// process-wide cache mirror and persists to `[ui].show_thinking_blocks`
     /// via `Effect::PersistSetting`.
     SetShowThinkingBlocks(bool),
-    /// Toggle live session token/cost label left of the model name.
-    SetShowSessionUsageBar(bool),
-    /// Toggle compact first-token / generation-rate metrics after each model response.
-    SetShowRequestMetrics(bool),
     /// Set whether runs of consecutive non-destructive tool calls and
     /// subagent rows are grouped into one row. SHELL-owned: updates the
     /// process-wide cache mirror and persists to `[ui].group_tool_verbs`
@@ -543,6 +539,10 @@ pub enum Action {
     SetHunkTrackerMode(String),
     /// Set default screen mode (`fullscreen` | `minimal`); restart-required.
     SetScreenMode(String),
+    /// Set fullscreen transparent canvas mode. Persists to `[ui].transparent_bg`.
+    SetTransparentBg(bool),
+    /// Show or hide the contextual shortcuts bar. Persists to `[ui].show_shortcuts_bar`.
+    SetShowShortcutsBar(bool),
     /// Enable/disable the Ctrl+Space / F8 voice-dictation shortcut. SHELL-owned;
     /// persisted to `[ui].voice_keybind_enabled`. Takes effect on the next
     /// keypress; `/voice` is unaffected.

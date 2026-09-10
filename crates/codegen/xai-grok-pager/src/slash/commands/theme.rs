@@ -5,7 +5,7 @@
 //! Selecting an explicit theme turns auto mode off.
 //!
 //! `run` dispatches `Action::SetTheme(<canonical>)`; the dispatcher handles the state change, persistence, and the toast.
-//! `preview_arg` and `cancel_preview` call `Theme::apply_kind` directly so a preview never persists: no toast or disk write per keystroke.
+//! `preview_arg` and `cancel_preview` use `Theme::preview_name` so previews never persist or change auto-mode configuration.
 
 use crate::app::actions::Action;
 use crate::slash::command::{
@@ -35,31 +35,22 @@ impl SlashCommand for ThemeCommand {
     }
 
     fn preview_state(&self) -> Option<String> {
-        Some(Theme::current_kind().display_name().to_string())
+        Some(theme_cache::current_name())
     }
 
     fn preview_arg(&self, arg: &str) {
-        if let Some(kind) = ThemeKind::from_name(arg) {
-            if kind.is_auto() {
-                // Preview the theme that auto mode would resolve to.
-                let resolved = theme_cache::resolve_auto();
-                Theme::apply_kind(resolved);
-            } else {
-                Theme::apply_kind(kind);
-            }
-        }
+        let _ = Theme::preview_name(arg);
     }
 
     fn cancel_preview(&self, previous: &str) {
-        if let Some(kind) = ThemeKind::from_name(previous) {
-            Theme::apply_kind(kind);
-        }
+        let _ = Theme::preview_name(previous);
     }
 
     fn suggest_args(&self, _ctx: &AppCtx, _args_query: &str) -> Option<Vec<ArgItem>> {
-        let current = Theme::current_kind();
+        theme_cache::reload_custom_themes();
+        let current = theme_cache::current_name();
         let is_auto = theme_cache::is_auto_mode();
-        let available = ThemeKind::available();
+        let choices = theme_cache::theme_choices(None);
 
         // Prepend "auto" (follow system appearance) as the first option.
         let auto_active = if is_auto { " (active)" } else { "" };
@@ -70,18 +61,18 @@ impl SlashCommand for ThemeCommand {
             description: format!("auto (follow system){auto_active}"),
         }];
 
-        // Concrete themes: only show "(active)" when not in auto mode
-        items.extend(available.iter().map(|kind| {
-            let active = if *kind == current && !is_auto {
+        // Concrete themes: only show "(active)" when not in auto mode.
+        items.extend(choices.into_iter().map(|theme| {
+            let active = if theme.canonical == current && !is_auto {
                 " (active)"
             } else {
                 ""
             };
             ArgItem {
-                display: kind.display_name().to_string(),
-                match_text: kind.display_name().to_string(),
-                insert_text: kind.display_name().to_string(),
-                description: format!("{}{active}", kind.display_name()),
+                display: theme.display_name.clone(),
+                match_text: theme.canonical.clone(),
+                insert_text: theme.canonical,
+                description: format!("{}{active}", theme.display_name),
             }
         }));
 
@@ -90,29 +81,30 @@ impl SlashCommand for ThemeCommand {
 
     fn run(&self, _ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         let trimmed = args.trim();
-        let available = ThemeKind::available();
+        theme_cache::reload_custom_themes();
+        let choices = theme_cache::theme_choices(None);
 
         // No args: toggle between available themes.
         if trimmed.is_empty() {
-            let current = Theme::current_kind();
-            let current_idx = available.iter().position(|k| *k == current).unwrap_or(0);
-            let next = available[(current_idx + 1) % available.len()];
-
-            return CommandResult::Action(Action::SetTheme(next.display_name().to_string()));
+            if choices.is_empty() {
+                return CommandResult::Error("No themes are available".to_string());
+            }
+            let current = theme_cache::current_name();
+            let current_idx = choices
+                .iter()
+                .position(|theme| theme.canonical == current)
+                .unwrap_or(0);
+            let Some(next) = choices.get((current_idx + 1) % choices.len()) else {
+                return CommandResult::Error("No themes are available".to_string());
+            };
+            return CommandResult::Action(Action::SetTheme(next.canonical.clone()));
         }
 
-        // Named theme (including "auto"): parse and dispatch.
-        // Truecolor-only themes are accepted on any terminal; `Theme::apply_kind` clamps the live colors as needed
-        match ThemeKind::from_name(trimmed) {
-            Some(kind) => {
-                // An alias normalises to the canonical `display_name`
-                CommandResult::Action(Action::SetTheme(kind.display_name().to_string()))
-            }
+        // Named theme (including "auto"): canonicalize built-in aliases and loaded custom names.
+        match crate::theme::canonical_name(trimmed) {
+            Some(canonical) => CommandResult::Action(Action::SetTheme(canonical)),
             None => {
-                let all_names: Vec<&str> = ThemeKind::selectable()
-                    .iter()
-                    .map(|k| k.display_name())
-                    .collect();
+                let all_names: Vec<&str> = choices.iter().map(|theme| theme.canonical.as_str()).collect();
                 CommandResult::Error(format!(
                     "Unknown theme: {}. Available: auto, {}",
                     trimmed,
@@ -167,7 +159,7 @@ mod tests {
             assert_eq!(items[0].insert_text, "auto");
             assert!(items[0].description.contains("follow system"));
             // The "auto" entry plus every available concrete theme
-            assert_eq!(items.len(), ThemeKind::available().len() + 1);
+            assert_eq!(items.len(), theme_cache::theme_choices(None).len() + 1);
         });
     }
 
@@ -317,6 +309,10 @@ mod tests {
                 }
                 other => panic!("expected Action::SetTheme(\"groknight\"), got {other:?}"),
             }
+            match cmd.run(&mut ctx, "opencode") {
+                CommandResult::Action(Action::SetTheme(name)) => assert_eq!(name, "opencode"),
+                other => panic!("expected custom theme action, got {other:?}"),
+            }
         });
     }
 
@@ -378,17 +374,15 @@ mod tests {
     }
 
     /// `/theme` (no args) toggles by dispatching `Action::SetTheme(<next>)`.
-    /// Asserts first that `ThemeKind::available()` has at least 2 entries so a broken invariant fails loudly instead of being masked.
+    /// The next theme is selected from the loaded concrete theme catalog.
     #[test]
     fn run_toggle_dispatches_set_theme_action() {
         with_test_env(|| {
             theme_cache::set(ThemeKind::GrokNight);
-            // Hard-fail with a clear message if the precondition breaks
-            // `(0 + 1) % 0` in `run` would otherwise panic with `attempt to calculate the remainder with a divisor of zero`, a worse message
+            // The command must not panic even when the catalog is runtime-loaded.
             assert!(
-                ThemeKind::available().len() >= 2,
-                "toggle test requires ≥2 available themes, got {}",
-                ThemeKind::available().len(),
+                !theme_cache::theme_choices(None).is_empty(),
+                "toggle test requires at least one available theme"
             );
             let cmd = ThemeCommand;
             let models = crate::acp::model_state::ModelState::default();
@@ -409,9 +403,14 @@ mod tests {
             let result = cmd.run(&mut ctx, "");
             match result {
                 CommandResult::Action(Action::SetTheme(name)) => {
-                    // available[0] is GrokNight; next is available[1]
-                    let expected = ThemeKind::available()[1].display_name();
-                    assert_eq!(name, expected);
+                    let choices = theme_cache::theme_choices(None);
+                    let current = theme_cache::current_name();
+                    let current_idx = choices
+                        .iter()
+                        .position(|theme| theme.canonical == current)
+                        .unwrap_or(0);
+                    let expected = &choices[(current_idx + 1) % choices.len()].canonical;
+                    assert_eq!(&name, expected);
                 }
                 other => panic!("expected Action::SetTheme(...), got {other:?}"),
             }
@@ -498,6 +497,19 @@ mod tests {
             let cmd = ThemeCommand;
             cmd.preview_arg("grokday");
             assert_eq!(Theme::current_kind(), ThemeKind::GrokDay);
+        });
+    }
+
+    #[test]
+    fn preview_and_cancel_custom_theme() {
+        with_test_env(|| {
+            theme_cache::set(ThemeKind::GrokNight);
+            let cmd = ThemeCommand;
+            cmd.preview_arg("opencode");
+            assert_eq!(Theme::current_kind(), ThemeKind::Custom);
+            assert_eq!(theme_cache::current_name(), "opencode");
+            cmd.cancel_preview("groknight");
+            assert_eq!(Theme::current_kind(), ThemeKind::GrokNight);
         });
     }
 

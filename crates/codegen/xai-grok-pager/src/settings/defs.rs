@@ -29,9 +29,7 @@ pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_DEFAULT: i64 = 5;
 pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_MIN: i64 = 1;
 pub(crate) const USAGE_REFRESH_INTERVAL_MINUTES_MAX: i64 = 60;
 
-// Theme choice catalogs. Canonical names MUST match `ThemeKind::display_name()`. The catalogs are shared by
-// `theme`, `auto_dark_theme`, and `auto_light_theme`; the auto-* sub-pickers drop "auto" to avoid a circular
-// reference.
+// Theme choices are resolved by `DynamicEnumSource` from the built-in catalog and `$GROK_HOME/theme`.
 
 /// UI language catalog (`[ui].language`).
 const UI_LANGUAGE_CHOICES: &[EnumChoice] = &[
@@ -52,45 +50,6 @@ const UI_LANGUAGE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-/// Full theme catalog including the "auto" meta-variant; only `theme` uses it.
-const THEME_CHOICES: &[EnumChoice] = &[
-    EnumChoice {
-        canonical: "auto",
-        display: "Auto",
-        description: "Follow system dark/light appearance.",
-    },
-    EnumChoice {
-        canonical: "groknight",
-        display: "Grok Night",
-        description: "Neutral dark with magenta accent.",
-    },
-    EnumChoice {
-        canonical: "grokday",
-        display: "Grok Day",
-        description: "Light theme for bright environments.",
-    },
-    EnumChoice {
-        canonical: "tokyonight",
-        display: "Tokyo Night",
-        description: "Dark + blue-tinted; needs truecolor.",
-    },
-    // The display name is ASCII "Rose Pine Moon" (not "Rosé") for cross-terminal compatibility
-    EnumChoice {
-        canonical: "rosepine-moon",
-        display: "Rose Pine Moon",
-        description: "Muted dark with mauve accents; needs truecolor.",
-    },
-    EnumChoice {
-        canonical: "oscura-midnight",
-        display: "Oscura Midnight",
-        description: "Deep dark with warm accents; needs truecolor.",
-    },
-    EnumChoice {
-        canonical: "terminal",
-        display: "Terminal",
-        description: "Terminal's own background and text colors.",
-    },
-];
 
 // Permission-mode catalog. Persisted values map onto runtime flags: "always-approve" ↔ yolo_mode = true
 // (auto-approve all). `supports_preview: false` because toggling YOLO drains the permission queue (unsafe for
@@ -444,40 +403,6 @@ const VOICE_STT_LANGUAGE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
-/// Concrete-only theme catalog (excludes "auto"), used by both `auto_dark_theme` and `auto_light_theme`.
-/// There is no dark/light filtering: the user can pair any theme with any system-appearance bucket.
-const CONCRETE_THEME_CHOICES: &[EnumChoice] = &[
-    EnumChoice {
-        canonical: "groknight",
-        display: "Grok Night",
-        description: "Neutral dark with magenta accent.",
-    },
-    EnumChoice {
-        canonical: "grokday",
-        display: "Grok Day",
-        description: "Light theme for bright environments.",
-    },
-    EnumChoice {
-        canonical: "tokyonight",
-        display: "Tokyo Night",
-        description: "Dark + blue-tinted; needs truecolor.",
-    },
-    EnumChoice {
-        canonical: "rosepine-moon",
-        display: "Rose Pine Moon",
-        description: "Muted dark with mauve accents; needs truecolor.",
-    },
-    EnumChoice {
-        canonical: "oscura-midnight",
-        display: "Oscura Midnight",
-        description: "Deep dark with warm accents; needs truecolor.",
-    },
-    EnumChoice {
-        canonical: "terminal",
-        display: "Terminal",
-        description: "Terminal's own background and text colors.",
-    },
-];
 
 /// Child settings shown inside the "Show contextual hints" group sub-sheet. Keys match the `[ui.contextual_hints]`
 /// serde fields. The namespace keeps them globally unique: bare `plan_mode` collides with the plan-mode enum row.
@@ -552,6 +477,32 @@ pub fn default_settings() -> Vec<SettingMeta> {
             kind: SettingKind::Bool {
                 // `Option<bool>`: `None` is treated as `true`
                 default: ui_default.show_timestamps.unwrap_or(true),
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "transparent_bg",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Transparent background",
+            description: "Let the terminal background show through fullscreen theme canvas (Acrylic / Mica). Restart required.",
+            keywords: &["transparent", "background", "acrylic", "mica", "terminal", "fullscreen"],
+            kind: SettingKind::Bool {
+                default: ui_default.transparent_bg_enabled(),
+            },
+            restart_required: true,
+            hidden_in_minimal: true,
+        },
+        SettingMeta {
+            key: "show_shortcuts_bar",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Show shortcuts bar",
+            description: "Show the contextual keyboard shortcuts row at the bottom of the fullscreen pager.",
+            keywords: &["shortcuts", "keyboard", "hints", "footer", "bottom", "bar", "show", "hide"],
+            kind: SettingKind::Bool {
+                default: ui_default.show_shortcuts_bar_enabled(),
             },
             restart_required: false,
             hidden_in_minimal: false,
@@ -726,10 +677,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 "dark",
                 "light",
             ],
-            kind: SettingKind::Enum {
-                // `Option<String>`: `None` resolves to "groknight"
+            kind: SettingKind::DynamicEnum {
                 default: "groknight",
-                choices: THEME_CHOICES,
+                source: DynamicEnumSource::Theme,
                 supports_preview: true,
             },
             restart_required: false,
@@ -742,10 +692,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
             label: "Auto dark theme",
             description: "Theme to use when the system is in dark mode (only with theme=auto).",
             keywords: &["auto", "dark", "theme", "system", "appearance", "night"],
-            kind: SettingKind::Enum {
-                // `Option<String>`: `None` falls back to "groknight"
+            kind: SettingKind::DynamicEnum {
                 default: "groknight",
-                choices: CONCRETE_THEME_CHOICES,
+                source: DynamicEnumSource::DarkTheme,
                 supports_preview: true,
             },
             restart_required: false,
@@ -758,10 +707,9 @@ pub fn default_settings() -> Vec<SettingMeta> {
             label: "Auto light theme",
             description: "Theme to use when the system is in light mode (only with theme=auto).",
             keywords: &["auto", "light", "theme", "system", "appearance", "day"],
-            kind: SettingKind::Enum {
-                // `Option<String>`: `None` falls back to "grokday"
+            kind: SettingKind::DynamicEnum {
                 default: "grokday",
-                choices: CONCRETE_THEME_CHOICES,
+                source: DynamicEnumSource::LightTheme,
                 supports_preview: true,
             },
             restart_required: false,
@@ -958,35 +906,6 @@ pub fn default_settings() -> Vec<SettingMeta> {
             ],
             kind: SettingKind::Bool {
                 default: ui_default.show_thinking_blocks.unwrap_or(true),
-            },
-            restart_required: false,
-            hidden_in_minimal: false,
-        },
-        SettingMeta {
-            key: "show_session_usage_bar",
-            category: SettingCategory::Appearance,
-            owner: SettingOwner::Shell,
-            label: "Live session usage on prompt",
-            description: "Show this session's total tokens (and estimated cost when \
-                          model prices are configured) to the left of the model name \
-                          on the prompt line. Cost uses server-provided pricing when present, \
-                          otherwise local [model.*] price fields.",
-            keywords: &["usage", "tokens", "cost", "price", "session", "billing", "status", "bar"],
-            kind: SettingKind::Bool {
-                default: ui_default.show_session_usage_bar.unwrap_or(false),
-            },
-            restart_required: false,
-            hidden_in_minimal: false,
-        },
-        SettingMeta {
-            key: "show_request_metrics",
-            category: SettingCategory::Appearance,
-            owner: SettingOwner::Shell,
-            label: "Per-request metrics in scrollback",
-            description: "After each model response, show first-token time, generation rate, duration, and token counts in the conversation.",
-            keywords: &["metrics", "ttft", "tps", "first", "token", "latency", "speed", "request", "usage"],
-            kind: SettingKind::Bool {
-                default: ui_default.show_request_metrics_enabled(),
             },
             restart_required: false,
             hidden_in_minimal: false,

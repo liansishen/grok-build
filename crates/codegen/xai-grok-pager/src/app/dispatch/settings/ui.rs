@@ -13,9 +13,9 @@ use super::setters::{
     set_max_thoughts_width_inner, set_multiline_mode, set_page_flip_on_send_inner,
     set_prompt_suggestions_inner, set_remember_tool_approvals_inner, set_render_mermaid_inner,
     set_respect_manual_folds_inner, set_screen_mode_inner, set_scroll_lines_inner,
-    set_scroll_mode_inner, set_scroll_speed_inner, set_show_request_metrics_inner,
-    set_show_session_usage_bar_inner,
+    set_scroll_mode_inner, set_scroll_speed_inner, set_show_shortcuts_bar_inner,
     set_show_thinking_blocks_inner, set_show_tips_inner, set_simple_mode_inner, set_theme_inner,
+    set_transparent_bg_inner,
     set_timeline_inner, set_timestamps, set_timestamps_inner, set_ui_language_inner,
     set_usage_refresh_interval_minutes_inner, set_vim_mode_inner, set_voice_capture_mode_inner,
     set_voice_keybind_enabled_inner, set_voice_stt_language_inner,
@@ -905,10 +905,8 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("invert_scroll", SettingValue::Bool(b)) => Some(Action::SetInvertScroll(*b)),
         ("scroll_lines", SettingValue::Int(v)) => Some(Action::SetScrollLines(*v)),
         ("show_thinking_blocks", SettingValue::Bool(b)) => Some(Action::SetShowThinkingBlocks(*b)),
-        ("show_session_usage_bar", SettingValue::Bool(b)) => {
-            Some(Action::SetShowSessionUsageBar(*b))
-        }
-        ("show_request_metrics", SettingValue::Bool(b)) => Some(Action::SetShowRequestMetrics(*b)),
+        ("transparent_bg", SettingValue::Bool(b)) => Some(Action::SetTransparentBg(*b)),
+        ("show_shortcuts_bar", SettingValue::Bool(b)) => Some(Action::SetShowShortcutsBar(*b)),
         ("group_tool_verbs", SettingValue::Bool(b)) => Some(Action::SetGroupToolVerbs(*b)),
         ("collapsed_edit_blocks", SettingValue::Bool(b)) => {
             Some(Action::SetCollapsedEditBlocks(*b))
@@ -919,12 +917,15 @@ pub(in crate::app::dispatch) fn action_for_reset(
             Some(Action::SetDefaultSelectedPermission((*s).to_owned()))
         }
         ("theme", SettingValue::Enum(s)) => Some(Action::SetTheme((*s).to_owned())),
+        ("theme", SettingValue::String(s)) => Some(Action::SetTheme(s.clone())),
         ("auto_dark_theme", SettingValue::Enum(s)) => {
             Some(Action::SetAutoDarkTheme((*s).to_owned()))
         }
+        ("auto_dark_theme", SettingValue::String(s)) => Some(Action::SetAutoDarkTheme(s.clone())),
         ("auto_light_theme", SettingValue::Enum(s)) => {
             Some(Action::SetAutoLightTheme((*s).to_owned()))
         }
+        ("auto_light_theme", SettingValue::String(s)) => Some(Action::SetAutoLightTheme(s.clone())),
         // Three explicit arms, one per
         // canonical, all dispatched through the typed
         // `Action::SetPermissionMode(kind)` (NOT the legacy
@@ -1124,6 +1125,7 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         }
         ("respect_manual_folds", SettingValue::Bool(b)) => set_respect_manual_folds_inner(app, *b),
         ("theme", SettingValue::Enum(s)) => set_theme_inner(app, s),
+        ("theme", SettingValue::String(s)) => set_theme_inner(app, s),
         ("default_selected_permission", SettingValue::Enum(s)) => {
             set_default_selected_permission_inner(
                 app,
@@ -1165,6 +1167,16 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         }
         ("auto_dark_theme", SettingValue::Enum(s)) => set_auto_dark_theme_inner(app, s),
         ("auto_light_theme", SettingValue::Enum(s)) => set_auto_light_theme_inner(app, s),
+        ("auto_dark_theme", SettingValue::String(s)) if s == "auto" => {
+            app.current_ui.auto_dark_theme = None;
+            crate::theme::cache::invalidate_auto_theme_config();
+        }
+        ("auto_light_theme", SettingValue::String(s)) if s == "auto" => {
+            app.current_ui.auto_light_theme = None;
+            crate::theme::cache::invalidate_auto_theme_config();
+        }
+        ("auto_dark_theme", SettingValue::String(s)) => set_auto_dark_theme_inner(app, s),
+        ("auto_light_theme", SettingValue::String(s)) => set_auto_light_theme_inner(app, s),
         // permission_mode rollback: recover kind from canonical,
         // run inner, then restore the canonical the inner collapsed.
         ("permission_mode", SettingValue::Enum(s)) => {
@@ -1296,10 +1308,8 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
             }
         }
         ("show_thinking_blocks", SettingValue::Bool(b)) => set_show_thinking_blocks_inner(app, *b),
-        ("show_session_usage_bar", SettingValue::Bool(b)) => {
-            set_show_session_usage_bar_inner(app, *b)
-        }
-        ("show_request_metrics", SettingValue::Bool(b)) => set_show_request_metrics_inner(app, *b),
+        ("transparent_bg", SettingValue::Bool(b)) => set_transparent_bg_inner(app, *b),
+        ("show_shortcuts_bar", SettingValue::Bool(b)) => set_show_shortcuts_bar_inner(app, *b),
         ("group_tool_verbs", SettingValue::Bool(b)) => set_group_tool_verbs_inner(app, *b),
         ("collapsed_edit_blocks", SettingValue::Bool(b)) => {
             set_collapsed_edit_blocks_inner(app, *b)

@@ -779,6 +779,15 @@ fn format_default_for_prompt(
             }
             (*canonical).to_owned()
         }
+        SettingValue::String(s)
+            if matches!(setting_key, "theme" | "auto_dark_theme" | "auto_light_theme") =>
+        {
+            if s.is_empty() {
+                xai_grok_i18n::t("settings.dynamic_enum.no_override").to_owned()
+            } else {
+                crate::theme::display_name_for_name(s)
+            }
+        }
         SettingValue::String(s) => format!("\"{s}\""),
         SettingValue::Int(i) => i.to_string(),
     }

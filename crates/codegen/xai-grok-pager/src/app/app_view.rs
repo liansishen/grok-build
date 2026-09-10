@@ -5063,9 +5063,6 @@ impl AppView {
                                 .session_picker_pending_delete
                                 .is_some(),
                             chat_mode: self.chat_mode,
-                            credit_balance: self.credit_balance.as_ref(),
-                            auto_topup: self.auto_topup.as_ref(),
-                            usage_visible: self.usage_visible,
                             is_api_key_auth: self.is_api_key_auth,
                             changelog_bullets: &self.changelog_bullets,
                             changelog_has_full_notes: self.changelog_markdown.is_some(),
@@ -5341,6 +5338,7 @@ impl AppView {
                                     voice_listening,
                                     voice_interim: voice_interim.as_deref(),
                                     status_line: status_line_frame.clone(),
+                                    show_shortcuts_bar: self.current_ui.show_shortcuts_bar_enabled(),
                                     workspace_dashboard_enabled: self.workspace_dashboard_enabled,
                                 },
                             );
@@ -5474,6 +5472,7 @@ impl AppView {
                                                     AppRenderParams {
                                                         workspace_dashboard_enabled: self
                                                             .workspace_dashboard_enabled,
+                                                        show_shortcuts_bar: self.current_ui.show_shortcuts_bar_enabled(),
                                                         ..Default::default()
                                                     },
                                                 )

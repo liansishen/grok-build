@@ -8,7 +8,7 @@ Grok Build 从集中式主题读取 TUI 的所有颜色。你可以在 Grok 运�
 <a id="available-themes"></a>
 ## 可用主题
 
-Grok 内置五种主题，另有跟随系统外观的 `auto` 选项：
+Grok 内置六种主题（Terminal 主题可能受发布门控），另有跟随系统外观的 `auto` 选项：
 
 | 主题 | 配置名称 | 说明 | 需要 Truecolor |
 |-------|-------------|-------------|--------------------|
@@ -18,6 +18,12 @@ Grok 内置五种主题，另有跟随系统外观的 `auto` 选项：
 | **RosePineMoon** | `rosepine`、`rose-pine`、`rosepine-moon`、`rose-pine-moon` | 来自 Rosé Pine 系列的柔和深色调色板，带灰紫色强调。 | Yes |
 | **OscuraMidnight** | `oscura`、`oscura-midnight` | 深色底色，带紫色强调。 | Yes |
 
+<a id="custom-theme-files"></a>
+### 自定义主题文件
+
+Grok 还内置 OpenCode 深色主题 `opencode` 以及对应的浅色变体 `opencode-day`。其他主题会在打开主题选择器时从 `$GROK_HOME/theme` 加载（通常是 `~/.grok/theme`）。支持 TOML 和 JSON 文件；用户目录中同名的自定义主题会覆盖内置文件。
+
+每个文件都必须声明唯一的 `name`，并将 `appearance` 设置为 `dark` 或 `light`。`display_name`、`description` 和 `[colors]` 中的颜色项均可省略；省略的颜色槽会继承对应的内置明暗主题。规范化后的 `name` 可用于 `[ui].theme`、`auto_dark_theme`、`auto_light_theme`、`/theme` 及补全。`appearance` 会决定自定义主题是否出现在自动深色或自动浅色主题选择器中。
 主题名称不区分大小写。`auto` 选项（别名 `system`）在[自动主题（系统外观）](#auto-theme-system-appearance)中说明。
 
 <a id="terminal-theme"></a>
@@ -175,11 +181,11 @@ Grok 使用当前主题的 `accent_user` 颜色，通过 OSC 12 转义序列设�
 
 Grok 捆绑三个 `.tmTheme` 文件用于代码块语法高亮，并根据活动主题选择其中一个：
 
-- `grok-night.tmTheme` —— GrokNight、RosePineMoon 和 OscuraMidnight
-- `grok-day.tmTheme` —— GrokDay
+- `grok-night.tmTheme` —— GrokNight、深色自定义主题、RosePineMoon 和 OscuraMidnight
+- `grok-day.tmTheme` —— GrokDay 和浅色自定义主题
 - `tokyo-night.tmTheme` —— TokyoNight
 
-切换主题时，Grok 会自动选择匹配的文件。这些 `.tmTheme` 文件内置于二进制文件中，因此无法用自定义文件替换。
+这些 `.tmTheme` 文件内置于二进制文件中。自定义主题会根据其 `appearance` 属性选择日间或夜间语法调色板。
 
 ---
 

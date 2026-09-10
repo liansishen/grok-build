@@ -3,7 +3,10 @@
 
 use std::time::Instant;
 
-use xai_grok_status_line::{ResolvedStatusLine, StatusLineContext, StatusLineItem};
+use xai_grok_status_line::{
+    ResolvedStatusLine, StatusLineBilling, StatusLineContext, StatusLineItem, StatusLineQuota,
+    StatusLineQuotaAccount,
+};
 
 use super::app_view::{AppView, TickDemand};
 use super::status_line::{
@@ -11,6 +14,41 @@ use super::status_line::{
     draws_a_row,
 };
 use crate::views::status_line::RowSize;
+
+fn status_line_billing(
+    balance: &crate::views::credit_bar::CreditBalance,
+) -> StatusLineBilling {
+    StatusLineBilling {
+        usage_percentage: Some(balance.usage_pct),
+        effective_usage_percentage: Some(balance.effective_usage_pct),
+        period_type: balance.period_type.clone(),
+        period_end: balance.period_end_display.clone(),
+        pay_as_you_go: Some(balance.pay_as_you_go),
+        on_demand_cap_cents: balance.on_demand_cap_cents,
+        on_demand_used_cents: balance.on_demand_used_cents,
+        prepaid_balance_cents: balance.prepaid_balance_cents,
+    }
+}
+
+fn status_line_quota(
+    snapshot: &crate::cpa_quota::CpaQuotaSnapshot,
+) -> Option<StatusLineQuota> {
+    let accounts = snapshot
+        .accounts
+        .iter()
+        .map(|account| StatusLineQuotaAccount {
+            email: account.email.clone(),
+            used_percentage: account.used_percent,
+            remaining_percentage: (100.0 - account.used_percent).clamp(0.0, 100.0),
+            reset_at: account.reset_at,
+            plan_type: account.plan_type.clone(),
+        })
+        .collect::<Vec<_>>();
+    (!accounts.is_empty()).then(|| StatusLineQuota {
+        model_id: snapshot.model_id.clone(),
+        accounts,
+    })
+}
 
 /// The row's next state, decided before anything is touched.
 /// Owned rather than borrowed out of the config, so it can be applied through `&mut self`.
@@ -259,7 +297,10 @@ impl AppView {
     }
 
     fn shell_status_context(&self) -> Option<StatusLineContext> {
-        let mut ctx = self.status_line_source_view()?.status_context.clone()?;
+        let agent = self.status_line_source_view()?;
+        let mut ctx = agent.status_context.clone()?;
+        ctx.billing = agent.credit_balance.as_ref().map(status_line_billing);
+        ctx.quota = agent.cpa_quota.as_ref().and_then(status_line_quota);
         // Destructured, so a field added to the overlay is a compile error here rather than one the staleness check watches and nothing applies
         let ClientOwnedFields { session_name } = self.client_owned_fields();
         ctx.session_name = session_name;

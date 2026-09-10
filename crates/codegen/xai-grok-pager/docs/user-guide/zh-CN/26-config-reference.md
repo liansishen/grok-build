@@ -606,10 +606,12 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `ui.show_thinking_blocks` | `boolean` | `yes` | `user` | 流式输出时显示思考／推理块。也对应 `GROK_SHOW_THINKING_BLOCKS`。 |
 | `ui.show_timeline` | `boolean` | `yes` | `user` | 显示每轮刻度轨道而不是滚动条。 |
 | `ui.show_timestamps` | `boolean` | `yes` | `user` | 在消息旁显示时钟时间。也对应 `/timestamps`。 |
+| `ui.show_shortcuts_bar` | `boolean` | `yes` | `user` | 显示全屏界面底部的上下文键盘快捷键提示栏，默认值为 `true`。 |
 | `ui.simple_mode` | `boolean` | `yes` | `user` | true 时使用 readline 提示编辑；false 时使用实验性 Vim 提示按键。 |
 | `ui.status_line.command` | `string` | `yes` | `user` | `command` 状态栏脚本；campaign 会移除此路径，但 requirements 层仍可合并。 |
-| `ui.status_line.type` | `disabled / command` | `yes` | `user` | 快捷键栏上方的可选状态行，默认关闭；详见状态栏指南。 |
+| `ui.status_line.type` | `disabled / builtin / command` | `yes` | `user` | 快捷键栏上方的可选状态行，默认关闭；详见状态栏指南。 |
 | `ui.theme` | `string` | `yes` | `user` | 主题名称，或用 `auto`/`system` 跟随操作系统。也对应 `/theme` 和 `GROK_THEME`。 |
+| `ui.transparent_bg` | `boolean` | `yes` | `user` | 使全屏主题画布背景透明，从而显示终端配置文件的背景；需要重启。也对应 `GROK_TRANSPARENT_BG`。 |
 | `ui.ui_theme` | `string` | `yes` | `user` | `ui.theme` 的旧版别名。 |
 | `ui.vim_mode` | `boolean` | `yes` | `user` | 在回滚区（而非提示框）启用 Vim 按键。也对应 `/vim-mode`。 |
 | `ui.voice_capture_mode` | `hold / toggle` | `yes` | `user` | 按住说话或按键切换语音采集。 |

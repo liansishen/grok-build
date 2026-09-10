@@ -2146,6 +2146,8 @@ pub(super) fn value_display(
         SettingValue::String(s) => {
             if s.is_empty() && matches!(meta.kind, SettingKind::DynamicEnum { .. }) {
                 xai_grok_i18n::t("settings.dynamic_enum.no_override").to_string()
+            } else if matches!(meta.key, "theme" | "auto_dark_theme" | "auto_light_theme") {
+                crate::theme::display_name_for_name(s)
             } else {
                 s.clone()
             }

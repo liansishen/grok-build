@@ -36,28 +36,37 @@ transparent_bg = true
 
 环境变量：`GROK_TRANSPARENT_BG=1`。该选项在启动时读取；修改配置或环境变量后需要重启 Grok。
 
-### 3. 提示栏用量状态（周/月限额 + 重置时间）
+### 3. 用量信息接入状态栏
 
-- 在提示框信息行、**模型名称左侧**显示紧凑用量，例如：  
-  `每周限额: 45% · 重置 Mar 31, 12:00 · Grok 4.5 (high) · 始终批准`
-- 数据来自现有 billing / credit API（`usage_pct`、周期类型、`period_end_display`）。
-- **刷新策略**
-  - 默认每 **5 分钟** 静默拉取一次用量；
-  - **回合结束**时也会立即刷新（原有逻辑）；
-  - 间隔可在设置中调整。
+- 账户计费、CPA 配额和会话累计 token 不再插入提示框或对话滚动区；这些信息通过状态栏按需显示。
+- 内置状态栏支持 `usage`（会话 token）、`billing`（账户周期用量）和 `quota`（当前模型 CPA 剩余配额）项目；数据不可用时对应项目会省略。
+- 默认每 **5 分钟**静默刷新账户用量，回合结束后也会刷新；刷新间隔可在设置中调整。
 
 配置示例：
 
 ```toml
 [ui]
 usage_refresh_interval_minutes = 5   # 1–60，默认 5
-show_session_usage_bar = false       # 提示行实时会话 token/费用，默认关
-show_request_metrics = true          # 对话里显示 首/速/耗/词，默认开；设 false 关闭
+
+[ui.status_line]
+type = "builtin"
+items = ["model", "usage", "billing", "quota", "cost", "turn-timer"]
 ```
 
-设置 UI 中对应项：**用量刷新间隔**、**提示行实时会话用量**、**对话中显示逐次请求指标**。
+设置 UI 中对应项：**用量刷新间隔**。状态栏项目在 `25-status-line.md` 中有完整说明。
 
-### 4. Windows 一键构建与替换
+### 4. 自定义主题与快捷键提示
+
+- 内置 OpenCode 深色主题 `opencode` 和浅色主题 `opencode-day`。
+- 其他 TOML/JSON 主题文件放入 `$GROK_HOME/theme`（通常为 `~/.grok/theme`），在主题选择器打开时加载；文件必须包含 `name`、`appearance = "dark"` 或 `"light"`。
+- `[ui] show_shortcuts_bar = false` 可隐藏全屏界面底部的快捷键提示栏；默认值为 `true`。
+
+```toml
+[ui]
+show_shortcuts_bar = false
+```
+
+### 5. Windows 一键构建与替换
 
 仓库 `scripts/` 下提供本地开发辅助脚本（见脚本内注释）：
 
@@ -80,7 +89,7 @@ show_request_metrics = true          # 对话里显示 首/速/耗/词，默认�
 > auto_update = false
 > ```
 
-### 5. 其它相关说明
+### 6. 其它相关说明
 
 | 主题 | 说明 |
 |------|------|

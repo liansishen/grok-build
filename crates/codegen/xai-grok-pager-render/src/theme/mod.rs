@@ -19,6 +19,8 @@ mod rosepine;
 pub mod system_appearance;
 mod terminal_default;
 pub mod tokyonight;
+mod custom;
+pub use custom::{LoadedTheme, ThemeAppearance};
 
 pub use color_support::quantize;
 pub use tokyonight::{Theme, pulse_brightness, wave_brightness};
@@ -35,6 +37,8 @@ pub enum ThemeKind {
     /// Every bg is `Reset` so the terminal canvas shows through; legible on both polarities without appearance detection.
     /// Hidden and unparseable while `cache::terminal_theme_enabled()` is off.
     Terminal = 6,
+    /// A user or bundled theme loaded from a theme file.
+    Custom = 7,
     /// Follow system appearance. Disk stores `"auto"`; `cache::CURRENT` holds only the resolved concrete kind. Excluded from [`ALL`].
     Auto = 4,
 }
@@ -102,6 +106,7 @@ impl ThemeKind {
             Self::RosePineMoon => "rosepine-moon",
             Self::OscuraMidnight => "oscura-midnight",
             Self::Terminal => "terminal",
+            Self::Custom => "custom",
             Self::Auto => "auto",
         }
     }
@@ -118,6 +123,7 @@ impl ThemeKind {
             Self::Terminal => false,
             // Auto is resolved to a concrete theme before rendering.
             Self::Auto => false,
+            Self::Custom => false,
         }
     }
 
@@ -164,10 +170,14 @@ impl std::str::FromStr for ThemeKind {
     }
 }
 
-/// Resolve a theme string to its canonical `&'static str` name.
-/// Used by both dispatch and registry layers.
-pub fn canonical_name(value: &str) -> Option<&'static str> {
-    ThemeKind::from_name(value).map(|k| k.display_name())
+/// Resolve a theme string to its canonical name, including user theme files.
+pub fn canonical_name(value: &str) -> Option<String> {
+    cache::canonical_name(value)
+}
+
+/// Human-friendly display name for a built-in or loaded theme.
+pub fn display_name_for_name(value: &str) -> String {
+    cache::display_name_for_name(value)
 }
 
 /// Human-friendly display name for a canonical theme value (e.g. `"groknight"` becomes `"Grok Night"`).
@@ -179,6 +189,7 @@ pub fn display_name_for_canonical(value: &str) -> &str {
         "grokday" => "Grok Day",
         "tokyonight" => "Tokyo Night",
         "rosepine-moon" => "Rose Pine Moon",
+        "oscura-midnight" => "Oscura Midnight",
         "terminal" => "Terminal",
         other => other,
     }
@@ -300,6 +311,7 @@ impl Theme {
             ThemeKind::Terminal => Self::terminal(),
             // Auto is resolved to a concrete theme before being stored; if reached, fall back to GrokNight
             ThemeKind::Auto => Self::groknight(),
+            ThemeKind::Custom => cache::current_custom_theme().unwrap_or_else(Self::groknight),
         };
         // Sample polarity before quantizing
         // After quantization `bg_base` may land on a named or indexed entry whose luminance depends on the host palette
@@ -377,6 +389,41 @@ impl Theme {
         let effective = Self::clamp_to_terminal(kind);
         cache::set(effective);
         effective
+    }
+
+    /// Apply a built-in or loaded theme name to the in-memory display.
+    pub fn apply_name(name: &str) -> Option<String> {
+        let canonical = cache::canonical_name(name)?;
+        if canonical == ThemeKind::Auto.display_name() {
+            cache::set_auto_mode(true);
+            Self::apply_kind(cache::resolve_auto());
+        } else if let Some(kind) = ThemeKind::from_name(&canonical) {
+            cache::set_auto_mode(false);
+            Self::apply_kind(kind);
+        } else if cache::set_custom_name(&canonical) {
+            cache::set_auto_mode(false);
+            Self::apply_kind(ThemeKind::Custom);
+        } else {
+            return None;
+        }
+        Some(canonical)
+    }
+
+    /// Preview a built-in or loaded concrete theme without changing auto-mode configuration.
+    pub fn preview_name(name: &str) -> Option<String> {
+        let canonical = cache::canonical_name(name)?;
+        if canonical == ThemeKind::Auto.display_name() {
+            Self::apply_kind(cache::resolve_auto());
+            return Some(canonical);
+        }
+        if let Some(kind) = ThemeKind::from_name(&canonical) {
+            Self::apply_kind(kind);
+        } else if cache::set_custom_name(&canonical) {
+            Self::apply_kind(ThemeKind::Custom);
+        } else {
+            return None;
+        }
+        Some(canonical)
     }
 
     fn clamp_to_terminal(kind: ThemeKind) -> ThemeKind {
@@ -1056,6 +1103,7 @@ mod tests {
                 // terminal's own fg/bg contrast, so there is no RGB delta.
                 ThemeKind::Terminal => continue,
                 ThemeKind::Auto => unreachable!("ALL excludes Auto"),
+                ThemeKind::Custom => continue,
             };
             let track = lum(theme.scrollbar_bg, "scrollbar_bg", kind);
             let thumb = lum(theme.scrollbar_fg, "scrollbar_fg", kind);

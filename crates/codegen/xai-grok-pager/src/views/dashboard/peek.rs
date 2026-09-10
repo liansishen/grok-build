@@ -433,9 +433,6 @@ fn paint_peek_config_badge(
         model_name: &model_label,
         flags: &flags,
         multiline,
-        usage_status: None,
-        usage_warning: None,
-        usage_warning_critical: false,
     };
     // Bottom border row, inside the corners: the same content rect the chat prompt and dispatch box use for their info line
     let info_rect = Rect {

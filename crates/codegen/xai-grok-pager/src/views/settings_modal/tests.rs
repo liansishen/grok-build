@@ -14,6 +14,7 @@ use crate::input::line_editor::LineEditor;
 use crate::settings::{
     CodingDataSharingLock, EnumChoice, PagerLocalSnapshot, SettingCategory, SettingKey,
     SettingKind, SettingMeta, SettingOwner, SettingValue, SettingsRegistry, StringValidator,
+    dynamic_enum_choices,
 };
 use crate::theme::Theme;
 use xai_grok_shell::agent::config::UiConfig;
@@ -112,18 +113,16 @@ fn effective_enum_choices_hides_auto_for_permission_mode_when_gated_off() {
         "Auto must be selectable when the gate is on"
     );
 
-    // The theme keys are only filtered by the terminal-theme rollout gate, seeded on above.
+    // The theme catalog is dynamic; the auto-permission gate must not change it.
     let theme = reg.find("theme").expect("theme registered");
-    if let SettingKind::Enum {
-        choices: theme_choices,
-        ..
-    } = &theme.kind
-    {
+    if let SettingKind::DynamicEnum { source, .. } = &theme.kind {
         assert_eq!(
-            effective_enum_choices("theme", theme_choices, &gated_off).len(),
-            theme_choices.len(),
+            dynamic_enum_choices(*source, &gated_off).len(),
+            dynamic_enum_choices(*source, &gated_on).len(),
             "the auto gate must not filter theme keys"
         );
+    } else {
+        panic!("theme must be DynamicEnum");
     }
 }
 
@@ -357,12 +356,10 @@ fn every_string_setting_has_action_for_string_arm() {
 }
 
 /// Every registered `SettingKind::DynamicEnum` setting must have a matching arm in `action_for_string` for the picker's Enter (commit) path.
-/// That includes the empty-canonical sentinel (row 0 of the picker is always "(no override)").
 #[test]
 fn every_dynamic_enum_setting_has_action_for_string_arm() {
     let reg = SettingsRegistry::defaults();
-    // Seed a synthetic catalog so the resolver path can produce a non-empty SetX action
-    // With an empty catalog only the empty-canonical arm runs, masking a missing SetX arm
+    // Seed a synthetic model catalog so model resolver paths produce typed actions.
     use agent_client_protocol as acp;
     use std::sync::Arc;
     let snapshot = PagerLocalSnapshot {
@@ -370,46 +367,78 @@ fn every_dynamic_enum_setting_has_action_for_string_arm() {
             "Test Model".to_string(),
             acp::ModelId::new(Arc::from("test-model")),
         )],
+        fork_secondary_effort_options: vec![(
+            "high".to_string(),
+            "High".to_string(),
+            "High effort".to_string(),
+        )],
         ..PagerLocalSnapshot::default()
     };
     for meta in reg.all() {
         if !matches!(meta.kind, SettingKind::DynamicEnum { .. }) {
             continue;
         }
-        // Discriminate on the Action variant, not just `is_some()`
-        // A refactor could swallow the typed `SetDefaultModel` / `SetForkSecondaryModel` into a generic `Action::DynamicSettingChanged(...)`
-        // That would pass `is_some()` while breaking the typed dispatch
+        let nonempty_value = match meta.key {
+            "theme" | "auto_dark_theme" => "groknight",
+            "fork_secondary_reasoning_effort" => "high",
+            "auto_light_theme" => "grokday",
+            _ => "Test Model",
+        };
         let empty_action = action_for_string(meta.key, String::new(), &snapshot);
-        let nonempty_action = action_for_string(meta.key, "Test Model".to_string(), &snapshot);
+        let nonempty_action = action_for_string(meta.key, nonempty_value.to_string(), &snapshot);
         match meta.key {
             "default_model" => {
                 assert!(
                     matches!(empty_action, Some(Action::ClearDefaultModel)),
-                    "default_model empty canonical must produce ClearDefaultModel, \
-                     got {empty_action:?}",
+                    "default_model empty canonical must produce ClearDefaultModel, got {empty_action:?}"
                 );
                 assert!(
                     matches!(nonempty_action, Some(Action::SetDefaultModel(_))),
-                    "default_model non-empty canonical must produce \
-                     SetDefaultModel(_), got {nonempty_action:?}",
+                    "default_model non-empty canonical must produce SetDefaultModel(_), got {nonempty_action:?}"
+                );
+            }
+            "web_search_model" => {
+                assert!(
+                    matches!(empty_action, Some(Action::ClearWebSearchModel)),
+                    "web_search_model empty canonical must produce ClearWebSearchModel, got {empty_action:?}"
+                );
+                assert!(
+                    matches!(nonempty_action, Some(Action::SetWebSearchModel(_))),
+                    "web_search_model non-empty canonical must produce SetWebSearchModel(_), got {nonempty_action:?}"
                 );
             }
             "fork_secondary_model" => {
                 assert!(
                     matches!(empty_action, Some(Action::ClearForkSecondaryModel)),
-                    "fork_secondary_model empty canonical must produce \
-                     ClearForkSecondaryModel, got {empty_action:?}",
+                    "fork_secondary_model empty canonical must produce ClearForkSecondaryModel, got {empty_action:?}"
                 );
                 assert!(
                     matches!(nonempty_action, Some(Action::SetForkSecondaryModel(_))),
-                    "fork_secondary_model non-empty canonical must produce \
-                     SetForkSecondaryModel(_), got {nonempty_action:?}",
+                    "fork_secondary_model non-empty canonical must produce SetForkSecondaryModel(_), got {nonempty_action:?}"
                 );
             }
+            "fork_secondary_reasoning_effort" => assert!(
+                matches!(
+                    nonempty_action,
+                    Some(Action::SetForkSecondaryReasoningEffort(ref effort)) if effort == "high"
+                ),
+                "fork_secondary_reasoning_effort must produce SetForkSecondaryReasoningEffort, got {nonempty_action:?}"
+            ),
+            "theme" => assert!(
+                matches!(nonempty_action, Some(Action::SetTheme(ref name)) if name == "groknight"),
+                "theme must produce SetTheme, got {nonempty_action:?}"
+            ),
+            "auto_dark_theme" => assert!(
+                matches!(nonempty_action, Some(Action::SetAutoDarkTheme(ref name)) if name == "groknight"),
+                "auto_dark_theme must produce SetAutoDarkTheme, got {nonempty_action:?}"
+            ),
+            "auto_light_theme" => assert!(
+                matches!(nonempty_action, Some(Action::SetAutoLightTheme(ref name)) if name == "grokday"),
+                "auto_light_theme must produce SetAutoLightTheme, got {nonempty_action:?}"
+            ),
             other => panic!(
                 "Unknown DynamicEnum key `{other}` — add a discriminating arm in \
-                 every_dynamic_enum_setting_has_action_for_string_arm so future \
-                 additions can't silently rely on the generic is_some() check.",
+                 every_dynamic_enum_setting_has_action_for_string_arm"
             ),
         }
     }
@@ -630,12 +659,15 @@ fn rows_contain_categories_and_settings_through_pr_14() {
             "compact_mode",
             "screen_mode",
             "show_timestamps",
+            "transparent_bg",
+            "show_shortcuts_bar",
             "show_timeline",
             // PAGER-owned page_flip_on_send (Appearance).
             "page_flip_on_send",
             "simple_mode",
             // PAGER-owned vim_mode (Appearance, paired with simple_mode)
             "vim_mode",
+            "language",
             // Theme enums.
             "theme",
             "auto_dark_theme",
@@ -684,8 +716,11 @@ fn rows_contain_categories_and_settings_through_pr_14() {
             "coding_data_sharing",
             // SHELL-owned default_model (Models category).
             "default_model",
-            // Models category. `default_reasoning_effort`, `web_search_model`, and `session_summary_model` are not exposed in the modal.
+            "web_search_model",
+            // Models category. `default_reasoning_effort` and `session_summary_model` are not exposed in the modal.
             "fork_secondary_model",
+            "fork_secondary_reasoning_effort",
+            "usage_refresh_interval_minutes",
             // `auto_compact_threshold_percent` (Session category) is not exposed in the modal
             // Advanced category.
             "show_tips",
@@ -778,6 +813,22 @@ fn f2_closes_modal() {
         handle_settings_key(&mut s, &f2),
         SettingsKeyOutcome::Close
     ));
+}
+
+#[test]
+fn f2_reverts_dynamic_theme_preview_before_closing() {
+    let mut s = make_state();
+    s.transition_to_picking_enum(
+        "theme",
+        0,
+        SettingValue::String("groknight".to_string()),
+        true,
+    );
+    let outcome = handle_settings_key(&mut s, &KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE));
+    assert!(
+        matches!(outcome, SettingsKeyOutcome::ActionThenClose(Action::PreviewTheme(ref name)) if name == "groknight"),
+        "F2 must restore a previewed dynamic theme, got {outcome:?}"
+    );
 }
 
 #[test]
@@ -1483,7 +1534,7 @@ fn editor_render_fixture(buffer: &str, cursor_byte: usize) -> SettingsModalState
     // `default_model` is a `SettingKind::DynamicEnum`, so no production setting registers a String editor
     // A synthetic registry with one `KnownModel`-validated String entry keeps the editor-render code path exercised
     let synthetic_meta = SettingMeta {
-        key: "default_model",
+        key: "settings_editor_test",
         category: SettingCategory::Models,
         owner: crate::settings::SettingOwner::Shell,
         label: "Default model (synthetic)",
@@ -1516,12 +1567,20 @@ fn editor_render_fixture(buffer: &str, cursor_byte: usize) -> SettingsModalState
         &s.pager_snapshot.available_models,
     );
     s.transition_to_editing_string(
-        "default_model",
+        "settings_editor_test",
         editor,
         StringValidator::KnownModel,
         validation_error,
     );
     s
+}
+
+fn editor_action_fixture(buffer: &str, cursor_byte: usize) -> SettingsModalState {
+    let mut state = editor_render_fixture(buffer, cursor_byte);
+    if let SettingsMode::EditingString { key, .. } = &mut state.state.mode {
+        *key = "default_model";
+    }
+    state
 }
 
 /// Cursor lands at the visual column matching `cursor_byte` for buffers that fit entirely within the visible window.
@@ -2193,7 +2252,7 @@ fn picking_enum_esc_dispatches_preview_revert_for_each_key() {
     ];
     for &(key, original) in cases {
         let mut s = make_state();
-        s.transition_to_picking_enum(key, 0, SettingValue::Enum(original), true);
+        s.transition_to_picking_enum(key, 0, SettingValue::String(original.to_string()), true);
         let outcome = handle_settings_key(&mut s, &KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
         match (key, outcome) {
             ("theme", SettingsKeyOutcome::Action(Action::PreviewTheme(name))) => {
@@ -2225,7 +2284,7 @@ fn picking_enum_esc_dispatches_preview_revert_for_each_key() {
 #[test]
 fn picking_enum_esc_returns_to_browse() {
     let mut s = make_state();
-    s.transition_to_picking_enum("theme", 0, SettingValue::Enum("groknight"), true);
+    s.transition_to_picking_enum("theme", 0, SettingValue::String("groknight".to_string()), true);
     let outcome = handle_settings_key(&mut s, &KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     match outcome {
         SettingsKeyOutcome::Action(Action::PreviewTheme(name)) => {
@@ -2499,7 +2558,7 @@ fn browse_path_enter_commit_returns_to_browse() {
 #[test]
 fn deep_link_theme_commit_closes_with_set() {
     let mut s = make_state();
-    s.transition_to_picking_enum("theme", 0, SettingValue::Enum("groknight"), true);
+    s.transition_to_picking_enum("theme", 0, SettingValue::String("groknight".to_string()), true);
     s.close_on_picker_exit = true;
 
     let outcome = handle_settings_key(&mut s, &KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
@@ -2516,7 +2575,7 @@ fn deep_link_theme_commit_closes_with_set() {
 #[test]
 fn deep_link_picker_esc_reverts_preview_and_closes() {
     let mut s = make_state();
-    s.transition_to_picking_enum("theme", 0, SettingValue::Enum("groknight"), true);
+    s.transition_to_picking_enum("theme", 0, SettingValue::String("groknight".to_string()), true);
     s.close_on_picker_exit = true;
 
     let outcome = handle_settings_key(&mut s, &KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
@@ -3966,7 +4025,7 @@ fn editing_value_chars_mutate_buffer_and_invalid_enter_is_noop() {
 
 #[test]
 fn string_editor_uses_canonical_edits_policy_and_live_validation() {
-    let mut state = editor_render_fixture("alpha-beta", "alpha-beta".len());
+    let mut state = editor_action_fixture("alpha-beta", "alpha-beta".len());
     let outcome = handle_settings_key(
         &mut state,
         &KeyEvent::new(KeyCode::Backspace, KeyModifiers::ALT),
@@ -3974,7 +4033,7 @@ fn string_editor_uses_canonical_edits_policy_and_live_validation() {
     assert!(matches!(outcome, SettingsKeyOutcome::Changed));
     assert_eq!(state.editing_buffer(), Some("alpha-"));
 
-    let mut state = editor_render_fixture("Grok Tes", "Grok Tes".len());
+    let mut state = editor_action_fixture("Grok Tes", "Grok Tes".len());
     assert!(state.editing_validation_error().is_some());
     let _ = handle_settings_key(
         &mut state,
@@ -5916,7 +5975,8 @@ fn click_settings_breadcrumb_after_nav_reverts_to_original() {
         } => {
             let orig = match original_value {
                 SettingValue::Enum(c) => c.to_string(),
-                other => panic!("expected SettingValue::Enum, got {other:?}"),
+                SettingValue::String(value) => value.clone(),
+                other => panic!("expected string-backed theme value, got {other:?}"),
             };
             (orig, *choices_idx)
         }
@@ -6495,6 +6555,7 @@ fn max_thoughts_width_preview_title_styling_distinguishes_from_content() {
         // underline cue instead.
         crate::theme::ThemeKind::Terminal => return,
         crate::theme::ThemeKind::Auto => crate::theme::Theme::groknight(),
+        crate::theme::ThemeKind::Custom => crate::theme::Theme::current(),
     };
     assert_ne!(
         raw_theme.bg_visual, raw_theme.bg_highlight,
@@ -7549,7 +7610,7 @@ fn settings_render_uses_pseudo_locale_for_core_modes() {
         "integer editor title was not localized:\n{int}"
     );
     assert!(
-        string.contains("⟦settings.default_model.label⟧"),
+        string.contains("⟦settings.settings_editor_test.label⟧"),
         "string editor title was not localized:\n{string}"
     );
     assert!(

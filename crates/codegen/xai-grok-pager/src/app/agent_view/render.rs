@@ -38,7 +38,6 @@ use std::time::Instant;
 /// Grouped (mirroring `WelcomeRenderParams`) so the next app-level render
 /// fact extends this struct instead of every `draw` call site; tests take
 /// `Default` and override only what they exercise.
-#[derive(Default)]
 pub struct AppRenderParams<'a> {
     /// Voice feature available (shows the mic affordances).
     pub voice_available: bool,
@@ -49,7 +48,22 @@ pub struct AppRenderParams<'a> {
     pub voice_interim: Option<&'a str>,
     /// The status row this frame paints, or `Off` when this frame has none.
     pub status_line: crate::views::status_line::StatusLineFrame,
+    /// Whether the contextual shortcuts bar and its layout row are visible.
+    pub show_shortcuts_bar: bool,
     pub workspace_dashboard_enabled: bool,
+}
+
+impl<'a> Default for AppRenderParams<'a> {
+    fn default() -> Self {
+        Self {
+            voice_available: false,
+            voice_listening: false,
+            voice_interim: None,
+            status_line: Default::default(),
+            show_shortcuts_bar: true,
+            workspace_dashboard_enabled: false,
+        }
+    }
 }
 /// What the bottom shortcuts bar renders this frame.
 enum ShortcutsBarContent {
@@ -581,6 +595,7 @@ impl AgentView {
         scratch: &mut ScratchBuffer,
         theme: &Theme,
         bundle_state: &crate::app::bundle::BundleState,
+        show_shortcuts_bar: bool,
     ) -> (
         Option<(u16, u16)>,
         Option<crate::terminal::overlay::PostFlush>,
@@ -811,7 +826,10 @@ impl AgentView {
                 false,
                 false,
                 &mut Vec::new(),
-                AppRenderParams::default(),
+                AppRenderParams {
+                    show_shortcuts_bar,
+                    ..Default::default()
+                }
             );
             child_post_flush = post_flush;
         }
@@ -884,6 +902,7 @@ impl AgentView {
             voice_listening,
             voice_interim,
             status_line,
+            show_shortcuts_bar,
             workspace_dashboard_enabled,
         } = app_params;
         self.scrollback.begin_frame();
@@ -962,6 +981,7 @@ impl AgentView {
                 scratch,
                 &theme,
                 bundle_state,
+                show_shortcuts_bar,
             );
         }
         if let Some(esc) = self.take_subagent_inline_media_clear_escapes() {
@@ -1414,7 +1434,7 @@ impl AgentView {
             dock_height,
             prompt_gap,
             voice_recording_height,
-            shortcuts_height: 1,
+            shortcuts_height: u16::from(show_shortcuts_bar),
             status_line_height: status_line.height(),
             compact,
         };
@@ -2576,52 +2596,6 @@ impl AgentView {
         let flags: Vec<PromptFlag> =
             mode_flags(plan_label, self.session.permission_label(), &theme);
         let multiline = self.multiline_mode;
-        // Consumer billing surface (personal OAuth), not slash-registry
-        // availability. `/usage` is tier-restricted on free/X Basic and when
-        // subscription_tier is still unknown, but the compact weekly/monthly
-        // status next to the model name must track the same gate as the
-        // welcome screen and credit warnings (`billing_surface_visible`).
-        let warning = self.credit_balance.as_ref().and_then(|bal| {
-            crate::views::credit_bar::usage_warning_for_session(
-                bal,
-                self.auto_topup.as_ref(),
-                self.billing_surface_visible,
-                self.chat_kind,
-            )
-        });
-        let usage_warning_text: Option<String> = warning.as_ref().map(|(t, _)| t.clone());
-        let usage_warning = usage_warning_text.as_deref();
-        let usage_warning_critical = warning.is_some_and(|(_, critical)| critical);
-        // CPA weekly quotas (per-model management) take precedence over xAI
-        // coding-credit status when present — xAI limits are meaningless on
-        // CPA-routed models.
-        let cpa_status = self
-            .cpa_quota
-            .as_ref()
-            .filter(|_| !self.chat_kind)
-            .and_then(|s| s.prompt_status_line());
-        // Always-visible compact usage (weekly/monthly % + reset) left of model.
-        let credit_status = if cpa_status.is_some() {
-            None
-        } else {
-            self.credit_balance
-                .as_ref()
-                .filter(|_| self.billing_surface_visible && !self.chat_kind)
-                .map(|bal| bal.prompt_status_line())
-        };
-        // Live session tokens/cost (left of model; cost only when available).
-        let session_status = self
-            .session_usage_snapshot
-            .as_ref()
-            .and_then(crate::app::status_blocks::session_usage_bar_label);
-        let quota_status = cpa_status.or(credit_status);
-        let usage_status_owned = match (session_status, quota_status) {
-            (Some(s), Some(c)) => Some(format!("{s} · {c}")),
-            (Some(s), None) => Some(s),
-            (None, Some(c)) => Some(c),
-            (None, None) => None,
-        };
-        let usage_status = usage_status_owned.as_deref();
         let model_label = match self.session.models.reasoning_effort {
             Some(eff) => format!("{model_id} ({eff})"),
             None => model_id,
@@ -2631,9 +2605,6 @@ impl AgentView {
                 model_name: &model_label,
                 flags: &flags,
                 multiline,
-                usage_status,
-                usage_warning,
-                usage_warning_critical,
             },
             PromptMode::EditingQueued { id, .. } => {
                 let pos = self.session.queue_position(*id).map(|i| i + 1).unwrap_or(1);
@@ -2647,9 +2618,6 @@ impl AgentView {
                     model_name: &editing_label,
                     flags: &flags,
                     multiline,
-                    usage_status,
-                    usage_warning,
-                    usage_warning_critical,
                 }
             }
         };
@@ -2658,9 +2626,6 @@ impl AgentView {
                 model_name: label,
                 flags: &[],
                 multiline: false,
-                usage_status,
-                usage_warning,
-                usage_warning_critical,
             }
         } else {
             info
@@ -3527,28 +3492,30 @@ impl AgentView {
             self.pane_areas = layout.pane_areas();
             return (None, crate::terminal::overlay::clear().map(Into::into));
         }
-        match self.shortcuts_bar_content(registry) {
-            ShortcutsBarContent::Hidden => {}
-            ShortcutsBarContent::Surface(hints) => {
-                ShortcutsBar::new(&hints)
-                    .with_pending(pending_hint)
-                    .render(layout.shortcuts, buf);
-            }
-            ShortcutsBarContent::Pane(hints) => {
-                let help_hint = registry.find(ActionId::ShortcutsHelp).map(|def| {
-                    let mut hint = def.hint();
-                    if in_dashboard_overlay
-                        && def.default_key == key!('x', CONTROL)
-                        && let Some(alt) = def.alt_keys.first()
-                    {
-                        hint.keys = vec![*alt];
-                    }
-                    hint
-                });
-                ShortcutsBar::new(&hints)
-                    .compact(5, help_hint)
-                    .with_pending(pending_hint)
-                    .render(layout.shortcuts, buf);
+        if show_shortcuts_bar {
+            match self.shortcuts_bar_content(registry) {
+                ShortcutsBarContent::Hidden => {}
+                ShortcutsBarContent::Surface(hints) => {
+                    ShortcutsBar::new(&hints)
+                        .with_pending(pending_hint)
+                        .render(layout.shortcuts, buf);
+                }
+                ShortcutsBarContent::Pane(hints) => {
+                    let help_hint = registry.find(ActionId::ShortcutsHelp).map(|def| {
+                        let mut hint = def.hint();
+                        if in_dashboard_overlay
+                            && def.default_key == key!('x', CONTROL)
+                            && let Some(alt) = def.alt_keys.first()
+                        {
+                            hint.keys = vec![*alt];
+                        }
+                        hint
+                    });
+                    ShortcutsBar::new(&hints)
+                        .compact(5, help_hint)
+                        .with_pending(pending_hint)
+                        .render(layout.shortcuts, buf);
+                }
             }
         }
         let line_viewer_toast = self.active_toast_message().map(|s| s.to_string());
@@ -5262,6 +5229,14 @@ mod status_line_draw_tests {
         draw_script_for(&mut make_agent(), output, rows)
     }
     fn draw_script_for(agent: &mut AgentView, output: &str, rows: u16) -> Buffer {
+        draw_script_for_with_shortcuts(agent, output, rows, true)
+    }
+    fn draw_script_for_with_shortcuts(
+        agent: &mut AgentView,
+        output: &str,
+        rows: u16,
+        show_shortcuts_bar: bool,
+    ) -> Buffer {
         let area = Rect::new(0, 0, 80, rows);
         let mut buf = Buffer::empty(area);
         let mut scratch = ScratchBuffer::new();
@@ -5284,6 +5259,7 @@ mod status_line_draw_tests {
                     ))),
                     padding: 0,
                 },
+                show_shortcuts_bar,
                 ..Default::default()
             },
         );
@@ -5424,6 +5400,24 @@ mod status_line_draw_tests {
         assert_eq!(
             agent.last_status_line_size, painted,
             "a frame with no row must not export a width the script would read as the 80-column fallback"
+        );
+    }
+    #[test]
+    fn hidden_shortcuts_bar_reclaims_its_layout_row() {
+        let buf = draw_script_for_with_shortcuts(
+            &mut make_agent(),
+            FIVE_ROW_SCRIPT,
+            16,
+            false,
+        );
+        let screen = dump(&buf);
+        assert!(
+            find(&buf, "row-5").is_some(),
+            "hiding the shortcuts bar should reclaim one row\n{screen}"
+        );
+        assert!(
+            find(&buf, ":shortcuts").is_none(),
+            "the hidden shortcuts bar must not paint its hint row\n{screen}"
         );
     }
 }
