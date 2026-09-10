@@ -47,6 +47,16 @@ struct ThemeFile {
     colors: BTreeMap<String, String>,
 }
 
+const MAX_METADATA_CHARS: usize = 256;
+
+fn sanitize_metadata(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| if ch.is_control() { ' ' } else { ch })
+        .take(MAX_METADATA_CHARS)
+        .collect()
+}
+
 pub fn bundled() -> Vec<LoadedTheme> {
     [
         ("opencode-dark.toml", OPENCODE_DARK),
@@ -150,9 +160,20 @@ fn parse_theme(file: ThemeFile) -> Result<LoadedTheme, String> {
         set_color(&mut theme, role, color).ok_or_else(|| format!("unknown color role: {role}"))?;
     }
 
+    let display_name = file
+        .display_name
+        .as_deref()
+        .map(sanitize_metadata)
+        .unwrap_or_else(|| canonical.clone());
+    let description = file
+        .description
+        .as_deref()
+        .map(sanitize_metadata)
+        .unwrap_or_default();
+
     Ok(LoadedTheme {
-        display_name: file.display_name.unwrap_or_else(|| canonical.clone()),
-        description: file.description.unwrap_or_default(),
+        display_name,
+        description,
         canonical,
         appearance,
         theme,
@@ -319,6 +340,39 @@ bg_base = "#000000"
         let error =
             parse_document(document, "custom.toml").expect_err("reserved name must be rejected");
         assert!(error.contains("reserved"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn custom_metadata_replaces_terminal_controls() {
+        let theme = parse_theme(ThemeFile {
+            name: "safe".to_string(),
+            display_name: Some("Display\u{1b}[31m\nName\u{7f}".to_string()),
+            appearance: "dark".to_string(),
+            description: Some("Description\r\n\t\u{9b}tail".to_string()),
+            colors: BTreeMap::new(),
+        })
+        .expect("theme metadata should parse");
+
+        assert_eq!(theme.display_name, "Display [31m Name ");
+        assert_eq!(theme.description, "Description    tail");
+        assert!(theme.display_name.chars().all(|ch| !ch.is_control()));
+        assert!(theme.description.chars().all(|ch| !ch.is_control()));
+    }
+
+    #[test]
+    fn custom_metadata_is_bounded() {
+        let long = "x".repeat(MAX_METADATA_CHARS + 1);
+        let theme = parse_theme(ThemeFile {
+            name: "bounded".to_string(),
+            display_name: Some(long.clone()),
+            appearance: "light".to_string(),
+            description: Some(long),
+            colors: BTreeMap::new(),
+        })
+        .expect("theme metadata should parse");
+
+        assert_eq!(theme.display_name.chars().count(), MAX_METADATA_CHARS);
+        assert_eq!(theme.description.chars().count(), MAX_METADATA_CHARS);
     }
 
     #[test]
