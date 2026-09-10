@@ -1,5 +1,56 @@
 # Changelog
 
+# 1.0.24-fork.5 — 2026-09-10
+
+本版为上游同步、Fork 功能与问题修复更新，产品版本仍为 **1.0.24**。发布范围覆盖上一版 `v1.0.24-fork.4` 之后的状态栏与主题功能、终端安全修复、上游同步提交 `37949780` 以及合并适配修复；上游 Source-Revision 为 `c4ea71cfdbcdb21e32e41bc25a0043d7d4836714`。
+
+### 上游更新
+
+- 同步上游启动与会话架构调整，包括启动缓存与设置加载修复、会话创建/恢复和 agent-host 流程改进、提示确认超时恢复，以及会话、扩展和 MCP 启动职责的重新组织。
+- 增加 durable v2 memory observation capture 和隔离的 v2 memory storage 基础能力，同时保留现有 Fork 的内存配置与兼容路径。
+- 改进 hooks 界面反馈、后台任务快照、语音输入、仪表盘 actions row 键盘导航、工作区配置解析和 agent workflow 控制。
+- 增加启动、会话、子代理、回合时间和 OpenTelemetry 相关观测能力，并收紧若干 listener、ripgrep 和 SVG 缩略图处理路径。
+
+### 本 Fork
+
+- 状态栏新增 `usage`、`billing` 和 `quota` 项，分别用于显示会话 token、账户周期用量和当前模型 CPA 剩余额度；数据不可用时对应项目自动省略。
+- 增加内置 OpenCode 深色与浅色主题，并支持从 `$GROK_HOME/theme` 加载 TOML/JSON 自定义主题；保留主题选择、自动深浅主题和现有主题配置兼容性。
+- 修复自定义主题名称和描述中的终端控制字符注入问题；控制字符替换为空格，元数据长度限制为 256 个字符，并增加回归测试。
+- 为上游合并后的新的等待状态、仪表盘操作行和主题行为补齐 Fork 侧适配，同时保留英文/简体中文界面、账户用量、CPA 配额、会话累计用量和主题设置能力。
+- 补回上游合并时丢失的失败 hook 结果行：忽略失败的 hook 会显示带工具行项目符号的 `HookOutcome` 文案，工具行附着与回合结束 hook 折叠仍保留 Fork 实现。
+
+### 兼容性
+
+- 产品版本仍为 **1.0.24**；现有配置段、模型 ID、命令行用法和状态栏协议版本保持兼容，新增状态栏字段均为可选字段。
+- 旧版状态栏脚本继续读取已有字段；新脚本可以按会话和模型分别读取 token、费用、账户用量和配额信息。
+- 自定义主题文件仍使用既有 `name`、`appearance`、`description` 和 `colors` 字段；不符合名称、外观或颜色规则的文件继续被忽略，不新增外部服务或鉴权流程。
+- 上游同步带来的 v2 memory 能力与现有 legacy memory 配置并存；未选择 v2 模式的既有配置继续走兼容路径。
+
+### 国际化
+
+- 新增或修改的用户可见状态栏、主题选择、等待状态和仪表盘操作行文案已补齐英文与简体中文目录，并继续使用英文回退。
+- 自定义主题文件中的用户提供名称和描述不是翻译键，而是经过终端控制字符清理后按原文显示。
+- 本版未扩展其它语种翻译；其它语种继续使用英文目录回退。
+
+### 验证
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：257 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib settings_render_uses_pseudo_locale_for_core_modes`：通过；同次编译覆盖上游合并后补回的 hook 结果行与回合结束标记测试。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：9 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`：9 项通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：在 Protoc 29.3 和 `GROK_VERSION=1.0.24-fork.5` 环境下通过；版本输出包含当前 Fork 版本格式。
+- PR #8 的 GitHub Actions 已通过 Linux x86_64、Windows x86_64、Localization audit 和 Resolve version 检查；发布工作流会在本版本提交上重新执行构建、测试、国际化审计和版本校验。
+- 完整 `xai-grok-pager-render` 库测试曾有 1186/1187 通过；唯一失败是上一版已存在的剪贴板提示断言与英文目录长破折号文案不一致，不涉及本版修复路径。
+
+### 产物
+
+- `grok-1.0.24-fork.5-linux-x86_64`
+- `grok-1.0.24-fork.5-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.24-fork.4...v1.0.24-fork.5
+
 # 1.0.24-fork.4 — 2026-09-10
 
 本版为 Fork 功能与问题修复更新，产品版本仍为 **1.0.24**，不包含新的上游同步。
