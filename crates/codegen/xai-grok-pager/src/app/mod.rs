@@ -44,9 +44,11 @@ pub(crate) use dispatch::dashboard_stop_readiness;
 /// Display-refresh probe + motion cadence + terminal telemetry at startup.
 mod display_refresh_startup;
 mod effects;
+pub(crate) mod prompt_ack;
 pub(crate) mod error_display;
 mod x10_filter;
 pub(crate) use effects::sanitize_user_error;
+pub(crate) use effects::cancel_notification_meta;
 mod event_loop;
 mod event_loop_stall;
 mod exit_timeout;
@@ -728,12 +730,14 @@ pub async fn run(
     )
     .await
     .unwrap_or(None);
-    let had_prefetch = match refreshed_auth {
-        Some(auth) => xai_grok_shell::agent::models::startup_prefetch::begin_with_auth(Some(auth)),
-        None => {
-            xai_grok_shell::agent::models::startup_prefetch::begin(Some(grok_com_config.clone()))
-        }
-    };
+    let settings_query = xai_grok_shell::agent::remote_config::settings_get::SettingsQuery::resolve(
+        refreshed_auth,
+        Some(grok_com_config.clone()),
+    );
+    let had_prefetch = xai_grok_shell::agent::remote_config::settings_get::is_eligible(&settings_query);
+    if had_prefetch {
+        xai_grok_shell::agent::remote_config::settings_get::warm_startup_settings(settings_query.clone());
+    }
     xai_grok_shell::agent::mvp_agent::warm_async_http_client();
     tokio::task::spawn_blocking(|| {});
     if let Ok(cwd) = std::env::current_dir() {
@@ -742,8 +746,17 @@ pub async fn run(
     let prefetch_wait_started = std::time::Instant::now();
     let remote_settings = if had_prefetch {
         let _wait_span = region!("startup.prefetch_join_wait", Parent::Inherit);
-        let settings =
-            xai_grok_shell::agent::models::startup_prefetch::wait_settings(EARLY_PREFETCH_WAIT);
+        let warmed_auth = settings_query.auth().cloned();
+        let wait = xai_grok_shell::agent::remote_config::settings_get::await_startup_settings(
+            settings_query,
+            EARLY_PREFETCH_WAIT,
+            &tokio_util::sync::CancellationToken::new(),
+        ).await;
+        let settings = xai_grok_shell::agent::remote_config::settings_get::consume_wait(
+            wait,
+            warmed_auth.as_ref(),
+            &grok_com_config,
+        );
         xai_grok_telemetry::startup::record_prefetch_wait(prefetch_wait_started.elapsed());
         settings
     } else {
@@ -753,9 +766,7 @@ pub async fn run(
         remote_settings.as_ref().and_then(|s| s.auto_mode.clone()),
     );
     xai_grok_shell::util::config::cache_remote_prompt_suggestions(
-        remote_settings
-            .as_ref()
-            .and_then(|s| s.prompt_suggestions.clone()),
+        remote_settings.as_ref().and_then(|s| s.prompt_suggestions.clone()),
     );
     xai_grok_shell::util::config::set_remote_campaigns_from_settings(remote_settings.as_ref());
     let raw_config = xai_grok_shell::config::load_effective_config()

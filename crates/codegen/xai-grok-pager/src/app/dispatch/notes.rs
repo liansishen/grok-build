@@ -676,6 +676,7 @@ pub(super) fn dispatch_save_remember_note_from_modal(app: &mut AppView) -> Vec<E
         agent_id: id,
         text: content,
         cwd,
+        pinned_mode: agent.memory_mode,
     }]
 }
 

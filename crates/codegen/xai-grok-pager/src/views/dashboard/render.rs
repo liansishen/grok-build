@@ -67,16 +67,8 @@ const ROW_HEIGHT: u16 = 3;
 /// Per-group-header visual height in cells: a label row and a one-cell breathing gap.
 const GROUP_HEADER_HEIGHT: u16 = 2;
 
-/// Promo upgrade CTA for the dashboard header, resolved through the shared slot gate by the producer (`app_view`).
-#[derive(Clone, Copy)]
-pub struct HeaderUpgradeCta<'a> {
-    /// The `[label]` button text.
-    pub label: &'a str,
-    /// True when the promo is non-dismissible, so the `Ctrl+O` override applies.
-    pub pinned: bool,
-    /// The promo's trimmed `cta.caption` value; painted only when `pinned` is set.
-    pub caption: Option<&'a str>,
-}
+/// Promo upgrade CTA shared with the dashboard chrome producer.
+pub use super::chrome::HeaderUpgradeCta;
 
 /// The user must press Space to peek (which routes the permission question and options into the
 /// peek panel) and then a number key to answer.
@@ -803,18 +795,18 @@ fn render_header(
     });
     let label_budget = full_label_budget.saturating_sub(upgrade_reserve);
 
-    let crate::views::welcome::LocationParts {
+    let crate::views::location::LocationParts {
         branch,
         is_worktree,
         cwd_display,
-    } = crate::views::welcome::location_parts(&state.cwd);
+    } = crate::views::location::location_parts(&state.cwd);
     let mut location_spans: Vec<Span<'static>> = Vec::new();
     if let Some(branch) = branch {
         location_spans.push(Span::styled(branch, dim));
         location_spans.push(Span::styled(" ", bg));
     }
     if is_worktree {
-        location_spans.push(crate::views::welcome::worktree_badge(theme).patch_style(bg));
+        location_spans.push(crate::views::location::worktree_badge(theme).patch_style(bg));
     }
     location_spans.push(Span::styled(cwd_display, bg.fg(theme.text_secondary)));
     let mut location = truncate_line(Line::from(location_spans), label_budget);
@@ -943,7 +935,7 @@ fn render_actions_row(
 ) {
     if area.area() == 0 {
         // No row means no `Open Previous` button under a cursor parked there
-        if state.open_session_button_focused {
+        if state.open_session_button_focused() {
             state.focus_new_agent_button();
         }
         return;
@@ -1027,7 +1019,7 @@ fn render_actions_row(
             Span::styled(
                 xai_grok_i18n::t("dashboard.open_previous"),
                 bg.fg(button_fg(
-                    state.open_session_button_focused,
+                    state.open_session_button_focused(),
                     state.open_session_button_hit.hovered,
                     theme.gray,
                 )),
@@ -1043,12 +1035,12 @@ fn render_actions_row(
         state.open_session_button_hit.set(open_rect.flatten());
     }
     // A cursor parked on `Open Previous` needs a painted button under it; when the row dropped it, fall back to `+ New Agent`
-    if state.open_session_button_focused && state.open_session_button_hit.rect.is_none() {
+    if state.open_session_button_focused() && state.open_session_button_hit.rect.is_none() {
         state.focus_new_agent_button();
     }
 
     let new_agent_fg = button_fg(
-        state.new_agent_button_focused,
+        state.new_agent_button_focused(),
         state.new_agent_button_hit.hovered,
         theme.text_secondary,
     );
@@ -3403,7 +3395,7 @@ fn render_footer(
                 .render(inner, buf);
             return;
         }
-        if state.open_session_button_focused {
+        if state.open_session_button_focused() {
             let hints = vec![
                 HintItem::new(
                     key!(Enter),
@@ -3426,7 +3418,7 @@ fn render_footer(
                 .render(inner, buf);
             return;
         }
-        if state.new_agent_button_focused {
+        if state.new_agent_button_focused() {
             let mut hints = vec![HintItem::new(
                 key!(Enter),
                 xai_grok_i18n::t("dashboard.footer.create"),
@@ -3500,7 +3492,7 @@ fn render_footer(
 
     // Submit chord is `send_key` (Enter, or Shift/Alt+Enter in multiline). Ctrl+S is send+open.
     // Empty draft: create/open on the submit chord; non-empty: send
-    let button_focused = state.new_agent_button_focused || state.open_session_button_focused;
+    let button_focused = state.new_agent_button_focused() || state.open_session_button_focused();
     let row_selected = state.selected.is_some();
     let prompt_empty = state.dispatch.text().trim().is_empty();
 

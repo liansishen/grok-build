@@ -558,6 +558,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         crate::app::workspace_sync::request(app);
     }
     match result {
+        TaskResult::WithPinnedMemoryMode { agent_id, memory_mode, result } => {
+            if let Some(agent) = app.agents.get_mut(&agent_id) {
+                agent.memory_mode = memory_mode;
+            }
+            dispatch_task_result(*result, app)
+        }
         TaskResult::SessionCreated { agent_id, session_id, models: new_models, .. } => {
             handle_session_created(app, agent_id, session_id, new_models)
         }

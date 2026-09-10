@@ -839,6 +839,8 @@ pub struct AppView {
     pub welcome_prompt_focused: bool,
     /// Session created for the current home screen.
     pub home_session_agent: Option<AgentId>,
+    /// Welcome husk that survives the initial session reveal.
+    pub optimistic_home_husk: Option<AgentId>,
     /// Sticky flag: set once the user types in the welcome prompt, hides the
     /// tip for the rest of the session (even if the input is cleared).
     pub welcome_tip_typing_dismissed: bool,
@@ -1813,6 +1815,7 @@ impl AppView {
             command_tags,
             welcome_prompt_focused: true,
             home_session_agent: None,
+            optimistic_home_husk: None,
             welcome_tip_typing_dismissed: false,
             pending_effects: Vec::new(),
             pending_editor: None,

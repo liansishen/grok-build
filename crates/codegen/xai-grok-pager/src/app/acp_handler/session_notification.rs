@@ -922,7 +922,7 @@ pub(super) fn handle_session_notification_with_origin(
             }
             true
         }
-        XaiSessionUpdate::HookAnnotation { message } => {
+        XaiSessionUpdate::HookAnnotation { message, .. } => {
             if app.appearance.disable_plugins {
                 return false;
             }

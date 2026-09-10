@@ -438,7 +438,7 @@ pub struct TextClickState {
     pub click_count: u8,
 }
 /// Maximum time (ms) between consecutive clicks to count as a multi-click.
-pub(super) const MULTI_CLICK_TIMEOUT_MS: u128 = 300;
+pub(crate) const MULTI_CLICK_TIMEOUT_MS: u128 = 300;
 /// Minimum interval (ms) between clipboard toasts for rapid word/line
 /// selections. Drag completions always show the toast regardless.
 const CLIPBOARD_TOAST_DEBOUNCE_MS: u128 = 500;
@@ -1402,6 +1402,7 @@ pub struct AgentView {
     /// Whether the `/share` slash command is available (mirrors
     /// `AppView::sharing_enabled`). Used to gate palette entries.
     pub sharing_enabled: bool,
+    pub(crate) memory_mode: Option<xai_grok_shell::config::MemoryMode>,
     /// Mirrors `AppView::usage_visible` (credit warning + `/usage manage`).
     pub billing_surface_visible: bool,
     /// Whether `/usage` is offered. Mirrors `!AppView::has_external_auth_provider`.
@@ -1463,6 +1464,8 @@ pub struct AgentView {
     /// `session/cancel` is fire-and-forget with known loss windows, so the event loop re-sends the idempotent cancel after
     /// [`super::dispatch::CANCEL_RESEND_GRACE`] while still cancelling.
     pub(crate) pending_cancel_resend: Option<PendingCancelResend>,
+    /// Prompt acknowledgement watcher for the currently dispatched prompt.
+    pub(crate) prompt_ack: Option<crate::app::prompt_ack::PromptAckWatch>,
     pub(crate) cancel_latency: Option<CancelLatency>,
     /// Send-now cancel expectation: the client-minted id of an explicit cancel-and-send this client dispatched into a running turn (send-now chord / `SendPromptNow`, or queue-row "Send now"). The running turn's imminent cancel is the silent half of cancel-and-send, so the turn-end rails suppress the "Turn cancelled by user …" marker.
     /// Compat fallback only: a wire `_meta.cancelTrigger` on the turn end is trusted over this flag (`"send_now"` suppresses, anything else renders). Consumed at every driver turn end. Kept across the matching send-now prompt's turn start (so the outgoing turn's cancel

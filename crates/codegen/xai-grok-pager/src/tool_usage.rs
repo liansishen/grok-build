@@ -108,8 +108,7 @@ impl ToolCategory {
             ToolCallBlock::IntegrationSearch(_) | ToolCallBlock::UseTool(_) => Self::Other,
             ToolCallBlock::MemorySearch(_)
             | ToolCallBlock::SentMessage(_)
-            | ToolCallBlock::Other(_)
-            | ToolCallBlock::Lifecycle(_) => Self::Other,
+            | ToolCallBlock::Other(_) | ToolCallBlock::Lifecycle(_) => Self::Other,
         }
     }
 }

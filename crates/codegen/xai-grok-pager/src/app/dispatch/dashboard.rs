@@ -2964,7 +2964,7 @@ pub(super) fn dispatch_dashboard_select(app: &mut AppView, next: bool) {
     // Button-focused navigation contract:
     //   - Down on the button → first focusable (header or row).
     //   - Up on the button   → stay on the button (no wrap).
-    if d.new_agent_button_focused {
+    if d.new_agent_button_focused() {
         if next && !focusables.is_empty() {
             set_cursor(d, &focusables[0]);
             d.clear_manual_scroll();

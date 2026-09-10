@@ -668,7 +668,9 @@ fn voice_final_appends_to_dashboard_dispatch() {
     let mut app = test_app_with_agent();
     app.active_view = ActiveView::AgentDashboard;
     ensure_dashboard_state(&mut app);
-    app.dashboard.as_mut().unwrap().dispatch.set_text("fix");
+    let dispatch = &mut app.dashboard.as_mut().unwrap().dispatch;
+    dispatch.set_text("fix");
+    dispatch.set_cursor("fix".len());
     app.voice_state = VoiceState::Stopping {
         target: VoiceTarget::DashboardDispatch,
         interim: None,
@@ -707,6 +709,7 @@ fn voice_final_appends_to_peek_reply_when_peek_open() {
         },
     ));
     dash.peek_reply.set_text("reply");
+    dash.peek_reply.set_cursor("reply".len());
     app.voice_state = VoiceState::Stopping {
         target: VoiceTarget::DashboardPeekReply(id),
         interim: None,
@@ -2283,7 +2286,7 @@ fn workspace_grouping_toggle_emits_sqlite_layout_write_not_config_write() {
             .all(|effect| !matches!(effect, Effect::PersistDashboard(_)))
     );
     let dashboard = app.dashboard.as_ref().unwrap();
-    assert!(dashboard.new_agent_button_focused);
+    assert!(dashboard.new_agent_button_focused());
     assert!(!dashboard.manual_scroll_active);
 }
 #[test]
@@ -2761,7 +2764,7 @@ fn workspace_overlay_closes_unbound_agent_without_store_removal() {
     assert_eq!(app.active_view, ActiveView::AgentDashboard);
     let dashboard = app.dashboard.as_ref().unwrap();
     assert!(dashboard.attached_agent.is_none());
-    assert!(dashboard.new_agent_button_focused);
+    assert!(dashboard.new_agent_button_focused());
 }
 #[test]
 fn workspace_list_allows_archiving_waiting_for_user_row() {
@@ -4111,7 +4114,7 @@ fn dashboard_dispatch_with_top_level_selection_creates_new_session() {
 fn dashboard_enter_button_focused_with_text_creates_and_stays() {
     let mut app = test_app();
     open_dashboard(&mut app);
-    assert!(app.dashboard.as_ref().unwrap().new_agent_button_focused);
+    assert!(app.dashboard.as_ref().unwrap().new_agent_button_focused());
     let agents_before = app.agents.len();
     let _ = dispatch_dashboard_dispatch(&mut app, "kick off a fresh session".into(), false);
     assert_eq!(
@@ -4136,7 +4139,7 @@ fn dashboard_enter_button_focused_with_text_creates_and_stays() {
 fn dashboard_ctrl_s_button_focused_with_text_creates_and_opens() {
     let mut app = test_app();
     open_dashboard(&mut app);
-    assert!(app.dashboard.as_ref().unwrap().new_agent_button_focused);
+    assert!(app.dashboard.as_ref().unwrap().new_agent_button_focused());
     let _ = dispatch_dashboard_dispatch(&mut app, "kick off and open".into(), true);
     let new_id = *app.agents.keys().last().unwrap();
     assert!(
@@ -4156,7 +4159,7 @@ fn dashboard_ctrl_s_button_focused_with_text_creates_and_opens() {
         "Ctrl+S must snap selection onto the new row (overlay anchor)",
     );
     assert!(
-        !app.dashboard.as_ref().unwrap().new_agent_button_focused,
+        !app.dashboard.as_ref().unwrap().new_agent_button_focused(),
         "selection on the new row implies the button is no longer focused",
     );
 }
@@ -4476,7 +4479,7 @@ fn dashboard_open_does_not_auto_attach_to_focused_agent() {
         d.selected,
     );
     assert!(
-        d.new_agent_button_focused,
+        d.new_agent_button_focused(),
         "open must default to the `+ New Agent` button (new-session mode)",
     );
     assert!(
@@ -4494,7 +4497,7 @@ fn dashboard_open_with_agents_list_focused() {
     open_dashboard(&mut app);
     let d = app.dashboard.as_ref().unwrap();
     assert!(d.list_focused, "nonempty open must focus the overview list");
-    assert!(d.new_agent_button_focused);
+    assert!(d.new_agent_button_focused());
     assert!(d.selected.is_none());
     app.dashboard.as_mut().unwrap().list_focused = false;
     app.dashboard
@@ -4508,7 +4511,7 @@ fn dashboard_open_with_agents_list_focused() {
     let d = app.dashboard.as_ref().unwrap();
     assert!(d.list_focused, "reopen with agents must re-list-focus");
     assert!(
-        d.new_agent_button_focused,
+        d.new_agent_button_focused(),
         "reopen resets to new-agent button",
     );
     assert!(d.selected.is_none());
@@ -4525,7 +4528,7 @@ fn dashboard_open_empty_input_focused() {
         !d.list_focused,
         "empty open must keep dispatch input focused",
     );
-    assert!(d.new_agent_button_focused);
+    assert!(d.new_agent_button_focused());
     assert!(d.selected.is_none());
     app.dashboard.as_mut().unwrap().list_focused = true;
     let _ = dispatch_exit_dashboard(&mut app);
@@ -4578,7 +4581,7 @@ fn dashboard_open_from_welcome_focuses_new_agent_button() {
         d.selected,
     );
     assert!(
-        d.new_agent_button_focused,
+        d.new_agent_button_focused(),
         "the `+ New Agent` button must be focused as the default",
     );
 }
@@ -4604,7 +4607,7 @@ fn dashboard_arrow_keys_clear_manual_scroll_flag_even_with_no_selection() {
     open_dashboard(&mut app);
     let d = app.dashboard.as_mut().unwrap();
     d.manual_scroll_active = true;
-    assert!(d.new_agent_button_focused);
+    assert!(d.new_agent_button_focused());
     assert!(d.selected.is_none());
     let _ = dispatch(Action::DashboardSelectNext, &mut app);
     assert!(!app.dashboard.as_ref().unwrap().manual_scroll_active);
@@ -6642,7 +6645,7 @@ fn dashboard_new_agent_button_create_with_detail_switches_view() {
         Some(new_id),
         "create-with-detail must set attached_agent so the overlay paints",
     );
-    assert!(!app.dashboard.as_ref().unwrap().new_agent_button_focused);
+    assert!(!app.dashboard.as_ref().unwrap().new_agent_button_focused());
     assert!(!effects.is_empty(), "session creation must emit effects");
 }
 #[serial_test::serial(GROK_AGENT_DASHBOARD)]
@@ -6659,7 +6662,7 @@ fn dashboard_focus_new_agent_button_action_clears_selection() {
     let _ = dispatch(Action::DashboardFocusNewAgentButton, &mut app);
     let d = app.dashboard.as_ref().unwrap();
     assert!(
-        d.new_agent_button_focused,
+        d.new_agent_button_focused(),
         "FocusNewAgentButton must light up the button flag",
     );
     assert!(
@@ -6680,7 +6683,7 @@ fn dashboard_up_arrow_from_first_row_focuses_button() {
     let _ = dispatch(Action::DashboardSelectPrev, &mut app);
     let d = app.dashboard.as_ref().unwrap();
     assert!(
-        d.new_agent_button_focused,
+        d.new_agent_button_focused(),
         "Up from the first row must focus the button",
     );
     assert!(d.selected.is_none());
@@ -6699,7 +6702,7 @@ fn dashboard_up_arrow_on_button_is_noop() {
     let _ = dispatch(Action::DashboardSelectPrev, &mut app);
     let d = app.dashboard.as_ref().unwrap();
     assert!(
-        d.new_agent_button_focused,
+        d.new_agent_button_focused(),
         "Up on button must stay on button"
     );
     assert!(d.selected.is_none());
@@ -6722,7 +6725,7 @@ fn dashboard_down_arrow_on_button_selects_first_focusable() {
         "Down on button must land on the first section header",
     );
     assert!(d.selected.is_none());
-    assert!(!d.new_agent_button_focused);
+    assert!(!d.new_agent_button_focused());
     let _ = dispatch(Action::DashboardSelectNext, &mut app);
     let d = app.dashboard.as_ref().unwrap();
     assert_eq!(
@@ -6743,19 +6746,19 @@ fn dashboard_down_arrow_from_open_session_selects_first_focusable() {
     let _ = dispatch(Action::DashboardSelectNext, &mut app);
     let dashboard = app.dashboard.as_ref().unwrap();
     assert!(dashboard.selected_section.is_some());
-    assert!(!dashboard.open_session_button_focused);
-    assert!(!dashboard.new_agent_button_focused);
+    assert!(!dashboard.open_session_button_focused());
+    assert!(!dashboard.new_agent_button_focused());
 }
 #[serial_test::serial(GROK_AGENT_DASHBOARD)]
 #[test]
 fn dashboard_down_arrow_on_button_with_no_rows_is_noop() {
     let mut app = test_app();
     open_dashboard(&mut app);
-    assert!(app.dashboard.as_ref().unwrap().new_agent_button_focused);
+    assert!(app.dashboard.as_ref().unwrap().new_agent_button_focused());
     let _ = dispatch(Action::DashboardSelectNext, &mut app);
     let d = app.dashboard.as_ref().unwrap();
     assert!(
-        d.new_agent_button_focused,
+        d.new_agent_button_focused(),
         "Down on button with empty row list must keep the button focused",
     );
     assert!(d.selected.is_none());
