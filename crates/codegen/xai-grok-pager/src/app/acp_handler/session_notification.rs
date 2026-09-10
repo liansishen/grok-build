@@ -42,6 +42,39 @@ pub(super) fn stash_live_stop_batch(
         }
     }
 }
+pub(super) fn failed_hook_line(
+    event_name: &str,
+    run: &xai_grok_shell::extensions::notification::HookRunEntryDto,
+) -> Option<String> {
+    use xai_grok_hooks::config::HookDisplayName;
+    use xai_grok_shell::extensions::notification::HookRunStatusDto;
+    let HookRunStatusDto::Failed {
+        error,
+        blocked: false,
+        ..
+    } = &run.status
+    else {
+        return None;
+    };
+    let subject = match xai_grok_hooks::config::hook_display_label(&run.name) {
+        HookDisplayName::Named(name) => format!("{event_name} hook ({name})"),
+        HookDisplayName::Tier(_) => format!("{event_name} hook"),
+    };
+    let error = error.lines().next().unwrap_or("").trim();
+    Some(if error.is_empty() {
+        format!("{subject} failed, ignored")
+    } else {
+        format!("{subject} failed, ignored: {error}")
+    })
+}
+/// A batch stamped with another turn's prompt id: a late `stop_cancelled` / `stop_failure` report can land after the next
+/// queued prompt started and must not touch its phase. Unstamped batches always belong to the running turn.
+fn is_foreign_hook_batch(agent: &AgentView, batch_prompt_id: Option<&str>) -> bool {
+    matches!(
+        (batch_prompt_id, agent.session.current_prompt_id.as_deref()),
+        (Some(batch), Some(current)) if batch != current
+    )
+}
 pub(super) fn refresh_context_used(view: &mut AgentView, used: u64) {
     let total = view.session.models.get_context_window().unwrap_or(0);
     view.apply_context_used(used, total);
@@ -922,25 +955,62 @@ pub(super) fn handle_session_notification_with_origin(
             }
             true
         }
-        XaiSessionUpdate::HookAnnotation { message, .. } => {
+        XaiSessionUpdate::HookRunStarted {
+            event_name,
+            tool_name,
+            count,
+            prompt_id,
+        } => {
+            if app.appearance.disable_plugins || is_foreign_hook_batch(agent, prompt_id.as_deref())
+            {
+                return false;
+            }
+            let batch = crate::acp::tracker::HookBatchId {
+                event_name,
+                tool_name,
+            };
+            agent
+                .session
+                .tracker
+                .set_hooks_running(batch, count, meta.agent_timestamp_ms);
+            false
+        }
+        XaiSessionUpdate::HookAnnotation { message, kind } => {
             if app.appearance.disable_plugins {
                 return false;
             }
             tracing::debug!("Hook annotation: {message}");
+            let event = match kind {
+                HookAnnotationKind::Note => SessionEvent::HookAnnotation { message },
+                HookAnnotationKind::ToolOutcome => SessionEvent::HookOutcome { message },
+            };
             agent
                 .scrollback
-                .push_block(RenderBlock::session_event(SessionEvent::HookAnnotation {
-                    message,
-                }));
+                .push_block(RenderBlock::session_event(event));
             true
         }
         XaiSessionUpdate::HookExecution {
             event_name,
-            tool_name: _tool_name,
+            tool_name,
             prompt_id: batch_prompt_id,
             runs,
         } => {
             use crate::scrollback::blocks::tool::{HookPhase, HookRunEntry, HookRunStatus};
+            let batch = crate::acp::tracker::HookBatchId {
+                event_name: event_name.clone(),
+                tool_name: tool_name.clone(),
+            };
+            let mut redraw = !is_foreign_hook_batch(agent, batch_prompt_id.as_deref())
+                && agent.session.tracker.clear_hooks_running(&batch);
+            if app.appearance.disable_plugins {
+                return redraw;
+            }
+            for line in runs.iter().filter_map(|r| failed_hook_line(&event_name, r)) {
+                agent.scrollback.push_block(RenderBlock::session_event(
+                    SessionEvent::HookOutcome { message: line },
+                ));
+                redraw = true;
+            }
             let hook_entries: Vec<HookRunEntry> = runs
                 .into_iter()
                 .map(|r| {
@@ -980,6 +1050,12 @@ pub(super) fn handle_session_notification_with_origin(
             let is_tool_hook = event_name == "pre_tool_use" || event_name == "post_tool_use";
             let is_stop_hook =
                 xai_hooks_plugins_types::HookEvent::from_wire(&event_name).is_turn_end();
+            let has_visible_hook = hook_entries.iter().any(|r| {
+                matches!(
+                    r.status,
+                    HookRunStatus::Failed { .. } | HookRunStatus::Blocked { .. }
+                )
+            });
             if is_tool_hook {
                 let phase = if event_name == "pre_tool_use" {
                     HookPhase::Pre
@@ -988,6 +1064,7 @@ pub(super) fn handle_session_notification_with_origin(
                 };
                 if let Some(entry_id) = agent.scrollback.last_tool_call_entry_id() {
                     agent.scrollback.attach_hooks(entry_id, phase, hook_entries);
+                    redraw = true;
                 }
             } else if is_stop_hook && !meta.is_replay && !agent.session.loading_replay {
                 let local_turn_active =
@@ -998,9 +1075,12 @@ pub(super) fn handle_session_notification_with_origin(
                     && batch_prompt_id != agent.session.current_prompt_id
                     && !batch_is_wake;
                 if foreign_batch {
-                    agent
-                        .scrollback
-                        .push_lifecycle_hooks(event_name, hook_entries);
+                    if has_visible_hook {
+                        agent
+                            .scrollback
+                            .push_lifecycle_hooks(event_name, hook_entries);
+                        redraw = true;
+                    }
                 } else if !batch_is_wake && local_turn_active {
                     let stash_pid = batch_prompt_id
                         .clone()
@@ -1012,6 +1092,7 @@ pub(super) fn handle_session_notification_with_origin(
                         hook_entries,
                         batch_prompt_id.is_some(),
                     );
+                    redraw = true;
                 } else if let Some(entry_id) = agent
                     .scrollback
                     .latest_turn_marker_accepting(&event_name, batch_prompt_id.as_deref())
@@ -1022,17 +1103,20 @@ pub(super) fn handle_session_notification_with_origin(
                         hook_entries,
                         batch_prompt_id.as_deref(),
                     );
-                } else {
+                    redraw = true;
+                } else if has_visible_hook {
                     agent
                         .scrollback
                         .push_lifecycle_hooks(event_name, hook_entries);
+                    redraw = true;
                 }
-            } else {
+            } else if has_visible_hook {
                 agent
                     .scrollback
                     .push_lifecycle_hooks(event_name, hook_entries);
+                redraw = true;
             }
-            true
+            redraw
         }
         XaiSessionUpdate::HooksChanged {
             hooks,
@@ -1431,7 +1515,6 @@ pub(super) fn handle_session_notification_with_origin(
     }
     changed && is_active
 }
-
 
 /// Handle an xAI session notification that targets a child (subagent) session.
 ///

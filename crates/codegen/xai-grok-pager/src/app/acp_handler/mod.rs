@@ -14,7 +14,8 @@ use xai_acp_lib::AcpClientMessage;
 
 use super::actions::Effect;
 use xai_grok_shell::extensions::notification::{
-    SessionNotification, SessionUpdate as XaiSessionUpdate, is_reauthable_failure,
+    HookAnnotationKind, SessionNotification, SessionUpdate as XaiSessionUpdate,
+    is_reauthable_failure,
 };
 use xai_grok_shell::tools::todo::todo_item_from_plan_entry;
 use xai_grok_tools::notification::ScheduledTaskRemovedReason;

@@ -120,6 +120,8 @@ pub enum SessionEvent {
     /// Hook annotation, displayed inline after a tool call.
     /// The message comes from the agent via `XaiSessionUpdate::HookAnnotation`.
     HookAnnotation { message: String },
+    /// A hook's verdict on the tool call above it (deny, failure, timeout); this block draws the tool-row bullet.
+    HookOutcome { message: String },
     /// The session's persisted model is no longer available after re-auth.
     /// Both IDs are empty when re-shown on blocked prompt attempts.
     ModelUnavailable {
@@ -261,7 +263,9 @@ impl SessionEvent {
             SessionEvent::CompactCompleted { elapsed } => {
                 format!("Compaction completed in {}.", format_duration(*elapsed))
             }
-            SessionEvent::HookAnnotation { message } => message.clone(),
+            SessionEvent::HookAnnotation { message } | SessionEvent::HookOutcome { message } => {
+                message.clone()
+            }
             SessionEvent::ModelUnavailable {
                 new_model_id,
                 reason,
@@ -599,10 +603,11 @@ impl BlockContent for SessionEventBlock {
 
     fn bullet(&self, ctx: &BlockContext) -> Option<AccentStyle> {
         // Recap: animated dot while loading; default gray dot when collapsed-idle; accent color when expanded
-        // Other events never show a bullet
-        if self.event.recap_summary().is_some()
-            && !ctx.is_running
-            && ctx.mode == DisplayMode::Collapsed
+        // A hook outcome keeps the default gray, matching its muted text; other events never show a bullet
+        if matches!(self.event, SessionEvent::HookOutcome { .. })
+            || (self.event.recap_summary().is_some()
+                && !ctx.is_running
+                && ctx.mode == DisplayMode::Collapsed)
         {
             return None;
         }
@@ -640,8 +645,9 @@ impl BlockContent for SessionEventBlock {
     }
 
     fn has_bullet(&self, ctx: &BlockContext) -> bool {
-        // Recap only, and only when the shared tool bullet is configured, so it tracks the same appearance setting as real tool calls
-        self.event.recap_summary().is_some()
+        // Recap and hook outcomes only, gated on the shared tool bullet so they track the tool rows' appearance setting
+        (self.event.recap_summary().is_some()
+            || matches!(self.event, SessionEvent::HookOutcome { .. }))
             && ctx
                 .appearance
                 .scrollback
@@ -927,6 +933,35 @@ mod tests {
             is_selected: false,
             cwd: None,
         }
+    }
+
+    /// The deny / failure line takes the tool rows' bullet (config-gated like theirs); a plain hook note stays unbulleted.
+    #[test]
+    fn hook_outcome_takes_the_tool_bullet_and_a_note_does_not() {
+        let outcome = SessionEventBlock::new(SessionEvent::HookOutcome {
+            message: "`web_fetch` blocked by global/qa: no".into(),
+        });
+        let note = SessionEventBlock::new(SessionEvent::HookAnnotation {
+            message: "`web_fetch` blocked by global/qa: no".into(),
+        });
+        assert!(outcome.has_bullet(&ctx()));
+        assert!(!note.has_bullet(&ctx()));
+        assert!(
+            outcome.bullet(&ctx()).is_none(),
+            "default gray, matching the muted text"
+        );
+
+        let mut no_bullet = ctx();
+        no_bullet.appearance.scrollback.blocks.tool.bullet = crate::appearance::ToolBullet::None;
+        assert!(
+            !outcome.has_bullet(&no_bullet),
+            "a user who turned tool bullets off gets none on hook lines either"
+        );
+        assert_eq!(
+            outcome.output(&ctx()).lines[0].content.to_string(),
+            "`web_fetch` blocked by global/qa: no",
+            "the message itself carries no glyph"
+        );
     }
 
     #[test]

@@ -17,6 +17,7 @@
 - 增加内置 OpenCode 深色与浅色主题，并支持从 `$GROK_HOME/theme` 加载 TOML/JSON 自定义主题；保留主题选择、自动深浅主题和现有主题配置兼容性。
 - 修复自定义主题名称和描述中的终端控制字符注入问题；控制字符替换为空格，元数据长度限制为 256 个字符，并增加回归测试。
 - 为上游合并后的新的等待状态、仪表盘操作行和主题行为补齐 Fork 侧适配，同时保留英文/简体中文界面、账户用量、CPA 配额、会话累计用量和主题设置能力。
+- 补回上游合并时丢失的失败 hook 结果行：忽略失败的 hook 会显示带工具行项目符号的 `HookOutcome` 文案，工具行附着与回合结束 hook 折叠仍保留 Fork 实现。
 
 ### 兼容性
 
@@ -35,6 +36,7 @@
 
 - `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
 - `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：257 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib settings_render_uses_pseudo_locale_for_core_modes`：通过；同次编译覆盖上游合并后补回的 hook 结果行与回合结束标记测试。
 - `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：9 项通过。
 - `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`：9 项通过。
 - `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：在 Protoc 29.3 和 `GROK_VERSION=1.0.24-fork.5` 环境下通过；版本输出包含当前 Fork 版本格式。
