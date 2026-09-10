@@ -377,7 +377,7 @@ pub(super) fn render_actions_row(
     buf.set_string(
         area.x,
         area.y,
-        crate::util::truncate_to_width(new_agent_label, new_agent_w as usize),
+        crate::util::truncate_to_width(&new_agent_label, new_agent_w as usize),
         bg.fg(new_agent_fg),
     );
     state.new_agent_button_hit.set(Some(Rect {
