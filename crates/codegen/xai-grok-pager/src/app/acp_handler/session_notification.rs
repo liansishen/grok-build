@@ -1,21 +1,6 @@
 use super::*;
 use xai_grok_shell::sampling::error::format_rate_limited_user_message;
 use xai_grok_shell::session::storage::ReplayLookupFallback;
-use std::sync::atomic::{AtomicBool, Ordering};
-
-static SHOW_REQUEST_METRICS: AtomicBool = AtomicBool::new(
-    xai_grok_shell::agent::config::UiConfig::SHOW_REQUEST_METRICS_DEFAULT,
-);
-
-/// Process-wide gate for compact per-request metrics in the scrollback.
-/// Synced from `[ui].show_request_metrics` at startup and when the setting changes.
-pub(crate) fn set_show_request_metrics_enabled(enabled: bool) {
-    SHOW_REQUEST_METRICS.store(enabled, Ordering::Relaxed);
-}
-
-fn request_metrics_enabled() -> bool {
-    SHOW_REQUEST_METRICS.load(Ordering::Relaxed)
-}
 /// Stash a live stop-family batch under `stash_pid` for the turn marker
 /// to fold. `merge_same_name` merges a same-name repeat instead of standalone.
 pub(super) fn stash_live_stop_batch(
@@ -255,7 +240,6 @@ pub(super) fn handle_session_notification_with_origin(
     };
     let parent_id = matched.agent_id();
     let is_active = is_matched_agent_active(app, parent_id);
-    let show_request_metrics = app.current_ui.show_request_metrics_enabled();
     let agent = app
         .agents
         .get_mut(&parent_id)
@@ -267,7 +251,6 @@ pub(super) fn handle_session_notification_with_origin(
             child_sid,
             agent,
             is_api_key_auth,
-            show_request_metrics,
         );
         return changed && is_active;
     }
@@ -375,20 +358,7 @@ pub(super) fn handle_session_notification_with_origin(
                 changed
             }
         }
-        XaiSessionUpdate::ResponseCompleted {
-            ref prompt_id,
-            ref usage,
-            time_to_first_token_ms,
-            duration_ms,
-            ..
-        } => push_request_metrics(
-            &mut agent.scrollback,
-            prompt_id.as_deref(),
-            usage.as_ref(),
-            time_to_first_token_ms,
-            duration_ms,
-            show_request_metrics,
-        ),
+        XaiSessionUpdate::ResponseCompleted { .. } => false,
         XaiSessionUpdate::TurnCompleted {
             prompt_id,
             stop_reason,
@@ -1462,33 +1432,6 @@ pub(super) fn handle_session_notification_with_origin(
     changed && is_active
 }
 
-fn push_request_metrics(
-    scrollback: &mut crate::scrollback::state::ScrollbackState,
-    prompt_id: Option<&str>,
-    usage: Option<&xai_grok_shell::extensions::notification::ResponseUsage>,
-    time_to_first_token_ms: Option<u64>,
-    duration_ms: Option<u64>,
-    enabled: bool,
-) -> bool {
-    if !enabled {
-        return false;
-    }
-    if prompt_id.is_some_and(|prompt_id| {
-        xai_grok_shell::session::PromptOrigin::from_prompt_id(prompt_id)
-            .hide_user_echo_from_scrollback()
-    }) {
-        return false;
-    }
-    let (Some(usage), Some(duration_ms)) = (usage, duration_ms) else {
-        return false;
-    };
-    scrollback.push_block(RenderBlock::request_metrics(
-        time_to_first_token_ms,
-        duration_ms,
-        usage,
-    ));
-    true
-}
 
 /// Handle an xAI session notification that targets a child (subagent) session.
 ///
@@ -1500,7 +1443,6 @@ pub(super) fn handle_child_session_notification(
     child_sid: &str,
     agent: &mut AgentView,
     is_api_key_auth: bool,
-    show_request_metrics: bool,
 ) -> bool {
     match update {
         XaiSessionUpdate::AutoCompactStarted { .. }
@@ -1526,25 +1468,7 @@ pub(super) fn handle_child_session_notification(
             }
             changed
         }
-        XaiSessionUpdate::ResponseCompleted {
-            ref prompt_id,
-            ref usage,
-            time_to_first_token_ms,
-            duration_ms,
-            ..
-        } => {
-            let Some(child_view) = agent.subagent_views.get_mut(child_sid) else {
-                return false;
-            };
-            push_request_metrics(
-                &mut child_view.scrollback,
-                prompt_id.as_deref(),
-                usage.as_ref(),
-                time_to_first_token_ms,
-                duration_ms,
-                show_request_metrics,
-            )
-        }
+        XaiSessionUpdate::ResponseCompleted { .. } => false,
         XaiSessionUpdate::ToolCallDeltaChunk {
             ref name,
             tool_index,
@@ -1586,23 +1510,6 @@ pub(crate) fn apply_child_view_session_event(
     update: &XaiSessionUpdate,
     is_api_key_auth: bool,
 ) -> bool {
-    if let XaiSessionUpdate::ResponseCompleted {
-        prompt_id,
-        usage,
-        time_to_first_token_ms,
-        duration_ms,
-        ..
-    } = update
-    {
-        return push_request_metrics(
-            &mut child_view.scrollback,
-            prompt_id.as_deref(),
-            usage.as_ref(),
-            *time_to_first_token_ms,
-            *duration_ms,
-            request_metrics_enabled(),
-        );
-    }
     let changed = apply_session_event(
         update,
         &mut child_view.session,

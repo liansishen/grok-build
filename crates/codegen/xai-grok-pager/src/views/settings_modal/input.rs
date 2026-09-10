@@ -5,6 +5,7 @@ use super::render::int_step_sizes;
 use super::state::{
     RowEntry, SettingsKeyOutcome, SettingsModalState, SettingsMode, SettingsModeKind,
     action_for_bool, action_for_enum, action_for_enum_commit, action_for_int, action_for_string,
+    preview_action_for_string,
     effective_enum_choices, group_children, validate_string,
 };
 use crate::app::actions::Action;
@@ -30,7 +31,23 @@ pub fn handle_settings_key(state: &mut SettingsModalState, key: &KeyEvent) -> Se
     }
 
     if is_close_key(key) {
-        return SettingsKeyOutcome::Close;
+        let revert = match &state.state.mode {
+            SettingsMode::PickingEnum {
+                key: setting_key,
+                original_value,
+                supports_preview: true,
+                ..
+            } => match original_value {
+                SettingValue::Enum(original) => action_for_enum(*setting_key, original),
+                SettingValue::String(original) => {
+                    preview_action_for_string(*setting_key, original.clone())
+                }
+                SettingValue::Bool(_) | SettingValue::Int(_) => None,
+            },
+            _ => None,
+        };
+        state.close_on_picker_exit = false;
+        return revert.map_or(SettingsKeyOutcome::Close, SettingsKeyOutcome::ActionThenClose);
     }
 
     match state.state.mode_kind() {
@@ -146,9 +163,18 @@ fn handle_picking_enum(state: &mut SettingsModalState, key: &KeyEvent) -> Settin
             if !close {
                 state.transition_to_browse();
             }
-            if let SettingValue::Enum(orig) = &original_value
-                && let Some(action) = action_for_enum(setting_key, orig)
-            {
+            let revert = if supports_preview {
+                match &original_value {
+                    SettingValue::Enum(orig) => action_for_enum(setting_key, orig),
+                    SettingValue::String(orig) => {
+                        preview_action_for_string(setting_key, orig.clone())
+                    }
+                    SettingValue::Bool(_) | SettingValue::Int(_) => None,
+                }
+            } else {
+                None
+            };
+            if let Some(action) = revert {
                 return if close {
                     SettingsKeyOutcome::ActionThenClose(action)
                 } else {
@@ -167,14 +193,20 @@ fn handle_picking_enum(state: &mut SettingsModalState, key: &KeyEvent) -> Settin
             if key.modifiers.is_empty() && !crate::settings::is_consent_chooser(setting_key) =>
         {
             state.transition_to_browse();
-            if supports_preview
-                && let SettingValue::Enum(orig) = &original_value
-                && let Some(revert) = action_for_enum(setting_key, orig)
-            {
-                return SettingsKeyOutcome::ActionPair(
-                    revert,
-                    Action::OpenResetConfirm { key: setting_key },
-                );
+            if supports_preview {
+                let revert = match &original_value {
+                    SettingValue::Enum(orig) => action_for_enum(setting_key, orig),
+                    SettingValue::String(orig) => {
+                        preview_action_for_string(setting_key, orig.clone())
+                    }
+                    SettingValue::Bool(_) | SettingValue::Int(_) => None,
+                };
+                if let Some(revert) = revert {
+                    return SettingsKeyOutcome::ActionPair(
+                        revert,
+                        Action::OpenResetConfirm { key: setting_key },
+                    );
+                }
             }
             SettingsKeyOutcome::Action(Action::OpenResetConfirm { key: setting_key })
         }
@@ -250,12 +282,21 @@ pub(super) fn set_picker_idx(
         return SettingsKeyOutcome::Unchanged;
     }
     state.transition_to_picking_enum(setting_key, new_idx, original_value, supports_preview);
-    // Preview dispatch for static Enums with preview support.
-    if supports_preview
-        && let Some(new_canonical) = picker_choice_at(state, setting_key, new_idx)
-        && let Some(action) = action_for_enum(setting_key, new_canonical)
-    {
-        return SettingsKeyOutcome::Action(action);
+    if supports_preview {
+        let dynamic = state
+            .registry
+            .find(setting_key)
+            .is_some_and(|meta| matches!(meta.kind, SettingKind::DynamicEnum { .. }));
+        let action = if dynamic {
+            picker_choice_at_owned(state, setting_key, new_idx)
+                .and_then(|canonical| preview_action_for_string(setting_key, canonical))
+        } else {
+            picker_choice_at(state, setting_key, new_idx)
+                .and_then(|canonical| action_for_enum(setting_key, canonical))
+        };
+        if let Some(action) = action {
+            return SettingsKeyOutcome::Action(action);
+        }
     }
     SettingsKeyOutcome::Changed
 }

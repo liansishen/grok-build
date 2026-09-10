@@ -45,6 +45,53 @@ fn omits_segments_whose_data_is_missing_or_rounds_to_zero() {
 }
 
 #[test]
+fn usage_billing_and_quota_segments_use_optional_context_data() {
+    use xai_grok_status_line::{
+        StatusLineBilling, StatusLineQuota, StatusLineQuotaAccount, StatusLineSessionUsage,
+    };
+
+    let mut ctx = context();
+    ctx.context_window.session_usage = Some(StatusLineSessionUsage {
+        input_tokens: 1_000,
+        output_tokens: 500,
+        cache_creation_input_tokens: 250,
+        cache_read_input_tokens: 250,
+    });
+    ctx.billing = Some(StatusLineBilling {
+        usage_percentage: Some(42.5),
+        period_type: Some("USAGE_PERIOD_TYPE_WEEKLY".into()),
+        ..Default::default()
+    });
+    ctx.quota = Some(StatusLineQuota {
+        model_id: "grok-4.5".into(),
+        accounts: vec![StatusLineQuotaAccount {
+            email: "user@example.com".into(),
+            used_percentage: 24.0,
+            remaining_percentage: 76.0,
+            ..Default::default()
+        }],
+    });
+
+    let text = compose_builtin(
+        &ctx,
+        None,
+        &[
+            StatusLineItem::Usage,
+            StatusLineItem::Billing,
+            StatusLineItem::Quota,
+        ],
+    );
+    let text = text
+        .iter()
+        .map(|segment| segment.text())
+        .collect::<Vec<_>>()
+        .join(" │ ");
+    assert!(text.contains("2.0k tok"), "usage segment: {text}");
+    assert!(text.contains("wk 42%"), "billing segment: {text}");
+    assert!(text.contains("quota 76%"), "quota segment: {text}");
+}
+
+#[test]
 fn name_past_its_budget_is_cut_by_painted_columns() {
     let mut ctx = context();
     ctx.session_name = Some("辺".repeat(SESSION_NAME_COLS));

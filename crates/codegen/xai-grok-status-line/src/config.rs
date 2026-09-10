@@ -326,6 +326,9 @@ pub enum StatusLineItem {
     Cwd,
     Model,
     Context,
+    Usage,
+    Billing,
+    Quota,
     Cost,
     TurnTimer,
     SessionName,
@@ -336,8 +339,14 @@ impl StatusLineItem {
 
     pub const fn varies_mid_turn(self) -> bool {
         match self {
-            Self::TurnTimer => true,
-            Self::Cwd | Self::Model | Self::Context | Self::Cost | Self::SessionName => false,
+            Self::TurnTimer | Self::Usage => true,
+            Self::Cwd
+            | Self::Model
+            | Self::Context
+            | Self::Billing
+            | Self::Quota
+            | Self::Cost
+            | Self::SessionName => false,
         }
     }
 

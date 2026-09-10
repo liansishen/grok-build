@@ -188,6 +188,10 @@ pub struct UiConfig {
     /// Env override: `GROK_TRANSPARENT_BG=1`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transparent_bg: Option<bool>,
+    /// Whether the contextual shortcuts bar occupies the bottom row of the full-screen pager.
+    /// Unset/`true` keeps the bar visible for backward compatibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_shortcuts_bar: Option<bool>,
     /// Retired hidden opt-in for terminal-like double/triple-click word/line selection.
     /// Superseded by `keep_text_selection = "word_select"`.
     /// Still read only when `keep_text_selection` is unset; Settings clears this on write.
@@ -343,6 +347,7 @@ impl Default for UiConfig {
             cursor_blink: None,
             screen_mode: None,
             transparent_bg: None,
+            show_shortcuts_bar: None,
             double_click_action: None,
             contextual_hints: ContextualHints::default(),
             combine_queued_prompts: None,
@@ -354,6 +359,10 @@ impl Default for UiConfig {
 }
 
 impl UiConfig {
+    /// Whether the bottom contextual shortcuts bar is visible.
+    pub fn show_shortcuts_bar_enabled(&self) -> bool {
+        self.show_shortcuts_bar.unwrap_or(true)
+    }
     /// The single source of truth for the timeline-sidebar default (opt-in). TODO: migrate the other boolean UI settings
     /// (show_timestamps, simple_mode, show_thinking_blocks, …) to the same const and resolver pattern. They currently
     /// duplicate their default literal across cache.rs / config.rs / defs.rs / setters.rs / registry.rs.
@@ -510,6 +519,18 @@ mod tests {
     fn transparent_bg_deserializes_from_json() {
         let ui: UiConfig = serde_json::from_str(r#"{"transparent_bg": true}"#).unwrap();
         assert_eq!(ui.transparent_bg, Some(true));
+    }
+
+    #[test]
+    fn show_shortcuts_bar_defaults_on_and_accepts_false() {
+        assert!(UiConfig::default().show_shortcuts_bar_enabled());
+        let off = UiConfig {
+            show_shortcuts_bar: Some(false),
+            ..Default::default()
+        };
+        assert!(!off.show_shortcuts_bar_enabled());
+        let decoded: UiConfig = serde_json::from_str(r#"{"show_shortcuts_bar":false}"#).unwrap();
+        assert!(!decoded.show_shortcuts_bar_enabled());
     }
 
     #[test]

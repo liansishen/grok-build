@@ -235,6 +235,8 @@ impl SessionActor {
                 display_name,
             },
             model_usage,
+            billing: None,
+            quota: None,
             workspace: StatusLineWorkspace {
                 current_dir: cwd,
                 repo_root,

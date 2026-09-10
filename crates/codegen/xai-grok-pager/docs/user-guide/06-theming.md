@@ -19,6 +19,12 @@ Grok includes six built-in themes, plus an `auto` option that follows your syste
 
 Theme names are case-insensitive. The `auto` option (alias `system`) is documented under [Auto Theme (System Appearance)](#auto-theme-system-appearance).
 
+### Custom theme files
+
+Grok also bundles the OpenCode dark theme as `opencode` and a matching light variant as `opencode-day`. Additional themes are loaded from `$GROK_HOME/theme` (normally `~/.grok/theme`) whenever the theme picker opens. TOML and JSON files are supported, and a user file with the same custom name replaces the bundled file.
+
+Each file must declare a unique `name` and an `appearance` of `dark` or `light`. `display_name`, `description`, and entries in `[colors]` are optional; omitted color slots inherit the matching built-in polarity. The canonical `name` is used in `[ui].theme`, `auto_dark_theme`, `auto_light_theme`, `/theme`, and completion. The appearance field controls whether a custom theme is offered in the dark or light automatic-theme picker.
+
 ### Terminal Theme
 
 `terminal` paints no surface backgrounds and defines almost no colors of its own — everything comes from your terminal profile. The scrollback, composer, modals, and status line leave the terminal's canvas visible (a translucent or image-backed window shows through Grok the way it shows through your shell), body text uses the terminal's default foreground, and accents (errors, diffs, links, syntax) come from your profile's 16-color ANSI palette. Because it borrows your profile's colors instead of assuming a light or dark background, it stays readable on any profile with no appearance detection, and it renders identically at every color depth.
@@ -165,11 +171,11 @@ Use compact mode on small screens to maximize content area.
 
 Grok bundles three `.tmTheme` files for code-block syntax highlighting and selects one based on the active theme:
 
-- `grok-night.tmTheme` -- GrokNight, RosePineMoon, and OscuraMidnight
-- `grok-day.tmTheme` -- GrokDay
+- `grok-night.tmTheme` -- GrokNight, dark custom themes, RosePineMoon, and OscuraMidnight
+- `grok-day.tmTheme` -- GrokDay and light custom themes
 - `tokyo-night.tmTheme` -- TokyoNight
 
-Grok selects the matching file automatically when you switch themes. The `.tmTheme` files are built into the binary, so you cannot replace them with your own.
+The `.tmTheme` files are built into the binary. Custom themes use the day or night syntax palette selected by their `appearance` attribute.
 
 ---
 

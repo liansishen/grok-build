@@ -15,7 +15,7 @@ use tokio::time::{Instant, sleep_until};
 use crate::appearance::ConfigWatcher;
 use crate::client_identity::{PAGER_CLIENT_TYPE, PAGER_CLIENT_VERSION};
 use crate::render::draw::{EscapeWriter, WriterDrain, WriterEvent};
-use crate::theme::system_appearance::{self, SystemAppearanceWatcher};
+use crate::theme::system_appearance::SystemAppearanceWatcher;
 use crate::theme::{Theme, ThemeKind, cache as theme_cache};
 
 use agent_client_protocol as acp;
@@ -1826,9 +1826,6 @@ pub(crate) async fn run(
         .and_then(|root| root.get("models")?.get("web_search")?.as_str())
         .unwrap_or_default()
         .to_string();
-    crate::app::acp_handler::set_show_request_metrics_enabled(
-        app.current_ui.show_request_metrics_enabled(),
-    );
     // Keep the process-wide catalog aligned with the language field itself.
     // Read it independently so a malformed unrelated `[ui]` setting cannot
     // make whole-UiConfig fallback reset a valid Chinese preference to auto.
@@ -3237,12 +3234,7 @@ pub(crate) async fn run(
                 if let Some(ref w) = appearance_watcher
                     && let Some(appearance) = w.current()
                 {
-                    let config = theme_cache::auto_theme_config();
-                    let new_kind = system_appearance::to_theme_kind(
-                        appearance,
-                        config.dark_theme,
-                        config.light_theme,
-                    );
+                    let new_kind = theme_cache::resolve_for_appearance(appearance);
                     let current = Theme::current_kind();
                     let effective = Theme::apply_kind(new_kind);
                     if effective != current {

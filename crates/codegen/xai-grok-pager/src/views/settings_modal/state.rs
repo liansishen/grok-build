@@ -869,9 +869,9 @@ pub(super) fn action_for_bool(key: SettingKey, new: bool) -> Option<Action> {
     match key {
         "compact_mode" => Some(Action::SetCompactMode(new)),
         "show_timestamps" => Some(Action::SetTimestamps(new)),
+        "transparent_bg" => Some(Action::SetTransparentBg(new)),
+        "show_shortcuts_bar" => Some(Action::SetShowShortcutsBar(new)),
         "show_timeline" => Some(Action::SetTimeline(new)),
-        "show_session_usage_bar" => Some(Action::SetShowSessionUsageBar(new)),
-        "show_request_metrics" => Some(Action::SetShowRequestMetrics(new)),
         "simple_mode" => Some(Action::SetSimpleMode(new)),
         "contextual_hints.undo" => Some(Action::SetContextualHintUndo(new)),
         "contextual_hints.plan_mode" => Some(Action::SetContextualHintPlanMode(new)),
@@ -919,6 +919,17 @@ pub(super) fn action_for_enum(key: SettingKey, choice: &'static str) -> Option<A
         "render_mermaid" => None,
         "keep_text_selection" => None,
         "scroll_mode" => None,
+        _ => None,
+    }
+}
+
+/// Construct preview-only actions for dynamic string-backed enum settings.
+/// Model catalogs do not support preview; theme catalogs do.
+pub(super) fn preview_action_for_string(key: SettingKey, value: String) -> Option<Action> {
+    match key {
+        "theme" => Some(Action::PreviewTheme(value)),
+        "auto_dark_theme" => Some(Action::PreviewAutoDarkTheme(value)),
+        "auto_light_theme" => Some(Action::PreviewAutoLightTheme(value)),
         _ => None,
     }
 }
@@ -990,6 +1001,13 @@ pub(super) fn action_for_string(
     snapshot: &PagerLocalSnapshot,
 ) -> Option<Action> {
     match key {
+        "theme" => crate::theme::canonical_name(&value).map(Action::SetTheme),
+        "auto_dark_theme" => crate::theme::canonical_name(&value)
+            .filter(|canonical| canonical != "auto")
+            .map(Action::SetAutoDarkTheme),
+        "auto_light_theme" => crate::theme::canonical_name(&value)
+            .filter(|canonical| canonical != "auto")
+            .map(Action::SetAutoLightTheme),
         "default_model" => {
             if value.is_empty() {
                 Some(Action::ClearDefaultModel)

@@ -120,15 +120,22 @@ pub fn mermaid_block_ranges(view: &MarkdownRenderView) -> Vec<Range<usize>> {
         .collect()
 }
 
-/// `GrokDay` is the only light theme. `Terminal` has no polarity of its own — a rendered diagram is a raster with a
+/// `GrokDay` and light custom themes use the light treatment. `Terminal` has no polarity of its own — a rendered diagram is a raster with a
 /// baked background, so it takes the dark treatment that minimal mode already gets. It lives here (not in the
 /// engine crate) so the always-compiled detection module stays independent of the optional `mermaid` feature.
 pub fn theme_is_dark(theme: ThemeKind) -> bool {
-    !matches!(theme, ThemeKind::GrokDay)
+    match theme {
+        ThemeKind::GrokDay => false,
+        ThemeKind::Custom => !matches!(
+            crate::theme::cache::current_custom_appearance(),
+            Some(crate::theme::ThemeAppearance::Light)
+        ),
+        _ => true,
+    }
 }
 
-/// Cache key for a rendered diagram: content hash, theme, quality tier, and (for the terminal tier) bucketed width.
-/// Keys the rendered-PNG cache. Theme, quality, and width are part of the key.
+/// Cache key for a rendered diagram: content hash, theme name, quality tier, and (for the terminal tier) bucketed width.
+/// Keys the rendered-PNG cache. Theme identity, quality, and width are part of the key.
 /// A theme switch, resize, or open-vs-terminal tier is then a lookup (usually a hit) or a fresh render, never a stale-color/size diagram.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MermaidCacheKey {
@@ -136,6 +143,8 @@ pub struct MermaidCacheKey {
     pub source_hash: [u8; 32],
     /// Active theme (its surface color is baked into the rendered diagram).
     pub theme: ThemeKind,
+    /// Canonical name for a custom theme; built-in themes use only `theme`.
+    pub theme_name: Option<String>,
     /// Target render width quantized to [`MERMAID_WIDTH_BUCKET`] columns for [`MermaidRenderQuality::Terminal`].
     /// [`OPEN_QUALITY_WIDTH_BUCKET`] for [`MermaidRenderQuality::Open`].
     pub width_bucket: u16,
@@ -156,9 +165,11 @@ impl MermaidCacheKey {
             MermaidRenderQuality::Terminal => width_bucket(target_width_cols),
             MermaidRenderQuality::Open => OPEN_QUALITY_WIDTH_BUCKET,
         };
+        let theme_name = (theme == ThemeKind::Custom).then(crate::theme::cache::current_name);
         Self {
             source_hash: hash_source(source),
             theme,
+            theme_name,
             width_bucket,
             quality,
         }
@@ -177,10 +188,15 @@ impl MermaidCacheKey {
             MermaidRenderQuality::Terminal => "t",
             MermaidRenderQuality::Open => "o",
         };
+        let theme_tag = match (self.theme, self.theme_name.as_deref()) {
+            (ThemeKind::Custom, Some(name)) => format!("c-{name}"),
+            (ThemeKind::Custom, None) => "c-unknown".to_string(),
+            (kind, _) => (kind as u8).to_string(),
+        };
         let _ = write!(
             name,
-            "-{}-{}-{}-r{RENDER_REVISION}.png",
-            self.theme as u8, self.width_bucket, quality_tag
+            "-{theme_tag}-{}-{}-r{RENDER_REVISION}.png",
+            self.width_bucket, quality_tag
         );
         name
     }
@@ -756,6 +772,19 @@ mod tests {
     }
 
     #[test]
+    fn theme_is_dark_uses_custom_appearance_metadata() {
+        let _guard = crate::theme::cache::pin_theme();
+        crate::theme::cache::reload_custom_themes();
+        assert!(crate::theme::cache::set_custom_name("opencode-day"));
+        crate::theme::cache::set(ThemeKind::Custom);
+        assert!(!theme_is_dark(ThemeKind::Custom));
+
+        assert!(crate::theme::cache::set_custom_name("opencode"));
+        crate::theme::cache::set(ThemeKind::Custom);
+        assert!(theme_is_dark(ThemeKind::Custom));
+    }
+
+    #[test]
     fn cache_filename_is_stable_and_keyed() {
         let a = MermaidCacheKey::derive(
             "flowchart TD\nA-->B",
@@ -796,6 +825,30 @@ mod tests {
         assert_ne!(a.cache_filename(), open.cache_filename());
         // No raw source in the name (only the hash).
         assert!(!a.cache_filename().contains("flowchart"));
+    }
+
+    #[test]
+    fn custom_theme_cache_filename_includes_theme_name() {
+        let _guard = crate::theme::cache::pin_theme();
+        crate::theme::cache::reload_custom_themes();
+        assert!(crate::theme::cache::set_custom_name("opencode"));
+        crate::theme::cache::set(ThemeKind::Custom);
+        let dark = MermaidCacheKey::derive(
+            "flowchart TD\nA-->B",
+            ThemeKind::Custom,
+            80,
+            MermaidRenderQuality::Open,
+        );
+        assert!(crate::theme::cache::set_custom_name("opencode-day"));
+        crate::theme::cache::set(ThemeKind::Custom);
+        let light = MermaidCacheKey::derive(
+            "flowchart TD\nA-->B",
+            ThemeKind::Custom,
+            80,
+            MermaidRenderQuality::Open,
+        );
+        assert_ne!(dark, light);
+        assert_ne!(dark.cache_filename(), light.cache_filename());
     }
 
     #[test]

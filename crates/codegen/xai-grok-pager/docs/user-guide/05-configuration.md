@@ -71,7 +71,9 @@ default_selected_permission = "always_allow_all_sessions" # preselected row on t
 remember_tool_approvals = true         # show per-command "Always allow" options on permission prompts;
                                        # grants are remembered per project (default: true); see 22-permissions-and-safety.md
 show_thinking_blocks = true            # show agent thinking blocks in the TUI (default: true)
-show_request_metrics = true            # after each model response, show first-token time, generation rate, duration, and token counts (default: true)
+show_shortcuts_bar = true                 # show the bottom contextual shortcuts hint row (default: true)
+transparent_bg = false                     # let the terminal background show through fullscreen themes; restart required
+# Request metrics are no longer added to the conversation automatically; `/usage` remains available for explicit details.
 group_tool_verbs = true                # fold runs of read/search/list tool calls and subagent rows
                                        # — and finished thoughts among them — into one row (default: true)
 collapsed_edit_blocks = false          # show edits as one-line +N/-M diffstat summaries and merge

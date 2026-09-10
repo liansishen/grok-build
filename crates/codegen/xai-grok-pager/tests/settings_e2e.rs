@@ -10,12 +10,12 @@ use std::sync::Arc;
 
 use xai_grok_pager::app::actions::Action;
 use xai_grok_pager::settings::{
-    EnumChoice, PagerLocalSnapshot, SettingCategory, SettingKind, SettingMeta, SettingOwner,
-    SettingValue, SettingsRegistry,
+    dynamic_enum_choices, EnumChoice, PagerLocalSnapshot, SettingCategory, SettingKind,
+    SettingMeta, SettingOwner, SettingValue, SettingsRegistry,
 };
 use xai_grok_pager::views::settings_modal::{
-    RowEntry, SettingsKeyOutcome, SettingsModalMode, SettingsModalState, handle_settings_key,
-    handle_settings_mouse,
+    handle_settings_key, handle_settings_mouse, RowEntry, SettingsKeyOutcome, SettingsModalMode,
+    SettingsModalState,
 };
 use xai_grok_shell::agent::config::UiConfig;
 
@@ -29,6 +29,8 @@ const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "language",
     "screen_mode",
     "show_timestamps",
+    "transparent_bg",
+    "show_shortcuts_bar",
     "show_timeline",
     "page_flip_on_send",
     "confirm_before_rewind",
@@ -61,8 +63,6 @@ const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "show_tips",
     "auto_update",
     "fork_secondary_model",
-    "show_session_usage_bar",
-    "show_request_metrics",
     "show_thinking_blocks",
     "prompt_suggestions",
     "group_tool_verbs",
@@ -412,12 +412,16 @@ fn language_picker_supports_keyboard_and_mouse_paths() {
             height: 1,
         })
         .collect();
-    match handle_settings_mouse(
-        &mut mouse,
-        MouseEventKind::Down(crossterm::event::MouseButton::Left),
-        10,
-        1,
-    ) {
+    assert!(matches!(
+        handle_settings_mouse(
+            &mut mouse,
+            MouseEventKind::Down(crossterm::event::MouseButton::Left),
+            10,
+            1,
+        ),
+        SettingsKeyOutcome::Changed
+    ));
+    match handle_settings_key(&mut mouse, &press(KeyCode::Enter)) {
         SettingsKeyOutcome::Action(Action::SetUiLanguage(value)) => assert_eq!(value, "en"),
         other => panic!("expected mouse UI-language commit action, got {other:?}"),
     }
@@ -1917,8 +1921,8 @@ fn registry_kind_membership_through_pr_14() {
             "show_thinking_blocks",
             "show_timeline",
             "show_timestamps",
-            "show_session_usage_bar",
-            "show_request_metrics",
+            "show_shortcuts_bar",
+            "transparent_bg",
             "page_flip_on_send",
             "confirm_before_rewind",
             "combine_queued_prompts",
@@ -1950,22 +1954,19 @@ fn registry_kind_membership_through_pr_14() {
     assert_eq!(
         enum_keys,
         vec![
-            "auto_dark_theme",
-            "auto_light_theme",
             "coding_data_sharing",
             "default_selected_permission",
             "follow_up_behavior",
             "hunk_tracker_mode",
             "keep_text_selection",
+            "language",
             "permission_mode",
             "plan_mode",
             "render_mermaid",
             "screen_mode",
             "scroll_mode",
-            "theme",
             "voice_capture_mode",
             "voice_stt_language",
-            "language",
         ],
         "Enum kind membership drift",
     );
@@ -1981,9 +1982,12 @@ fn registry_kind_membership_through_pr_14() {
     assert_eq!(
         dynamic_enum_keys,
         vec![
+            "auto_dark_theme",
+            "auto_light_theme",
             "default_model",
             "fork_secondary_model",
             "fork_secondary_reasoning_effort",
+            "theme",
             "web_search_model",
         ],
         "DynamicEnum kind membership drift",
@@ -2031,8 +2035,6 @@ fn enum_settings_membership_through_pr_14() {
     assert_eq!(
         enum_keys,
         vec![
-            "auto_dark_theme",
-            "auto_light_theme",
             "coding_data_sharing",
             "default_selected_permission",
             "follow_up_behavior",
@@ -2044,7 +2046,6 @@ fn enum_settings_membership_through_pr_14() {
             "render_mermaid",
             "screen_mode",
             "scroll_mode",
-            "theme",
             "voice_capture_mode",
             "voice_stt_language",
         ],
@@ -2085,6 +2086,8 @@ fn defaults_round_trip_through_registry() {
             "compact_mode" => SettingValue::Bool(false),
             "screen_mode" => SettingValue::Enum("fullscreen"),
             "show_timestamps" => SettingValue::Bool(true),
+            "transparent_bg" => SettingValue::Bool(false),
+            "show_shortcuts_bar" => SettingValue::Bool(true),
             "show_timeline" => SettingValue::Bool(false),
             "page_flip_on_send" => SettingValue::Bool(true),
             "confirm_before_rewind" => SettingValue::Bool(true),
@@ -2095,9 +2098,9 @@ fn defaults_round_trip_through_registry() {
             "remember_tool_approvals" => SettingValue::Bool(true),
             "toolset.ask_user_question.timeout_enabled" => SettingValue::Bool(true),
             "keep_text_selection" => SettingValue::Enum("flash"),
-            "theme" => SettingValue::Enum("groknight"),
-            "auto_dark_theme" => SettingValue::Enum("groknight"),
-            "auto_light_theme" => SettingValue::Enum("grokday"),
+            "theme" => SettingValue::String("groknight".to_string()),
+            "auto_dark_theme" => SettingValue::String("groknight".to_string()),
+            "auto_light_theme" => SettingValue::String("grokday".to_string()),
             "render_mermaid" => SettingValue::Enum("auto"),
             "multiline_mode" => SettingValue::Bool(false),
             "permission_mode" => SettingValue::Enum("ask"),
@@ -2122,8 +2125,6 @@ fn defaults_round_trip_through_registry() {
             "fork_secondary_model" => SettingValue::String(String::new()),
             "fork_secondary_reasoning_effort" => SettingValue::String(String::new()),
             "usage_refresh_interval_minutes" => SettingValue::Int(5),
-            "show_session_usage_bar" => SettingValue::Bool(false),
-            "show_request_metrics" => SettingValue::Bool(true),
             "show_thinking_blocks" => SettingValue::Bool(true),
             "prompt_suggestions" => SettingValue::Bool(true),
             "group_tool_verbs" => SettingValue::Bool(true),
@@ -2211,7 +2212,9 @@ fn settings_value_payload_matches_kind() {
             | SettingsKeyOutcome::Action(Action::SetCollapsedEditBlocks(_))
             | SettingsKeyOutcome::Action(Action::SetInvertScroll(_))
             | SettingsKeyOutcome::Action(Action::SetDisplayRefreshAutoCadence(_))
-            | SettingsKeyOutcome::Action(Action::SetVoiceKeybindEnabled(_)) => {}
+            | SettingsKeyOutcome::Action(Action::SetVoiceKeybindEnabled(_))
+            | SettingsKeyOutcome::Action(Action::SetTransparentBg(_))
+            | SettingsKeyOutcome::Action(Action::SetShowShortcutsBar(_)) => {}
             other => panic!(
                 "expected a typed bool setter for `{}`, got {:?}",
                 meta.key, other
@@ -2556,24 +2559,39 @@ fn pr4_theme_preview_and_commit_e2e() {
     let theme_meta = reg
         .find("theme")
         .expect("registry must contain `theme` for PR 4");
-    let (default_canonical, default_idx, choices_count, next_canonical, next_idx) =
-        match &theme_meta.kind {
-            SettingKind::Enum {
-                default, choices, ..
-            } => {
-                let default_idx = choices
-                    .iter()
-                    .position(|c| c.canonical == *default)
-                    .expect("theme default must exist in choices");
-                assert!(
-                    default_idx + 1 < choices.len(),
-                    "test requires at least one choice AFTER the default; reorder?"
-                );
-                let next = choices[default_idx + 1].canonical;
-                (*default, default_idx, choices.len(), next, default_idx + 1)
-            }
-            other => panic!("expected Enum kind for `theme`, got {other:?}"),
-        };
+    let (default_name, choices) = match &theme_meta.kind {
+        SettingKind::Enum {
+            default, choices, ..
+        } => (
+            *default,
+            choices
+                .iter()
+                .map(|choice| choice.canonical.to_string())
+                .collect::<Vec<_>>(),
+        ),
+        SettingKind::DynamicEnum {
+            default, source, ..
+        } => (
+            *default,
+            dynamic_enum_choices(*source, &PagerLocalSnapshot::default())
+                .into_iter()
+                .map(|choice| choice.canonical)
+                .collect::<Vec<_>>(),
+        ),
+        other => panic!("expected Enum or DynamicEnum kind for `theme`, got {other:?}"),
+    };
+    let default_idx = choices
+        .iter()
+        .position(|choice| choice == default_name)
+        .expect("theme default must exist in choices");
+    assert!(
+        default_idx + 1 < choices.len(),
+        "test requires at least one choice AFTER the default; reorder?"
+    );
+    let default_canonical = default_name.to_string();
+    let choices_count = choices.len();
+    let next_idx = default_idx + 1;
+    let next_canonical = choices[next_idx].clone();
     assert!(
         choices_count >= 3,
         "PR 4 test requires ≥3 theme choices, got {choices_count}",
@@ -2603,7 +2621,8 @@ fn pr4_theme_preview_and_commit_e2e() {
             // choices_idx points at the registry's default (derived dynamically, no hardcoded "1")
             assert_eq!(*choices_idx, default_idx);
             match original_value {
-                SettingValue::Enum(s) => *s,
+                SettingValue::Enum(s) => (*s).to_string(),
+                SettingValue::String(s) => s.clone(),
                 other => panic!("expected Enum original_value, got {other:?}"),
             }
         }
@@ -2666,8 +2685,8 @@ fn pr4_theme_preview_and_commit_e2e() {
 fn pr4_theme_picker_esc_dispatches_revert_action() {
     let reg = SettingsRegistry::defaults();
     let default_canonical = match &reg.find("theme").unwrap().kind {
-        SettingKind::Enum { default, .. } => *default,
-        _ => panic!("theme must be Enum"),
+        SettingKind::Enum { default, .. } | SettingKind::DynamicEnum { default, .. } => *default,
+        _ => panic!("theme must be Enum or DynamicEnum"),
     };
 
     let mut s = make_state();
@@ -2713,18 +2732,31 @@ fn pr4_picker_dispatches_each_theme_settings_action_variant() {
         let meta = reg
             .find(key)
             .unwrap_or_else(|| panic!("registry missing `{key}`"));
-        let (default_idx, choices) = match &meta.kind {
+        let (default_name, choices) = match &meta.kind {
             SettingKind::Enum {
                 default, choices, ..
-            } => {
-                let i = choices
+            } => (
+                *default,
+                choices
                     .iter()
-                    .position(|c| c.canonical == *default)
-                    .unwrap();
-                (i, *choices)
-            }
-            _ => panic!("`{key}` must be Enum"),
+                    .map(|choice| choice.canonical.to_string())
+                    .collect::<Vec<_>>(),
+            ),
+            SettingKind::DynamicEnum {
+                default, source, ..
+            } => (
+                *default,
+                dynamic_enum_choices(*source, &PagerLocalSnapshot::default())
+                    .into_iter()
+                    .map(|choice| choice.canonical)
+                    .collect::<Vec<_>>(),
+            ),
+            _ => panic!("`{key}` must be Enum or DynamicEnum"),
         };
+        let default_idx = choices
+            .iter()
+            .position(|choice| choice == default_name)
+            .expect("theme default must exist in choices");
 
         let mut s = make_state();
         navigate_to(&mut s, key);
@@ -2732,7 +2764,7 @@ fn pr4_picker_dispatches_each_theme_settings_action_variant() {
 
         // Navigate forward through every remaining choice, asserting the variant on each Preview dispatch
         for (next_idx, choice) in choices.iter().enumerate().skip(default_idx + 1) {
-            let expected = choice.canonical;
+            let expected = choice.as_str();
             let outcome = handle_settings_key(&mut s, &press(KeyCode::Down));
             match (*key, outcome) {
                 ("theme", SettingsKeyOutcome::Action(Action::PreviewTheme(name))) => {
@@ -2757,7 +2789,7 @@ fn pr4_picker_dispatches_each_theme_settings_action_variant() {
         }
 
         // Enter at the LAST choice commits the Action variant for that canonical
-        let last_canonical = choices.last().unwrap().canonical;
+        let last_canonical = choices.last().expect("theme choices").as_str();
         let outcome = handle_settings_key(&mut s, &press(KeyCode::Enter));
         match (*key, outcome) {
             ("theme", SettingsKeyOutcome::Action(Action::SetTheme(name))) => {

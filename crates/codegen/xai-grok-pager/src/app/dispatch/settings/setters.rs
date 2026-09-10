@@ -116,6 +116,58 @@ pub(super) fn set_screen_mode_inner(app: &mut AppView, canonical: &str) {
     app.current_ui.screen_mode = Some(canonical.to_string());
 }
 
+pub(super) fn set_transparent_bg_inner(app: &mut AppView, new: bool) {
+    app.current_ui.transparent_bg = Some(new);
+}
+
+pub(super) fn set_show_shortcuts_bar_inner(app: &mut AppView, new: bool) {
+    app.current_ui.show_shortcuts_bar = Some(new);
+}
+
+pub(in crate::app::dispatch) fn set_transparent_bg(
+    app: &mut AppView,
+    new: bool,
+) -> Vec<Effect> {
+    let prev = app.current_ui.transparent_bg_enabled();
+    if prev == new && app.current_ui.transparent_bg.is_some() {
+        return vec![];
+    }
+    set_transparent_bg_inner(app, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(target: "settings", key = "transparent_bg", value = new, "setting changed");
+    app.show_toast(&with_restart_cue(&save_success_toast(
+        xai_grok_i18n::t("settings.transparent_bg.label"),
+        new,
+    )));
+    vec![Effect::PersistSetting {
+        key: "transparent_bg",
+        value: crate::settings::SettingValue::Bool(new),
+        rollback_value: crate::settings::SettingValue::Bool(prev),
+    }]
+}
+
+pub(in crate::app::dispatch) fn set_show_shortcuts_bar(
+    app: &mut AppView,
+    new: bool,
+) -> Vec<Effect> {
+    let prev = app.current_ui.show_shortcuts_bar_enabled();
+    if prev == new && app.current_ui.show_shortcuts_bar.is_some() {
+        return vec![];
+    }
+    set_show_shortcuts_bar_inner(app, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(target: "settings", key = "show_shortcuts_bar", value = new, "setting changed");
+    app.show_toast(&save_success_toast(
+        xai_grok_i18n::t("settings.show_shortcuts_bar.label"),
+        new,
+    ));
+    vec![Effect::PersistSetting {
+        key: "show_shortcuts_bar",
+        value: crate::settings::SettingValue::Bool(new),
+        rollback_value: crate::settings::SettingValue::Bool(prev),
+    }]
+}
+
 /// Persist `[ui].screen_mode` (`fullscreen` | `minimal`). Restart-required.
 ///
 /// Unset is *displayed* as Fullscreen but is not an explicit on-disk value —
@@ -549,97 +601,6 @@ pub(in crate::app::dispatch) fn set_show_thinking_blocks(
     }]
 }
 
-pub(super) fn set_show_session_usage_bar_inner(app: &mut AppView, new: bool) {
-    app.current_ui.show_session_usage_bar = Some(new);
-    if !new {
-        for agent in app.agents.values_mut() {
-            agent.session_usage_snapshot = None;
-        }
-    }
-}
-
-pub(super) fn set_show_request_metrics_inner(app: &mut AppView, new: bool) {
-    app.current_ui.show_request_metrics = Some(new);
-    crate::app::acp_handler::set_show_request_metrics_enabled(new);
-}
-
-/// Toggle compact first-token / generation-rate metrics after each model response.
-pub(in crate::app::dispatch) fn set_show_request_metrics(
-    app: &mut AppView,
-    new: bool,
-) -> Vec<Effect> {
-    let prev = app.current_ui.show_request_metrics_enabled();
-    if prev == new {
-        return vec![];
-    }
-    set_show_request_metrics_inner(app, new);
-    refresh_open_settings_modals(app);
-    tracing::info!(
-        target: "settings",
-        key = "show_request_metrics",
-        value = new,
-        "setting changed",
-    );
-    app.show_toast(&save_success_toast(
-        xai_grok_i18n::t_or(
-            "settings.show_request_metrics.label",
-            "Per-request metrics in scrollback",
-        ),
-        new,
-    ));
-    vec![Effect::PersistSetting {
-        key: "show_request_metrics",
-        value: crate::settings::SettingValue::Bool(new),
-        rollback_value: crate::settings::SettingValue::Bool(prev),
-    }]
-}
-
-/// Toggle live session tokens/cost left of the model name on the prompt line.
-pub(in crate::app::dispatch) fn set_show_session_usage_bar(
-    app: &mut AppView,
-    new: bool,
-) -> Vec<Effect> {
-    let prev = app.current_ui.show_session_usage_bar.unwrap_or(false);
-    if prev == new {
-        return vec![];
-    }
-    set_show_session_usage_bar_inner(app, new);
-    refresh_open_settings_modals(app);
-    tracing::info!(
-        target: "settings",
-        key = "show_session_usage_bar",
-        value = new,
-        "setting changed",
-    );
-    app.show_toast(&save_success_toast(
-        xai_grok_i18n::t_or(
-            "settings.show_session_usage_bar.label",
-            "Live session usage on prompt",
-        ),
-        new,
-    ));
-    let mut effects = vec![Effect::PersistSetting {
-        key: "show_session_usage_bar",
-        value: crate::settings::SettingValue::Bool(new),
-        rollback_value: crate::settings::SettingValue::Bool(prev),
-    }];
-    // Kick an immediate bar refresh for the active agent when enabling.
-    if new {
-        if let crate::app::app_view::ActiveView::Agent(id) = app.active_view {
-            if let Some(agent) = app.agents.get(&id) {
-                if let Some(session_id) = agent.session.session_id.clone() {
-                    effects.push(Effect::FetchSessionUsage {
-                        agent_id: id,
-                        session_id,
-                        for_status_bar: true,
-                        nonce: 0,
-                    });
-                }
-            }
-        }
-    }
-    effects
-}
 
 pub(super) fn set_group_tool_verbs_inner(app: &mut AppView, new: bool) {
     crate::appearance::cache::set_group_tool_verbs(new);
@@ -1619,7 +1580,7 @@ fn auto_theme_setting_is_live(key: &str) -> bool {
 /// at `warn` (defensive — a malformed `rollback_value` is a softer
 /// failure mode than an unknown commit-time value) and no-op.
 pub(super) fn set_theme_inner(app: &mut AppView, value: &str) {
-    let Some(kind) = crate::theme::ThemeKind::from_name(value) else {
+    let Some(canonical) = crate::theme::canonical_name(value) else {
         tracing::warn!(
             target: "settings",
             key = "theme",
@@ -1628,33 +1589,36 @@ pub(super) fn set_theme_inner(app: &mut AppView, value: &str) {
         );
         return;
     };
-    let canonical = kind.display_name();
-    app.current_ui.theme = Some(canonical.to_string());
-    crate::theme::cache::set_auto_mode(kind.is_auto());
-    apply_theme_kind_for_display(kind);
+    if crate::theme::Theme::apply_name(&canonical).is_none() {
+        tracing::warn!(
+            target: "settings",
+            key = "theme",
+            value = value,
+            "theme could not be applied — set_theme_inner no-op",
+        );
+        return;
+    }
+    app.current_ui.theme = Some(canonical);
 }
 
 /// State + cache + persist for `theme` commits.
 pub(in crate::app::dispatch) fn set_theme(app: &mut AppView, new: String) -> Vec<Effect> {
-    let prev_canonical: &'static str = app
+    let prev_canonical = app
         .current_ui
         .theme
         .as_deref()
         .and_then(crate::theme::canonical_name)
-        .unwrap_or_else(|| crate::theme::cache::current_kind().display_name());
-    let new_canonical = match crate::theme::canonical_name(&new) {
-        Some(c) => c,
-        None => {
-            tracing::error!(
-                target: "settings",
-                key = "theme",
-                value = %new,
-                "Action::SetTheme dispatched with unknown name — no-op",
-            );
-            return vec![];
-        }
+        .unwrap_or_else(|| crate::theme::cache::current_name());
+    let Some(new_canonical) = crate::theme::canonical_name(&new) else {
+        tracing::error!(
+            target: "settings",
+            key = "theme",
+            value = %new,
+            "Action::SetTheme dispatched with unknown name — no-op",
+        );
+        return vec![];
     };
-    set_theme_inner(app, &new);
+    set_theme_inner(app, &new_canonical);
     refresh_open_settings_modals(app);
     tracing::info!(
         target: "settings",
@@ -1662,14 +1626,15 @@ pub(in crate::app::dispatch) fn set_theme(app: &mut AppView, new: String) -> Vec
         value = %new_canonical,
         "setting changed",
     );
+    let display_name = crate::theme::display_name_for_name(&new_canonical);
     app.show_toast(&save_theme_toast(
         xai_grok_i18n::t("setter.theme"),
-        crate::theme::display_name_for_canonical(new_canonical),
+        &display_name,
     ));
     vec![Effect::PersistSetting {
         key: "theme",
-        value: crate::settings::SettingValue::Enum(new_canonical),
-        rollback_value: crate::settings::SettingValue::Enum(prev_canonical),
+        value: crate::settings::SettingValue::String(new_canonical),
+        rollback_value: crate::settings::SettingValue::String(prev_canonical),
     }]
 }
 
@@ -1680,16 +1645,14 @@ pub(in crate::app::dispatch) fn set_theme(app: &mut AppView, new: String) -> Vec
 /// For `"auto"`, resolves and applies the theme but does NOT toggle
 /// `AUTO_MODE` (commit-only side effect).
 fn preview_theme_inner(value: &str) {
-    let Some(kind) = crate::theme::ThemeKind::from_name(value) else {
+    if crate::theme::Theme::preview_name(value).is_none() {
         tracing::warn!(
             target: "settings",
             key = "theme",
             value = value,
             "unknown theme name — preview_theme_inner no-op",
         );
-        return;
-    };
-    apply_theme_kind_for_display(kind);
+    }
 }
 
 pub(in crate::app::dispatch) fn preview_theme(_app: &mut AppView, new: String) -> Vec<Effect> {
@@ -1712,7 +1675,7 @@ pub(in crate::app::dispatch) fn preview_theme(_app: &mut AppView, new: String) -
 /// Applies visually only when the setting is live (auto mode + dark).
 /// Rejects `"auto"` as an invalid value (log + no-op).
 pub(super) fn set_auto_dark_theme_inner(app: &mut AppView, value: &str) {
-    let Some(kind) = crate::theme::ThemeKind::from_name(value) else {
+    let Some(canonical) = crate::theme::canonical_name(value) else {
         tracing::warn!(
             target: "settings",
             key = "auto_dark_theme",
@@ -1721,7 +1684,7 @@ pub(super) fn set_auto_dark_theme_inner(app: &mut AppView, value: &str) {
         );
         return;
     };
-    if kind.is_auto() {
+    if canonical == "auto" {
         tracing::warn!(
             target: "settings",
             key = "auto_dark_theme",
@@ -1729,36 +1692,37 @@ pub(super) fn set_auto_dark_theme_inner(app: &mut AppView, value: &str) {
         );
         return;
     }
-    let canonical = kind.display_name();
-    app.current_ui.auto_dark_theme = Some(canonical.to_string());
+    app.current_ui.auto_dark_theme = Some(canonical.clone());
     crate::theme::cache::invalidate_auto_theme_config();
     if auto_theme_setting_is_live("auto_dark_theme") {
-        crate::theme::Theme::apply_kind(kind);
+        let _ = crate::theme::Theme::preview_name(&canonical);
     }
 }
 
-pub(in crate::app::dispatch) fn set_auto_dark_theme(app: &mut AppView, new: String) -> Vec<Effect> {
-    let prev_canonical: &'static str = app
+pub(in crate::app::dispatch) fn set_auto_dark_theme(
+    app: &mut AppView,
+    new: String,
+) -> Vec<Effect> {
+    let prev_canonical = app
         .current_ui
         .auto_dark_theme
         .as_deref()
         .and_then(crate::theme::canonical_name)
-        .filter(|s| *s != "auto")
-        // No prior config: fall back to GrokNight (the default).
-        .unwrap_or_else(|| crate::theme::ThemeKind::GrokNight.display_name());
-    let new_canonical = match crate::theme::canonical_name(&new) {
-        Some(c) if c != crate::theme::ThemeKind::Auto.display_name() => c,
-        _ => {
-            tracing::error!(
-                target: "settings",
-                key = "auto_dark_theme",
-                value = %new,
-                "Action::SetAutoDarkTheme dispatched with invalid name — no-op",
-            );
-            return vec![];
-        }
+        .filter(|s| s != "auto")
+        .unwrap_or_else(|| "groknight".to_string());
+    let Some(new_canonical) = crate::theme::canonical_name(&new) else {
+        tracing::error!(
+            target: "settings",
+            key = "auto_dark_theme",
+            value = %new,
+            "Action::SetAutoDarkTheme dispatched with invalid name — no-op",
+        );
+        return vec![];
     };
-    set_auto_dark_theme_inner(app, &new);
+    if new_canonical == "auto" {
+        return vec![];
+    }
+    set_auto_dark_theme_inner(app, &new_canonical);
     refresh_open_settings_modals(app);
     tracing::info!(
         target: "settings",
@@ -1766,14 +1730,15 @@ pub(in crate::app::dispatch) fn set_auto_dark_theme(app: &mut AppView, new: Stri
         value = %new_canonical,
         "setting changed",
     );
+    let display_name = crate::theme::display_name_for_name(&new_canonical);
     app.show_toast(&save_theme_toast(
         xai_grok_i18n::t("setter.auto_dark_theme"),
-        crate::theme::display_name_for_canonical(new_canonical),
+        &display_name,
     ));
     vec![Effect::PersistSetting {
         key: "auto_dark_theme",
-        value: crate::settings::SettingValue::Enum(new_canonical),
-        rollback_value: crate::settings::SettingValue::Enum(prev_canonical),
+        value: crate::settings::SettingValue::String(new_canonical),
+        rollback_value: crate::settings::SettingValue::String(prev_canonical),
     }]
 }
 
@@ -1781,20 +1746,8 @@ pub(in crate::app::dispatch) fn set_auto_dark_theme(app: &mut AppView, new: Stri
 
 /// Preview-only mutation for `auto_dark_theme`. Visual only when live.
 fn preview_auto_dark_theme_inner(value: &str) {
-    let Some(kind) = crate::theme::ThemeKind::from_name(value) else {
-        tracing::warn!(
-            target: "settings",
-            key = "auto_dark_theme",
-            value = value,
-            "unknown theme name — preview_auto_dark_theme_inner no-op",
-        );
-        return;
-    };
-    if kind.is_auto() {
-        return;
-    }
     if auto_theme_setting_is_live("auto_dark_theme") {
-        crate::theme::Theme::apply_kind(kind);
+        let _ = crate::theme::Theme::preview_name(value);
     }
 }
 
@@ -1823,7 +1776,7 @@ pub(in crate::app::dispatch) fn preview_auto_dark_theme(
 /// State + cache + visual mutation for `auto_light_theme`. Commit path.
 /// Mirror of `set_auto_dark_theme_inner` for the light bucket.
 pub(super) fn set_auto_light_theme_inner(app: &mut AppView, value: &str) {
-    let Some(kind) = crate::theme::ThemeKind::from_name(value) else {
+    let Some(canonical) = crate::theme::canonical_name(value) else {
         tracing::warn!(
             target: "settings",
             key = "auto_light_theme",
@@ -1832,7 +1785,7 @@ pub(super) fn set_auto_light_theme_inner(app: &mut AppView, value: &str) {
         );
         return;
     };
-    if kind.is_auto() {
+    if canonical == "auto" {
         tracing::warn!(
             target: "settings",
             key = "auto_light_theme",
@@ -1840,11 +1793,10 @@ pub(super) fn set_auto_light_theme_inner(app: &mut AppView, value: &str) {
         );
         return;
     }
-    let canonical = kind.display_name();
-    app.current_ui.auto_light_theme = Some(canonical.to_string());
+    app.current_ui.auto_light_theme = Some(canonical.clone());
     crate::theme::cache::invalidate_auto_theme_config();
     if auto_theme_setting_is_live("auto_light_theme") {
-        crate::theme::Theme::apply_kind(kind);
+        let _ = crate::theme::Theme::preview_name(&canonical);
     }
 }
 
@@ -1852,26 +1804,26 @@ pub(in crate::app::dispatch) fn set_auto_light_theme(
     app: &mut AppView,
     new: String,
 ) -> Vec<Effect> {
-    let prev_canonical: &'static str = app
+    let prev_canonical = app
         .current_ui
         .auto_light_theme
         .as_deref()
         .and_then(crate::theme::canonical_name)
-        .filter(|s| *s != "auto")
-        .unwrap_or_else(|| crate::theme::ThemeKind::GrokDay.display_name());
-    let new_canonical = match crate::theme::canonical_name(&new) {
-        Some(c) if c != crate::theme::ThemeKind::Auto.display_name() => c,
-        _ => {
-            tracing::error!(
-                target: "settings",
-                key = "auto_light_theme",
-                value = %new,
-                "Action::SetAutoLightTheme dispatched with invalid name — no-op",
-            );
-            return vec![];
-        }
+        .filter(|s| s != "auto")
+        .unwrap_or_else(|| "grokday".to_string());
+    let Some(new_canonical) = crate::theme::canonical_name(&new) else {
+        tracing::error!(
+            target: "settings",
+            key = "auto_light_theme",
+            value = %new,
+            "Action::SetAutoLightTheme dispatched with invalid name — no-op",
+        );
+        return vec![];
     };
-    set_auto_light_theme_inner(app, &new);
+    if new_canonical == "auto" {
+        return vec![];
+    }
+    set_auto_light_theme_inner(app, &new_canonical);
     refresh_open_settings_modals(app);
     tracing::info!(
         target: "settings",
@@ -1879,14 +1831,15 @@ pub(in crate::app::dispatch) fn set_auto_light_theme(
         value = %new_canonical,
         "setting changed",
     );
+    let display_name = crate::theme::display_name_for_name(&new_canonical);
     app.show_toast(&save_theme_toast(
         xai_grok_i18n::t("setter.auto_light_theme"),
-        crate::theme::display_name_for_canonical(new_canonical),
+        &display_name,
     ));
     vec![Effect::PersistSetting {
         key: "auto_light_theme",
-        value: crate::settings::SettingValue::Enum(new_canonical),
-        rollback_value: crate::settings::SettingValue::Enum(prev_canonical),
+        value: crate::settings::SettingValue::String(new_canonical),
+        rollback_value: crate::settings::SettingValue::String(prev_canonical),
     }]
 }
 
@@ -1895,20 +1848,8 @@ pub(in crate::app::dispatch) fn set_auto_light_theme(
 /// Preview-only mutation for `auto_light_theme`. Mirror of
 /// `preview_auto_dark_theme_inner` for the light bucket.
 fn preview_auto_light_theme_inner(value: &str) {
-    let Some(kind) = crate::theme::ThemeKind::from_name(value) else {
-        tracing::warn!(
-            target: "settings",
-            key = "auto_light_theme",
-            value = value,
-            "unknown theme name — preview_auto_light_theme_inner no-op",
-        );
-        return;
-    };
-    if kind.is_auto() {
-        return;
-    }
     if auto_theme_setting_is_live("auto_light_theme") {
-        crate::theme::Theme::apply_kind(kind);
+        let _ = crate::theme::Theme::preview_name(value);
     }
 }
 

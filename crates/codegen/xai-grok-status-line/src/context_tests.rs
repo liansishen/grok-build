@@ -49,6 +49,26 @@ fn every_field_survives_a_round_trip_through_the_shared_fixture() {
                 cost_is_partial: true,
             },
         )])),
+        billing: Some(StatusLineBilling {
+            usage_percentage: Some(42.5),
+            effective_usage_percentage: Some(40.0),
+            period_type: Some("USAGE_PERIOD_TYPE_MONTHLY".into()),
+            period_end: Some("Mar 31, 12:00".into()),
+            pay_as_you_go: Some(true),
+            on_demand_cap_cents: Some(500),
+            on_demand_used_cents: Some(125),
+            prepaid_balance_cents: Some(2500),
+        }),
+        quota: Some(StatusLineQuota {
+            model_id: "gpt-4.5".into(),
+            accounts: vec![StatusLineQuotaAccount {
+                email: "acct@example.com".into(),
+                used_percentage: 24.0,
+                remaining_percentage: 76.0,
+                reset_at: 1_785_903_012,
+                plan_type: Some("pro".into()),
+            }],
+        }),
         workspace: StatusLineWorkspace {
             current_dir: DIR.into(),
             repo_root: Some(DIR.into()),

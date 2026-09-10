@@ -126,6 +126,18 @@ pub fn get_syntect() -> &'static Syntect {
         | ThemeKind::Terminal
         | ThemeKind::Auto => SYNTECT_GROKNIGHT
             .get_or_init(|| Syntect::new(include_bytes!("../assets/grok-night.tmTheme"))),
+        ThemeKind::Custom => {
+            if matches!(
+                crate::theme::cache::current_custom_appearance(),
+                Some(crate::theme::ThemeAppearance::Light)
+            ) {
+                SYNTECT_GROKDAY
+                    .get_or_init(|| Syntect::new(include_bytes!("../assets/grok-day.tmTheme")))
+            } else {
+                SYNTECT_GROKNIGHT
+                    .get_or_init(|| Syntect::new(include_bytes!("../assets/grok-night.tmTheme")))
+            }
+        }
         ThemeKind::TokyoNight => SYNTECT_TOKYONIGHT
             .get_or_init(|| Syntect::new(include_bytes!("../assets/tokyo-night.tmTheme"))),
         ThemeKind::GrokDay => SYNTECT_GROKDAY

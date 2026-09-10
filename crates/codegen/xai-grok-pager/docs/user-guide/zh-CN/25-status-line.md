@@ -19,6 +19,9 @@ items = ["cwd", "model", "context"]   # 省略时的默认值
 | `cwd` | 当前目录（最后一级目录名） |
 | `model` | 模型显示名称 |
 | `context` | 上下文窗口使用百分比；达到自动压缩阈值时显示琥珀色，智能体未报告阈值时则以 80% 为界 |
+| `usage` | 整个会话的累计 token 数，包括缓存创建和缓存读取 |
+| `billing` | 可用时显示账户用量百分比和计费周期信息 |
+| `quota` | 可用时显示当前模型的 CPA 剩余配额百分比 |
 | `cost` | 会话费用；低于 0.005 美元时隐藏，避免显示具有误导性的 `$0.00` |
 | `turn-timer` | 当前回合的已用时间，从运行满一秒后开始显示 |
 | `session-name` | 已设置的会话名称 |
@@ -94,6 +97,11 @@ refresh_interval = 300   # 秒
 | `model_usage` | 按模型 ID 索引的映射，包含会话中记录的所有模型，包括主智能体、子智能体和辅助调用。首次计费前或用量账本不可读时省略 |
 | `model_usage.<model_id>.{input_tokens,output_tokens,reasoning_tokens,total_tokens,cache_creation_input_tokens,cache_read_input_tokens,model_calls,api_duration_ms}` | 该模型的累计用量和 API 时间。`input_tokens` 是未缓存输入；`input_tokens + cache_creation_input_tokens + cache_read_input_tokens + output_tokens = total_tokens` |
 | `model_usage.<model_id>.{cost_usd,cost_usd_ticks,cost_is_partial}` | 已知时提供该模型的费用。`cost_usd_ticks` 以 1 美元 = 10^10 ticks 精确表示；未定价或费用不完整时费用字段可能省略，`cost_is_partial` 表示费用不可信 |
+| `billing` | 账户计费快照；无法获取账户计费时省略 |
+| `billing.{usage_percentage,effective_usage_percentage,period_type,period_end,pay_as_you_go,on_demand_cap_cents,on_demand_used_cents,prepaid_balance_cents}` | 账户额度和信用额度信息。百分比为数字，cents 是美元的百分之一；账户未提供的字段会省略 |
+| `quota` | 当前模型的 CPA 配额快照；没有管理配额时省略 |
+| `quota.model_id` | 执行配额查询的模型 ID |
+| `quota.accounts[]` | 每个账户的配额记录，包含 `email`、`used_percentage`、`remaining_percentage`、`reset_at`（Unix 秒）及可选的 `plan_type` |
 | `workspace.current_dir` | 当前目录 |
 | `workspace.repo_root` | 仓库根目录；仓库外省略。它不是其他系统中表示启动目录的 `project_dir` |
 | `workspace.branch` | 任意仓库中当前检出的分支；分离 HEAD 时省略 |

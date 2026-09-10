@@ -1673,7 +1673,7 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
             let _ = dispatch(Action::SetAutoDarkTheme("tokyonight".to_owned()), app);
         }
         "auto_light_theme" => {
-            let _ = dispatch(Action::SetAutoLightTheme("rosepine-dawn".to_owned()), app);
+            let _ = dispatch(Action::SetAutoLightTheme("grokday".to_owned()), app);
         }
         "permission_mode" => {
             let _ = dispatch(Action::SetYoloMode(true), app);
@@ -1775,6 +1775,12 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
         }
         "screen_mode" => {
             let _ = dispatch(Action::SetScreenMode("minimal".to_string()), app);
+        }
+        "transparent_bg" => {
+            let _ = dispatch(Action::SetTransparentBg(true), app);
+        }
+        "show_shortcuts_bar" => {
+            let _ = dispatch(Action::SetShowShortcutsBar(false), app);
         }
         "voice_keybind_enabled" => {
             let _ = dispatch(Action::SetVoiceKeybindEnabled(false), app);
@@ -3268,8 +3274,8 @@ fn set_theme_emits_persist_setting_with_correct_payload() {
                 rollback_value,
             } => {
                 assert_eq!(*key, "theme");
-                assert_eq!(*value, SettingValue::Enum("grokday"));
-                assert_eq!(*rollback_value, SettingValue::Enum("groknight"));
+                assert_eq!(*value, SettingValue::String("grokday".to_string()));
+                assert_eq!(*rollback_value, SettingValue::String("groknight".to_string()));
             }
             other => panic!("expected PersistSetting, got {other:?}"),
         }
@@ -3300,8 +3306,8 @@ fn set_auto_dark_theme_emits_persist_setting_with_correct_payload() {
                 rollback_value,
             } => {
                 assert_eq!(*key, "auto_dark_theme");
-                assert_eq!(*value, SettingValue::Enum("grokday"));
-                assert_eq!(*rollback_value, SettingValue::Enum("groknight"));
+                assert_eq!(*value, SettingValue::String("grokday".to_string()));
+                assert_eq!(*rollback_value, SettingValue::String("groknight".to_string()));
             }
             other => panic!("expected PersistSetting, got {other:?}"),
         }
@@ -3322,8 +3328,8 @@ fn set_auto_light_theme_emits_persist_setting_with_correct_payload() {
                 rollback_value,
             } => {
                 assert_eq!(*key, "auto_light_theme");
-                assert_eq!(*value, SettingValue::Enum("groknight"));
-                assert_eq!(*rollback_value, SettingValue::Enum("grokday"));
+                assert_eq!(*value, SettingValue::String("groknight".to_string()));
+                assert_eq!(*rollback_value, SettingValue::String("grokday".to_string()));
             }
             other => panic!("expected PersistSetting, got {other:?}"),
         }
@@ -3622,7 +3628,7 @@ fn rollback_theme_reverts_current_ui_and_cache() {
         let _ = dispatch(
             Action::TaskComplete(TaskResult::SettingPersistFailed {
                 key: "theme",
-                rollback_value: SettingValue::Enum("groknight"),
+                rollback_value: SettingValue::String("groknight".to_string()),
                 error: "disk full".into(),
             }),
             &mut app,
@@ -3649,7 +3655,7 @@ fn rollback_auto_dark_theme_reverts_current_ui() {
         let _ = dispatch(
             Action::TaskComplete(TaskResult::SettingPersistFailed {
                 key: "auto_dark_theme",
-                rollback_value: SettingValue::Enum("groknight"),
+                rollback_value: SettingValue::String("groknight".to_string()),
                 error: "disk full".into(),
             }),
             &mut app,
@@ -3670,7 +3676,7 @@ fn rollback_auto_light_theme_reverts_current_ui() {
         let _ = dispatch(
             Action::TaskComplete(TaskResult::SettingPersistFailed {
                 key: "auto_light_theme",
-                rollback_value: SettingValue::Enum("grokday"),
+                rollback_value: SettingValue::String("grokday".to_string()),
                 error: "disk full".into(),
             }),
             &mut app,
@@ -3695,7 +3701,7 @@ fn rollback_auto_dark_theme_with_auto_value_clears_to_none() {
         let _ = dispatch(
             Action::TaskComplete(TaskResult::SettingPersistFailed {
                 key: "auto_dark_theme",
-                rollback_value: SettingValue::Enum("auto"),
+                rollback_value: SettingValue::String("auto".to_string()),
                 error: "disk full".into(),
             }),
             &mut app,
@@ -3720,7 +3726,7 @@ fn rollback_auto_light_theme_with_auto_value_clears_to_none() {
         let _ = dispatch(
             Action::TaskComplete(TaskResult::SettingPersistFailed {
                 key: "auto_light_theme",
-                rollback_value: SettingValue::Enum("auto"),
+                rollback_value: SettingValue::String("auto".to_string()),
                 error: "disk full".into(),
             }),
             &mut app,

@@ -17,6 +17,16 @@ const SESSION_NAME_COLS: usize = 40;
 
 const MIN_DISPLAYED_COST_USD: f64 = 0.005;
 
+fn format_token_count(tokens: u64) -> String {
+    if tokens >= 1_000_000 {
+        format!("{:.1}M", tokens as f64 / 1_000_000.0)
+    } else if tokens >= 1_000 {
+        format!("{:.1}k", tokens as f64 / 1_000.0)
+    } else {
+        tokens.to_string()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SegmentTone {
     Dim,
@@ -96,6 +106,39 @@ pub fn compose_builtin(
                     SegmentTone::Dim
                 };
                 Some(StatusSegment::toned(format!("{pct}% ctx"), tone))
+            }
+            StatusLineItem::Usage => {
+                let usage = ctx.context_window.session_usage.as_ref()?;
+                let input_tokens = usage
+                    .input_tokens
+                    .saturating_add(usage.cache_creation_input_tokens)
+                    .saturating_add(usage.cache_read_input_tokens);
+                let total_tokens = input_tokens.saturating_add(usage.output_tokens);
+                (total_tokens > 0).then(|| {
+                    StatusSegment::dim(format!("{} tok", format_token_count(total_tokens)))
+                })
+            }
+            StatusLineItem::Billing => {
+                let billing = ctx.billing.as_ref()?;
+                let pct = billing.usage_percentage?;
+                let period = match billing.period_type.as_deref() {
+                    Some(value) if value.contains("WEEKLY") => "wk",
+                    Some(value) if value.contains("MONTHLY") => "mo",
+                    _ => "usage",
+                };
+                Some(StatusSegment::dim(format!("{period} {pct:.0}%")))
+            }
+            StatusLineItem::Quota => {
+                let quota = ctx.quota.as_ref()?;
+                let account = quota.accounts.iter().max_by(|a, b| {
+                    a.used_percentage
+                        .partial_cmp(&b.used_percentage)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })?;
+                Some(StatusSegment::dim(format!(
+                    "quota {:.0}%",
+                    account.remaining_percentage
+                )))
             }
             StatusLineItem::Cost => ctx
                 .cost

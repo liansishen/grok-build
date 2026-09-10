@@ -164,6 +164,17 @@ pub async fn set_theme(value: String) -> Result<()> {
     update_config(|cfg| cfg.ui.theme = Some(value)).await
 }
 
+/// Persist `[ui].transparent_bg` via `update_config`.
+/// The renderer applies the value on the next startup because terminal canvas setup is initialized at launch.
+pub async fn set_transparent_bg(value: bool) -> Result<()> {
+    update_config(|cfg| cfg.ui.transparent_bg = Some(value)).await
+}
+
+/// Persist `[ui].show_shortcuts_bar` via `update_config`.
+pub async fn set_show_shortcuts_bar(value: bool) -> Result<()> {
+    update_config(|cfg| cfg.ui.show_shortcuts_bar = Some(value)).await
+}
+
 /// Persist `[ui].auto_dark_theme` via `update_config`.
 /// `UiConfig::auto_dark_theme` is `Option<String>` holding a canonical theme name.
 /// The pager's `load_auto_theme_config` filter rejects `auto` at read time to prevent a circular reference.
@@ -351,15 +362,6 @@ pub async fn set_show_thinking_blocks(value: bool) -> Result<()> {
     update_config(|cfg| cfg.ui.show_thinking_blocks = Some(value)).await
 }
 
-/// Persist `[ui].show_session_usage_bar` via `update_config`.
-pub async fn set_show_session_usage_bar(value: bool) -> Result<()> {
-    update_config(|cfg| cfg.ui.show_session_usage_bar = Some(value)).await
-}
-
-/// Persist `[ui].show_request_metrics` via `update_config`.
-pub async fn set_show_request_metrics(value: bool) -> Result<()> {
-    update_config(|cfg| cfg.ui.show_request_metrics = Some(value)).await
-}
 
 /// Persist `[ui].prompt_suggestions` via `update_config`.
 pub async fn set_prompt_suggestions(value: bool) -> Result<()> {

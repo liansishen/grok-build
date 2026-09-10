@@ -34,6 +34,10 @@ pub struct StatusLineContext {
     pub model: StatusLineModel,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_usage: Option<BTreeMap<String, StatusLineModelUsage>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub billing: Option<StatusLineBilling>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quota: Option<StatusLineQuota>,
     pub workspace: StatusLineWorkspace,
     pub version: String,
     pub cost: StatusLineCost,
@@ -67,6 +71,8 @@ impl Default for StatusLineContext {
             transcript_path: None,
             model: StatusLineModel::default(),
             model_usage: None,
+            billing: None,
+            quota: None,
             workspace: StatusLineWorkspace::default(),
             version: String::new(),
             cost: StatusLineCost::default(),
@@ -166,6 +172,36 @@ pub struct StatusLineCost {
     pub total_duration_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_api_duration_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StatusLineBilling {
+    pub usage_percentage: Option<f64>,
+    pub effective_usage_percentage: Option<f64>,
+    pub period_type: Option<String>,
+    pub period_end: Option<String>,
+    pub pay_as_you_go: Option<bool>,
+    pub on_demand_cap_cents: Option<i64>,
+    pub on_demand_used_cents: Option<i64>,
+    pub prepaid_balance_cents: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StatusLineQuota {
+    pub model_id: String,
+    pub accounts: Vec<StatusLineQuotaAccount>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StatusLineQuotaAccount {
+    pub email: String,
+    pub used_percentage: f64,
+    pub remaining_percentage: f64,
+    pub reset_at: i64,
+    pub plan_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

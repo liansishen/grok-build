@@ -303,6 +303,7 @@ pub fn ensure_query_param(url: &str, key: &str, value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const BROWSER_UNAVAILABLE_NOTICE: &str = "Could not open a browser. Open this URL manually";
 
     // `build_open_path_command` is only compiled on non-Windows (Windows uses
     // ShellExecuteW via a different path). Keep this unit test platform-scoped.
