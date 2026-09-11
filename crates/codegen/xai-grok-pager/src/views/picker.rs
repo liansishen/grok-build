@@ -1732,8 +1732,8 @@ pub fn picker_shortcuts() -> &'static [HintItem] {
                 description: None,
                 pinned: false,
             },
-            HintItem::new(crate::key!(Enter), "select"),
-            HintItem::new(crate::key!(Esc), "close"),
+            HintItem::new(crate::key!(Enter), t("hint.select")),
+            HintItem::new(crate::key!(Esc), t("extensions.hint.close")),
         ]
     });
     &SHORTCUTS
@@ -2414,20 +2414,20 @@ pub fn render_picker(
         }
         // Show `i` in vim nav mode so users discover how to start typing
         if config.vim_normal_first && !state.search_active {
-            all_hints.push(HintItem::new(crate::key!('i'), "search"));
+            all_hints.push(HintItem::new(crate::key!('i'), t("extensions.hint.search")));
         }
         // Expandable: add the e (expand) and y (copy) hints
         if config.expandable && !config.compact_bottom_bar {
             all_hints.push(HintItem {
                 keys: vec![],
-                label: "expand".into(),
+                label: t("extensions.hint.expand").into(),
                 custom_display: Some("e/Shift+e"),
                 description: None,
                 pinned: false,
             });
             all_hints.push(HintItem {
                 keys: vec![],
-                label: "copy".into(),
+                label: t("hint.copy").into(),
                 custom_display: Some("y"),
                 description: None,
                 pinned: false,

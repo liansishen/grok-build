@@ -9,7 +9,7 @@ use crate::app::actions::Action;
 use crate::slash::command::{
     AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand, slash_meta,
 };
-use crate::slash::commands::effort_levels::build_effort_arg_items;
+use crate::slash::commands::effort_levels::{build_effort_arg_items, effort_error_message};
 
 /// Switch the active model (and optionally its reasoning effort).
 pub struct ModelCommand;
@@ -18,7 +18,7 @@ impl SlashCommand for ModelCommand {
     slash_meta! {
         name: "model",
         aliases: ["m"],
-        description: "Switch the active model",
+        description: xai_grok_i18n::t("slash.model.description"),
         usage: "/model <name> [effort]",
         takes_args: true,
         args_required: true,
@@ -43,7 +43,7 @@ impl SlashCommand for ModelCommand {
     fn run(&self, ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         let trimmed = args.trim();
         if trimmed.is_empty() {
-            return CommandResult::Error("Usage: /model <name> [effort]".into());
+            return CommandResult::Error(xai_grok_i18n::t("slash.err.usage_model").to_string());
         }
 
         // Prefer an exact full-string catalog match first. Model display names often contain spaces ("Grok 4.5").
@@ -69,11 +69,11 @@ impl SlashCommand for ModelCommand {
                     model_id: id,
                     effort: Some(effort),
                 }),
-                Err(err) => CommandResult::Error(err.message()),
+                Err(err) => CommandResult::Error(effort_error_message(&err)),
             };
         }
 
-        CommandResult::Error(format!("Unknown model: {trimmed}"))
+        CommandResult::Error(xai_grok_i18n::t_fmt("slash.model.unknown", &[("model", trimmed)]))
     }
 }
 
@@ -131,7 +131,7 @@ fn build_model_items(models: &ModelState) -> Vec<ArgItem> {
         let supports = supports_reasoning_effort(info);
 
         let display = if is_current {
-            format!("{} (current)", info.name)
+            format!("{} {}", info.name, xai_grok_i18n::t("slash.common.current_suffix"))
         } else {
             info.name.clone()
         };

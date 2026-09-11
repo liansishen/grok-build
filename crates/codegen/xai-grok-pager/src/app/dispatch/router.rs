@@ -1286,10 +1286,10 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 return vec![];
             }
             if crate::app::workspace_sync::permanent_delete_blocked(app, &session_id) {
-                app.show_toast("Cannot delete session: dashboard workspace is read-only");
+                app.show_toast(xai_grok_i18n::t("toast.delete_session_workspace_readonly"));
                 return vec![];
             }
-            app.show_toast("Deleting session\u{2026}");
+            app.show_toast(xai_grok_i18n::t("toast.deleting_session"));
             vec![Effect::DeleteSession {
                 source,
                 session_id,

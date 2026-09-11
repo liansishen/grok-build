@@ -20,12 +20,12 @@ impl SlashCommand for ThemeCommand {
     slash_meta! {
         name: "theme",
         aliases: ["t"],
-        description: "Switch the color theme",
+        description: xai_grok_i18n::t("slash.theme.description"),
         usage: "/theme <name>",
         takes_args: true,
         args_required: false,
         mode_support: ModeSupport::FullscreenOnly(Remedy::SwitchMode {
-            why: "minimal renders with your terminal's own palette",
+            why: xai_grok_i18n::t("slash.remedy.theme_why"),
         }),
         arg_placeholder: "<theme>",
     }
@@ -53,18 +53,18 @@ impl SlashCommand for ThemeCommand {
         let choices = theme_cache::theme_choices(None);
 
         // Prepend "auto" (follow system appearance) as the first option.
-        let auto_active = if is_auto { " (active)" } else { "" };
+        let auto_active = if is_auto { xai_grok_i18n::t("slash.common.active_suffix") } else { "" };
         let mut items = vec![ArgItem {
             display: "auto".to_string(),
             match_text: "auto".to_string(),
             insert_text: "auto".to_string(),
-            description: format!("auto (follow system){auto_active}"),
+            description: format!("{}{auto_active}", xai_grok_i18n::t("slash.theme.auto_description")),
         }];
 
         // Concrete themes: only show "(active)" when not in auto mode.
         items.extend(choices.into_iter().map(|theme| {
             let active = if theme.canonical == current && !is_auto {
-                " (active)"
+                xai_grok_i18n::t("slash.common.active_suffix")
             } else {
                 ""
             };
@@ -87,7 +87,7 @@ impl SlashCommand for ThemeCommand {
         // No args: toggle between available themes.
         if trimmed.is_empty() {
             if choices.is_empty() {
-                return CommandResult::Error("No themes are available".to_string());
+                return CommandResult::Error(xai_grok_i18n::t("slash.theme.none_available").to_string());
             }
             let current = theme_cache::current_name();
             let current_idx = choices
@@ -95,7 +95,7 @@ impl SlashCommand for ThemeCommand {
                 .position(|theme| theme.canonical == current)
                 .unwrap_or(0);
             let Some(next) = choices.get((current_idx + 1) % choices.len()) else {
-                return CommandResult::Error("No themes are available".to_string());
+                return CommandResult::Error(xai_grok_i18n::t("slash.theme.none_available").to_string());
             };
             return CommandResult::Action(Action::SetTheme(next.canonical.clone()));
         }
@@ -105,10 +105,12 @@ impl SlashCommand for ThemeCommand {
             Some(canonical) => CommandResult::Action(Action::SetTheme(canonical)),
             None => {
                 let all_names: Vec<&str> = choices.iter().map(|theme| theme.canonical.as_str()).collect();
-                CommandResult::Error(format!(
-                    "Unknown theme: {}. Available: auto, {}",
-                    trimmed,
-                    all_names.join(", ")
+                CommandResult::Error(xai_grok_i18n::t_fmt(
+                    "slash.theme.unknown",
+                    &[
+                        ("theme", trimmed),
+                        ("available", &all_names.join(", ")),
+                    ],
                 ))
             }
         }

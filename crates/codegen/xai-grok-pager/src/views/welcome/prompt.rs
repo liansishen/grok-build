@@ -28,7 +28,7 @@ fn prompt_style(focus: WelcomePromptFocus, compact: bool) -> PromptStyle {
         chrome: true,
         chrome_pad_left: CHROME_PAD,
         chrome_pad_right: CHROME_PAD,
-        placeholder_override: Some("Type a message..."),
+        placeholder_override: Some(xai_grok_i18n::t("welcome.type_message")),
         ..PromptStyle::default()
     }
 }

@@ -52,7 +52,7 @@ impl SlashCommand for DashboardCommand {
     /// (single-session standalone — K14/§6.15).
     fn mode_support(&self) -> ModeSupport {
         ModeSupport::FullscreenOnly(Remedy::SwitchMode {
-            why: "minimal is single-session",
+            why: xai_grok_i18n::t("slash.remedy.dashboard_why"),
         })
     }
 

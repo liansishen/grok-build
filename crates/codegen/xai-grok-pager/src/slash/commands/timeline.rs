@@ -20,7 +20,7 @@ impl SlashCommand for TimelineCommand {
 
     fn mode_support(&self) -> ModeSupport {
         ModeSupport::FullscreenOnly(Remedy::SwitchMode {
-            why: "the timeline rail needs the interactive scrollback pane",
+            why: xai_grok_i18n::t("slash.remedy.timeline_why"),
         })
     }
 

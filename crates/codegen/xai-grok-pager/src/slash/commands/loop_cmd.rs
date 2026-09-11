@@ -106,7 +106,9 @@ impl SlashCommand for LoopCommand {
 
     fn run(&self, _ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         if args.trim().is_empty() {
-            return CommandResult::Message(loop_usage_message().to_string());
+            return CommandResult::Message(
+                xai_grok_i18n::t_or("slash.loop.usage_message", loop_usage_message()).to_string(),
+            );
         }
 
         let (interval_token, prompt) = parse_loop_args(args);
