@@ -34,6 +34,9 @@ pub struct StatusLineContext {
     pub model: StatusLineModel,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_usage: Option<BTreeMap<String, StatusLineModelUsage>>,
+    /// Cumulative usage since the current agent process started or resumed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub process_model_usage: Option<BTreeMap<String, StatusLineModelUsage>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub billing: Option<StatusLineBilling>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -71,6 +74,7 @@ impl Default for StatusLineContext {
             transcript_path: None,
             model: StatusLineModel::default(),
             model_usage: None,
+            process_model_usage: None,
             billing: None,
             quota: None,
             workspace: StatusLineWorkspace::default(),

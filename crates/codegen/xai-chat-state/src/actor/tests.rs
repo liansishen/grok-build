@@ -587,10 +587,43 @@ async fn prompt_usage_ledger_via_handle_resets_and_clears() {
             .model_calls,
         2
     );
+    assert_eq!(
+        h.handle
+            .try_get_process_usage()
+            .await
+            .expect("actor alive")
+            .totals
+            .model_calls,
+        2,
+        "process usage includes the same calls as the session ledger",
+    );
 
     h.handle
         .record_model_call_usage(Some("m".into()), call.clone(), None, None);
     let snap = h.handle.snapshot().await.unwrap();
+    let restored = TestHarness::new();
+    restored.handle.restore_snapshot(snap.clone());
+    assert_eq!(
+        restored
+            .handle
+            .try_get_session_usage()
+            .await
+            .expect("restored actor alive")
+            .totals
+            .model_calls,
+        3,
+    );
+    assert_eq!(
+        restored
+            .handle
+            .try_get_process_usage()
+            .await
+            .expect("restored actor alive")
+            .totals
+            .model_calls,
+        0,
+        "a new actor process must not inherit the persisted process window",
+    );
     h.handle.restore_snapshot(snap);
     assert!(
         h.handle
@@ -612,6 +645,56 @@ async fn prompt_usage_ledger_via_handle_resets_and_clears() {
             .flatten()
             .is_none()
     );
+}
+
+#[tokio::test]
+async fn process_usage_includes_subagent_and_side_calls() {
+    use xai_grok_sampling_types::TokenUsage;
+
+    let h = TestHarness::new();
+    h.handle
+        .record_session_side_usage(
+            "side-model",
+            &TokenUsage {
+                prompt_tokens: 7,
+                completion_tokens: 3,
+                total_tokens: 10,
+                reasoning_tokens: 0,
+                cached_prompt_tokens: 0,
+                cache_creation_prompt_tokens: 0,
+            },
+            Some(11),
+            Some(22),
+        )
+        .await;
+    assert!(
+        h.handle
+            .record_subagent_usage(
+                vec![(
+                    "child-model".to_string(),
+                    crate::usage::UsageTotals {
+                        input_tokens: 40,
+                        output_tokens: 5,
+                        model_calls: 1,
+                        ..Default::default()
+                    },
+                )],
+                false,
+                false,
+            )
+            .await
+    );
+
+    let process = h
+        .handle
+        .try_get_process_usage()
+        .await
+        .expect("actor alive");
+    assert_eq!(process.totals.model_calls, 2);
+    assert_eq!(process.totals.input_tokens, 47);
+    assert_eq!(process.by_model["side-model"].model_calls, 1);
+    assert_eq!(process.by_model["child-model"].model_calls, 1);
+    assert_eq!(process.main_loop_model_calls, 0);
 }
 
 #[tokio::test]

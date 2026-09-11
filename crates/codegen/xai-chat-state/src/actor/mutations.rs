@@ -445,6 +445,12 @@ impl ChatStateActor {
             api_duration_ms,
             cost_usd_ticks,
         );
+        self.state.process_usage.record_main_loop_call(
+            &model_key,
+            usage,
+            api_duration_ms,
+            cost_usd_ticks,
+        );
     }
 
     pub(super) fn record_subagent_usage(
@@ -467,9 +473,12 @@ impl ChatStateActor {
         self.state
             .session_usage
             .record_subagent(by_model, incomplete);
+        self.state
+            .process_usage
+            .record_subagent(by_model, incomplete);
     }
 
-    /// Fold one side call (compaction, …) into the session ledger only.
+    /// Fold one side call (compaction, …) into both session and process ledgers.
     pub(super) fn record_session_side_usage(
         &mut self,
         model_id: &str,
@@ -479,6 +488,9 @@ impl ChatStateActor {
     ) {
         self.state
             .session_usage
+            .record_side_call(model_id, usage, api_duration_ms, cost_usd_ticks);
+        self.state
+            .process_usage
             .record_side_call(model_id, usage, api_duration_ms, cost_usd_ticks);
     }
 
@@ -491,6 +503,7 @@ impl ChatStateActor {
         }
         if session {
             self.state.session_usage.mark_incomplete();
+            self.state.process_usage.mark_incomplete();
         }
     }
 

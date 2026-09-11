@@ -105,7 +105,7 @@ fn build_context_window(
     }
 }
 
-fn build_model_usage(
+pub(super) fn build_model_usage(
     usage: Option<&PromptUsage>,
 ) -> Option<BTreeMap<String, StatusLineModelUsage>> {
     let usage = usage?;
@@ -184,6 +184,15 @@ impl SessionActor {
             .map(|ledger| PromptUsage::from(&ledger));
         let totals = usage.as_ref().map(|u| &u.totals);
         let model_usage = build_model_usage(usage.as_ref());
+        let process_model_usage = self
+            .chat_state_handle
+            .try_get_process_usage()
+            .await
+            .ok()
+            .map(|ledger| {
+                let usage = PromptUsage::from(&ledger);
+                build_model_usage(Some(&usage)).unwrap_or_default()
+            });
 
         let cwd = self.tool_context.cwd.as_path().to_path_buf();
         // Both stats run on the blocking pool, off the actor's thread.
@@ -235,6 +244,7 @@ impl SessionActor {
                 display_name,
             },
             model_usage,
+            process_model_usage,
             billing: None,
             quota: None,
             workspace: StatusLineWorkspace {

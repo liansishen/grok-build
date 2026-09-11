@@ -264,6 +264,10 @@ pub enum ChatStateCommand {
         reply: oneshot::Sender<crate::usage::UsageLedger>,
     },
 
+    GetProcessUsage {
+        reply: oneshot::Sender<crate::usage::UsageLedger>,
+    },
+
     /// `total_tokens` + bytes/4 delta from tool results since last model response.
     GetEstimatedTotalTokens { reply: oneshot::Sender<u64> },
 

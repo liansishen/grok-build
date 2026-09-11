@@ -49,6 +49,22 @@ fn every_field_survives_a_round_trip_through_the_shared_fixture() {
                 cost_is_partial: true,
             },
         )])),
+        process_model_usage: Some(std::collections::BTreeMap::from([(
+            "grok-4.5".into(),
+            StatusLineModelUsage {
+                input_tokens: 1500,
+                output_tokens: 600,
+                reasoning_tokens: 80,
+                total_tokens: 2500,
+                cache_creation_input_tokens: 100,
+                cache_read_input_tokens: 300,
+                model_calls: 1,
+                api_duration_ms: 1200,
+                cost_usd: Some(0.0045),
+                cost_usd_ticks: Some(45_000_000),
+                cost_is_partial: false,
+            },
+        )])),
         billing: Some(StatusLineBilling {
             usage_percentage: Some(42.5),
             effective_usage_percentage: Some(40.0),

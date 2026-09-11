@@ -25,6 +25,20 @@
       "cost_is_partial": true
     }
   },
+  "process_model_usage": {
+    "grok-4.5": {
+      "input_tokens": 1500,
+      "output_tokens": 600,
+      "reasoning_tokens": 80,
+      "total_tokens": 2500,
+      "cache_creation_input_tokens": 100,
+      "cache_read_input_tokens": 300,
+      "model_calls": 1,
+      "api_duration_ms": 1200,
+      "cost_usd": 0.0045,
+      "cost_usd_ticks": 45000000
+    }
+  },
   "billing": {
     "usage_percentage": 42.5,
     "effective_usage_percentage": 40.0,

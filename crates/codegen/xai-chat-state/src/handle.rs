@@ -514,6 +514,13 @@ impl ChatStateHandle {
         .ok_or(())
     }
 
+    /// Fail-closed read of usage accumulated in the current agent process.
+    pub async fn try_get_process_usage(&self) -> Result<crate::usage::UsageLedger, ()> {
+        self.query("GetProcessUsage", |reply| ChatStateCommand::GetProcessUsage { reply })
+            .await
+            .ok_or(())
+    }
+
     /// `total_tokens` plus bytes/4 estimate of tool results pushed since the
     /// last model response. Used by `check_preflight_overflow`.
     pub async fn get_estimated_total_tokens(&self) -> u64 {

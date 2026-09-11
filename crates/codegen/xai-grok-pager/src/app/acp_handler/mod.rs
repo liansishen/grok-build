@@ -264,6 +264,7 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
                     // real usage. The dedup already drops the render; the
                     // token/timing state must respect it too.
                     let mut usage_snapshot_changed = false;
+                    let mut process_usage_snapshot_changed = false;
                     if !dedup_drop {
                         if let Some(tokens) = meta.total_tokens {
                             confirm_context_used(agent, tokens);
@@ -275,6 +276,10 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         if let Some(usage) = meta.session_usage_view.take() {
                             agent.session_usage_snapshot = Some(usage);
                             usage_snapshot_changed = true;
+                        }
+                        if let Some(usage) = meta.process_usage_view.take() {
+                            agent.process_model_usage_snapshot = Some(usage);
+                            process_usage_snapshot_changed = true;
                         }
                         if let Some(ts) = meta.turn_start_ms {
                             agent.turn_start_ms = Some(ts);
@@ -573,11 +578,14 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         queue_open_workflows_modal_refresh(app, id);
                     }
 
+                    if process_usage_snapshot_changed && is_active {
+                        app.refresh_status_line_now();
+                    }
                     // Mutation always happens; redraw only when the matched
                     // agent is the visible one. A usage-view stamp alone
                     // (e.g. a deduped chunk that still carries fresh usage)
                     // also forces the redraw.
-                    (mutated || usage_snapshot_changed) && is_active
+                    (mutated || usage_snapshot_changed || process_usage_snapshot_changed) && is_active
                 }
                 Some(SessionMatch::Child(parent_id)) => {
                     let is_active = is_matched_agent_active(app, parent_id);

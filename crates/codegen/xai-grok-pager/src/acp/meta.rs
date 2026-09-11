@@ -4,6 +4,7 @@
 //! All fields are `Option`, so parsing degrades gracefully when grok-shell hasn't been updated or meta is absent.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Parsed fields from `SessionNotification._meta`.
 ///
@@ -38,6 +39,10 @@ pub struct NotificationMeta {
     /// request is accounted instead of waiting for the next `session/usage`
     /// RPC. `None` before the first recorded call or on older shells.
     pub session_usage_view: Option<xai_grok_shell::extensions::notification::PromptUsage>,
+    /// Current-process model usage (`processUsageView`) stamped on live updates.
+    /// `Some({})` is meaningful: it means a new shell reported an empty process window.
+    pub process_usage_view:
+        Option<BTreeMap<String, xai_grok_status_line::StatusLineModelUsage>>,
 }
 
 /// Serializable counterpart of the replay stamp the agent injects on replayed notifications.
@@ -125,6 +130,9 @@ impl NotificationMeta {
                     >(v.clone())
                     .ok()
                 }),
+            process_usage_view: m
+                .get("processUsageView")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
         }
     }
 }
@@ -142,6 +150,12 @@ mod tests {
             "streamStartMs": 1700000000000i64 - 3200,
             "turnStartMs": 1700000000000i64 - 5000,
             "eventId": "sess-1-7",
+            "processUsageView": {
+                "grok-4.5": {
+                    "total_tokens": 42,
+                    "cost_usd": 0.0042
+                }
+            },
         });
         let map = meta_json.as_object().unwrap();
         let meta = NotificationMeta::from_json(Some(map));
@@ -153,6 +167,13 @@ mod tests {
         assert!(!meta.is_replay);
         assert_eq!(meta.event_id.as_deref(), Some("sess-1-7"));
         assert_eq!(meta.event_seq, Some(7));
+        let process_usage = meta
+            .process_usage_view
+            .as_ref()
+            .and_then(|usage| usage.get("grok-4.5"))
+            .expect("process usage view");
+        assert_eq!(process_usage.total_tokens, 42);
+        assert_eq!(process_usage.cost_usd, Some(0.0042));
     }
 
     #[test]

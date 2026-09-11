@@ -376,6 +376,9 @@ impl ChatStateActor {
             ChatStateCommand::GetSessionUsage { reply } => {
                 let _ = reply.send(self.state.session_usage.clone());
             }
+            ChatStateCommand::GetProcessUsage { reply } => {
+                let _ = reply.send(self.state.process_usage.clone());
+            }
             ChatStateCommand::GetEstimatedTotalTokens { reply } => {
                 let _ =
                     reply.send(self.state.total_tokens + self.state.estimated_tokens_since_model);
