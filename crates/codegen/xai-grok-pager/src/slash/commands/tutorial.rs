@@ -34,7 +34,7 @@ impl SlashCommand for TutorialCommand {
     /// overlay's input intercept would freeze the session invisibly.
     fn mode_support(&self) -> ModeSupport {
         ModeSupport::FullscreenOnly(Remedy::SwitchMode {
-            why: "the tutorial overlay needs fullscreen",
+            why: xai_grok_i18n::t("slash.remedy.tutorial_why"),
         })
     }
 

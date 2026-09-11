@@ -48,7 +48,13 @@ impl SlashCommand for ImagineVideoCommand {
     fn run(&self, _ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         let prompt = args.trim();
         if prompt.is_empty() {
-            return CommandResult::Message(imagine_video_usage_message().to_string());
+            return CommandResult::Message(
+                xai_grok_i18n::t_or(
+                    "slash.imagine-video.usage_message",
+                    imagine_video_usage_message(),
+                )
+                .to_string(),
+            );
         }
 
         CommandResult::InjectSkill {

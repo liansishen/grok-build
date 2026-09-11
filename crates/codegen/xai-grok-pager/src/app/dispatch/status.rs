@@ -272,7 +272,7 @@ pub(super) fn set_coding_data_sharing(
 ) -> Vec<Effect> {
     // ── Guard 1: Enterprise ZDR ──────────────────────────────────────
     if app.is_zdr {
-        app.show_toast("\u{2717} Cannot change: Zero Data Retention enabled");
+        app.show_toast(xai_grok_i18n::t("toast.zdr_enabled"));
         return vec![];
     }
     // ── Guard 2: Non-admin team member ───────────────────────────────
@@ -282,7 +282,7 @@ pub(super) fn set_coding_data_sharing(
             .as_deref()
             .is_some_and(|r| r.eq_ignore_ascii_case("admin"));
         if !is_admin {
-            app.show_toast("\u{2717} Data sharing is controlled by your team admin");
+            app.show_toast(xai_grok_i18n::t("toast.data_sharing_admin"));
             return vec![];
         }
     }

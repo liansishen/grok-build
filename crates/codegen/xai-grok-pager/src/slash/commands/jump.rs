@@ -19,7 +19,7 @@ impl SlashCommand for JumpCommand {
 
     fn mode_support(&self) -> ModeSupport {
         ModeSupport::FullscreenOnly(Remedy::SwitchMode {
-            why: "minimal scrolls with your terminal's native scrollback",
+            why: xai_grok_i18n::t("slash.remedy.jump_why"),
         })
     }
 

@@ -1,5 +1,56 @@
 # Changelog
 
+# 1.0.24-fork.6 — 2026-09-11
+
+本版为 Fork 国际化补全与界面问题修复更新，产品版本仍为 **1.0.24**，不包含新的上游同步。
+
+### 问题修复
+
+- 修复欢迎界面（Welcome / Home）大量硬编码英文的问题：输入框占位符、认证流程提示与状态反馈、目录信任确认提示、订阅等级与刷新操作、账号切换与受限提示、会话选择器全屏快捷提示及匹配徽章已全部接入国际化。
+- 修复导入 Claude 设置弹窗（`/import-claude`）未国际化的问题：包含作用域头部（全局/项目）、类型分组头部（权限/环境变量/MCP 服务器/钩子/路径）、权限动作（allow/deny/ask）、路径类型（skill dir/rule dir）、底部操作快捷键栏以及标题文案已全部接入国际化，并修正了钩子显示格式与超时的中文翻译。
+- 修复斜杠命令中的未国际化与硬编码英文提示：
+  - `/model` 命令描述、用法错误、未知模型、推理级别错误及 `(current)` 当前标记；
+  - `/copy` 命令描述、参数占位符及用法错误提示；
+  - `/feedback` 命令描述、参数占位符、极简模式提示及语音录制中拒绝提示；
+  - `/fork` 命令描述、参数互斥（`--worktree` 与 `--no-worktree`）及重复参数错误提示；
+  - `/theme` 命令描述、自动跟随系统描述、活动主题标记、无可用主题及未知主题提示；
+  - 各斜杠命令在不匹配模式下的模式限制原因（Remedy）文案（`/dashboard`、`/expand`、`/find`、`/jump`、`/theme`、`/timeline`、`/tutorial`）；
+  - `/loop`、`/imagine`、`/imagine-video` 在无参数调用时的用法说明提示。
+- 补齐 `/learn` 技能描述的国际化词条（`slash.skill.learn.description`），使其在命令列表与技能列表中支持中文显示。
+- 修复状态栏/调度器通知与选择器表面硬编码文本：ZDR 与团队管理数据共享限制提示、回顾不可用提示、会话删除提示与只读工作区限制提示，以及通用选择器底栏的操作提示。
+
+### 本 Fork
+
+- 为所有新增和补全的界面文案在英文（`en.toml`）与简体中文（`zh-CN.toml`）目录中建立严格对齐的翻译词条。
+- 在 `xai-grok-shell` 的 `PAGER_COMMAND_KEYS` 中补齐 `"setting"`、`"web-search-model"` 和 `"wsm"`，保证命令解析与保留键定义一致。
+
+### 兼容性
+
+- 产品版本仍为 **1.0.24**；不修改配置结构、模型 ID、命令行语法或网络通信协议。
+- 所有国际化翻译采用健壮的键查找与回退机制，未选择简体中文时自动回退至英文原文，保持完全向后兼容。
+- 无新增运行时依赖或外部服务依赖。
+
+### 国际化
+
+- 补齐欢迎页、导入 Claude 弹窗、斜杠命令、模式切换限制及通知消息等全部此前遗留未翻译词条。
+- 英文与简体中文两套资源目录完全镜像对齐，通过 `i18n_audit` 审计测试无遗漏。
+
+### 验证
+
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：9 项单元测试通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`：9 项当前源码与 Markdown 覆盖审计测试全部通过。
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：编译检查通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：257 项通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：Protoc 29.3、`GROK_VERSION=1.0.24-fork.6` 环境下构建通过；`target/release/xai-grok-pager --version` 正确输出版本。
+
+### 产物
+
+- `grok-1.0.24-fork.6-linux-x86_64`
+- `grok-1.0.24-fork.6-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.24-fork.5...v1.0.24-fork.6
+
 # 1.0.24-fork.5 — 2026-09-10
 
 本版为上游同步、Fork 功能与问题修复更新，产品版本仍为 **1.0.24**。发布范围覆盖上一版 `v1.0.24-fork.4` 之后的状态栏与主题功能、终端安全修复、上游同步提交 `37949780` 以及合并适配修复；上游 Source-Revision 为 `c4ea71cfdbcdb21e32e41bc25a0043d7d4836714`。

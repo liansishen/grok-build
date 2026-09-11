@@ -523,6 +523,7 @@ pub const PAGER_COMMAND_KEYS: &[&str] = &[
     "scroll-debug",
     "session-info",
     "sessions",
+    "setting",
     "settings",
     "share",
     "show-plan",
@@ -547,8 +548,10 @@ pub const PAGER_COMMAND_KEYS: &[&str] = &[
     "vim-mode",
     "voice",
     "welcome",
+    "web-search-model",
     "workflow",
     "workflows",
+    "wsm",
     "yolo",
 ];
 /// Unconditional reservations for `grok inspect`.

@@ -34,7 +34,7 @@ impl SlashCommand for ExpandCommand {
 
     fn mode_support(&self) -> ModeSupport {
         ModeSupport::MinimalOnly(Remedy::UseInstead(
-            "press Tab to focus the scrollback, then → on the block",
+            xai_grok_i18n::t("slash.remedy.expand_use_instead"),
         ))
     }
 

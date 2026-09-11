@@ -33,10 +33,10 @@ pub struct FeedbackCommand;
 impl SlashCommand for FeedbackCommand {
     slash_meta! {
         name: "feedback",
-        description: "Send feedback about the current session",
+        description: xai_grok_i18n::t("slash.feedback.description"),
         usage: "/feedback [text]",
         takes_args: true,
-        arg_placeholder: "[feedback text]",
+        arg_placeholder: xai_grok_i18n::t("slash.feedback.arg_placeholder"),
     }
 
     fn submission_refusal(
@@ -49,10 +49,10 @@ impl SlashCommand for FeedbackCommand {
             None
         } else if is_minimal {
             Some(
-                "Use `/feedback <text>` in minimal mode, or run without --minimal to open the feedback form.",
+                xai_grok_i18n::t("slash.feedback.refusal_minimal"),
             )
         } else if voice_owns_prompt {
-            Some("Stop voice input before opening the feedback form")
+            Some(xai_grok_i18n::t("slash.feedback.refusal_voice"))
         } else {
             None
         }

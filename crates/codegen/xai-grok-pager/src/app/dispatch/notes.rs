@@ -821,9 +821,9 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
 /// Empty sessions get a clear empty-state message; anything else (model failure, empty summary, etc.) keeps the generic failure toast.
 pub(crate) fn recap_unavailable_toast(has_user_messages: bool) -> &'static str {
     if has_user_messages {
-        "Couldn't generate recap"
+        t("sys.recap_failed")
     } else {
-        "No messages yet"
+        t("sys.no_messages_yet")
     }
 }
 

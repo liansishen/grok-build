@@ -32,26 +32,26 @@ pub fn parse_fork_args(args: &str) -> Result<ForkArgs, String> {
         match flag {
             "--worktree" => {
                 if worktree_override == Some(false) {
-                    return Err("--worktree and --no-worktree are mutually exclusive".into());
+                    return Err(xai_grok_i18n::t("slash.fork.mutually_exclusive").into());
                 }
                 if worktree_override == Some(true) {
-                    return Err("--worktree specified twice".into());
+                    return Err(xai_grok_i18n::t("slash.fork.worktree_twice").into());
                 }
                 worktree_override = Some(true);
                 rest = after.trim_start();
             }
             "--no-worktree" => {
                 if worktree_override == Some(true) {
-                    return Err("--worktree and --no-worktree are mutually exclusive".into());
+                    return Err(xai_grok_i18n::t("slash.fork.mutually_exclusive").into());
                 }
                 if worktree_override == Some(false) {
-                    return Err("--no-worktree specified twice".into());
+                    return Err(xai_grok_i18n::t("slash.fork.no_worktree_twice").into());
                 }
                 worktree_override = Some(false);
                 rest = after.trim_start();
             }
             "--at" => {
-                return Err("--at is not supported in this version".into());
+                return Err(xai_grok_i18n::t("slash.fork.at_not_supported").into());
             }
             _ => break,
         }
@@ -73,7 +73,7 @@ pub struct ForkCommand;
 impl SlashCommand for ForkCommand {
     slash_meta! {
         name: "fork",
-        description: "Branch the current session into a peer agent",
+        description: xai_grok_i18n::t("slash.fork.description"),
         usage: "/fork [--worktree|--no-worktree] [directive]",
         takes_args: true,
         args_required: false,

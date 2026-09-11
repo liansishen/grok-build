@@ -13,6 +13,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Padding, Paragraph, Widget, Wrap};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::app::app_view::{AuthMode, AuthState, SessionPickerEntry, TrustState};
 use crate::app::consent::ConsentState;
@@ -65,7 +66,7 @@ fn quit_hint_spans(theme: &Theme) -> Vec<Span<'static>> {
                 .fg(theme.accent_user)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("  quit", Style::default().fg(theme.gray)),
+        Span::styled(format!("  {}", t("welcome.quit")), Style::default().fg(theme.gray)),
     ]
 }
 
@@ -98,10 +99,11 @@ pub(super) fn render_pending_hint(
         .fg(theme.text_primary)
         .add_modifier(Modifier::BOLD);
     let action_style = Style::default().fg(theme.gray);
+    let press_again_msg = format!(" {}", t_fmt("welcome.press_again", &[("label", pending.label)]));
     let line = Line::from(vec![
         Span::styled(format!("  {}", pending.shortcut.display()), key_style),
         Span::styled(":", action_style),
-        Span::styled(format!("press again to {}", pending.label), action_style),
+        Span::styled(press_again_msg, action_style),
     ]);
     buf.set_line(area.x, area.y, &line, area.width);
 }
@@ -539,14 +541,14 @@ pub(super) fn render_version_badge(
         } = &mode
     {
         spans.push(Span::styled(
-            format!("Tier: {tier}"),
+            t_fmt("welcome.tier", &[("tier", tier)]),
             Style::default().fg(theme.gray),
         ));
         spans.push(sep.clone());
     }
     if show_api_key && is_api_key_auth {
         spans.push(Span::styled(
-            "Logged in with API key",
+            t("welcome.logged_in_api_key"),
             Style::default().fg(theme.gray),
         ));
         spans.push(sep);
@@ -786,8 +788,9 @@ pub fn render_welcome(
     let mut result = match params.auth_state {
         AuthState::Pending { error } => {
             let label = params.login_label.unwrap_or("grok.com");
-            let login_text = format!("Login with {}", label);
-            let menu = [("l", login_text.as_str()), ("q", "Quit")];
+            let login_text = t_fmt("welcome.login_with", &[("label", label)]);
+            let quit_text = t("welcome.quit_menu");
+            let menu = [("l", login_text.as_str()), ("q", quit_text)];
             let msg = error.as_deref().map(|e| (e, theme.accent_error));
             let info = PromptInfo {
                 model_name: params.model_name,
@@ -832,12 +835,14 @@ pub fn render_welcome(
             }
         }
         AuthState::Done if params.is_zdr_blocked => {
-            let menu = [("l", "Switch account"), ("q", "Quit")];
+            let switch_account_text = t("welcome.switch_account");
+            let quit_text = t("welcome.quit_menu");
+            let menu = [("l", switch_account_text), ("q", quit_text)];
             let (menu_rects, post_flush_escapes) = render_welcome_blocked(
                 content_area,
                 buf,
                 Some((
-                    "Grok Build is not yet available for this account.",
+                    t("welcome.zdr_unavailable"),
                     theme.gray_bright,
                 )),
                 &menu,
@@ -1002,10 +1007,12 @@ fn render_welcome_trust(
     h_margin: u16,
     compact: bool,
 ) -> WelcomeRenderResult {
-    let menu_items = [("y", "Yes, proceed"), ("n", "No, quit")];
+    let yes_text = t("welcome.trust.yes");
+    let no_text = t("welcome.trust.no");
+    let menu_items = [("y", yes_text), ("n", no_text)];
     let lines = vec![
         Line::from(Span::styled(
-            "Do you trust the contents of this directory?",
+            t("welcome.trust.question"),
             Style::default().fg(theme.gray_bright),
         ))
         .alignment(Alignment::Center),
@@ -1015,18 +1022,16 @@ fn render_welcome_trust(
         ))
         .alignment(Alignment::Center),
         Line::default(),
-        // Two lines so the warning never clips at narrow / compact widths (a single ~78-char line would truncate "...posing security risks")
         Line::from(Span::styled(
-            "Grok Build may run or modify contents in this directory,",
+            t("welcome.trust.warning_line1"),
             Style::default().fg(theme.gray),
         ))
         .alignment(Alignment::Center),
         Line::from(Span::styled(
-            "posing security risks.",
+            t("welcome.trust.warning_line2"),
             Style::default().fg(theme.gray),
         ))
         .alignment(Alignment::Center),
-        // Spacer between the warning and the y/n menu.
         Line::default(),
     ];
 
@@ -1155,16 +1160,16 @@ fn push_auth_copy_block(
     lines.push(Line::default());
     lines.push(match clipboard_delivery {
         Some(crate::clipboard::ClipboardDelivery::Confirmed) => {
-            Line::from(Span::styled("copied!", Style::default().fg(theme.gray)))
+            Line::from(Span::styled(t("auth.copied"), Style::default().fg(theme.gray)))
                 .alignment(Alignment::Center)
         }
         Some(crate::clipboard::ClipboardDelivery::Unverified) => Line::from(Span::styled(
-            "copy sent: verify paste",
+            t("auth.copy_unverified"),
             Style::default().fg(theme.gray),
         ))
         .alignment(Alignment::Center),
         Some(crate::clipboard::ClipboardDelivery::Failed) => {
-            Line::from(Span::styled("copy failed", Style::default().fg(theme.gray)))
+            Line::from(Span::styled(t("auth.copy_failed"), Style::default().fg(theme.gray)))
                 .alignment(Alignment::Center)
         }
         None => Line::default(),
@@ -1235,7 +1240,7 @@ fn render_raw_url_mode(
 
     // Render hint above the URL.
     let hint = Line::from(Span::styled(
-        "Select the URL below with your mouse and copy manually.",
+        t("auth.select_url_hint"),
         Style::default().fg(theme.gray),
     ))
     .alignment(Alignment::Center);
@@ -1283,7 +1288,7 @@ fn render_raw_url_mode(
                 .fg(theme.accent_user)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("  go back", Style::default().fg(theme.gray)),
+        Span::styled(format!("  {}", t("auth.go_back")), Style::default().fg(theme.gray)),
     ];
     let hints = Line::from(hint_spans).alignment(Alignment::Center);
     Paragraph::new(hints).render(hint_area, buf);
@@ -1476,7 +1481,7 @@ fn render_welcome_authenticating(
             } else {
                 lines.push(
                     Line::from(Span::styled(
-                        "Waiting for auth URL...",
+                        t("auth.waiting_url"),
                         Style::default().fg(theme.gray),
                     ))
                     .alignment(Alignment::Center),
@@ -1518,7 +1523,7 @@ fn render_welcome_authenticating(
                         .fg(theme.accent_user)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled("  submit    ", Style::default().fg(theme.gray)),
+                Span::styled(format!("  {}    ", t("auth.submit")), Style::default().fg(theme.gray)),
             ];
             hint_spans.extend(quit_hint_spans(theme));
             let hints = Line::from(hint_spans).alignment(Alignment::Center);
@@ -1567,7 +1572,7 @@ fn render_welcome_authenticating(
             render_logo(logo_area, buf, theme, content_area.height);
 
             let msg = Line::from(Span::styled(
-                "Connecting...",
+                t("auth.connecting"),
                 Style::default().fg(theme.gray_bright),
             ))
             .alignment(Alignment::Center);
@@ -1628,7 +1633,7 @@ fn render_changelog_section(
             .fg(theme.gray_bright)
             .add_modifier(Modifier::DIM),
     );
-    let title = "Changelog";
+    let title = t("welcome.changelog");
     buf.set_span(
         centered.x,
         centered.y,
@@ -1725,7 +1730,7 @@ fn render_welcome_done(
     let cta = p
         .gate
         .and_then(|g| g.label.as_deref())
-        .unwrap_or("Upgrade Subscription");
+        .unwrap_or_else(|| t("welcome.upgrade_subscription"));
     let in_vscode_family = welcome_in_vscode_family();
     let (key_g, key_l, key_q) = (
         "ctrl+g",
@@ -1774,7 +1779,7 @@ fn render_welcome_done(
     let gate_menu;
     let owned_menu;
     let menu_items: &[(&str, &str)] = if !p.has_access {
-        gate_menu = [(key_g, cta), (key_l, "Logout"), (key_q, "Quit")];
+        gate_menu = [(key_g, cta), (key_l, t("welcome.logout")), (key_q, t("welcome.quit_menu"))];
         &gate_menu
     } else {
         let (key_w, key_resume, key_q, key_i_with_x) = (
@@ -1789,15 +1794,15 @@ fn render_welcome_done(
             // The trailing "[x]" is a clickable dismiss control
             // The welcome screen mouse handler treats clicks on the rightmost 3 cells of this row as dismiss instead of open. Keyboard: ctrl-shift-i.
             // The key string is right-aligned by render_menu, so [x] sits at the very end of the row
-            items.push((key_i_with_x, "Import Claude settings"));
+            items.push((key_i_with_x, t("welcome.import_claude_settings")));
         }
-        items.push((key_w, "New worktree"));
-        items.push((key_resume, "Resume session"));
+        items.push((key_w, t("welcome.new_worktree")));
+        items.push((key_resume, t("welcome.resume_session")));
         // "Changelog" above Quit; no shortcut, opened by click (row or block)
         if show_changelog_action {
-            items.push(("", "Changelog"));
+            items.push(("", t("welcome.changelog")));
         }
-        items.push((key_q, "Quit"));
+        items.push((key_q, t("welcome.quit_menu")));
         owned_menu = items;
         owned_menu.as_slice()
     };
@@ -2034,12 +2039,12 @@ fn render_welcome_done(
         .flex(Flex::Center)
         .areas(layout.prompt);
         // Show the user's current tier and a clickable refresh button above the gate message
-        let tier_label = p.subscription_tier.unwrap_or("Free");
-        let tier_prefix = format!("Tier: {tier_label}  ");
-        let refresh_text = "[Refresh]";
-        let total_width = tier_prefix.len() + refresh_text.len();
+        let tier_label = p.subscription_tier.unwrap_or_else(|| t("welcome.tier_free"));
+        let tier_prefix = format!("{}{tier_label}  ", t("welcome.tier_prefix"));
+        let refresh_text = t("welcome.refresh");
+        let total_width = UnicodeWidthStr::width(tier_prefix.as_str()) + UnicodeWidthStr::width(refresh_text);
         let tier_line = Line::from(vec![
-            Span::styled("Tier: ", Style::default().fg(theme.gray)),
+            Span::styled(t("welcome.tier_prefix"), Style::default().fg(theme.gray)),
             Span::styled(
                 tier_label,
                 Style::default()
@@ -2064,16 +2069,16 @@ fn render_welcome_done(
         // Compute the click rect for "[Refresh]" within the centered line.
         let line_start_x = tier_area.x + tier_area.width.saturating_sub(total_width as u16) / 2;
         refresh_hit_rect = Some(Rect {
-            x: line_start_x + tier_prefix.len() as u16,
+            x: line_start_x + UnicodeWidthStr::width(tier_prefix.as_str()) as u16,
             y: tier_area.y,
-            width: refresh_text.len() as u16,
+            width: UnicodeWidthStr::width(refresh_text) as u16,
             height: 1,
         });
 
         let gate_text = p
             .gate
             .map(|g| g.message.as_str())
-            .unwrap_or("SuperGrok subscription required");
+            .unwrap_or_else(|| t("welcome.supergrok_required"));
         let msg = Line::from(Span::styled(
             gate_text,
             Style::default().fg(theme.gray_bright),
@@ -2171,15 +2176,16 @@ fn render_welcome_done(
                 height: tip_centered.height,
             };
             let key_name = "ctrl+u";
+            let update_msg = t_fmt("welcome.update.available", &[("version", ver), ("key", key_name)]);
             let line = Line::from(vec![
                 Span::styled(
-                    "Update: ",
+                    t("welcome.update.prefix"),
                     Style::default()
                         .fg(theme.accent_user)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
-                    format!("v{ver} available, press {key_name} to restart"),
+                    update_msg,
                     Style::default().fg(theme.accent_user),
                 ),
             ]);
@@ -2210,17 +2216,18 @@ fn render_welcome_done(
             };
             let mins = hint.age.as_secs() / 60;
             let when = if mins == 0 {
-                "moments ago".to_string()
+                t("welcome.foreign.moments_ago").to_string()
             } else {
-                format!("{mins}m ago")
+                t_fmt("welcome.foreign.minutes_ago", &[("n", &mins.to_string())])
             };
             let accent = Style::default().fg(theme.accent_user);
             let accent_bold = accent.add_modifier(Modifier::BOLD);
             let tool = crate::app::foreign_tool_display_label(hint.tool);
+            let resume_text = t_fmt("welcome.foreign.resume", &[("when", &when)]);
             let line = Line::from(vec![
-                Span::styled("Coming from ", accent),
+                Span::styled(t("welcome.foreign.coming_from"), accent),
                 Span::styled(tool, accent_bold),
-                Span::styled(format!("? Resume your session from {when} using "), accent),
+                Span::styled(resume_text, accent),
                 Span::styled("ctrl+u", accent_bold),
             ]);
             Paragraph::new(line)
@@ -2435,7 +2442,7 @@ pub(crate) fn render_session_picker_body(
             summary_lines: &[],
             dimmed: false,
             indent: 1,
-            badge: if has_snippet { "match" } else { "" },
+            badge: if has_snippet { t("session_picker.badge.match") } else { "" },
             badge_color: Some(theme.accent_user),
             collapsible: true,
             underline_last_desc: false,
@@ -2453,13 +2460,13 @@ pub(crate) fn render_session_picker_body(
     let worktree_shortcut: &'static str = "ctrl+w";
     use crate::views::shortcuts_bar::HintItem;
     let mut default_shortcuts: Vec<HintItem> = vec![
-        HintItem::new(crate::key!(Esc), "back"),
-        HintItem::new(crate::key!(Enter), "select"),
+        HintItem::new(crate::key!(Esc), t("welcome.picker.back")),
+        HintItem::new(crate::key!(Enter), t("welcome.picker.select")),
     ];
     if !controls_hidden {
         default_shortcuts.push(HintItem {
             keys: vec![],
-            label: "worktree".into(),
+            label: t("welcome.picker.worktree").into(),
             custom_display: Some(worktree_shortcut),
             description: None,
             pinned: false,
@@ -2467,7 +2474,7 @@ pub(crate) fn render_session_picker_body(
     }
     default_shortcuts.push(HintItem {
         keys: vec![],
-        label: "navigate".into(),
+        label: t("welcome.picker.navigate").into(),
         custom_display: Some("\u{2191}\u{2193}"),
         description: None,
         pinned: false,
@@ -2476,14 +2483,14 @@ pub(crate) fn render_session_picker_body(
         default_shortcuts.clear();
         default_shortcuts.push(HintItem {
             keys: vec![],
-            label: "confirm delete".into(),
+            label: t("welcome.picker.confirm_delete").into(),
             custom_display: Some("y"),
             description: None,
             pinned: false,
         });
         default_shortcuts.push(HintItem {
             keys: vec![],
-            label: "cancel".into(),
+            label: t("welcome.picker.cancel").into(),
             custom_display: Some("n"),
             description: None,
             pinned: false,
@@ -2491,14 +2498,14 @@ pub(crate) fn render_session_picker_body(
     } else if !controls_hidden {
         default_shortcuts.push(HintItem {
             keys: vec![],
-            label: "filter".into(),
+            label: t("welcome.picker.filter").into(),
             custom_display: Some("f"),
             description: None,
             pinned: false,
         });
         default_shortcuts.push(HintItem {
             keys: vec![],
-            label: "delete".into(),
+            label: t("welcome.picker.delete").into(),
             custom_display: Some("d"),
             description: None,
             pinned: false,
@@ -2506,7 +2513,7 @@ pub(crate) fn render_session_picker_body(
     }
 
     let config = PickerConfig {
-        title: Some("Resume session"),
+        title: Some(t("welcome.resume_session")),
         show_search_hint: true,
         expandable: true,
         esc_clears_query: true,
@@ -2524,7 +2531,7 @@ pub(crate) fn render_session_picker_body(
         action_keys: if controls_hidden || ctx.pending_delete {
             &[]
         } else {
-            &[('d', "delete")]
+            &[('d', t("welcome.picker.delete"))]
         },
         disable_search: false,
         compact_bottom_bar: false,
@@ -2621,7 +2628,12 @@ fn render_startup_warnings(
         .map(|l| Line::from(Span::styled(l, style)).alignment(Alignment::Center))
         .collect();
     if let Some(ref action) = w.action {
-        lines.push(Line::from(Span::styled(action.as_str(), style)).alignment(Alignment::Center));
+        let action_str = if action == crate::startup::DOCTOR_ACTION {
+            t("clipboard_action_run_doctor")
+        } else {
+            action.as_str()
+        };
+        lines.push(Line::from(Span::styled(action_str, style)).alignment(Alignment::Center));
     }
 
     Paragraph::new(lines).render(area, buf);
@@ -2660,7 +2672,7 @@ fn build_masked_auth_token(input: &str, cursor_byte: usize) -> MaskedAuthToken {
 
 fn masked_auth_token_view(input: &str, cursor_byte: usize, width: usize) -> (String, usize) {
     if input.is_empty() {
-        return ("Paste your token here...".to_string(), 0);
+        return (t("auth.paste_token_placeholder").to_string(), 0);
     }
     let masked = build_masked_auth_token(input, cursor_byte);
     let buffer =
