@@ -114,7 +114,7 @@ pub enum ChatStateCommand {
         cost_usd_ticks: Option<i64>,
     },
 
-    /// Fold one side call (compaction, …) into the session ledger only —
+    /// Fold one side call (compaction, recap, title, turn summary, `/btw`, …) into the session ledger only —
     /// never the open prompt ledger, never `main_loop_model_calls`.
     RecordSessionSideUsage {
         model_id: String,

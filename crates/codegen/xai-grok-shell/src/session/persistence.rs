@@ -311,6 +311,8 @@ pub enum PersistenceMsg {
     /// Generated session title from background LLM task.
     /// Routed back through the persistence channel so the storage write stays sequential with other summary.json mutations.
     GeneratedTitle(String),
+    /// Attach the session ledger so first-title generation can record billed usage.
+    AttachChatState(xai_chat_state::ChatStateHandle),
     /// Early-session title refresh (turns 3 and 6): overwrite an existing auto title with one regenerated from the whole conversation.
     /// Never overwrites a manual `/rename` (enforced atomically under the summary lock).
     RegenerateTitle(String),
@@ -2170,6 +2172,9 @@ impl SessionPersistence {
                         &self.info.cwd,
                     );
                 }
+                PersistenceMsg::AttachChatState(handle) => {
+                    self.summary.set_chat_state(handle);
+                }
                 PersistenceMsg::GeneratedTitle(title) => {
                     // Auto-generated titles must never overwrite a title the user set via `/rename`
                     // `set_generated_title_if_absent` writes only when the session still has no title (checked atomically under the summary lock)
@@ -2776,6 +2781,7 @@ pub(crate) async fn new(
                     sampling_client,
                     model: session_summary_model,
                     persistence_tx: summary_tx,
+                    chat_state: None,
                 },
             ),
             registry_title_sync,
@@ -2885,6 +2891,7 @@ pub(crate) async fn new_with_explicit_dir(
                     sampling_client,
                     model: session_summary_model,
                     persistence_tx: summary_tx,
+                    chat_state: None,
                 },
             ),
             registry_title_sync: None,
@@ -3013,6 +3020,7 @@ pub(crate) async fn load_light(
                 sampling_client,
                 model: session_summary_model,
                 persistence_tx: summary_tx,
+                chat_state: None,
             },
         );
         if has_title {

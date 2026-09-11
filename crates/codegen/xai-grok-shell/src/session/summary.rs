@@ -25,6 +25,8 @@ pub(crate) struct SummaryConfig {
     /// Channel back to the persistence actor for sequential storage writes.
     /// Weak: a strong sender here would keep the actor's own channel and task alive.
     pub(crate) persistence_tx: mpsc::WeakUnboundedSender<PersistenceMsg>,
+    /// Set after session spawn so the first-title model call can fold into the session ledger.
+    pub(crate) chat_state: Option<xai_chat_state::ChatStateHandle>,
 }
 
 /// Created once per persistence actor. The only public method is [`update`], which is called from the `ContentChunk` handler.
@@ -60,11 +62,17 @@ impl SummaryGenerator {
                 let sampling_client = self.config.sampling_client.clone();
                 let model = self.config.model.clone();
                 let persistence_tx = self.config.persistence_tx.clone();
+                let chat_state = self.config.chat_state.clone();
 
                 // A background task runs the LLM call so the persistence actor keeps processing messages (updates, flushes)
                 tokio::spawn(async move {
-                    let mut title =
-                        generate_session_summary(content.clone(), sampling_client, &model).await;
+                    let mut title = generate_session_summary(
+                        content.clone(),
+                        sampling_client,
+                        &model,
+                        chat_state.as_ref(),
+                    )
+                    .await;
                     if title.trim().is_empty() {
                         title =
                             crate::session::helpers::session_summary::title_fallback_from_user_text(
@@ -88,6 +96,11 @@ impl SummaryGenerator {
     /// Mark as Done (e.g. when disk already has a summary during load).
     pub(crate) fn mark_done(&mut self) {
         self.state = State::Done;
+    }
+
+    /// Attach the session ledger so the first-title model call is billed like other side calls.
+    pub(crate) fn set_chat_state(&mut self, handle: xai_chat_state::ChatStateHandle) {
+        self.config.chat_state = Some(handle);
     }
 
     /// Inverse of [`mark_done`]: `/rename --auto` calls this so the next content chunk regenerates a title through the normal if-absent path.
@@ -220,6 +233,7 @@ mod tests {
             sampling_client,
             model: String::new(),
             persistence_tx: tx.downgrade(),
+            chat_state: None,
         });
         assert!(generator.is_idle());
         generator.mark_done();

@@ -2340,7 +2340,7 @@ impl SessionActor {
             _ => false,
         }
     }
-    async fn persist_live_usage(&self) {
+    pub(crate) async fn persist_live_usage(&self) {
         let Some(signals) = self.signals_handle().snapshot().await else {
             return;
         };

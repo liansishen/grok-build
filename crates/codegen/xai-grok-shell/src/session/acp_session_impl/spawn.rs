@@ -615,6 +615,9 @@ pub(crate) async fn spawn_session_actor(
     .instrument(chat_state_span)
     .await;
     chat_state_handle.update_credentials(credentials);
+    let _ = persistence
+        .tx
+        .send(PersistenceMsg::AttachChatState(chat_state_handle.clone()));
     let state = TokioMutex::new(State {
         running_task: None,
         finalization_gate: Default::default(),

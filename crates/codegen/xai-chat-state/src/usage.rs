@@ -140,8 +140,8 @@ impl UsageLedger {
         }
     }
 
-    /// Fold one side call (compaction summarization, background utility
-    /// requests, …) into the totals without incrementing
+    /// Fold one side call (compaction summarization, recap, title, turn summary,
+    /// `/btw`, …) into the totals without incrementing
     /// `main_loop_model_calls` (the wire `numTurns` counts main-loop rounds
     /// only). Failed requests never reach this: callers record only
     /// successfully completed responses.

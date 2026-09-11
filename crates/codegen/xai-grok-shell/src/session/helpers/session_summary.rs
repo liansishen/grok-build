@@ -129,6 +129,7 @@ pub async fn generate_session_summary(
     user_message: String,
     client: OaiCompatClient,
     model: &str,
+    chat_state: Option<&xai_chat_state::ChatStateHandle>,
 ) -> String {
     let clean_message = title_source_text(&user_message);
     let request = ConversationRequest::from_items(vec![
@@ -171,6 +172,18 @@ Just generate the session_title and nothing else"#,
 
     match client.conversation_collect(request).await {
         Ok(response) => {
+            if let Some(usage) = response.usage.as_ref()
+                && let Some(handle) = chat_state
+            {
+                handle
+                    .record_session_side_usage(
+                        model,
+                        usage,
+                        None,
+                        response.cost_usd_ticks,
+                    )
+                    .await;
+            }
             if let Some(a) = response.assistant()
                 && let Some(tool_call) = a.tool_calls.first()
                 && let Ok(result) = serde_json::from_str::<SessionTitle>(&tool_call.arguments)

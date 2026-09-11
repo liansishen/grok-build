@@ -478,7 +478,7 @@ impl ChatStateActor {
             .record_subagent(by_model, incomplete);
     }
 
-    /// Fold one side call (compaction, …) into both session and process ledgers.
+    /// Fold one side call (compaction, recap, title, turn summary, `/btw`, …) into both session and process ledgers.
     pub(super) fn record_session_side_usage(
         &mut self,
         model_id: &str,
