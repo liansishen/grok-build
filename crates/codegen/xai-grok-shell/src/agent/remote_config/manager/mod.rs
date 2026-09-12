@@ -381,6 +381,21 @@ impl ModelsManager {
         self.inner.catalog.read().models.clone()
     }
 
+    /// Price sheet for a catalog key or API model id.
+    /// `None` when the catalog has no matching entry.
+    pub fn pricing_for(&self, model_id: &str) -> Option<xai_grok_sampling_types::ModelPricing> {
+        let catalog = self.inner.catalog.read();
+        catalog
+            .models
+            .get(model_id)
+            .or_else(|| {
+                catalog.models.values().find(|entry| {
+                    entry.info.model == model_id || entry.info.id.as_deref() == Some(model_id)
+                })
+            })
+            .map(|entry| entry.info.pricing.clone())
+    }
+
     /// One name without cloning the catalog, for callers on a hot path.
     pub fn display_name(&self, id: &str) -> Option<String> {
         self.inner

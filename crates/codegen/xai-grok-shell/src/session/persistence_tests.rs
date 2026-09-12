@@ -38,6 +38,7 @@ fn test_actor_inner(
         crate::session::summary::SummaryGenerator::new(crate::session::summary::SummaryConfig {
             sampling_client,
             model: String::new(),
+            pricing: xai_grok_sampling_types::ModelPricing::default(),
             persistence_tx: tx.downgrade(),
             chat_state: None,
         });

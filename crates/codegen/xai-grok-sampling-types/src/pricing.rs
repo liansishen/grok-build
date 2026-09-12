@@ -148,6 +148,7 @@ mod tests {
             total_tokens: prompt + completion,
             reasoning_tokens: 0,
             cached_prompt_tokens: cached,
+            cache_creation_prompt_tokens: 0,
         }
     }
 
@@ -200,5 +201,21 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(p.resolve_cost_ticks(&usage(100, 10, 0), None), None);
+    }
+
+    #[test]
+    fn auto_estimates_when_server_reports_zero() {
+        // Title generation on BYOK/proxy often reports 0; `reported_cost_ticks` treats that as unreported.
+        let p = ModelPricing {
+            input_price_per_mtok: Some(0.2),
+            cached_input_price_per_mtok: Some(0.02),
+            output_price_per_mtok: Some(1.2),
+            cost_source: CostSource::Auto,
+        };
+        let ticks = p.resolve_cost_ticks(
+            &usage(229, 28, 0),
+            crate::reported_cost_ticks(Some(0)),
+        );
+        assert!(ticks.is_some_and(|t| t > 0));
     }
 }

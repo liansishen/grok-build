@@ -5,6 +5,7 @@ use crate::sampling::{
     ToolSpec,
 };
 use crate::session::helpers::chat::floor_char_boundary;
+use xai_grok_sampling_types::ModelPricing;
 
 /// Upper bound on the user text that feeds title generation.
 /// Titles only need the opening, and this keeps the request well under the model prompt limit.
@@ -130,6 +131,7 @@ pub async fn generate_session_summary(
     client: OaiCompatClient,
     model: &str,
     chat_state: Option<&xai_chat_state::ChatStateHandle>,
+    pricing: &ModelPricing,
 ) -> String {
     let clean_message = title_source_text(&user_message);
     let request = ConversationRequest::from_items(vec![
@@ -175,12 +177,21 @@ Just generate the session_title and nothing else"#,
             if let Some(usage) = response.usage.as_ref()
                 && let Some(handle) = chat_state
             {
+                let model_key = response
+                    .assistant()
+                    .and_then(|a| a.model_id.as_deref())
+                    .filter(|id| !id.is_empty())
+                    .unwrap_or(model);
+                let cost_usd_ticks = pricing.resolve_cost_ticks(
+                    usage,
+                    xai_grok_sampling_types::reported_cost_ticks(response.cost_usd_ticks),
+                );
                 handle
                     .record_session_side_usage(
-                        model,
+                        model_key,
                         usage,
                         None,
-                        response.cost_usd_ticks,
+                        cost_usd_ticks,
                     )
                     .await;
             }
@@ -239,6 +250,50 @@ mod tests {
         TITLE_SOURCE_MAX_BYTES, clean_title_text, strip_system_reminder_blocks,
         title_fallback_from_user_text, title_refresh_instruction, title_source_text,
     };
+    use xai_grok_sampling_types::{CostSource, ModelPricing, TokenUsage};
+
+    fn title_usage() -> TokenUsage {
+        TokenUsage {
+            prompt_tokens: 229,
+            completion_tokens: 28,
+            total_tokens: 257,
+            reasoning_tokens: 0,
+            cached_prompt_tokens: 0,
+            cache_creation_prompt_tokens: 0,
+        }
+    }
+
+    fn luna_pricing() -> ModelPricing {
+        ModelPricing {
+            input_price_per_mtok: Some(0.2),
+            cached_input_price_per_mtok: Some(0.02),
+            output_price_per_mtok: Some(1.2),
+            cost_source: CostSource::Auto,
+        }
+    }
+
+    #[test]
+    fn title_path_fills_unreported_server_cost_from_local_pricing() {
+        let ticks = luna_pricing().resolve_cost_ticks(
+            &title_usage(),
+            xai_grok_sampling_types::reported_cost_ticks(Some(0)),
+        );
+        assert!(
+            ticks.is_some_and(|t| t > 0),
+            "hepdd-style 0/absent cost must not leave the title call unstamped"
+        );
+    }
+
+    #[test]
+    fn empty_title_pricing_keeps_unreported_cost_none() {
+        assert_eq!(
+            ModelPricing::default().resolve_cost_ticks(
+                &title_usage(),
+                xai_grok_sampling_types::reported_cost_ticks(None),
+            ),
+            None
+        );
+    }
 
     #[test]
     fn checkpoints_reached_counts_and_catches_up() {

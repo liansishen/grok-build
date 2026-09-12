@@ -2712,6 +2712,8 @@ pub(crate) struct SessionDeps {
     pub(crate) relay_sync: Option<crate::relay::RelaySync>,
     pub(crate) gateway: Option<GatewaySender>,
     pub(crate) session_summary_model: String,
+    /// Price sheet for [`Self::session_summary_model`]; empty if the catalog has none.
+    pub(crate) session_summary_pricing: xai_grok_sampling_types::ModelPricing,
     pub(crate) registry_title_sync: Option<RegistryGeneratedTitleSync>,
     pub(crate) search_index: crate::session::storage::search::SharedSearchIndex,
     /// Client-claimed kind for a fresh session (allowlisted at `session/new`; currently only `"headless"`).
@@ -2731,6 +2733,7 @@ pub(crate) async fn new(
         relay_sync,
         gateway,
         session_summary_model,
+        session_summary_pricing,
         registry_title_sync,
         search_index,
         session_kind,
@@ -2780,6 +2783,7 @@ pub(crate) async fn new(
                 crate::session::summary::SummaryConfig {
                     sampling_client,
                     model: session_summary_model,
+                    pricing: session_summary_pricing,
                     persistence_tx: summary_tx,
                     chat_state: None,
                 },
@@ -2890,6 +2894,7 @@ pub(crate) async fn new_with_explicit_dir(
                 crate::session::summary::SummaryConfig {
                     sampling_client,
                     model: session_summary_model,
+                    pricing: xai_grok_sampling_types::ModelPricing::default(),
                     persistence_tx: summary_tx,
                     chat_state: None,
                 },
@@ -2961,6 +2966,7 @@ pub(crate) async fn load_light(
         relay_sync,
         gateway,
         session_summary_model,
+        session_summary_pricing,
         registry_title_sync,
         search_index,
         session_kind: _,
@@ -3019,6 +3025,7 @@ pub(crate) async fn load_light(
             crate::session::summary::SummaryConfig {
                 sampling_client,
                 model: session_summary_model,
+                pricing: session_summary_pricing,
                 persistence_tx: summary_tx,
                 chat_state: None,
             },

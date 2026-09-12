@@ -22,6 +22,8 @@ enum State {
 pub(crate) struct SummaryConfig {
     pub(crate) sampling_client: OaiCompatClient,
     pub(crate) model: String,
+    /// Local price sheet for the title model. Empty means "server ticks only".
+    pub(crate) pricing: xai_grok_sampling_types::ModelPricing,
     /// Channel back to the persistence actor for sequential storage writes.
     /// Weak: a strong sender here would keep the actor's own channel and task alive.
     pub(crate) persistence_tx: mpsc::WeakUnboundedSender<PersistenceMsg>,
@@ -61,6 +63,7 @@ impl SummaryGenerator {
 
                 let sampling_client = self.config.sampling_client.clone();
                 let model = self.config.model.clone();
+                let pricing = self.config.pricing.clone();
                 let persistence_tx = self.config.persistence_tx.clone();
                 let chat_state = self.config.chat_state.clone();
 
@@ -71,6 +74,7 @@ impl SummaryGenerator {
                         sampling_client,
                         &model,
                         chat_state.as_ref(),
+                        &pricing,
                     )
                     .await;
                     if title.trim().is_empty() {
@@ -232,6 +236,7 @@ mod tests {
         let mut generator = SummaryGenerator::new(SummaryConfig {
             sampling_client,
             model: String::new(),
+            pricing: xai_grok_sampling_types::ModelPricing::default(),
             persistence_tx: tx.downgrade(),
             chat_state: None,
         });

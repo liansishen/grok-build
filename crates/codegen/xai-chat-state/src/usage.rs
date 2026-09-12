@@ -216,4 +216,30 @@ mod tests {
         ledger.record_subagent(&[], true);
         assert!(ledger.incomplete);
     }
+
+    #[test]
+    fn estimated_side_call_does_not_mark_session_partial() {
+        let mut ledger = UsageLedger::default();
+        ledger.record_main_loop_call("grok", &tu(100, 10), None, Some(1_000));
+        let pricing = xai_grok_sampling_types::ModelPricing {
+            input_price_per_mtok: Some(0.2),
+            cached_input_price_per_mtok: Some(0.02),
+            output_price_per_mtok: Some(1.2),
+            cost_source: xai_grok_sampling_types::CostSource::Auto,
+        };
+        let ticks = pricing.resolve_cost_ticks(&tu(229, 28), None);
+        assert!(ticks.is_some_and(|t| t > 0), "local estimate must stamp a positive cost");
+        ledger.record_side_call("gpt-5.6-luna", &tu(229, 28), None, ticks);
+        assert!(!ledger.totals.cost_is_partial());
+        assert_eq!(ledger.totals.cost_missing_calls, 0);
+    }
+
+    #[test]
+    fn missing_side_call_cost_marks_session_partial() {
+        let mut ledger = UsageLedger::default();
+        ledger.record_main_loop_call("grok", &tu(100, 10), None, Some(1_000));
+        ledger.record_side_call("gpt-5.6-luna", &tu(229, 28), None, None);
+        assert!(ledger.totals.cost_is_partial());
+        assert_eq!(ledger.totals.cost_missing_calls, 1);
+    }
 }
