@@ -1,4 +1,5 @@
 //! Building the status-line payload and pushing it to clients.
+use std::time::Duration;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -9,7 +10,7 @@ use super::*;
 use crate::extensions::notification::{PromptUsage, PromptUsageModel, ticks_to_usd};
 use xai_grok_status_line::{
     STATUS_LINE_SCHEMA_VERSION, StatusLineContext, StatusLineContextWindow, StatusLineCost,
-    StatusLineEffort, StatusLineModel, StatusLineModelUsage, StatusLineRepo,
+    StatusLineEffort, StatusLineGeneration, StatusLineModel, StatusLineModelUsage, StatusLineRepo,
     StatusLineSessionUsage, StatusLineTurn, StatusLineWorkspace, StatusLineWorktree,
 };
 use xai_grok_workspace::session::git::normalize_repo_url;
@@ -231,6 +232,15 @@ impl SessionActor {
         };
         let cwd = path_string(&cwd);
         let repo_root = repo_state.repo_root.as_deref().map(path_string);
+        let live_generation = self.turn_phases.generation_metrics();
+        let generation = (live_generation.first_token_ms.is_some()
+            || live_generation.tokens_per_second.is_some())
+        .then_some(StatusLineGeneration {
+            first_token_ms: live_generation.first_token_ms,
+            tokens_per_second: live_generation.tokens_per_second,
+            estimated: live_generation.estimated,
+            stale: live_generation.stale,
+        });
 
         StatusLineContext {
             schema_version: Some(STATUS_LINE_SCHEMA_VERSION),
@@ -268,6 +278,7 @@ impl SessionActor {
             ),
             effort,
             worktree,
+            generation,
             turn: live_turn(turn_start_ms, prompt_id.as_deref()),
             // Like `session_name`: a run property the client stamps, not the agent's to send
             trigger: None,
@@ -330,15 +341,29 @@ pub(super) async fn run_status_emitter(session: std::sync::Weak<SessionActor>) {
         Some(s) if !s.startup_hints.is_subagent => s.status_wake.handle(),
         _ => return,
     };
-    emit_loop(wake, || {
-        let session = session.upgrade()?;
-        Some(async move {
-            if session.status_line_enabled.load(Ordering::Relaxed) {
-                session.emit_status_snapshot().await;
+    let mut ticker = tokio::time::interval(Duration::from_millis(250));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        tokio::select! {
+            _ = wake.notified() => {
+                let Some(session) = session.upgrade() else { return; };
+                if session.status_line_enabled.load(Ordering::Relaxed) {
+                    session.emit_status_snapshot().await;
+                }
             }
-        })
-    })
-    .await;
+            _ = ticker.tick() => {
+                let Some(session) = session.upgrade() else { return; };
+                let turn_active = session
+                    .current_prompt_id
+                    .lock()
+                    .ok()
+                    .is_some_and(|prompt_id| prompt_id.is_some());
+                if session.status_line_enabled.load(Ordering::Relaxed) && turn_active {
+                    session.emit_status_snapshot().await;
+                }
+            }
+        }
+    }
 }
 
 /// The emitter's wake, which also ends it: dropping this wakes the loop a last time and the upgrade that follows fails.

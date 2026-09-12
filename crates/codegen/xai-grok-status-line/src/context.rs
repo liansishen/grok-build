@@ -52,6 +52,8 @@ pub struct StatusLineContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub turn: Option<StatusLineTurn>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub generation: Option<StatusLineGeneration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger: Option<StatusLineTrigger>,
 }
 
@@ -85,6 +87,7 @@ impl Default for StatusLineContext {
             worktree: None,
             turn: None,
             trigger: None,
+            generation: None,
         }
     }
 }
@@ -94,6 +97,17 @@ impl Default for StatusLineContext {
 pub struct StatusLineTurn {
     /// The value is Unix milliseconds, so a client subtracts it from its own clock.
     pub started_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StatusLineGeneration {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_token_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_per_second: Option<f64>,
+    pub estimated: bool,
+    pub stale: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

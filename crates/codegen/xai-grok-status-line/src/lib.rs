@@ -20,7 +20,7 @@ pub use config::test_support;
 pub use config::{ResolvedStatusLine, StatusLineConfig, StatusLineItem, StatusLineType};
 pub use context::{
     STATUS_LINE_SCHEMA_VERSION, StatusLineBilling, StatusLineContext, StatusLineContextWindow,
-    StatusLineCost, StatusLineEffort, StatusLineModel, StatusLineModelUsage, StatusLineQuota,
-    StatusLineQuotaAccount, StatusLineRepo, StatusLineSessionUsage, StatusLineTrigger, StatusLineTurn,
-    StatusLineWorkspace, StatusLineWorktree,
+    StatusLineCost, StatusLineEffort, StatusLineGeneration, StatusLineModel, StatusLineModelUsage,
+    StatusLineQuota, StatusLineQuotaAccount, StatusLineRepo, StatusLineSessionUsage,
+    StatusLineTrigger, StatusLineTurn, StatusLineWorkspace, StatusLineWorktree,
 };

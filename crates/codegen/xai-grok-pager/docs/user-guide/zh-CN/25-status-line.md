@@ -25,6 +25,8 @@ items = ["cwd", "model", "context"]   # 省略时的默认值
 | `cost` | 会话费用；低于 0.005 美元时隐藏，避免显示具有误导性的 `$0.00` |
 | `turn-timer` | 当前回合的已用时间，从运行满一秒后开始显示 |
 | `session-name` | 已设置的会话名称 |
+| `tps` | 回合中的实时文本生成速度（每秒 token）；使用 5 秒滚动窗口，文本停止 1.5 秒后隐藏。 |
+| `first-token` | 从回合开始到首个模型输出的时间，包括 reasoning 和工具调用输出。 |
 
 ### 命令状态栏
 
@@ -121,6 +123,9 @@ refresh_interval = 300   # 秒
 | `turn.started_at_ms` | 当前回合开始时的 Unix 毫秒时间戳；回合之间省略。可用自己的时钟相减得到已用时间 |
 | `worktree.{name,path,branch,main_worktree_root}` | 链接工作树中的活动工作树；工作树位于文件系统根目录时省略 `name`，`main_worktree_root` 是该工作树的分支来源 |
 | `trigger` | 本次运行原因：`refresh_interval` 计时器请求的运行为 `refresh_interval`，其他为 `state`。命令状态栏的标准输入中存在，描述会话而非单次运行的 `SessionStatus` 通知中不存在 |
+| `generation.first_token_ms` | 从回合开始到首个模型输出的毫秒数。 |
+| `generation.tokens_per_second` | 当前或完成后的输出速度；回合中是可见文本的估算值，完成后在有时间数据时使用 provider 输出 token。 |
+| `generation.estimated`、`generation.stale` | 标记速度是否为估算值，以及实时样本是否已过期。 |
 
 Grok 无法可靠获取的字段会直接省略，而不会发送占位值，状态栏因此不会显示伪造数据。务必处理缺失字段：`jq -r` 会把缺失键打印成字面量 `null`，因此可使用 `// 0` 或 `// "?"`；JavaScript 中可使用 `?.`。
 

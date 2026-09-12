@@ -25,6 +25,8 @@ This renders, for example, `grok-shell-status-line │ Grok 4.5 │ 12% ctx`. It
 | `cost` | Session cost, hidden below $0.005 so it never shows a misleading `$0.00` |
 | `turn-timer` | Elapsed time of the running turn, from one second in |
 | `session-name` | Session name, when set |
+| `tps` | Live text generation speed in tokens per second; uses a five-second rolling window during a turn and is hidden after 1.5 seconds without text. |
+| `first-token` | Time from turn start to the first model output, including reasoning and tool-call output. |
 
 ### Command
 
@@ -125,6 +127,9 @@ Nothing outside the table below is sent. A ported script that reads counts of li
 | `turn.started_at_ms` | Unix milliseconds the turn in flight began, absent between turns. Subtract it from your own clock for an elapsed time |
 | `worktree.{name,path,branch,main_worktree_root}` | Active worktree, inside a linked worktree. `name` is omitted for a worktree at a filesystem root, and `main_worktree_root` is where the worktree branched from |
 | `trigger` | Why this run was invoked: `refresh_interval` for a run the timer asked for, `state` otherwise. Present on a command row's stdin, absent from the `SessionStatus` notification, which describes the session rather than a run |
+| `generation.first_token_ms` | Milliseconds from the turn start to the first model output. |
+| `generation.tokens_per_second` | Current or settled output speed. During a turn this is an estimated visible-text rate; after a complete response it uses provider output tokens when timing is available. |
+| `generation.estimated`, `generation.stale` | Whether the speed is estimated and whether the live sample has gone stale. |
 
 Fields Grok cannot source are omitted rather than sent as placeholders, so the row never shows a fabricated value. Always guard them: `jq -r` prints the literal text `null` for a missing key, so write `// 0` or `// "?"` in jq, and `?.` in JavaScript.
 

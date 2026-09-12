@@ -129,6 +129,12 @@ fn every_field_survives_a_round_trip_through_the_shared_fixture() {
             branch: Some("feature-x".into()),
             main_worktree_root: Some(DIR.into()),
         }),
+        generation: Some(StatusLineGeneration {
+            first_token_ms: Some(842),
+            tokens_per_second: Some(132.0),
+            estimated: true,
+            stale: false,
+        }),
         trigger: Some(StatusLineTrigger::RefreshInterval),
     };
 

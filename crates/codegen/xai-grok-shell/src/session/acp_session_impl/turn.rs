@@ -2449,6 +2449,7 @@ impl SessionActor {
             )
             .await;
         self.turn_phases.emit_pending_latency();
+        self.emit_status_snapshot_detached();
         result
     }
     #[tracing::instrument(

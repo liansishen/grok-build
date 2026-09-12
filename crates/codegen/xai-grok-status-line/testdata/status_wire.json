@@ -105,5 +105,11 @@
     "branch": "feature-x",
     "main_worktree_root": "/home/user/project"
   },
+  "generation": {
+    "first_token_ms": 842,
+    "tokens_per_second": 132.0,
+    "estimated": true,
+    "stale": false
+  },
   "trigger": "refresh_interval"
 }

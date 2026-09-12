@@ -1,9 +1,29 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
 use crate::events::PromptLatency;
 use crate::session_ctx::log_event;
+
+const LIVE_TPS_WINDOW: Duration = Duration::from_secs(5);
+const LIVE_TPS_STALE_AFTER: Duration = Duration::from_millis(1_500);
+const LIVE_TPS_MIN_DURATION: Duration = Duration::from_secs(1);
+const ESTIMATED_BYTES_PER_TOKEN: u64 = 5;
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GenerationMetrics {
+    pub first_token_ms: Option<u64>,
+    pub tokens_per_second: Option<f64>,
+    pub estimated: bool,
+    pub stale: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TextSample {
+    at: Instant,
+    bytes: u64,
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TurnPhases {
@@ -116,6 +136,34 @@ impl TurnPhaseProfile {
         self.state.lock().discard_uncommitted_first_meaningful();
     }
 
+    pub fn record_text_delta(&self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        self.state.lock().record_text_delta(text, Instant::now());
+    }
+
+    pub fn record_completed_response(
+        &self,
+        output_tokens: Option<u32>,
+        time_to_first_token_ms: Option<u64>,
+        time_to_last_byte_ms: u64,
+    ) {
+        self.state.lock().record_completed_response(
+            output_tokens,
+            time_to_first_token_ms,
+            time_to_last_byte_ms,
+        );
+    }
+
+    pub fn generation_metrics(&self) -> GenerationMetrics {
+        self.state.lock().generation_metrics(Instant::now())
+    }
+
+    pub fn reset_generation_after_retry(&self) {
+        self.state.lock().reset_generation_after_retry();
+    }
+
     pub fn complete(&self) -> TurnPhases {
         self.state.lock().complete(Instant::now())
     }
@@ -174,6 +222,10 @@ struct PhaseState {
     first_meaningful: Option<Duration>,
     first_meaningful_committed: bool,
     completed: Option<TurnPhases>,
+    text_samples: VecDeque<TextSample>,
+    last_text_at: Option<Instant>,
+    settled_output_tokens: u64,
+    settled_decode_ms: u64,
 }
 
 impl PhaseState {
@@ -272,6 +324,91 @@ impl PhaseState {
             return;
         };
         self.first_meaningful = Some(now.saturating_duration_since(started_at));
+    }
+
+    fn record_text_delta(&mut self, text: &str, now: Instant) {
+        if self.completed.is_some() || self.started_at.is_none() {
+            return;
+        }
+        let bytes = text.len() as u64;
+        self.text_samples.push_back(TextSample { at: now, bytes });
+        self.last_text_at = Some(now);
+        self.prune_text_samples(now);
+    }
+
+    fn record_completed_response(
+        &mut self,
+        output_tokens: Option<u32>,
+        time_to_first_token_ms: Option<u64>,
+        time_to_last_byte_ms: u64,
+    ) {
+        let (Some(output_tokens), Some(ttft_ms)) = (output_tokens, time_to_first_token_ms) else {
+            return;
+        };
+        let decode_ms = time_to_last_byte_ms.saturating_sub(ttft_ms);
+        if decode_ms > 0 {
+            self.settled_output_tokens = self
+                .settled_output_tokens
+                .saturating_add(u64::from(output_tokens));
+            self.settled_decode_ms = self.settled_decode_ms.saturating_add(decode_ms);
+        }
+    }
+
+    fn reset_generation_after_retry(&mut self) {
+        if self.completed.is_none() {
+            self.text_samples.clear();
+            self.last_text_at = None;
+            self.settled_output_tokens = 0;
+            self.settled_decode_ms = 0;
+        }
+    }
+
+    fn prune_text_samples(&mut self, now: Instant) {
+        while self
+            .text_samples
+            .front()
+            .is_some_and(|sample| now.saturating_duration_since(sample.at) > LIVE_TPS_WINDOW)
+        {
+            self.text_samples.pop_front();
+        }
+    }
+
+    fn live_tps(&mut self, now: Instant) -> Option<f64> {
+        self.prune_text_samples(now);
+        let first = self.text_samples.front()?.at;
+        let duration = now.saturating_duration_since(first);
+        if duration < LIVE_TPS_MIN_DURATION {
+            return None;
+        }
+        let bytes: u64 = self.text_samples.iter().map(|sample| sample.bytes).sum();
+        (bytes > 0)
+            .then_some(bytes as f64 / ESTIMATED_BYTES_PER_TOKEN as f64 / duration.as_secs_f64())
+    }
+
+    fn generation_metrics(&mut self, now: Instant) -> GenerationMetrics {
+        let first_token_ms = self.first_token.map(duration_to_ms);
+        if self.completed.is_some() {
+            let tokens_per_second = if self.settled_decode_ms > 0 {
+                Some(self.settled_output_tokens as f64 / (self.settled_decode_ms as f64 / 1000.0))
+            } else {
+                self.live_tps(now)
+            };
+            return GenerationMetrics {
+                first_token_ms,
+                tokens_per_second,
+                estimated: self.settled_decode_ms == 0,
+                stale: false,
+            };
+        }
+        let stale = self
+            .last_text_at
+            .is_some_and(|at| now.saturating_duration_since(at) > LIVE_TPS_STALE_AFTER);
+        GenerationMetrics {
+            first_token_ms,
+            tokens_per_second: (!stale).then(|| self.live_tps(now)).flatten(),
+            estimated: true,
+            stale,
+        }
     }
 
     fn advance(&mut self, now: Instant) {
@@ -373,5 +510,32 @@ mod tests {
             phases.ttft_ms <= phases.ttfm_ms,
             "ttft must not exceed ttfm"
         );
+    }
+
+    #[test]
+    fn live_speed_uses_utf8_bytes_over_the_window() {
+        let start = Instant::now();
+        let mut state = PhaseState::default();
+        state.start(start);
+        state.record_text_delta("12345", start + Duration::from_secs(1));
+
+        let metrics = state.generation_metrics(start + Duration::from_secs(2));
+        assert_eq!(metrics.tokens_per_second, Some(1.0));
+        assert!(metrics.estimated);
+        assert!(!metrics.stale);
+    }
+
+    #[test]
+    fn settled_speed_uses_provider_output_tokens_and_decode_time() {
+        let start = Instant::now();
+        let mut state = PhaseState::default();
+        state.start(start);
+        state.record_completed_response(Some(100), Some(200), 1_200);
+        state.complete(start + Duration::from_secs(2));
+
+        let metrics = state.generation_metrics(start + Duration::from_secs(2));
+        assert_eq!(metrics.tokens_per_second, Some(100.0));
+        assert!(!metrics.estimated);
+        assert!(!metrics.stale);
     }
 }

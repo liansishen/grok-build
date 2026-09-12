@@ -194,8 +194,12 @@ impl SessionActor {
                         cap.append(false, &text);
                     }
 
-                    self.record_turn_first_token(Some(&request_id));
-                    self.record_turn_first_meaningful_output(Some(&request_id));
+                    if !text.is_empty() {
+                        self.record_turn_first_token(Some(&request_id));
+                        self.turn_phases.record_text_delta(&text);
+                        self.record_turn_first_meaningful_output(Some(&request_id));
+                        self.emit_status_snapshot_detached();
+                    }
 
                     // The phase change is emitted alongside each text delta so the UI flips to "streaming text" the moment content starts arriving
                     // The `PhaseChanged` event itself is idempotent on the consumer side
@@ -231,7 +235,10 @@ impl SessionActor {
                     }
 
                     // Reasoning is a token (ttft) but not meaningful output (ttfm).
-                    self.record_turn_first_token(Some(&request_id));
+                    if !text.is_empty() {
+                        self.record_turn_first_token(Some(&request_id));
+                        self.emit_status_snapshot_detached();
+                    }
 
                     self.emit_event(crate::session::events::Event::PhaseChanged {
                         phase: crate::session::events::Phase::StreamingReasoning,
@@ -256,8 +263,16 @@ impl SessionActor {
                     }
                 }
 
-                // A tool call is a token (ttft) but not meaningful text output (ttfm).
-                self.record_turn_first_token(Some(&request_id));
+                // A non-empty tool call delta is model output (ttft), but not meaningful text output (ttfm).
+                let has_tool_output = id.as_ref().is_some_and(|value| !value.is_empty())
+                    || name.as_ref().is_some_and(|value| !value.is_empty())
+                    || arguments_delta
+                        .as_ref()
+                        .is_some_and(|value| !value.is_empty());
+                if has_tool_output {
+                    self.record_turn_first_token(Some(&request_id));
+                    self.emit_status_snapshot_detached();
+                }
 
                 self.send_buffered_xai_update(XaiSessionUpdate::ToolCallDeltaChunk {
                     tool_call_id: id,
@@ -308,8 +323,14 @@ impl SessionActor {
             SamplingEvent::Completed {
                 request_id,
                 response,
-                metrics: _,
+                metrics,
             } => {
+                self.turn_phases.record_completed_response(
+                    response.usage.as_ref().map(|usage| usage.completion_tokens),
+                    metrics.time_to_first_token_ms,
+                    metrics.time_to_last_byte_ms,
+                );
+                self.emit_status_snapshot_detached();
                 let request_updates_turn = request_owned;
 
                 // Persist before the drain waiter is released so the next prompt cannot
@@ -413,6 +434,7 @@ impl SessionActor {
                 if !self.turn_stream_drained.lock().contains_key(&request_id) {
                     return;
                 }
+                self.turn_phases.reset_generation_after_retry();
                 if kind == xai_grok_sampler::SamplingErrorKind::DoomLoopDetected {
                     let triggers = doom_loop_triggers.unwrap_or_default();
                     let (should_count, should_stamp) = {
@@ -516,8 +538,9 @@ impl SessionActor {
                 name,
             } => {
                 self.signals_handle().record_tool_call(&name);
-                // A backend tool start is a token (ttft) but not meaningful text output (ttfm).
+                // A backend tool start is model output (ttft), but not meaningful text output (ttfm).
                 self.record_turn_first_token(Some(&request_id));
+                self.emit_status_snapshot_detached();
                 let (title, kind, raw_input) = backend_tool_display(&name);
                 self.send_update(
                     acp::SessionUpdate::ToolCall(

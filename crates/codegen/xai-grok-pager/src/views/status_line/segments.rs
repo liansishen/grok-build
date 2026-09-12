@@ -158,6 +158,15 @@ pub fn compose_builtin(
                 let name = ctx.session_name.as_deref().filter(|s| !s.is_empty())?;
                 Some(StatusSegment::dim(fit_columns(name, SESSION_NAME_COLS)))
             }
+            StatusLineItem::Tps => {
+                let generation = ctx.generation.as_ref()?;
+                let tps = generation.tokens_per_second?;
+                (!generation.stale).then(|| StatusSegment::dim(format!("{tps:.0} tok/s")))
+            }
+            StatusLineItem::FirstToken => {
+                let first_token_ms = ctx.generation.as_ref()?.first_token_ms?;
+                Some(StatusSegment::dim(format!("ttft {first_token_ms}ms")))
+            }
         })
         .collect()
 }

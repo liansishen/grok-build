@@ -29,6 +29,28 @@ fn composes_every_segment_in_order() {
 }
 
 #[test]
+fn generation_segments_show_ttft_and_live_speed() {
+    let mut ctx = context();
+    ctx.generation = Some(xai_grok_status_line::StatusLineGeneration {
+        first_token_ms: Some(842),
+        tokens_per_second: Some(132.4),
+        estimated: true,
+        stale: false,
+    });
+
+    assert_eq!(
+        plain(&ctx, None),
+        "project │ Grok Build │ 42% ctx │ $0.37 │ ttft 842ms │ 132 tok/s │ status_line work"
+    );
+
+    ctx.generation.as_mut().unwrap().stale = true;
+    assert_eq!(
+        plain(&ctx, None),
+        "project │ Grok Build │ 42% ctx │ $0.37 │ ttft 842ms │ status_line work"
+    );
+}
+
+#[test]
 fn omits_segments_whose_data_is_missing_or_rounds_to_zero() {
     let mut ctx = context();
     ctx.cost.total_cost_usd = Some(0.004);
