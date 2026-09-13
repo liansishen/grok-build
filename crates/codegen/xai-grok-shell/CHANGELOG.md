@@ -1,4 +1,55 @@
 # Changelog
+# 1.0.24-fork.7 — 2026-09-13
+
+本版为 Fork 功能与问题修复更新，产品版本仍为 **1.0.24**，不包含新的上游同步。发布范围覆盖 `v1.0.24-fork.6` 之后的后台任务提醒控制、状态栏用量数据完善、斜杠命令国际化和相关账本修复。
+
+### 问题修复
+
+- 修复会话用量账本对 recap、标题刷新、回合摘要和 `/btw` 等辅助模型调用的记录不完整问题，使会话累计用量和费用统计包含这些调用。
+- 在本地模型价格可用时，为标题生成等辅助调用补充费用估算，避免已知价格的会话被错误标记为费用不完整；缺少价格时仍明确保留“不完整”状态，不伪造费用。
+- 补充状态栏命令的 `process_model_usage` 数据，表示当前 Agent 进程自启动或恢复以来按模型累计的用量；会话历史用量和当前进程用量保持区分。
+- 补齐隐藏 `/gboom` 与 `/scroll-debug` 斜杠命令的英文和简体中文描述，避免命令元数据出现硬编码英文。
+
+### 本 Fork
+
+- 新增 `[ui].show_background_task_completion_reminders` 配置项及设置页面中的“后台任务完成提醒”开关。关闭后，AI 启动的 Bash 后台任务完成或失败时，不再在下一次工具结果中向模型插入系统提醒，但后台任务本身仍会执行。
+- 设置页面开关位于“智能体与批准”分类，支持键盘和鼠标操作，并将值持久化到用户配置；该配置在创建新 Agent 时应用，修改后需要重启 Grok。
+- 顶层 Agent 和子 Agent 均使用同一后台任务提醒配置，避免子 Agent 继续显示已关闭的提醒。
+- 同步更新状态栏协议文档、配置参考、设置元数据和测试夹具；未保留此前实验性的实时首字时间与 TPS 状态栏显示。
+
+### 兼容性
+
+- 产品版本仍为 **1.0.24**；新增 `ui.show_background_task_completion_reminders` 默认为 `true`，未配置该键的用户保持原有提醒行为。
+- 新配置只影响 Grok 应用向模型发送的后台任务完成系统提醒，不改变后台任务执行、任务结果获取、任务 ID 记录或外层工具宿主的任务状态通知。
+- `process_model_usage` 是状态栏协议中的可选字段；旧版状态栏脚本继续读取已有字段，无法提供当前进程用量时该字段会省略。
+- 账本费用估算只在模型价格信息足够时启用；价格缺失时继续报告费用未知或不完整，不将未知费用当作零值。
+- 不新增外部服务、鉴权流程或运行时依赖。
+
+### 国际化
+
+- 新增后台任务完成提醒设置的英文与简体中文标签和说明，设置页和配置文档同步覆盖。
+- `/gboom` 和 `/scroll-debug` 的命令描述已加入英文（`en.toml`）与简体中文（`zh-CN.toml`）目录。
+- 状态栏新增字段与配置说明已同步到英文和简体中文文档；其它语种继续使用英文回退。
+
+### 验证
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-shared --lib`：140 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：257 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：9 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`：9 项当前源码与 Markdown 覆盖审计通过。
+- `cargo +1.92.0 test --locked -p xai-grok-tools --lib reminders::task_completion::tests::bash_completion_suppressed_when_reminders_flag_disabled`：后台完成提醒抑制测试通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --test settings_e2e`：使用隔离 `GROK_HOME` 执行，280 项通过，包含新增设置的键盘和鼠标路径。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：在 Protoc 29.3 和 `GROK_VERSION=1.0.24-fork.6` 环境下通过；修复后使用 `GROK_VERSION=1.0.24-fork.7` 重新执行 `cargo +1.92.0 check --locked -p xai-grok-pager-bin` 通过。
+- `git diff --check`：通过。
+
+### 产物
+
+- `grok-1.0.24-fork.7-linux-x86_64`
+- `grok-1.0.24-fork.7-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.24-fork.6...v1.0.24-fork.7
 
 # 1.0.24-fork.6 — 2026-09-11
 

@@ -92,11 +92,13 @@ impl SessionActor {
                 return;
             }
         };
-        super::side_call::log_prompt_cache_usage(
+        self.record_auxiliary_usage(
             "turn_summary",
             setup.client.api_backend(),
             &response,
-        );
+            &setup.model,
+        )
+        .await;
         let summary = turn_summary::clean_turn_summary_text(&response.assistant_text());
         if summary.is_empty() {
             tracing::debug!("turn summary: model returned empty summary");

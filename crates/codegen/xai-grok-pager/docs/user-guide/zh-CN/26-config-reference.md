@@ -603,6 +603,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `ui.scroll_lines` | `integer` | `yes` | `user` | 每次滚动的行数（1–10）。也对应 `GROK_SCROLL_LINES`。 |
 | `ui.scroll_mode` | `auto / wheel / trackpad` | `yes` | `user` | 滚动输入分类。也对应 `GROK_SCROLL_MODE`。 |
 | `ui.scroll_speed` | `integer` | `yes` | `user` | 鼠标／触控板滚动速度倍数（1–100）。也对应 `GROK_SCROLL_SPEED`。 |
+| `ui.show_background_task_completion_reminders` | `boolean` | `yes` | `user` | AI 启动的后台任务完成后，在下一次工具结果中向模型显示系统提醒。需重启。 |
 | `ui.show_thinking_blocks` | `boolean` | `yes` | `user` | 流式输出时显示思考／推理块。也对应 `GROK_SHOW_THINKING_BLOCKS`。 |
 | `ui.show_timeline` | `boolean` | `yes` | `user` | 显示每轮刻度轨道而不是滚动条。 |
 | `ui.show_timestamps` | `boolean` | `yes` | `user` | 在消息旁显示时钟时间。也对应 `/timestamps`。 |

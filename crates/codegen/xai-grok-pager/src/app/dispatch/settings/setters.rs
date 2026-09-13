@@ -552,6 +552,43 @@ pub(in crate::app::dispatch) fn set_ask_user_question_timeout_enabled(
     }]
 }
 
+/// Mirror the setting in `current_ui`; the effective value is applied to new agents at build time.
+pub(super) fn set_show_background_task_completion_reminders_inner(app: &mut AppView, new: bool) {
+    app.current_ui.show_background_task_completion_reminders = Some(new);
+}
+
+/// SHELL-owned setter for model-facing background completion reminders; persists via
+/// `Effect::PersistSetting` and applies to new sessions.
+pub(in crate::app::dispatch) fn set_show_background_task_completion_reminders(
+    app: &mut AppView,
+    new: bool,
+) -> Vec<Effect> {
+    let prev_state = app.current_ui.show_background_task_completion_reminders;
+    let prev_effective = prev_state.unwrap_or(
+        xai_grok_shell::agent::config::UiConfig::SHOW_BACKGROUND_TASK_COMPLETION_REMINDERS_DEFAULT,
+    );
+    if prev_effective == new && prev_state.is_some() {
+        return vec![];
+    }
+    set_show_background_task_completion_reminders_inner(app, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "show_background_task_completion_reminders",
+        value = new,
+        "setting changed",
+    );
+    app.show_toast(&with_restart_cue(&save_success_toast(
+        xai_grok_i18n::t("settings.show_background_task_completion_reminders.label"),
+        new,
+    )));
+    vec![Effect::PersistSetting {
+        key: "show_background_task_completion_reminders",
+        value: crate::settings::SettingValue::Bool(new),
+        rollback_value: crate::settings::SettingValue::Bool(prev_effective),
+    }]
+}
+
 pub(super) fn set_show_thinking_blocks_inner(app: &mut AppView, new: bool) {
     crate::appearance::cache::set_show_thinking_blocks(new);
     // Thinking visibility reshapes verb-group runs (shown thoughts claim
@@ -2473,7 +2510,7 @@ pub(in crate::app::dispatch) fn set_usage_refresh_interval_minutes(
 // ---------------------------------------------------------------------------
 
 /// Effective-default lookup for the `Option<bool>` AppView mirrors
-/// (`show_tips`, `auto_update`, ask_user_question timeout).
+/// (`show_tips`, `auto_update`, and the two tool-related reminder/timeout settings).
 /// Matches the consumer's `.unwrap_or(...)` fallback.
 pub(super) fn pr13_effective_default(key: &str) -> Option<bool> {
     use xai_grok_tools::implementations::grok_build::ask_user_question;
@@ -2483,6 +2520,9 @@ pub(super) fn pr13_effective_default(key: &str) -> Option<bool> {
         "toolset.ask_user_question.timeout_enabled" => {
             Some(ask_user_question::DEFAULT_ASK_USER_QUESTION_TIMEOUT_ENABLED)
         }
+        "show_background_task_completion_reminders" => Some(
+            xai_grok_shell::agent::config::UiConfig::SHOW_BACKGROUND_TASK_COMPLETION_REMINDERS_DEFAULT,
+        ),
         _ => None,
     }
 }

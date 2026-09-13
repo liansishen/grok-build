@@ -63,6 +63,38 @@ pub(crate) fn log_prompt_cache_usage(
     );
 }
 
+impl SessionActor {
+    /// Fold a successful auxiliary model call into the session ledger.
+    /// Recap, turn summary, title refresh, and `/btw` are display-only for conversation
+    /// history, but they still consume billed tokens and must be counted.
+    ///
+    /// Record as soon as the provider returns usage, even if the result is later dropped
+    /// (empty, cancelled, or suppressed).
+    pub(crate) async fn record_auxiliary_usage(
+        &self,
+        call: &str,
+        backend: crate::sampling::ApiBackend,
+        response: &xai_grok_sampling_types::ConversationResponse,
+        model_id: &str,
+    ) {
+        log_prompt_cache_usage(call, backend, response);
+        let Some(usage) = response.usage.as_ref() else {
+            return;
+        };
+        let model_key = response
+            .assistant()
+            .and_then(|a| a.model_id.as_deref())
+            .filter(|id| !id.is_empty())
+            .unwrap_or(model_id);
+        let cost_usd_ticks =
+            self.resolve_cost_usd_ticks(Some(model_key), usage, response.cost_usd_ticks);
+        self.chat_state_handle
+            .record_session_side_usage(model_key, usage, None, cost_usd_ticks)
+            .await;
+        self.persist_live_usage().await;
+    }
+}
+
 /// What differs between the two calls that reuse the parent's prompt cache.
 /// The shared parts live in [`SessionActor::parent_cached_request`].
 pub(crate) struct AuxCall {

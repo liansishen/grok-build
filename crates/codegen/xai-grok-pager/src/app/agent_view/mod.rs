@@ -139,7 +139,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::Widget;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::time::Instant;
 mod cta;
 mod elicitation;
@@ -895,6 +895,9 @@ pub struct AgentView {
     /// Cached server-reported context state.
     pub context_state: Option<xai_grok_shell::session::ContextInfo>,
     pub status_context: Option<xai_grok_status_line::StatusLineContext>,
+    /// Latest current-process token/cost snapshot for command status lines.
+    pub process_model_usage_snapshot:
+        Option<BTreeMap<String, xai_grok_status_line::StatusLineModelUsage>>,
     /// Held across a frame that clamps the row away, so a script keeps the size
     /// it last painted at.
     pub last_status_line_size: Option<crate::views::status_line::RowSize>,

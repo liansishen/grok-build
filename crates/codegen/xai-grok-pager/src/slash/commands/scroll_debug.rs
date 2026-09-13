@@ -13,7 +13,7 @@ impl SlashCommand for ScrollDebugCommand {
     slash_meta! {
         name: "scroll-debug",
         // Never shown: the command is hidden from the dropdown.
-        description: "Toggle the scroll-diagnostics HUD",
+        description: xai_grok_i18n::t("slash.scroll-debug.description"),
         usage: "/scroll-debug",
     }
 

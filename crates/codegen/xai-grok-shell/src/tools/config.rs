@@ -44,6 +44,19 @@ impl BashToolConfig {
         )
     }
 
+    /// Add the user-facing UI preference that controls model-facing background completion reminders.
+    pub(crate) fn to_bash_params_json_with_remote_and_completion_reminders(
+        &self,
+        remote: Option<&crate::util::config::RemoteSettings>,
+        show_background_task_completion_reminders: Option<bool>,
+    ) -> serde_json::Map<String, serde_json::Value> {
+        let mut map = self.to_bash_params_json_with_remote(remote);
+        if let Some(enabled) = show_background_task_completion_reminders {
+            map.insert("surface_bg_completion_reminders".into(), enabled.into());
+        }
+        map
+    }
+
     /// `remote_auto_bg` is the remote settings fallback for `auto_background_on_timeout`.
     /// Resolution: local config.toml > remote fallback > `true`.
     pub(crate) fn to_bash_params_json(
@@ -633,6 +646,28 @@ mod tests {
         assert_eq!(
             allow_bg_op(&local.to_bash_params_json(None, None)),
             Some(true)
+        );
+    }
+
+    fn completion_reminders(map: &serde_json::Map<String, serde_json::Value>) -> Option<bool> {
+        map.get("surface_bg_completion_reminders")
+            .and_then(|v| v.as_bool())
+    }
+
+    #[test]
+    fn completion_reminders_are_forwarded_from_ui_preference() {
+        let local = BashToolConfig::default();
+        assert_eq!(
+            completion_reminders(
+                &local.to_bash_params_json_with_remote_and_completion_reminders(None, Some(false))
+            ),
+            Some(false),
+        );
+        assert_eq!(
+            completion_reminders(
+                &local.to_bash_params_json_with_remote_and_completion_reminders(None, None)
+            ),
+            None,
         );
     }
 

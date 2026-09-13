@@ -15,7 +15,7 @@ impl SlashCommand for GboomCommand {
     slash_meta! {
         name: "gboom",
         // Never shown: the command is hidden from the dropdown.
-        description: "Hidden easter egg",
+        description: xai_grok_i18n::t("slash.gboom.description"),
         usage: "/gboom",
         // Needs an agent view to render in.
         session_scoped: true,

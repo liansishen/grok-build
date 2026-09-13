@@ -1761,3 +1761,79 @@ async fn parent_cached_request_pins_fail_length_policy() {
         xai_grok_sampling_types::LengthPolicy::Fail
     );
 }
+
+/// Recap, `/btw`, turn summary, and title refresh are display-only for conversation history
+/// but still consume billed tokens and must fold into the session ledger.
+#[tokio::test(flavor = "current_thread")]
+async fn auxiliary_side_calls_fold_into_session_usage() {
+    use xai_grok_test_support::MockInferenceServer;
+
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async {
+            let (gateway_tx, _grx) =
+                tokio::sync::mpsc::unbounded_channel::<xai_acp_lib::AcpClientMessage>();
+            let (persistence_tx, _prx) =
+                tokio::sync::mpsc::unbounded_channel::<PersistenceMsg>();
+            let mut actor = create_test_actor(0, 256_000, 85, gateway_tx, persistence_tx).await;
+            actor.turn_summary_enabled = true;
+            actor.title_refresh_enabled = true;
+            *actor.agent.borrow_mut() = test_agent_with_goal_tool().await;
+            let actor = std::sync::Arc::new(actor);
+
+            let server = MockInferenceServer::start().await.unwrap();
+            server.set_response("a short summary");
+            let mut cfg = actor.chat_state_handle.get_sampling_config().await.unwrap();
+            cfg.base_url = server.url();
+            cfg.api_backend = xai_grok_sampling_types::ApiBackend::Responses;
+            actor.chat_state_handle.update_sampling_config(cfg);
+
+            let parent = vec![
+                ConversationItem::system("you are a coding agent"),
+                ConversationItem::user("first question"),
+                ConversationItem::assistant("first answer"),
+                ConversationItem::user("second question"),
+                ConversationItem::assistant("second answer"),
+                ConversationItem::user("third question"),
+                ConversationItem::assistant("third answer"),
+            ];
+            let parent_bytes = serde_json::to_vec(&parent).unwrap();
+            actor.chat_state_handle.replace_conversation(parent);
+
+            actor
+                .handle_side_question("what matters most?")
+                .await
+                .expect("side question must succeed");
+            actor.handle_recap(false).await;
+            actor.restart_turn_summary("prompt-3".to_string());
+            for _ in 0..200 {
+                if actor.turn_summary_task.borrow().is_none() {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            actor.maybe_refresh_title();
+            for _ in 0..200 {
+                if actor.title_refresh_task.borrow().is_none() {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+
+            let usage = actor
+                .chat_state_handle
+                .try_get_session_usage()
+                .await
+                .expect("chat-state actor alive");
+            assert_eq!(usage.main_loop_model_calls, 0);
+            assert_eq!(usage.totals.model_calls, 4);
+            assert_eq!(usage.totals.input_tokens, 40);
+            assert_eq!(usage.totals.output_tokens, 20);
+            assert_eq!(
+                serde_json::to_vec(&actor.chat_state_handle.get_conversation().await).unwrap(),
+                parent_bytes,
+                "auxiliary calls must remain display-only for conversation history"
+            );
+        })
+        .await;
+}

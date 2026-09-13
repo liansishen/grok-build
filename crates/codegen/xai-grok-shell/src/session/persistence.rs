@@ -311,6 +311,8 @@ pub enum PersistenceMsg {
     /// Generated session title from background LLM task.
     /// Routed back through the persistence channel so the storage write stays sequential with other summary.json mutations.
     GeneratedTitle(String),
+    /// Attach the session ledger so first-title generation can record billed usage.
+    AttachChatState(xai_chat_state::ChatStateHandle),
     /// Early-session title refresh (turns 3 and 6): overwrite an existing auto title with one regenerated from the whole conversation.
     /// Never overwrites a manual `/rename` (enforced atomically under the summary lock).
     RegenerateTitle(String),
@@ -2170,6 +2172,9 @@ impl SessionPersistence {
                         &self.info.cwd,
                     );
                 }
+                PersistenceMsg::AttachChatState(handle) => {
+                    self.summary.set_chat_state(handle);
+                }
                 PersistenceMsg::GeneratedTitle(title) => {
                     // Auto-generated titles must never overwrite a title the user set via `/rename`
                     // `set_generated_title_if_absent` writes only when the session still has no title (checked atomically under the summary lock)
@@ -2707,6 +2712,8 @@ pub(crate) struct SessionDeps {
     pub(crate) relay_sync: Option<crate::relay::RelaySync>,
     pub(crate) gateway: Option<GatewaySender>,
     pub(crate) session_summary_model: String,
+    /// Price sheet for [`Self::session_summary_model`]; empty if the catalog has none.
+    pub(crate) session_summary_pricing: xai_grok_sampling_types::ModelPricing,
     pub(crate) registry_title_sync: Option<RegistryGeneratedTitleSync>,
     pub(crate) search_index: crate::session::storage::search::SharedSearchIndex,
     /// Client-claimed kind for a fresh session (allowlisted at `session/new`; currently only `"headless"`).
@@ -2726,6 +2733,7 @@ pub(crate) async fn new(
         relay_sync,
         gateway,
         session_summary_model,
+        session_summary_pricing,
         registry_title_sync,
         search_index,
         session_kind,
@@ -2775,7 +2783,9 @@ pub(crate) async fn new(
                 crate::session::summary::SummaryConfig {
                     sampling_client,
                     model: session_summary_model,
+                    pricing: session_summary_pricing,
                     persistence_tx: summary_tx,
+                    chat_state: None,
                 },
             ),
             registry_title_sync,
@@ -2884,7 +2894,9 @@ pub(crate) async fn new_with_explicit_dir(
                 crate::session::summary::SummaryConfig {
                     sampling_client,
                     model: session_summary_model,
+                    pricing: xai_grok_sampling_types::ModelPricing::default(),
                     persistence_tx: summary_tx,
+                    chat_state: None,
                 },
             ),
             registry_title_sync: None,
@@ -2954,6 +2966,7 @@ pub(crate) async fn load_light(
         relay_sync,
         gateway,
         session_summary_model,
+        session_summary_pricing,
         registry_title_sync,
         search_index,
         session_kind: _,
@@ -3012,7 +3025,9 @@ pub(crate) async fn load_light(
             crate::session::summary::SummaryConfig {
                 sampling_client,
                 model: session_summary_model,
+                pricing: session_summary_pricing,
                 persistence_tx: summary_tx,
+                chat_state: None,
             },
         );
         if has_title {

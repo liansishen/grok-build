@@ -508,7 +508,11 @@ impl MvpAgent {
                     auth_manager: Some(self.auth_manager.clone()),
                     relay_sync,
                     gateway: Some(self.gateway.clone()),
-                    session_summary_model: summary_model,
+                    session_summary_model: summary_model.clone(),
+                    session_summary_pricing: self
+                        .models_manager
+                        .pricing_for(&summary_model)
+                        .unwrap_or_default(),
                     registry_title_sync,
                     search_index: self.search_index_cell(),
                     session_kind: client_session_kind,
@@ -905,7 +909,11 @@ impl MvpAgent {
                 auth_manager: Some(self.auth_manager.clone()),
                 relay_sync,
                 gateway: Some(self.gateway.clone()),
-                session_summary_model: summary_model,
+                session_summary_model: summary_model.clone(),
+                session_summary_pricing: self
+                    .models_manager
+                    .pricing_for(&summary_model)
+                    .unwrap_or_default(),
                 registry_title_sync,
                 search_index: self.search_index_cell(),
                 session_kind: None,

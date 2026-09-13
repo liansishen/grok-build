@@ -350,7 +350,10 @@ impl MvpAgent {
                     bash: Some(
                         cfg.toolset
                             .bash
-                            .to_bash_params_json_with_remote(cfg.remote_settings.as_ref()),
+                            .to_bash_params_json_with_remote_and_completion_reminders(
+                                cfg.remote_settings.as_ref(),
+                                cfg.ui.show_background_task_completion_reminders,
+                            )
                     ),
                     ask_user_question: None,
                 }

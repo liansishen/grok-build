@@ -788,6 +788,9 @@ pub fn current_value_for(
                 .ask_user_question_timeout_enabled
                 .unwrap_or(ask_user_question::DEFAULT_ASK_USER_QUESTION_TIMEOUT_ENABLED),
         )),
+        "show_background_task_completion_reminders" => Some(SettingValue::Bool(
+            ui.show_background_task_completion_reminders_enabled(),
+        )),
         // default_selected_permission: maps `[ui].default_selected_permission` onto one of the four registry canonicals
         // `None` or an unrecognised value on disk falls back to `always_allow_all_sessions`, the effective default
         // The cursor lands on the "Always allow on all sessions" row, picked explicitly in `enqueue_permission`
@@ -1168,6 +1171,13 @@ mod tests {
                         ask_user_question::DEFAULT_ASK_USER_QUESTION_TIMEOUT_ENABLED,
                         "toolset.ask_user_question.timeout_enabled default drifts from the \
                          shared resolver const in xai-grok-tools"
+                    );
+                }
+                ("show_background_task_completion_reminders", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        UiConfig::default().show_background_task_completion_reminders_enabled(),
+                        "background completion reminder default drifts from UiConfig::default()",
                     );
                 }
                 // show_thinking_blocks: Option<bool>; None reads as true (client default)

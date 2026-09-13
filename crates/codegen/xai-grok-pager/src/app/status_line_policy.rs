@@ -299,6 +299,9 @@ impl AppView {
     fn shell_status_context(&self) -> Option<StatusLineContext> {
         let agent = self.status_line_source_view()?;
         let mut ctx = agent.status_context.clone()?;
+        if let Some(process_usage) = agent.process_model_usage_snapshot.as_ref() {
+            ctx.process_model_usage = Some(process_usage.clone());
+        }
         ctx.billing = agent.credit_balance.as_ref().map(status_line_billing);
         ctx.quota = agent.cpa_quota.as_ref().and_then(status_line_quota);
         // Destructured, so a field added to the overlay is a compile error here rather than one the staleness check watches and nothing applies

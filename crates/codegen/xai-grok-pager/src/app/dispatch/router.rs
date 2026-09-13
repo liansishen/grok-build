@@ -91,6 +91,7 @@ use super::settings::setters::{
     set_show_shortcuts_bar, set_show_thinking_blocks, set_show_tips,
     set_simple_mode,
     set_theme, set_timeline, set_timestamps, set_transparent_bg, set_ui_language, set_usage_refresh_interval_minutes,
+    set_show_background_task_completion_reminders,
     set_vim_mode, set_voice_capture_mode, set_voice_keybind_enabled, set_voice_stt_language,
     set_web_search_model,
 };
@@ -1100,6 +1101,9 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::SetRememberToolApprovals(v) => set_remember_tool_approvals(app, v),
         Action::SetAskUserQuestionTimeoutEnabled(v) => {
             set_ask_user_question_timeout_enabled(app, v)
+        }
+        Action::SetShowBackgroundTaskCompletionReminders(v) => {
+            set_show_background_task_completion_reminders(app, v)
         }
         Action::SetKeepTextSelection(v) => set_keep_text_selection(app, v),
         Action::SetScrollSpeed(v) => set_scroll_speed(app, v),

@@ -16,7 +16,7 @@ use crate::types::{
 
 /// Handle to communicate with ChatStateActor.
 /// This is cheap to clone and can be shared across tasks.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ChatStateHandle {
     cmd_tx: mpsc::UnboundedSender<ChatStateCommand>,
 }
@@ -203,7 +203,8 @@ impl ChatStateHandle {
         .is_some()
     }
 
-    /// Fold one side call (compaction, …) into the session ledger only.
+    /// Fold one side call (compaction, recap, title, turn summary, `/btw`, …)
+    /// into the session ledger only.
     pub async fn record_session_side_usage(
         &self,
         model_id: &str,
@@ -512,6 +513,13 @@ impl ChatStateHandle {
         })
         .await
         .ok_or(())
+    }
+
+    /// Fail-closed read of usage accumulated in the current agent process.
+    pub async fn try_get_process_usage(&self) -> Result<crate::usage::UsageLedger, ()> {
+        self.query("GetProcessUsage", |reply| ChatStateCommand::GetProcessUsage { reply })
+            .await
+            .ok_or(())
     }
 
     /// `total_tokens` plus bytes/4 estimate of tool results pushed since the

@@ -1,6 +1,6 @@
 //! After each turn the shell generates an ultra-short one-line summary of the agent's reply for that turn (not a meta activity log).
 //! The dashboard row shows it as its secondary line.
-//! Like recap, it is display-only and never mutates the conversation.
+//! Like recap, it never mutates the conversation; the billed usage still folds into the session ledger.
 //! The request is the conversation prefix verbatim plus one instruction turn.
 //! That shape is shared with recap via [`super::session_recap::budget_instruction_items`].
 

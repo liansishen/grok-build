@@ -3,7 +3,7 @@
 //! Shared cache-aligned request setup lives in [`super::side_call`].
 //! Per-turn dashboard summary lifecycle lives in [`super::turn_summary`].
 
-use super::side_call::{AuxCall, log_prompt_cache_usage};
+use super::side_call::AuxCall;
 use super::*;
 
 use crate::session::SideQuestionError;
@@ -123,7 +123,13 @@ impl SessionActor {
 
         match result {
             Ok(response) => {
-                log_prompt_cache_usage("btw", sampling_client.api_backend(), &response);
+                self.record_auxiliary_usage(
+                    "btw",
+                    sampling_client.api_backend(),
+                    &response,
+                    &model,
+                )
+                .await;
                 let content = response.assistant_text();
                 if content.is_empty() {
                     let err = SideQuestionError::EmptyResponse;
@@ -287,7 +293,8 @@ impl SessionActor {
             }
         };
 
-        log_prompt_cache_usage("recap", setup.client.api_backend(), &response);
+        self.record_auxiliary_usage("recap", setup.client.api_backend(), &response, &model)
+            .await;
         let raw_response = response.assistant_text();
         let summary = session_recap::clean_recap_text(&raw_response);
         if summary.is_empty() {

@@ -57,6 +57,7 @@ default_selected_permission = "always_allow_all_sessions" # 首次审批提示�
 remember_tool_approvals = true         # 在权限提示中显示每条命令的“始终允许”选项；
                                        # 按项目记住授权（默认：true）；见 22-permissions-and-safety.md
 show_thinking_blocks = true            # 在 TUI 中显示智能体思考块（默认：true）
+show_background_task_completion_reminders = true # AI 启动的后台任务完成时向模型显示提醒；需重启
 group_tool_verbs = true                # 将连续的 read/search/list 工具调用和子智能体行
                                        # ——以及其中已完成的思考——折叠成一行（默认：true）
 collapsed_edit_blocks = false          # 将编辑显示为单行 +N/-M diffstat 摘要，并把

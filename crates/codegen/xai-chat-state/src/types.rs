@@ -196,6 +196,7 @@ mod tests {
             turn_start_ms: None,
             last_compaction_prompt_index: None,
             credentials: Credentials::default(),
+            session_usage: crate::usage::UsageLedger::default(),
         };
 
         let json = serde_json::to_string(&snapshot).expect("serialize");
@@ -253,6 +254,7 @@ mod tests {
             turn_start_ms: Some(1234567800),
             last_compaction_prompt_index: Some(2),
             credentials: Credentials::default(),
+            session_usage: crate::usage::UsageLedger::default(),
         };
 
         let json = serde_json::to_string(&snapshot).expect("serialize");

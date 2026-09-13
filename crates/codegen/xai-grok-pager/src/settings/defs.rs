@@ -1247,6 +1247,31 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+        // SHELL-owned `[ui].show_background_task_completion_reminders`; resolved when an agent is built.
+        SettingMeta {
+            key: "show_background_task_completion_reminders",
+            category: SettingCategory::Agent,
+            owner: SettingOwner::Shell,
+            label: "Background task completion reminders",
+            description: "When on, show the model a system reminder after an AI-started background task completes. Restart required.",
+            keywords: &[
+                "background",
+                "task",
+                "completion",
+                "reminder",
+                "notification",
+                "auto-wake",
+                "system",
+                "agent",
+                "tool",
+                "quiet",
+            ],
+            kind: SettingKind::Bool {
+                default: ui_default.show_background_task_completion_reminders_enabled(),
+            },
+            restart_required: true,
+            hidden_in_minimal: false,
+        },
         // SHELL-owned startup-time settings (restart_required: true).
         // The running pager doesn't re-read these mid-session.
         SettingMeta {

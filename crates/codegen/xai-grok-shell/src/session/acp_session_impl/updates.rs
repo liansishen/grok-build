@@ -1,6 +1,7 @@
 //! Outbound updates for `SessionActor`: `send_update` and its buffered/transient/direct variants.
 //! Also xAI-notification handling and the gateway-bridge dispatch shims.
 use super::*;
+use super::status_line::build_model_usage;
 /// Hook / image-intake diagnostics and background_tasks snapshots leave the no-output rewind window open; every other variant closes it.
 /// `HookRunStarted` fires for the prompt gate before any output, so a Ctrl+C during a slow gate must still rewind the prompt.
 pub(super) fn closes_cancel_rewind_window(update: &XaiSessionUpdate) -> bool {
@@ -281,6 +282,7 @@ impl SessionActor {
         }
         let total_tokens = self.chat_state_handle.get_estimated_total_tokens().await;
         let session_usage = self.chat_state_handle.try_get_session_usage().await.ok();
+        let process_usage = self.chat_state_handle.try_get_process_usage().await.ok();
         let meta_info = self.chat_state_handle.get_notification_meta().await;
         let (stream_start_ms, turn_start_ms) = meta_info
             .map(|m| (m.stream_start_ms, m.turn_start_ms))
@@ -316,6 +318,14 @@ impl SessionActor {
                     serde_json::to_value(&view).unwrap_or(serde_json::Value::Null),
                 );
             }
+        }
+        if let Some(ledger) = process_usage {
+            let usage = crate::extensions::notification::PromptUsage::from(&ledger);
+            let process_usage_view = build_model_usage(Some(&usage)).unwrap_or_default();
+            obj.insert(
+                "processUsageView".to_string(),
+                serde_json::to_value(process_usage_view).unwrap_or(serde_json::Value::Null),
+            );
         }
         if let Some(pid) = self.current_prompt_id.lock().ok().and_then(|g| g.clone()) {
             obj.insert("promptId".to_string(), pid.into());
