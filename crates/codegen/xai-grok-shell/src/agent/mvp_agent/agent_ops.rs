@@ -4549,7 +4549,10 @@ impl MvpAgent {
             let cfg = self.cfg.borrow();
             cfg.toolset
                 .bash
-                .to_bash_params_json_with_remote(cfg.remote_settings.as_ref())
+                .to_bash_params_json_with_remote_and_completion_reminders(
+                    cfg.remote_settings.as_ref(),
+                    cfg.ui.show_background_task_completion_reminders,
+                )
         };
         let ask_user_question_params_json = {
             let cfg = self.cfg.borrow();

@@ -1124,6 +1124,11 @@ fn settings_helpers_target_correct_ui_fields() {
     assert_eq!(cfg.ui.show_timestamps, Some(true));
     let cfg = apply(|cfg| cfg.ui.show_timestamps = Some(false));
     assert_eq!(cfg.ui.show_timestamps, Some(false));
+    let cfg = apply(|cfg| cfg.ui.show_background_task_completion_reminders = Some(false));
+    assert_eq!(
+        cfg.ui.show_background_task_completion_reminders,
+        Some(false)
+    );
     let cfg = apply(|cfg| cfg.ui.simple_mode = Some(true));
     assert_eq!(cfg.ui.simple_mode, Some(true));
     let cfg = apply(|cfg| cfg.ui.simple_mode = Some(false));

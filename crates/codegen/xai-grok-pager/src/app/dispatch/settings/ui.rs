@@ -15,6 +15,7 @@ use super::setters::{
     set_respect_manual_folds_inner, set_screen_mode_inner, set_scroll_lines_inner,
     set_scroll_mode_inner, set_scroll_speed_inner, set_show_shortcuts_bar_inner,
     set_show_thinking_blocks_inner, set_show_tips_inner, set_simple_mode_inner, set_theme_inner,
+    set_show_background_task_completion_reminders_inner,
     set_transparent_bg_inner,
     set_timeline_inner, set_timestamps, set_timestamps_inner, set_ui_language_inner,
     set_usage_refresh_interval_minutes_inner, set_vim_mode_inner, set_voice_capture_mode_inner,
@@ -895,6 +896,9 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("toolset.ask_user_question.timeout_enabled", SettingValue::Bool(b)) => {
             Some(Action::SetAskUserQuestionTimeoutEnabled(*b))
         }
+        ("show_background_task_completion_reminders", SettingValue::Bool(b)) => {
+            Some(Action::SetShowBackgroundTaskCompletionReminders(*b))
+        }
         ("keep_text_selection", SettingValue::Enum(s)) => {
             crate::appearance::TextSelection::from_canonical(s).map(Action::SetKeepTextSelection)
         }
@@ -1305,6 +1309,15 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
                 app.ask_user_question_timeout_enabled = None;
             } else {
                 set_ask_user_question_timeout_enabled_inner(app, *b);
+            }
+        }
+        ("show_background_task_completion_reminders", SettingValue::Bool(b)) => {
+            if Some(*b)
+                == pr13_effective_default("show_background_task_completion_reminders")
+            {
+                app.current_ui.show_background_task_completion_reminders = None;
+            } else {
+                set_show_background_task_completion_reminders_inner(app, *b);
             }
         }
         ("show_thinking_blocks", SettingValue::Bool(b)) => set_show_thinking_blocks_inner(app, *b),

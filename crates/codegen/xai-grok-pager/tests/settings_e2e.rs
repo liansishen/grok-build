@@ -40,6 +40,7 @@ const ALL_SETTINGS_EXERCISED: &[&str] = &[
     "vim_mode",
     "remember_tool_approvals",
     "toolset.ask_user_question.timeout_enabled",
+    "show_background_task_completion_reminders",
     "keep_text_selection",
     "theme",
     "auto_dark_theme",
@@ -259,6 +260,15 @@ fn assert_set_bool_action(outcome: SettingsKeyOutcome, key: &str, expected: bool
             assert_eq!(
                 b, expected,
                 "SetAskUserQuestionTimeoutEnabled value differs from expected"
+            )
+        }
+        (
+            "show_background_task_completion_reminders",
+            Action::SetShowBackgroundTaskCompletionReminders(b),
+        ) => {
+            assert_eq!(
+                b, expected,
+                "SetShowBackgroundTaskCompletionReminders value differs from expected"
             )
         }
 
@@ -556,6 +566,15 @@ fn space_on_ask_user_question_timeout_dispatches_typed_setter() {
 }
 
 #[test]
+fn space_on_background_task_completion_reminders_dispatches_typed_setter() {
+    let mut s = make_state();
+    navigate_to(&mut s, "show_background_task_completion_reminders");
+    let outcome = handle_settings_key(&mut s, &press(KeyCode::Char(' ')));
+    let default_on = UiConfig::default().show_background_task_completion_reminders_enabled();
+    assert_set_bool_action(outcome, "show_background_task_completion_reminders", !default_on);
+}
+
+#[test]
 fn enter_on_bool_row_also_toggles() {
     let mut s = make_state();
     navigate_to(&mut s, "compact_mode");
@@ -845,6 +864,22 @@ fn mouse_click_on_ask_user_question_timeout_indicator_toggles_in_one_click() {
         row_y,
     );
     assert_set_bool_action(outcome, "toolset.ask_user_question.timeout_enabled", false);
+}
+
+/// Value-column click toggles the background-task completion reminder setting in one click.
+#[test]
+fn mouse_click_on_background_task_completion_reminders_indicator_toggles_in_one_click() {
+    let mut s = make_state();
+    synth_rects(&mut s);
+    let row_y = row_idx_for(&s, "show_background_task_completion_reminders") as u16;
+    let outcome = handle_settings_mouse(
+        &mut s,
+        MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        72,
+        row_y,
+    );
+    let default_on = UiConfig::default().show_background_task_completion_reminders_enabled();
+    assert_set_bool_action(outcome, "show_background_task_completion_reminders", !default_on);
 }
 
 /// Click on the value column toggles in one click regardless of selection.
@@ -1919,6 +1954,7 @@ fn registry_kind_membership_through_pr_14() {
             "prompt_suggestions",
             "respect_manual_folds",
             "show_thinking_blocks",
+            "show_background_task_completion_reminders",
             "show_timeline",
             "show_timestamps",
             "show_shortcuts_bar",
@@ -2097,6 +2133,7 @@ fn defaults_round_trip_through_registry() {
             "vim_mode" => SettingValue::Bool(false),
             "remember_tool_approvals" => SettingValue::Bool(true),
             "toolset.ask_user_question.timeout_enabled" => SettingValue::Bool(true),
+            "show_background_task_completion_reminders" => SettingValue::Bool(true),
             "keep_text_selection" => SettingValue::Enum("flash"),
             "theme" => SettingValue::String("groknight".to_string()),
             "auto_dark_theme" => SettingValue::String("groknight".to_string()),
@@ -2203,6 +2240,7 @@ fn settings_value_payload_matches_kind() {
             | SettingsKeyOutcome::Action(Action::SetVimMode(_))
             | SettingsKeyOutcome::Action(Action::SetRememberToolApprovals(_))
             | SettingsKeyOutcome::Action(Action::SetAskUserQuestionTimeoutEnabled(_))
+            | SettingsKeyOutcome::Action(Action::SetShowBackgroundTaskCompletionReminders(_))
             | SettingsKeyOutcome::Action(Action::SetShowTips(_))
             | SettingsKeyOutcome::Action(Action::SetAutoUpdate(_))
             | SettingsKeyOutcome::Action(Action::SetRespectManualFolds(_))

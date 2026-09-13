@@ -1414,6 +1414,14 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "show_background_task_completion_reminders" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("show_background_task_completion_reminders", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_show_background_task_completion_reminders(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "show_thinking_blocks" => {
             let SettingValue::Bool(b) = value else {
                 return Err(kind_mismatch("show_thinking_blocks", "Bool", &value));

@@ -160,6 +160,10 @@ pub struct UiConfig {
     /// Written by the pager's settings modal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub show_request_metrics: Option<bool>,
+    /// Whether the model receives a system reminder when an AI-started background task completes.
+    /// None keeps the default (on); written by the settings modal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_background_task_completion_reminders: Option<bool>,
     /// Fold runs of consecutive non-destructive tool calls (reads, searches, lists) into one transcript row.
     /// `None` means on (client default). Written by the pager's settings modal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -341,6 +345,7 @@ impl Default for UiConfig {
             show_thinking_blocks: None,
             show_session_usage_bar: None,
             show_request_metrics: None,
+            show_background_task_completion_reminders: None,
             group_tool_verbs: None,
             collapsed_edit_blocks: None,
             prompt_suggestions: None,
@@ -403,6 +408,14 @@ impl UiConfig {
     pub fn show_request_metrics_enabled(&self) -> bool {
         self.show_request_metrics
             .unwrap_or(Self::SHOW_REQUEST_METRICS_DEFAULT)
+    }
+
+    /// Default for [`Self::show_background_task_completion_reminders`] when unset.
+    pub const SHOW_BACKGROUND_TASK_COMPLETION_REMINDERS_DEFAULT: bool = true;
+
+    pub fn show_background_task_completion_reminders_enabled(&self) -> bool {
+        self.show_background_task_completion_reminders
+            .unwrap_or(Self::SHOW_BACKGROUND_TASK_COMPLETION_REMINDERS_DEFAULT)
     }
 
     /// Default for [`Self::confirm_before_rewind`] when unset.

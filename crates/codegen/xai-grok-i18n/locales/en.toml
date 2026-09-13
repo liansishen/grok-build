@@ -2296,6 +2296,8 @@
 "settings.scroll_mode.label" = "Scroll input"
 "settings.scroll_speed.description" = "Mouse-wheel and trackpad scroll speed multiplier (1-100). Higher = faster."
 "settings.scroll_speed.label" = "Scroll speed"
+"settings.show_background_task_completion_reminders.description" = "Show the model a system reminder after an AI-started background task completes. Restart required."
+"settings.show_background_task_completion_reminders.label" = "Background task completion reminders"
 "settings.show_request_metrics.description" = "After each model response, show first-token time, generation rate, duration, and token counts in the conversation."
 "settings.show_request_metrics.label" = "Per-request metrics in scrollback"
 "settings.show_session_usage_bar.description" = "Show this session's total tokens (and estimated cost when model prices are configured) to the left of the model name on the prompt line. Cost uses server stamps when present, otherwise local [model.*] price fields."
