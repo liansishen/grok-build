@@ -204,7 +204,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `features.compaction_tool_choice` | `string` | `yes` | `user` | 压缩期间使用的 tool-choice 提示。 |
 | `features.compaction_verbatim_input` | `boolean` | `pin` | `user` | 启用或禁用 `compaction_verbatim_input`；默认 true。也对应 `GROK_COMPACTION_VERBATIM_INPUT`。 |
 | `features.dock` | `boolean` | `pin` | `user` | 启用或禁用 `dock`；默认 false。也对应 `GROK_DOCK`。 |
-| `features.feedback` | `boolean` | `pin` | `user` | 启用或禁用反馈；默认 true。也对应 `GROK_FEEDBACK_ENABLED`。 |
+| `features.feedback` | `boolean` | `pin` | `user` | 启用或禁用反馈弹窗、`/feedback` 命令和 `send_feedback` 工具；默认 true。也对应 `GROK_FEEDBACK_ENABLED`。 |
 | `features.feedback_trace_card` | `boolean` | `pin` | `user` | `/feedback` 后显示跟踪上传同意问题；默认 false。也对应 `GROK_FEEDBACK_TRACE_CARD`。 |
 | `features.image_edit_model_override` | `string` | `yes` | `user` | `image_edit` 使用的 Imagine 模型 ID。 |
 | `features.image_gen` | `boolean` | `pin` | `user` | 启用 `image_gen` / `/imagine`。 |

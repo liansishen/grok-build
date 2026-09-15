@@ -1122,6 +1122,7 @@ pub(crate) async fn spawn_session_actor(
         subagent_toggle: subagent_toggle.clone(),
         background_workflows_enabled,
         ask_user_question_enabled,
+        send_feedback_enabled: feedback_flags.enabled,
         persona_summaries: persona_summaries.clone(),
         prompt_audience,
         role_instructions: role_instructions.clone(),

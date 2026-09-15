@@ -25,7 +25,7 @@ pub enum Feature {
     VoiceMode,
     /// The `write_file` tool.
     WriteFile,
-    /// Heuristic feedback popups and the `/feedback` command.
+    /// Heuristic feedback popups, the `/feedback` command, and the `send_feedback` tool.
     Feedback,
     /// The `/feedback` trace-consent card (the trace-upload opt-in offer).
     FeedbackTraceCard,

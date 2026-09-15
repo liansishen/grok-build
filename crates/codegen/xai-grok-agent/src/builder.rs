@@ -74,6 +74,7 @@ pub struct AgentBuilder {
     subagents_enabled: bool,
     background_workflows_enabled: bool,
     ask_user_question_enabled: bool,
+    send_feedback_enabled: bool,
     subagent_toggle: HashMap<String, bool>,
     task_model_slugs: Vec<String>,
     skills_config: crate::prompt::skills::SkillsConfig,
@@ -152,6 +153,43 @@ fn apply_workflow_tool_gates(
             .retain(|tool| tool.kind != Some(ToolKind::Workflow));
     }
 }
+fn apply_send_feedback_tool_gate(
+    tool_config: &mut xai_grok_tools::registry::types::ToolServerConfig,
+    prompt_audience: PromptAudience,
+    is_parent_grok_build: bool,
+    enabled: bool,
+) {
+    if prompt_audience == PromptAudience::Primary
+        && is_parent_grok_build
+        && enabled
+        && !tool_config
+            .tools
+            .iter()
+            .any(|tool| tool.kind == Some(ToolKind::Feedback))
+    {
+        tool_config
+            .tools
+            .push((&xai_grok_tools::implementations::grok_build::SendFeedbackTool).into());
+    }
+    if !enabled {
+        strip_send_feedback_tools(tool_config);
+    }
+}
+fn strip_send_feedback_tools(
+    tool_config: &mut xai_grok_tools::registry::types::ToolServerConfig,
+) {
+    let feedback_id = xai_grok_tools::registry::types::ToolConfig::for_tool::<
+        xai_grok_tools::implementations::grok_build::SendFeedbackTool,
+    >()
+    .id;
+    let feedback_name = xai_grok_tools::implementations::grok_build::SEND_FEEDBACK_TOOL_NAME;
+    tool_config.tools.retain(|tool| {
+        tool.kind != Some(ToolKind::Feedback)
+            && tool.id != feedback_id
+            && tool.id != feedback_name
+            && tool.name_override.as_deref() != Some(feedback_name)
+    });
+}
 impl AgentBuilder {
     pub fn new(
         working_directory: PathBuf,
@@ -204,6 +242,7 @@ impl AgentBuilder {
             subagents_enabled: false,
             background_workflows_enabled: false,
             ask_user_question_enabled: true,
+            send_feedback_enabled: true,
             subagent_toggle: HashMap::new(),
             task_model_slugs: Vec::new(),
             skills_config: Default::default(),
@@ -479,6 +518,12 @@ impl AgentBuilder {
         self.ask_user_question_enabled = enabled;
         self
     }
+    /// Parent grok-build sessions advertise `send_feedback` unless the shell-resolved
+    /// `features.feedback` flag (config / env / remote) is off. Subagents never receive it.
+    pub fn with_send_feedback_enabled(mut self, enabled: bool) -> Self {
+        self.send_feedback_enabled = enabled;
+        self
+    }
     /// `[subagents.toggle]`: omitted agents default to enabled; controls Task-description listing and spawn-time acceptance.
     pub fn with_subagent_toggle(mut self, toggle: HashMap<String, bool>) -> Self {
         self.subagent_toggle = toggle;
@@ -615,17 +660,12 @@ impl AgentBuilder {
                     | BuiltinAgentName::GrokBuildAskUser
             )
         );
-        if self.prompt_audience == PromptAudience::Primary
-            && is_parent_grok_build
-            && !tool_config
-                .tools
-                .iter()
-                .any(|tool| tool.kind == Some(ToolKind::Feedback))
-        {
-            tool_config
-                .tools
-                .push((&xai_grok_tools::implementations::grok_build::SendFeedbackTool).into());
-        }
+        apply_send_feedback_tool_gate(
+            &mut tool_config,
+            self.prompt_audience,
+            is_parent_grok_build,
+            self.send_feedback_enabled,
+        );
         if definition.inject_default_tools {
             if self.memory_backend.is_some() {
                 use xai_grok_tools::implementations::memory;
@@ -1808,6 +1848,64 @@ mod tests {
                 "[{label}] exit_plan_mode must always be present (TUI plan-mode keybind needs it); got tools: {names:?}"
             );
         }
+    }
+    fn feedback_tool_id() -> String {
+        xai_grok_tools::registry::types::ToolConfig::for_tool::<
+            xai_grok_tools::implementations::grok_build::SendFeedbackTool,
+        >()
+        .id
+    }
+    fn contains_feedback(config: &xai_grok_tools::registry::types::ToolServerConfig) -> bool {
+        let id = feedback_tool_id();
+        config.tools.iter().any(|tool| {
+            tool.kind == Some(xai_grok_tools::types::tool::ToolKind::Feedback) || tool.id == id
+        })
+    }
+    #[test]
+    fn send_feedback_gate_strips_preset_and_skips_plan_injection() {
+        let mut grok_build = crate::config::AgentDefinition::default_grok_build().tool_config;
+        assert!(
+            contains_feedback(&grok_build),
+            "premise: grok-build preset includes send_feedback"
+        );
+        apply_send_feedback_tool_gate(
+            &mut grok_build,
+            crate::prompt::context::PromptAudience::Primary,
+            true,
+            false,
+        );
+        assert!(
+            !contains_feedback(&grok_build),
+            "disabled gate must strip send_feedback from the grok-build preset"
+        );
+
+        let mut plan = crate::config::AgentDefinition::grok_build_plan().tool_config;
+        assert!(
+            !contains_feedback(&plan),
+            "premise: grok-build-plan builtin toolset omits send_feedback"
+        );
+        apply_send_feedback_tool_gate(
+            &mut plan,
+            crate::prompt::context::PromptAudience::Primary,
+            true,
+            true,
+        );
+        assert!(
+            contains_feedback(&plan),
+            "enabled gate must inject send_feedback for parent grok-build-plan"
+        );
+
+        let mut plan_disabled = crate::config::AgentDefinition::grok_build_plan().tool_config;
+        apply_send_feedback_tool_gate(
+            &mut plan_disabled,
+            crate::prompt::context::PromptAudience::Primary,
+            true,
+            false,
+        );
+        assert!(
+            !contains_feedback(&plan_disabled),
+            "disabled gate must not inject send_feedback for grok-build-plan"
+        );
     }
     #[tokio::test]
     async fn subagent_audience_never_receives_parent_only_tools() {
