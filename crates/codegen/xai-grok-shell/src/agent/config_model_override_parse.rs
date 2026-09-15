@@ -902,8 +902,14 @@ mod tests {
             found.push((canonical.to_owned(), legacy.to_owned()));
             rest = after;
         }
+        // Count only code: the field doc comments legitimately mention "aliases".
+        let code: String = block
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
         assert_eq!(
-            block.matches("alias").count(),
+            code.matches("alias").count(),
             found.len(),
             "an alias on ConfigModelOverride was not recognized; write it as \
              `#[serde(alias = \"...\")]` on its own line, or update this scan"
