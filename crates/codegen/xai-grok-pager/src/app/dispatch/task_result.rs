@@ -135,15 +135,15 @@ fn apply_workspace_transition(
     for notice in transition.notices {
         match notice {
             WorkspaceNotice::ArchiveRejectedReadOnly => {
-                app.show_toast("Could not archive session: dashboard workspace is read-only");
+                app.show_toast(xai_grok_i18n::t("task_result.workspace_archive_read_only"));
             }
             WorkspaceNotice::LoadFailed { error } => {
                 tracing::warn!(error = %error, "dashboard workspace load failed");
-                app.show_toast(&format!("Could not load dashboard workspace: {error}"));
+                app.show_toast(&xai_grok_i18n::t_fmt("task_result.workspace_load_failed", &[("error", &error.to_string())]));
             }
             WorkspaceNotice::Refreshing { error } => {
                 tracing::warn!(error = %error, "workspace snapshot after write failed");
-                app.show_toast("Dashboard workspace changed; refreshing");
+                app.show_toast(xai_grok_i18n::t("task_result.workspace_refreshing"));
             }
             WorkspaceNotice::SyncFailed {
                 count,
@@ -156,9 +156,9 @@ fn apply_workspace_transition(
                     error,
                     "dashboard workspace sync partially failed"
                 );
-                app.show_toast(&format!(
-                    "Could not sync {count} dashboard session{}",
-                    if count == 1 { "" } else { "s" }
+                app.show_toast(&xai_grok_i18n::t_fmt(
+                    if count == 1 { "task_result.workspace_sync_failed_one" } else { "task_result.workspace_sync_failed_many" },
+                    &[("count", &count.to_string())],
                 ));
             }
             WorkspaceNotice::ArchiveFailed {
@@ -172,21 +172,21 @@ fn apply_workspace_transition(
                     error,
                     "dashboard workspace archive partially failed"
                 );
-                app.show_toast(&format!(
-                    "Could not archive {count} dashboard session{}",
-                    if count == 1 { "" } else { "s" }
+                app.show_toast(&xai_grok_i18n::t_fmt(
+                    if count == 1 { "task_result.workspace_archive_failed_one" } else { "task_result.workspace_archive_failed_many" },
+                    &[("count", &count.to_string())],
                 ));
             }
             WorkspaceNotice::ReadOnly => {
-                app.show_toast("Dashboard workspace is read-only in this Grok version");
+                app.show_toast(xai_grok_i18n::t("task_result.workspace_read_only"));
             }
             WorkspaceNotice::WriterFailed { error } => {
                 tracing::error!(error = %error, "dashboard workspace writer failed");
-                app.show_toast("Dashboard workspace writer failed; reopening");
+                app.show_toast(xai_grok_i18n::t("task_result.workspace_writer_failed"));
             }
             WorkspaceNotice::LayoutFailed { error } => {
                 tracing::warn!(error = %error, "dashboard workspace layout write failed");
-                app.show_toast("Could not save dashboard layout");
+                app.show_toast(xai_grok_i18n::t("task_result.workspace_layout_failed"));
             }
             WorkspaceNotice::RefreshFailed { error } => {
                 tracing::warn!(error = %error, "dashboard workspace refresh failed");
@@ -564,9 +564,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             }
             dispatch_task_result(*result, app)
         }
-        TaskResult::SessionCreated { agent_id, session_id, models: new_models, .. } => {
-            handle_session_created(app, agent_id, session_id, new_models)
-        }
+        TaskResult::SessionCreated {
+            agent_id,
+            session_id,
+            models: new_models,
+            modes,
+        } => handle_session_created(app, agent_id, session_id, new_models, modes),
         TaskResult::SessionFailed { agent_id, error } => {
             handle_session_failed(app, agent_id, error)
         }
@@ -576,6 +579,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             worktree_path,
             session_cwd,
             models: new_models,
+            modes,
             strategy_summary,
         } => handle_worktree_session_created(
             app,
@@ -584,6 +588,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             worktree_path,
             session_cwd,
             new_models,
+            modes,
             strategy_summary,
         ),
         TaskResult::WorktreeForked {
@@ -732,6 +737,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             agent_id,
             session_id,
             models: new_models,
+            modes,
             code_restored,
             restore_summary,
             restore_degree,
@@ -742,6 +748,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             agent_id,
             session_id,
             new_models,
+            modes,
             code_restored,
             restore_summary,
             restore_degree,
@@ -1033,6 +1040,14 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         }
         TaskResult::CancelComplete => {
             tracing::trace!("Cancel notification sent successfully");
+            vec![]
+        }
+        TaskResult::SetSessionModeFailed { session_id } => {
+            if let Some(agent) = find_agent_by_session_id(&mut app.agents, session_id.0.as_ref()) {
+                agent.plan_mode_pending = None;
+                agent.session_mode_pending = None;
+                agent.pending_post_turn_commit = None;
+            }
             vec![]
         }
         TaskResult::ConsentPersistFailed { error } => {
@@ -1337,6 +1352,19 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         }
         TaskResult::PluginsListLoaded { agent_id, result } => {
             handle_plugins_list_loaded(app, agent_id, result)
+        }
+        TaskResult::MemoryForgetResult {
+            agent_id,
+            path,
+            result,
+        } => {
+            if let Some(agent) = app.agents.get_mut(&agent_id)
+                && let Some(crate::views::modal::ActiveModal::MemoryBrowser { state }) =
+                    agent.active_modal.as_mut()
+            {
+                state.apply_forget_result(&path, result);
+            }
+            vec![]
         }
         TaskResult::HooksActionResult { agent_id, result }
         | TaskResult::PluginsActionResult { agent_id, result }
@@ -1958,11 +1986,14 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         TaskResult::FeedbackFailed {
             agent_id,
             origin,
+            feedback_text,
+            image_count,
             error,
         } => {
             let Some(agent) = app.agents.get_mut(&agent_id) else {
                 return vec![];
             };
+            let failure = format!("Couldn't send feedback: {error}");
             if let crate::app::actions::FeedbackSendOrigin::Modal {
                 submission_id,
                 modal_id,
@@ -1970,21 +2001,29 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             } = origin
             {
                 let _ = agent.take_parked_feedback_trace_consent(submission_id);
-                if is_draft
-                    && let Some(modal) = agent
+                if is_draft {
+                    if let Some(modal) = agent
                         .feedback_modal
                         .as_mut()
                         .filter(|modal| modal.matches_id(modal_id))
-                {
-                    modal.mark_draft_send_error(format!(
-                        "Couldn't send feedback: {error}. The draft was kept."
-                    ));
+                    {
+                        modal.mark_draft_send_error(format!("{failure}. The draft was kept."));
+                    } else {
+                        agent
+                            .scrollback
+                            .push_block(crate::scrollback::block::RenderBlock::system(failure));
+                    }
                     return vec![];
                 }
             }
-            agent.scrollback.push_block(crate::scrollback::block::RenderBlock::system(
-                xai_grok_i18n::t_fmt("task_result.feedback_send_failed", &[("error", error.as_str())]),
-            ));
+            super::notes::keep_unsent_feedback_report(
+                agent,
+                super::notes::UnsentFeedbackReport {
+                    text: &feedback_text,
+                    image_count,
+                    failure: &failure,
+                },
+            );
             vec![]
         }
         TaskResult::FeedbackDraftListComplete {
@@ -2181,7 +2220,8 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             agent_id,
             result,
             minimal_request_id,
-        } => handle_btw_response(app, agent_id, result, minimal_request_id),
+            image_notice,
+        } => handle_btw_response(app, agent_id, result, minimal_request_id, image_notice),
         TaskResult::InterjectQueued { .. } => vec![],
         TaskResult::RecapRequested {
             session_id,

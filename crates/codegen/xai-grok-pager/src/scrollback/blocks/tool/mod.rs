@@ -31,7 +31,10 @@ pub use search::{
 pub use search_tool::{
     DiscoveredTool, SearchToolCallBlock as IntegrationSearchToolCallBlock, discovered_tool_action,
 };
-pub use sent_message::{SentMessagePresentation, SentMessageToolCallBlock};
+pub use sent_message::{
+    SentMessageDelivery, SentMessageInput, SentMessagePresentation, SentMessageTarget,
+    SentMessageToolCallBlock,
+};
 pub use use_tool::UseToolCallBlock;
 pub use web_fetch::WebFetchToolCallBlock;
 pub use web_search::WebSearchToolCallBlock;
@@ -568,18 +571,29 @@ impl ToolCallBlock {
     /// Verb-group kind; `None` renders standalone and splits verb-group runs (still dense-packs via `is_groupable`).
     pub fn verb_group_kind(&self) -> Option<VerbGroupKind> {
         match self {
-            ToolCallBlock::Read(b) => Some(if b.is_skill_read() {
+            ToolCallBlock::Read(b) => Some(if b.is_memory_activity {
+                VerbGroupKind::MemorySearch
+            } else if b.is_skill_read() {
                 VerbGroupKind::Skill
             } else {
                 VerbGroupKind::File
             }),
-            ToolCallBlock::ListDir(_) => Some(VerbGroupKind::Dir),
-            ToolCallBlock::Search(_) => Some(VerbGroupKind::Search),
+            ToolCallBlock::ListDir(b) => Some(if b.is_memory_activity {
+                VerbGroupKind::MemorySearch
+            } else {
+                VerbGroupKind::Dir
+            }),
+            ToolCallBlock::Search(b) => Some(if b.is_memory_activity {
+                VerbGroupKind::MemorySearch
+            } else {
+                VerbGroupKind::Search
+            }),
             ToolCallBlock::WebFetch(_) => Some(VerbGroupKind::WebFetch),
             ToolCallBlock::WebSearch(_) => Some(VerbGroupKind::WebSearch),
             ToolCallBlock::IntegrationSearch(_) => Some(VerbGroupKind::IntegrationSearch),
             ToolCallBlock::MemorySearch(_) => Some(VerbGroupKind::MemorySearch),
             ToolCallBlock::Skill(_) => Some(VerbGroupKind::Skill),
+            ToolCallBlock::Edit(b) if b.is_memory_activity => Some(VerbGroupKind::MemorySearch),
             ToolCallBlock::Execute(_)
             | ToolCallBlock::Edit(_)
             | ToolCallBlock::UseTool(_)
@@ -684,8 +698,13 @@ mod tests {
             ToolCallBlock::MemorySearch(MemorySearchToolCallBlock::new("auth")),
             ToolCallBlock::SentMessage(SentMessageToolCallBlock::new(
                 SentMessagePresentation::Sent,
-                Some("sub-123".into()),
-                Some("hello".into()),
+                Some(SentMessageInput {
+                    target: SentMessageTarget::Unresolved {
+                        subagent_id: "sub-123".into(),
+                    },
+                    delivery: Some(SentMessageDelivery::Steer),
+                    text: "hello".into(),
+                }),
             )),
             ToolCallBlock::Skill(OtherToolCallBlock::new("Skill", "deploy")),
             ToolCallBlock::Other(OtherToolCallBlock::new("todo_write", "update")),
@@ -731,8 +750,7 @@ mod tests {
         assert_eq!(
             ToolCallBlock::SentMessage(SentMessageToolCallBlock::new(
                 SentMessagePresentation::Sent,
-                None,
-                None,
+                None
             ))
             .label_kind(),
             Some(VerbGroupKind::Message)

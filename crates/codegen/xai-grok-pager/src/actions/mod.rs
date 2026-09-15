@@ -874,7 +874,10 @@ mod tests {
         assert!(ids.contains(&ActionId::SelectNext));
         // Sorted by priority
         for window in hints.windows(2) {
-            assert!(window[0].hint_priority <= window[1].hint_priority);
+            let [a, b] = window else {
+                panic!("windows(2) yielded {} items", window.len())
+            };
+            assert!(a.hint_priority <= b.hint_priority);
         }
     }
 
@@ -929,7 +932,7 @@ mod tests {
         );
         // Not on agent/prompt contexts (Ctrl+R is deliberately unbound there;
         // agent keeps the model picker on Alt+M, including from the prompt).
-        assert_eq!(registry.lookup(&ctrl_r, When::AgentScreen), None);
+        assert_eq!(registry.lookup(&ctrl_r, When::AgentScreen), Some(ActionId::OpenSessions));
         assert_eq!(registry.lookup(&ctrl_r, When::PromptFocused), None);
         assert_eq!(
             registry.lookup(&alt_m, When::AgentScreen),

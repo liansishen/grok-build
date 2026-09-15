@@ -14,10 +14,6 @@ use crate::settings::{
     SettingKey, SettingKind, SettingValue, StringValidator, dynamic_enum_choices,
 };
 
-// ---------------------------------------------------------------------------
-// Key handling
-// ---------------------------------------------------------------------------
-
 /// F2/Ctrl+,/Cmd+, always close regardless of mode. Space/Enter Repeat events are suppressed to
 /// avoid per-tick disk writes.
 pub fn handle_settings_key(state: &mut SettingsModalState, key: &KeyEvent) -> SettingsKeyOutcome {
@@ -25,7 +21,6 @@ pub fn handle_settings_key(state: &mut SettingsModalState, key: &KeyEvent) -> Se
         return SettingsKeyOutcome::Unchanged;
     }
 
-    // Suppress Repeat for toggle keys to avoid per-tick disk writes.
     if key.kind == KeyEventKind::Repeat && matches!(key.code, KeyCode::Char(' ') | KeyCode::Enter) {
         return SettingsKeyOutcome::Unchanged;
     }
@@ -617,7 +612,12 @@ fn handle_browse(state: &mut SettingsModalState, key: &KeyEvent) -> SettingsKeyO
                 .filtered_cache
                 .iter()
                 .copied()
-                .find(|&idx| matches!(state.rows[idx], RowEntry::Setting { .. }))
+                .find(|&idx| {
+                    state
+                        .rows
+                        .get(idx)
+                        .is_some_and(|r| matches!(r, RowEntry::Setting { .. }))
+                })
                 .unwrap_or(state.selected);
             if first != state.selected {
                 state.selected = first;
@@ -633,7 +633,12 @@ fn handle_browse(state: &mut SettingsModalState, key: &KeyEvent) -> SettingsKeyO
                 .iter()
                 .rev()
                 .copied()
-                .find(|&idx| matches!(state.rows[idx], RowEntry::Setting { .. }))
+                .find(|&idx| {
+                    state
+                        .rows
+                        .get(idx)
+                        .is_some_and(|r| matches!(r, RowEntry::Setting { .. }))
+                })
                 .unwrap_or(state.selected);
             if last != state.selected {
                 state.selected = last;
@@ -801,10 +806,6 @@ fn apply_filter_edit(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Mouse handling
-// ---------------------------------------------------------------------------
-
 /// Handle a mouse event in the modal content area.
 pub fn handle_settings_mouse(
     state: &mut SettingsModalState,
@@ -908,12 +909,18 @@ pub fn handle_settings_mouse(
                 return SettingsKeyOutcome::Unchanged;
             };
             // Clicking a header is a no-op.
-            if !matches!(state.rows[idx], RowEntry::Setting { .. }) {
+            if !state
+                .rows
+                .get(idx)
+                .is_some_and(|r| matches!(r, RowEntry::Setting { .. }))
+            {
                 return SettingsKeyOutcome::Unchanged;
             }
             // Two-stage clicks. Click on a different row: only select, so the user can read the description
             // first.
-            let row_rect = state.row_rects[idx];
+            let Some(&row_rect) = state.row_rects.get(idx) else {
+                return SettingsKeyOutcome::Unchanged;
+            };
             // Col 0 of the row is the `▸`/`▾` triangle glyph. A click there toggles expansion without touching
             // the value, matching the keyboard's Right/Left arrows. Two-line rows have `row_rect.height = 2`
             // with the triangle on line 1 only.

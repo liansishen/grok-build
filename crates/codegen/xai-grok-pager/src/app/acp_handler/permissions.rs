@@ -284,9 +284,16 @@ pub(super) fn build_permission_display(
         .fields
         .title
         .as_deref()
-        .map(|title| match &ask {
-            Some(ask) => ask.strip_prompt_header(title),
-            None => title,
+        .map(|title| {
+            let mut title = title;
+            if let Some(ask) = &ask {
+                while let Some((prefix, _)) = title.split_once(" — hook '") {
+                    title = prefix;
+                }
+                ask.strip_prompt_header(title)
+            } else {
+                title
+            }
         });
 
     let raw_command = bash_input.as_ref().map(|b| b.command.clone()).or_else(|| {
@@ -326,15 +333,31 @@ pub(super) fn build_permission_display(
             .and_then(|v| v.as_str());
         if let Some(path) = file_path {
             xai_grok_i18n::t_fmt("permission.title.allow_edit_path", &[("path", path)])
-        } else if let Some(ref t) = req.tool_call.fields.title {
+        } else if let Some(t) = acp_title {
             let name = xai_grok_workspace::permission::mcp_pretty_name_if_qualified(t);
-            xai_grok_i18n::t_fmt("permission.title.allow_named", &[("name", name.as_str())])
+            if name.starts_with("Allow ") {
+                if name.ends_with('?') {
+                    name.to_string()
+                } else {
+                    format!("{name}?")
+                }
+            } else {
+                xai_grok_i18n::t_fmt("permission.title.allow_named", &[("name", name.as_str())])
+            }
         } else {
             xai_grok_i18n::t("permission.title.allow_edit").to_string()
         }
-    } else if let Some(ref t) = req.tool_call.fields.title {
+    } else if let Some(t) = acp_title {
         let name = xai_grok_workspace::permission::mcp_pretty_name_if_qualified(t);
-        xai_grok_i18n::t_fmt("permission.title.allow_named", &[("name", name.as_str())])
+        if name.starts_with("Allow ") {
+            if name.ends_with('?') {
+                name.to_string()
+            } else {
+                format!("{name}?")
+            }
+        } else {
+            xai_grok_i18n::t_fmt("permission.title.allow_named", &[("name", name.as_str())])
+        }
     } else {
         match req.tool_call.fields.kind {
             Some(acp::ToolKind::Edit) => {
@@ -441,8 +464,11 @@ pub(super) fn mcp_args_lines(req: &acp::RequestPermissionRequest) -> Vec<String>
     if !is_mcp {
         return Vec::new();
     }
+    // A tool that takes no arguments arrives as `{}`; there is nothing to show for it.
     let args = match raw.get("tool_input") {
         Some(serde_json::Value::Null) | None => return Vec::new(),
+        Some(serde_json::Value::Object(map)) if map.is_empty() => return Vec::new(),
+        Some(serde_json::Value::Array(items)) if items.is_empty() => return Vec::new(),
         Some(args) => args,
     };
     let pretty = match serde_json::to_string_pretty(args) {
@@ -452,7 +478,10 @@ pub(super) fn mcp_args_lines(req: &acp::RequestPermissionRequest) -> Vec<String>
     let mut lines: Vec<String> = pretty
         .lines()
         .map(|l| match l.char_indices().nth(MCP_ARGS_MAX_LINE_CHARS) {
-            Some((byte_idx, _)) => format!("{}…", &l[..byte_idx]),
+            Some((byte_idx, _)) => match l.get(..byte_idx) {
+                Some(prefix) => format!("{prefix}…"),
+                None => l.to_owned(),
+            },
             None => l.to_owned(),
         })
         .collect();
@@ -508,28 +537,10 @@ pub(super) fn should_drop_late_auto_recap(
 
 /// Recap must not paint in the gap before the next turn starts.
 fn cli_is_idle_for_recap(agent: &crate::app::agent_view::AgentView) -> bool {
-    use crate::app::agent::BgTaskStatus;
-
-    if !agent.session.state.is_idle() {
-        return false;
-    }
-
-    // Auto-wake turns keep session state idle while their response streams.
-    if agent.running_wake_turn.is_some() {
+    if !agent.session.state.is_idle() || agent.has_wake_source() {
         return false;
     }
     if agent.session.in_flight_prompt.is_some() || agent.has_held_user_queue() {
-        return false;
-    }
-    if agent.subagent_sessions.values().any(|s| s.is_running()) {
-        return false;
-    }
-    if agent
-        .session
-        .bg_tasks
-        .values()
-        .any(|t| t.status == BgTaskStatus::Running && !t.is_monitor)
-    {
         return false;
     }
     if scrollback_waiting_on_user_turn(&agent.scrollback) {

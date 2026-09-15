@@ -378,8 +378,11 @@ fn fail_closed_401_is_uncharged_and_turn_survives() {
                 "expected the fail-closed send plus the resubmit; got {}",
                 inference.len()
             );
+            let Some(first) = inference.first() else {
+                panic!("expected inference requests: {inference:?}");
+            };
             assert_eq!(
-                inference[0].authorization, None,
+                first.authorization, None,
                 "first send must carry no Authorization header"
             );
             assert_eq!(
@@ -618,7 +621,10 @@ async fn deferred_recovery_credential_less_401_parks_and_survives() {
                  authenticated resubmit; got {}",
                 inference.len()
             );
-            for (i, req) in inference[..inference.len() - 1].iter().enumerate() {
+            let Some((_, prefix)) = inference.split_last() else {
+                panic!("expected inference requests: {inference:?}");
+            };
+            for (i, req) in prefix.iter().enumerate() {
                 assert_eq!(
                     req.authorization, None,
                     "send {i} precedes the token landing and must carry no \
@@ -714,11 +720,16 @@ async fn budgeted_workflow_child_credential_less_401_stays_terminal() {
 
 /// Rule: a transient Api 5xx mid-park proves nothing about the credential — the next
 /// credential-less 401 re-parks without a fresh recovery dispatch.
-#[tokio::test(flavor = "current_thread", start_paused = true)]
-async fn api_5xx_during_park_does_not_unpark_or_redispatch() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
+#[test]
+fn api_5xx_during_park_does_not_unpark_or_redispatch() {
+    on_session_stack(|| {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .start_paused(true)
+            .build()
+            .expect("test runtime must build");
+        let local = tokio::task::LocalSet::new();
+        rt.block_on(local.run_until(async {
             let server = MockInferenceServer::start_with_required_auth(
                 vec![MockModelEntry::new("test")],
                 FRESH_TOKEN,
@@ -772,7 +783,8 @@ async fn api_5xx_during_park_does_not_unpark_or_redispatch() {
                 "a surviving turn must not report a terminal retryState"
             );
         })
-        .await;
+        );
+    });
 }
 
 /// Rule: a parked resubmit's 429 waits never re-prepare — the mid-wait

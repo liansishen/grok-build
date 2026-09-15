@@ -723,7 +723,10 @@ pub struct MultiTaskOutputResult {
 
 impl TaskOutputResult {
     pub fn is_terminal(&self) -> bool {
-        matches!(self.status.as_str(), "completed" | "failed" | "cancelled")
+        matches!(
+            self.status.as_str(),
+            "completed" | "failed" | "cancelled" | "timed_out"
+        )
     }
 
     /// Compute a progress signature from the semantically meaningful output
@@ -835,7 +838,7 @@ pub struct SubagentDescriptor {
 }
 
 /// A built-in subagent type shared by the CLI (`xai-grok-agent`) and other
-/// agent hosts: its `subagent_type` name, canonical model-facing description,
+/// embedding crates: its `subagent_type` name, canonical model-facing description,
 /// tool-access fragment, and type-specific prompt body.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BuiltinSubagent {
@@ -1095,6 +1098,23 @@ pub const PLAN_SUBAGENT: BuiltinSubagent = BuiltinSubagent {
 pub const BUILTIN_SUBAGENTS: [BuiltinSubagent; 3] =
     [GENERAL_PURPOSE_SUBAGENT, EXPLORE_SUBAGENT, PLAN_SUBAGENT];
 
+/// Tool-access fragment for a subagent type whose toolset the host resolved at build time, in the
+/// same voice as the `tools_template` fragments: `Has access to: a, b, and c.` or, when `read_only`,
+/// `Read-only — has access to: a and b.` The caller passes `names` already ordered and deduplicated.
+pub fn render_tool_access_fragment(names: &[String], read_only: bool) -> String {
+    let prefix = if read_only {
+        "Read-only \u{2014} has access to: "
+    } else {
+        "Has access to: "
+    };
+    match names {
+        [] => "No tools.".to_string(),
+        [only] => format!("{prefix}{only}."),
+        [first, second] => format!("{prefix}{first} and {second}."),
+        [init @ .., last] => format!("{prefix}{}, and {last}.", init.join(", ")),
+    }
+}
+
 /// Look up a built-in subagent by its `subagent_type` name
 /// (e.g. `"explore"`), or `None` for user-defined / unknown types.
 pub fn builtin_subagent_by_name(name: &str) -> Option<&'static BuiltinSubagent> {
@@ -1179,20 +1199,40 @@ fn localized_subagent_description(subagent: &SubagentDescriptor) -> String {
     t(key).to_owned()
 }
 
+/// Localize the prose around a rendered tool-access fragment while keeping the tool list itself —
+/// including its order — exactly as the preview resolved it, so the advertised tools stay true to
+/// the child's real toolset.
 fn localized_subagent_tools(subagent: &SubagentDescriptor) -> Option<String> {
     let Some(builtin) = builtin_subagent_by_name(&subagent.name) else {
         return subagent.tools.clone();
     };
-    if builtin.description != subagent.description || subagent.tools.is_none() {
+    if builtin.description != subagent.description {
         return subagent.tools.clone();
     }
-    let key = match builtin.name {
-        "general-purpose" => "tool.description.subagent_tools.general_purpose",
-        "explore" => "tool.description.subagent_tools.explore",
-        "plan" => "tool.description.subagent_tools.plan",
-        _ => return subagent.tools.clone(),
+    Some(subagent.tools.as_deref().map(localize_tool_access_fragment).unwrap_or_default())
+        .filter(|tools| !tools.is_empty())
+}
+
+/// "Read-only — has access to: " prefix of a rendered fragment.
+const READ_ONLY_ACCESS_PREFIX: &str = "Read-only \u{2014} has access to: ";
+/// "Has access to: " prefix of a rendered fragment.
+const ACCESS_PREFIX: &str = "Has access to: ";
+/// The plan subagent's trailing sentence, translated separately from the tool list.
+const PLAN_FRAGMENT_TAIL: &str = " File editing and command execution are not available.";
+
+fn localize_tool_access_fragment(tools: &str) -> String {
+    let (prefix_key, rest) = if let Some(rest) = tools.strip_prefix(READ_ONLY_ACCESS_PREFIX) {
+        ("tool.description.subagent_tools.read_only_prefix", rest)
+    } else if let Some(rest) = tools.strip_prefix(ACCESS_PREFIX) {
+        ("tool.description.subagent_tools.access_prefix", rest)
+    } else {
+        return tools.to_owned();
     };
-    Some(t(key).to_owned())
+    let (list, tail) = match rest.strip_suffix(PLAN_FRAGMENT_TAIL) {
+        Some(list) => (list, t("tool.description.subagent_tools.plan_tail")),
+        None => (rest, ""),
+    };
+    format!("{}{list}{tail}", t(prefix_key))
 }
 
 /// Shared `background task or subagent`-style target suffix used by the
@@ -1432,6 +1472,7 @@ mod tests {
         assert!(result_with_status("completed").is_terminal());
         assert!(result_with_status("failed").is_terminal());
         assert!(result_with_status("cancelled").is_terminal());
+        assert!(result_with_status("timed_out").is_terminal());
     }
 
     #[test]
@@ -1775,6 +1816,31 @@ mod tests {
         assert_eq!(
             EXPLORE_SUBAGENT.render_tools(&naming),
             "Read-only \u{2014} has access to: read_file, list_dir, grep."
+        );
+    }
+
+    fn names(list: &[&str]) -> Vec<String> {
+        list.iter().map(|n| n.to_string()).collect()
+    }
+
+    #[test]
+    fn render_tool_access_fragment_joins_by_count_and_prefixes_read_only() {
+        assert_eq!(render_tool_access_fragment(&names(&[]), false), "No tools.");
+        assert_eq!(
+            render_tool_access_fragment(&names(&["grep"]), false),
+            "Has access to: grep."
+        );
+        assert_eq!(
+            render_tool_access_fragment(&names(&["read_file", "grep"]), false),
+            "Has access to: read_file and grep."
+        );
+        assert_eq!(
+            render_tool_access_fragment(&names(&["read_file", "list_dir", "grep"]), false),
+            "Has access to: read_file, list_dir, and grep."
+        );
+        assert_eq!(
+            render_tool_access_fragment(&names(&["read_file", "list_dir", "grep"]), true),
+            "Read-only \u{2014} has access to: read_file, list_dir, and grep."
         );
     }
 

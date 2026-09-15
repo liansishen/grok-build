@@ -374,6 +374,16 @@ pub(crate) fn report_prompt_failure(app: &mut AppView, agent_id: AgentId, messag
 mod tests {
     use super::*;
 
+    fn get_agent(
+        app: &AppView,
+        id: crate::app::agent::AgentId,
+    ) -> &crate::app::agent_view::AgentView {
+        let Some(a) = app.agents.get(&id) else {
+            panic!("missing agent {id:?}");
+        };
+        a
+    }
+
     fn success_status() -> std::process::ExitStatus {
         #[cfg(unix)]
         {
@@ -489,7 +499,7 @@ mod tests {
         app.screen_mode = crate::app::ScreenMode::Fullscreen;
         finish_prepare_error(&mut app, error());
         assert_eq!(
-            app.agents[&id]
+            get_agent(&app, id)
                 .toast
                 .as_ref()
                 .map(|(text, _)| text.as_str()),
@@ -500,7 +510,7 @@ mod tests {
         app.screen_mode = crate::app::ScreenMode::Minimal;
         finish_prepare_error(&mut app, error());
         assert!(
-            app.agents[&id]
+            get_agent(&app, id)
                 .scrollback
                 .iter_entries()
                 .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(message))
@@ -520,7 +530,7 @@ mod tests {
         };
         assert!(prepare(&mut app, request).unwrap().is_none());
         assert!(
-            app.agents[&id]
+            get_agent(&app, id)
                 .scrollback
                 .iter_entries()
                 .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(voice_message()))
@@ -537,7 +547,7 @@ mod tests {
         };
         assert!(prepare(&mut app, request).unwrap().is_none());
         assert!(
-            app.agents[&id]
+            get_agent(&app, id)
                 .scrollback
                 .iter_entries()
                 .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(voice_message()))
@@ -551,7 +561,7 @@ mod tests {
         app.agents.get_mut(&id).unwrap().paste_probe_in_flight = 1;
         assert!(prepare(&mut app, request).unwrap().is_none());
         assert!(
-            app.agents[&id]
+            get_agent(&app, id)
                 .scrollback
                 .iter_entries()
                 .any(|(_, entry)| entry.block.searchable_text().as_deref() == Some(paste_message()))
@@ -580,19 +590,19 @@ mod tests {
         };
         finish(&mut app, prepared, Ok(success_status()));
         assert_eq!(
-            app.agents[&id].prompt.text(),
+            get_agent(&app, id).prompt.text(),
             "edited",
             "the editor's final newline is stripped"
         );
 
         app.agents.get_mut(&id).unwrap().prompt.set_text("newer");
         apply_prompt_outcome(&mut app, id, "original".to_owned(), Ok("stale".to_owned()));
-        assert_eq!(app.agents[&id].prompt.text(), "newer");
+        assert_eq!(get_agent(&app, id).prompt.text(), "newer");
 
         apply_prompt_outcome(&mut app, id, "newer".to_owned(), Err(prompt_editor_nonzero()));
-        assert_eq!(app.agents[&id].prompt.text(), "newer");
+        assert_eq!(get_agent(&app, id).prompt.text(), "newer");
         assert!(
-            app.agents[&id]
+            get_agent(&app, id)
                 .scrollback
                 .iter_entries()
                 .any(|(_, entry)| entry.block.searchable_text().as_deref()
@@ -626,7 +636,7 @@ mod tests {
         };
         finish(&mut app, prepared, Ok(success_status()));
         assert_eq!(
-            app.agents[&id].prompt.text(),
+            get_agent(&app, id).prompt.text(),
             "edited\n",
             "a draft's own trailing newline survives the round trip"
         );
@@ -645,7 +655,7 @@ mod tests {
         };
         finish(&mut app, prepared, Ok(success_status()));
         assert_eq!(
-            app.agents[&id].prompt.text(),
+            get_agent(&app, id).prompt.text(),
             "text\n",
             "a deliberately added trailing blank line survives as one newline"
         );

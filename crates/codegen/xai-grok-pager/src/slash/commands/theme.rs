@@ -16,6 +16,16 @@ use crate::theme::{Theme, ThemeKind, cache as theme_cache};
 
 pub struct ThemeCommand;
 
+fn picker_match_text(canonical: &str) -> String {
+    let aliases = ThemeKind::from_name(canonical)
+        .map(|kind| kind.aliases().iter().copied().collect::<Vec<_>>())
+        .unwrap_or_default();
+    std::iter::once(canonical)
+        .chain(aliases)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 impl SlashCommand for ThemeCommand {
     slash_meta! {
         name: "theme",
@@ -56,7 +66,7 @@ impl SlashCommand for ThemeCommand {
         let auto_active = if is_auto { xai_grok_i18n::t("slash.common.active_suffix") } else { "" };
         let mut items = vec![ArgItem {
             display: "auto".to_string(),
-            match_text: "auto".to_string(),
+            match_text: picker_match_text("auto"),
             insert_text: "auto".to_string(),
             description: format!("{}{auto_active}", xai_grok_i18n::t("slash.theme.auto_description")),
         }];
@@ -70,7 +80,7 @@ impl SlashCommand for ThemeCommand {
             };
             ArgItem {
                 display: theme.display_name.clone(),
-                match_text: theme.canonical.clone(),
+                match_text: picker_match_text(&theme.canonical),
                 insert_text: theme.canonical,
                 description: format!("{}{active}", theme.display_name),
             }
@@ -94,10 +104,17 @@ impl SlashCommand for ThemeCommand {
                 .iter()
                 .position(|theme| theme.canonical == current)
                 .unwrap_or(0);
-            let Some(next) = choices.get((current_idx + 1) % choices.len()) else {
-                return CommandResult::Error(xai_grok_i18n::t("slash.theme.none_available").to_string());
+            let Some(next) = current_idx
+                .checked_add(1)
+                .and_then(|i| i.checked_rem(choices.len()))
+                .and_then(|i| choices.get(i))
+            else {
+                return CommandResult::Error(
+                    xai_grok_i18n::t("slash.theme.none_available").to_string(),
+                );
             };
             return CommandResult::Action(Action::SetTheme(next.canonical.clone()));
+
         }
 
         // Named theme (including "auto"): canonicalize built-in aliases and loaded custom names.
@@ -158,8 +175,11 @@ mod tests {
                 current_title: None,
             };
             let items = cmd.suggest_args(&ctx, "").expect("should return items");
-            assert_eq!(items[0].insert_text, "auto");
-            assert!(items[0].description.contains("follow system"));
+            let Some(first) = items.first() else {
+                panic!("expected items, got {items:?}");
+            };
+            assert_eq!(first.insert_text, "auto");
+            assert!(first.description.contains("follow system"));
             // The "auto" entry plus every available concrete theme
             assert_eq!(items.len(), theme_cache::theme_choices(None).len() + 1);
         });
@@ -184,10 +204,13 @@ mod tests {
                 current_title: None,
             };
             let items = cmd.suggest_args(&ctx, "").expect("should return items");
+            let Some(first) = items.first() else {
+                panic!("expected items, got {items:?}");
+            };
             assert!(
-                items[0].description.contains("(active)"),
+                first.description.contains("(active)"),
                 "auto should show (active), got: {}",
-                items[0].description
+                first.description
             );
         });
     }
@@ -211,10 +234,13 @@ mod tests {
                 current_title: None,
             };
             let items = cmd.suggest_args(&ctx, "").expect("should return items");
+            let Some(first) = items.first() else {
+                panic!("expected items, got {items:?}");
+            };
             assert!(
-                !items[0].description.contains("(active)"),
+                !first.description.contains("(active)"),
                 "auto should not show (active), got: {}",
-                items[0].description
+                first.description
             );
         });
     }
@@ -281,6 +307,44 @@ mod tests {
             }
         });
     }
+
+    /// Typing an alias ranks its canonical row first; the row still inserts the canonical name.
+    #[test]
+    fn suggest_args_alias_ranks_canonical_row() {
+        with_test_env(|| {
+            let cmd = ThemeCommand;
+            let models = crate::acp::model_state::ModelState::default();
+            let ctx = AppCtx {
+                models: &models,
+                cwd: std::path::Path::new("."),
+                has_session_announcements: false,
+                billing_surface_visible: true,
+                usage_command_visible: true,
+                workflows_available: true,
+                saved_workflows: &[],
+                workflow_runs: &[],
+                screen_mode: crate::app::ScreenMode::Fullscreen,
+                current_title: None,
+            };
+            let items = cmd.suggest_args(&ctx, "").expect("should return items");
+            let mut matcher = crate::slash::matcher::FuzzyMatcher::new();
+            for (alias, canonical) in [
+                ("transparent", "terminal"),
+                ("dark", "groknight"),
+                ("system", "auto"),
+            ] {
+                let hits = matcher.rank(&items, alias, items.len(), |item| &item.match_text);
+                let (top, _) = hits
+                    .first()
+                    .unwrap_or_else(|| panic!("{alias} matched nothing"));
+                let top = items
+                    .get(*top)
+                    .unwrap_or_else(|| panic!("{alias} ranked out-of-range index {top}"));
+                assert_eq!(top.insert_text, canonical, "top hit for {alias}");
+            }
+        });
+    }
+
 
     // -- run (dispatches Action::SetTheme) ------------------------------------
 
@@ -411,8 +475,16 @@ mod tests {
                         .iter()
                         .position(|theme| theme.canonical == current)
                         .unwrap_or(0);
-                    let expected = &choices[(current_idx + 1) % choices.len()].canonical;
+                    let Some(expected) = current_idx
+                        .checked_add(1)
+                        .and_then(|i| i.checked_rem(choices.len()))
+                        .and_then(|i| choices.get(i))
+                        .map(|theme| &theme.canonical)
+                    else {
+                        panic!("expected at least two themes");
+                    };
                     assert_eq!(&name, expected);
+
                 }
                 other => panic!("expected Action::SetTheme(...), got {other:?}"),
             }

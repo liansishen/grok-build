@@ -74,7 +74,7 @@ mod tests {
         let tip = ssh_wrap_tip();
         assert_eq!(tip.key, SSH_WRAP_TIP_KEY);
         let text: String = tip.line.spans.iter().map(|s| s.content.as_ref()).collect();
-        assert_eq!(text, "Run /doctor for details and fixes.");
+        assert_eq!(text, "Over SSH? Run grok wrap ssh <host> locally for clipboard + terminal restore");
     }
 
     #[test]

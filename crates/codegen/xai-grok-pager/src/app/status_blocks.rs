@@ -428,7 +428,7 @@ mod tests {
         // 12_500 + 500 = 13_000 → 13.0k
         assert_eq!(
             session_usage_bar_label(&usage).as_deref(),
-            Some("13.0k tok")
+            Some("13.0k tok(0.0%)")
         );
     }
 
@@ -489,8 +489,8 @@ mod tests {
             .insert("grok-4".into(), model_row(50, 5, None));
         let text = session_usage_block_text(&usage);
         assert!(text.contains("By model:"), "{text}");
-        assert!(text.contains("grok-build: 100 in / 10 out"), "{text}");
-        assert!(text.contains("grok-4: 50 in / 5 out"), "{text}");
+        assert!(text.contains("grok-build — 100 in / 10 out"), "{text}");
+        assert!(text.contains("grok-4 — 50 in / 5 out"), "{text}");
     }
 
     #[test]

@@ -15,7 +15,7 @@ fn show_plan_nudge_no_op_when_flag_off() {
     let effects = dispatch(Action::ShowPlanNudge, &mut app);
     assert!(effects.is_empty());
     assert!(app.tip_seen_counts.is_empty(), "no count burned");
-    assert!(!app.agents[&id].ephemeral_tip.is_active());
+    assert!(!test_agent(&app, id).ephemeral_tip.is_active());
 }
 
 /// `ShowPlanNudge` with the tip on and a drawable agent shows the tip and
@@ -29,7 +29,7 @@ fn show_plan_nudge_shows_and_counts_when_flag_on() {
     app.agents.get_mut(&id).unwrap().last_terminal_size = (80, 30);
 
     let effects = dispatch(Action::ShowPlanNudge, &mut app);
-    assert!(app.agents[&id].ephemeral_tip.is_active());
+    assert!(test_agent(&app, id).ephemeral_tip.is_active());
     assert_eq!(app.tip_seen_counts.get(PLAN_NUDGE_SEEN_KEY), Some(&1));
     assert!(
         effects.is_empty(),
@@ -48,7 +48,7 @@ fn show_word_select_tip_no_op_when_flag_off() {
     let effects = dispatch(Action::ShowWordSelectTip, &mut app);
     assert!(effects.is_empty());
     assert!(app.tip_seen_counts.is_empty(), "no count burned");
-    assert!(!app.agents[&id].ephemeral_tip.is_active());
+    assert!(!test_agent(&app, id).ephemeral_tip.is_active());
 }
 
 /// `ShowWordSelectTip` shows and counts when the gate is on and selection
@@ -64,7 +64,7 @@ fn show_word_select_tip_shows_and_counts_when_flag_on() {
     app.agents.get_mut(&id).unwrap().last_terminal_size = (80, 30);
 
     let effects = dispatch(Action::ShowWordSelectTip, &mut app);
-    assert!(app.agents[&id].ephemeral_tip.is_active());
+    assert!(test_agent(&app, id).ephemeral_tip.is_active());
     assert_eq!(app.tip_seen_counts.get(WORD_SELECT_TIP_SEEN_KEY), Some(&1));
     assert!(
         effects.is_empty(),
@@ -72,7 +72,61 @@ fn show_word_select_tip_shows_and_counts_when_flag_on() {
     );
 }
 
-/// Already on `word_select` → tip is redundant, skip without burning count.
+/// Under a takeover the tip belongs to the view the user dragged in: it lands on the child and never on the root.
+#[test]
+fn show_word_select_tip_targets_the_takeover_child() {
+    use crate::appearance::TextSelection;
+    use crate::tips::word_select::WORD_SELECT_TIP_KEY;
+    crate::appearance::cache::set_keep_text_selection(TextSelection::Flash);
+    let mut app = test_app_with_agent();
+    app.contextual_hints.word_select = true;
+    let root_id = AgentId(0);
+    let child_sid = "child-tip";
+    let mut child = AgentView::new(
+        make_test_agent_session(&app, AgentId(1), child_sid),
+        ScrollbackState::new(),
+    );
+    child.last_terminal_size = (80, 30);
+    {
+        let root = app.agents.get_mut(&root_id).unwrap();
+        root.last_terminal_size = (80, 30);
+        root.insert_test_child(child_sid.to_string(), Box::new(child));
+        root.active_subagent = Some(child_sid.to_string());
+    }
+
+    let _ = dispatch(Action::ShowWordSelectTip, &mut app);
+    let root = app
+        .agents
+        .get(&root_id)
+        .unwrap_or_else(|| panic!("missing root agent"));
+    assert!(
+        !root.ephemeral_tip.is_active(),
+        "the root never shows a tip for a child drag"
+    );
+    assert_eq!(
+        Some(WORD_SELECT_TIP_KEY),
+        root.subagent_view(child_sid)
+            .unwrap()
+            .ephemeral_tip
+            .current_key()
+    );
+
+    let _ = dispatch(Action::AcceptWordSelectTip, &mut app);
+    let root = app
+        .agents
+        .get(&root_id)
+        .unwrap_or_else(|| panic!("missing root agent"));
+    assert!(
+        !root
+            .subagent_view(child_sid)
+            .unwrap()
+            .ephemeral_tip
+            .is_active()
+    );
+    crate::appearance::cache::set_keep_text_selection(TextSelection::Flash);
+}
+
+/// Already on `word_select`, the tip is redundant: skip without burning the count.
 #[test]
 fn show_word_select_tip_no_op_when_already_word_select() {
     use crate::appearance::TextSelection;
@@ -85,7 +139,7 @@ fn show_word_select_tip_no_op_when_already_word_select() {
     let effects = dispatch(Action::ShowWordSelectTip, &mut app);
     assert!(effects.is_empty());
     assert!(app.tip_seen_counts.is_empty());
-    assert!(!app.agents[&id].ephemeral_tip.is_active());
+    assert!(!test_agent(&app, id).ephemeral_tip.is_active());
     // Restore default so sibling tests don't inherit word_select.
     crate::appearance::cache::set_keep_text_selection(TextSelection::Flash);
 }
@@ -102,7 +156,7 @@ fn accept_word_select_tip_flips_setting_and_retires_tip() {
     let id = AgentId(0);
     app.agents.get_mut(&id).unwrap().last_terminal_size = (80, 30);
     let _ = dispatch(Action::ShowWordSelectTip, &mut app);
-    assert!(app.agents[&id].ephemeral_tip.is_active());
+    assert!(test_agent(&app, id).ephemeral_tip.is_active());
 
     let effects = dispatch(Action::AcceptWordSelectTip, &mut app);
     assert!(
@@ -110,7 +164,7 @@ fn accept_word_select_tip_flips_setting_and_retires_tip() {
         "accept must flip the live setting to word_select"
     );
     assert!(
-        !app.agents[&id].ephemeral_tip.is_active(),
+        !test_agent(&app, id).ephemeral_tip.is_active(),
         "accept must retire the tip"
     );
     assert!(
@@ -138,7 +192,7 @@ fn accept_word_select_tip_no_op_when_tip_not_showing() {
     let mut app = test_app_with_agent();
     let id = AgentId(0);
     app.agents.get_mut(&id).unwrap().last_terminal_size = (80, 30);
-    assert!(!app.agents[&id].ephemeral_tip.is_active());
+    assert!(!test_agent(&app, id).ephemeral_tip.is_active());
 
     let effects = dispatch(Action::AcceptWordSelectTip, &mut app);
     assert!(effects.is_empty());
@@ -154,19 +208,19 @@ fn accept_word_select_tip_no_op_when_tip_not_showing() {
 fn slash_plan_no_args_not_in_plan_enters_plan_mode() {
     let mut app = test_app_with_agent();
     let id = AgentId(0);
-    assert!(!app.agents[&id].plan_mode_active);
-    assert!(app.agents[&id].plan_mode_pending.is_none());
+    assert!(!test_agent(&app, id).plan_mode_active);
+    assert!(test_agent(&app, id).plan_mode_pending.is_none());
 
     let effects = dispatch(Action::SendPrompt("/plan".into()), &mut app);
 
     // Should emit SetSessionMode to enter plan mode.
     assert_eq!(effects.len(), 1);
     assert!(
-        matches!(&effects[0], Effect::SetSessionMode { mode_id, .. } if &*mode_id.0 == "plan"),
+        matches!(effects.first(), Some(Effect::SetSessionMode { mode_id, .. }) if &*mode_id.0 == "plan"),
         "expected SetSessionMode(plan), got: {effects:?}"
     );
-    // Optimistic pending state should be set.
-    assert_eq!(app.agents[&id].plan_mode_pending, Some(true));
+    // The optimistic pending state is set
+    assert_eq!(test_agent(&app, id).plan_mode_pending, Some(true));
 }
 
 #[test]
@@ -196,13 +250,13 @@ fn slash_plan_with_args_not_in_plan_enters_and_sends_prompt() {
     assert_eq!(effects.len(), 1, "expected 1 effect, got: {effects:?}");
     assert!(
         matches!(
-            &effects[0],
-            Effect::SetModeThenPrompt { mode_id, text, .. }
+            effects.first(),
+            Some(Effect::SetModeThenPrompt { mode_id, text, .. })
                 if &*mode_id.0 == "plan" && text == "add auth to the app"
         ),
         "expected SetModeThenPrompt(plan, \"add auth to the app\"), got: {effects:?}"
     );
-    assert_eq!(app.agents[&id].plan_mode_pending, Some(true));
+    assert_eq!(test_agent(&app, id).plan_mode_pending, Some(true));
 }
 
 /// The `SendPrompt → SetModeThenPrompt` rewrap must forward the desc-space
@@ -222,7 +276,10 @@ fn slash_plan_desc_forwards_skill_token_ranges() {
     );
 
     assert_eq!(effects.len(), 1, "expected 1 effect, got: {effects:?}");
-    match &effects[0] {
+    let Some(effect) = effects.first() else {
+        panic!("expected an effect, got {effects:?}");
+    };
+    match effect {
         Effect::SetModeThenPrompt {
             mode_id,
             text,
@@ -239,8 +296,8 @@ fn slash_plan_desc_forwards_skill_token_ranges() {
         }
         other => panic!("expected SetModeThenPrompt, got {other:?}"),
     }
-    // The drained echo block carries the same desc-space ranges.
-    match &app.agents[&id].scrollback.get(0).unwrap().block {
+    // The drained echo block carries the same ranges against the stripped desc
+    match &test_agent(&app, id).scrollback.get(0).unwrap().block {
         RenderBlock::UserPrompt(b) => {
             assert_eq!(b.skill_token_ranges, vec![6..18]);
         }
@@ -273,8 +330,8 @@ fn slash_plan_with_args_already_in_plan_is_noop() {
 fn set_plan_mode_mutates_only_active_agent_not_others() {
     let mut app = test_app_with_agent();
     insert_placeholder_agent(&mut app, AgentId(1));
-    assert!(app.agents[&AgentId(0)].plan_mode_pending.is_none());
-    assert!(app.agents[&AgentId(1)].plan_mode_pending.is_none());
+    assert!(test_agent(&app, AgentId(0)).plan_mode_pending.is_none());
+    assert!(test_agent(&app, AgentId(1)).plan_mode_pending.is_none());
 
     let _ = dispatch(
         Action::SetPlanMode(crate::app::actions::PlanModeKind::On),
@@ -282,16 +339,16 @@ fn set_plan_mode_mutates_only_active_agent_not_others() {
     );
 
     assert_eq!(
-        app.agents[&AgentId(0)].plan_mode_pending,
+        test_agent(&app, AgentId(0)).plan_mode_pending,
         Some(true),
         "active agent must have optimistic plan_mode_pending = Some(true)",
     );
     assert!(
-        app.agents[&AgentId(1)].plan_mode_pending.is_none(),
+        test_agent(&app, AgentId(1)).plan_mode_pending.is_none(),
         "non-active agent must NOT receive the plan_mode pending state",
     );
     assert!(
-        !app.agents[&AgentId(1)].plan_mode_active,
+        !test_agent(&app, AgentId(1)).plan_mode_active,
         "non-active agent's confirmed plan_mode_active must stay false",
     );
 }
@@ -350,7 +407,7 @@ fn permission_mode_slash_gate_offers_toggles_subject_to_auto_feature() {
     app.sync_permission_mode_slash_gate();
 
     let offered = |app: &AppView, name: &str| {
-        app.agents[&id]
+        test_agent(app, id)
             .prompt
             .slash_controller
             .registry()
@@ -391,45 +448,45 @@ fn slash_always_approve_and_auto_toggle_and_cross_switch() {
 
     // Off → always-approve.
     let _ = dispatch(Action::SendPrompt("/always-approve".into()), &mut app);
-    assert!(app.agents[&id].session.is_yolo());
-    assert!(!app.agents[&id].session.is_auto());
+    assert!(test_agent(&app, id).session.is_yolo());
+    assert!(!test_agent(&app, id).session.is_auto());
 
     // Always-approve → auto (cross-switch).
     let _ = dispatch(Action::SendPrompt("/auto".into()), &mut app);
-    assert!(!app.agents[&id].session.is_yolo());
-    assert!(app.agents[&id].session.is_auto());
+    assert!(!test_agent(&app, id).session.is_yolo());
+    assert!(test_agent(&app, id).session.is_auto());
 
     // Auto → ask (toggle off).
     let _ = dispatch(Action::SendPrompt("/auto".into()), &mut app);
-    assert!(!app.agents[&id].session.is_yolo());
-    assert!(!app.agents[&id].session.is_auto());
+    assert!(!test_agent(&app, id).session.is_yolo());
+    assert!(!test_agent(&app, id).session.is_auto());
 
     // Off → auto.
     let _ = dispatch(Action::SendPrompt("/auto".into()), &mut app);
-    assert!(app.agents[&id].session.is_auto());
+    assert!(test_agent(&app, id).session.is_auto());
 
     // Auto → always-approve (cross-switch).
     let _ = dispatch(Action::SendPrompt("/always-approve".into()), &mut app);
-    assert!(app.agents[&id].session.is_yolo());
-    assert!(!app.agents[&id].session.is_auto());
+    assert!(test_agent(&app, id).session.is_yolo());
+    assert!(!test_agent(&app, id).session.is_auto());
 
     // Always-approve → ask (toggle off).
     let _ = dispatch(Action::SendPrompt("/always-approve".into()), &mut app);
-    assert!(!app.agents[&id].session.is_yolo());
-    assert!(!app.agents[&id].session.is_auto());
+    assert!(!test_agent(&app, id).session.is_yolo());
+    assert!(!test_agent(&app, id).session.is_auto());
 }
 
 #[test]
 fn set_yolo_mode_off_to_on_emits_persist_with_rollback() {
     let mut app = test_app_with_agent();
     // Default is yolo=false.
-    assert!(!app.agents[&AgentId(0)].session.is_yolo());
+    assert!(!test_agent(&app, AgentId(0)).session.is_yolo());
 
     let effects = dispatch(Action::SetYoloMode(true), &mut app);
 
     // In-memory state mutated.
     assert!(
-        app.agents[&AgentId(0)].session.is_yolo(),
+        test_agent(&app, AgentId(0)).session.is_yolo(),
         "session.yolo_mode must flip to true"
     );
     assert!(app.default_yolo, "app.default_yolo must mirror the toggle");
@@ -441,7 +498,10 @@ fn set_yolo_mode_off_to_on_emits_persist_with_rollback() {
 
     // Exactly one Effect with the right rollback payload.
     assert_eq!(effects.len(), 1, "expected exactly one Effect");
-    match &effects[0] {
+    let Some(effect) = effects.first() else {
+        panic!("expected an effect, got {effects:?}");
+    };
+    match effect {
         Effect::PersistPermissionMode {
             canonical,
             persist,
@@ -477,7 +537,7 @@ fn set_yolo_mode_on_under_plan_uses_plan_aware_toast() {
 
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
 
-    let toast = app.agents[&AgentId(0)]
+    let toast = test_agent(&app, AgentId(0))
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
@@ -488,7 +548,7 @@ fn set_yolo_mode_on_under_plan_uses_plan_aware_toast() {
     let mut app = test_app_with_agent();
     app.agents.get_mut(&AgentId(0)).unwrap().plan_mode_pending = Some(true);
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    let toast = app.agents[&AgentId(0)]
+    let toast = test_agent(&app, AgentId(0))
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
@@ -498,7 +558,7 @@ fn set_yolo_mode_on_under_plan_uses_plan_aware_toast() {
     // Without plan mode the standard destructive toast is unchanged.
     let mut app = test_app_with_agent();
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    let toast = app.agents[&AgentId(0)]
+    let toast = test_agent(&app, AgentId(0))
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
@@ -522,7 +582,7 @@ fn set_permission_mode_always_approve_under_plan_uses_plan_aware_toast() {
         &mut app,
     );
 
-    let toast = app.agents[&AgentId(0)]
+    let toast = test_agent(&app, AgentId(0))
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
@@ -537,15 +597,18 @@ fn set_yolo_mode_on_to_off_emits_persist_with_rollback() {
     // Pre-set yolo=true via the typed setter so the rollback
     // value is captured correctly.
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    assert!(app.agents[&AgentId(0)].session.is_yolo());
+    assert!(test_agent(&app, AgentId(0)).session.is_yolo());
 
     let effects = dispatch(Action::SetYoloMode(false), &mut app);
 
-    assert!(!app.agents[&AgentId(0)].session.is_yolo());
+    assert!(!test_agent(&app, AgentId(0)).session.is_yolo());
     assert!(!app.default_yolo);
     assert_eq!(app.current_ui.permission_mode.as_deref(), Some("ask"));
 
-    match &effects[0] {
+    let Some(effect) = effects.first() else {
+        panic!("expected an effect, got {effects:?}");
+    };
+    match effect {
         Effect::PersistPermissionMode {
             canonical,
             persist,
@@ -581,7 +644,7 @@ fn yolo_on_drain_clears_double_click_tracker() {
 
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
 
-    let agent = &app.agents[&AgentId(0)];
+    let agent = test_agent(&app, AgentId(0));
     assert!(agent.permission_queue.is_empty());
     assert!(
         agent.last_permission_click.is_none(),
@@ -614,7 +677,7 @@ fn enable_always_approve_sends_response_and_flips_yolo_and_persists() {
 
     // Sanity: YOLO is OFF before selecting the option.
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "precondition: YOLO must be off",
     );
 
@@ -670,7 +733,7 @@ fn enable_always_approve_sends_response_and_flips_yolo_and_persists() {
     // (3) Per-session YOLO flag is flipped — future prompts will be
     //     auto-approved in `handle_permission_request`.
     assert!(
-        app.agents[&AgentId(0)].session.is_yolo(),
+        test_agent(&app, AgentId(0)).session.is_yolo(),
         "session.yolo_mode must be flipped on after selecting enable-always-approve",
     );
     // Global default mirror also flipped.
@@ -697,7 +760,7 @@ fn enable_always_approve_is_idempotent_when_yolo_already_on() {
     // the permission AFTER the flip — exercises the dispatcher's
     // idempotency guard directly.
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    assert!(app.agents[&AgentId(0)].session.is_yolo());
+    assert!(test_agent(&app, AgentId(0)).session.is_yolo());
 
     let mut response_rx = enqueue_permission_with_enable_always_approve(&mut app);
 
@@ -797,8 +860,7 @@ fn set_yolo_mode_on_with_no_allow_once_option_sends_cancelled() {
 
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
 
-    // Queue drained.
-    assert!(app.agents[&AgentId(0)].permission_queue.is_empty());
+    assert!(test_agent(&app, AgentId(0)).permission_queue.is_empty());
     // Cancelled (NOT Selected{AllowAlways}).
     match response_rx.try_recv() {
         Ok(Ok(acp::RequestPermissionResponse {
@@ -885,7 +947,7 @@ fn set_yolo_mode_on_drains_multi_item_queue() {
 
     // Queue fully drained.
     assert!(
-        app.agents[&AgentId(0)].permission_queue.is_empty(),
+        test_agent(&app, AgentId(0)).permission_queue.is_empty(),
         "multi-item drain must fully empty the queue",
     );
     // All 3 channels received the AllowOnce response.
@@ -916,7 +978,7 @@ fn set_yolo_mode_on_duplicate_dispatch_still_drains_queue() {
     let mut app = test_app_with_agent();
     // First dispatch: turn YOLO ON. Queue is empty so no drain.
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    assert!(app.agents[&AgentId(0)].session.is_yolo());
+    assert!(test_agent(&app, AgentId(0)).session.is_yolo());
 
     // Now inject a permission AFTER the first dispatch.
     let (response_tx, mut response_rx) = tokio::sync::oneshot::channel();
@@ -965,7 +1027,7 @@ fn set_yolo_mode_on_duplicate_dispatch_still_drains_queue() {
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
 
     assert!(
-        app.agents[&AgentId(0)].permission_queue.is_empty(),
+        test_agent(&app, AgentId(0)).permission_queue.is_empty(),
         "duplicate YOLO=true dispatch MUST drain any permission that arrived \
              between dispatches — Security Issue 27 regression",
     );
@@ -1000,9 +1062,8 @@ fn set_yolo_mode_on_duplicate_dispatch_still_drains_queue() {
 fn set_yolo_mode_redispatch_same_value_still_emits_effect_and_toast() {
     let mut app = test_app_with_agent();
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    assert!(app.agents[&AgentId(0)].toast.is_some());
-    // Clear the toast: prove the second dispatch RE-FIRES the
-    // toast (not just "the first toast is still visible").
+    assert!(test_agent(&app, AgentId(0)).toast.is_some());
+    // Clear the toast: prove the second dispatch RE-FIRES the toast (not just "the first toast is still visible")
     app.agents.get_mut(&AgentId(0)).unwrap().toast = None;
 
     let effects = dispatch(Action::SetYoloMode(true), &mut app);
@@ -1012,7 +1073,10 @@ fn set_yolo_mode_redispatch_same_value_still_emits_effect_and_toast() {
         1,
         "duplicate dispatch must still emit PersistPermissionMode"
     );
-    match &effects[0] {
+    let Some(effect) = effects.first() else {
+        panic!("expected an effect, got {effects:?}");
+    };
+    match effect {
         Effect::PersistPermissionMode {
             canonical,
             persist,
@@ -1036,7 +1100,7 @@ fn set_yolo_mode_redispatch_same_value_still_emits_effect_and_toast() {
     }
     // Pin all state fields explicitly.
     assert!(
-        app.agents[&AgentId(0)].session.is_yolo(),
+        test_agent(&app, AgentId(0)).session.is_yolo(),
         "session.yolo_mode must remain true",
     );
     assert!(app.default_yolo, "app.default_yolo must remain true");
@@ -1049,7 +1113,7 @@ fn set_yolo_mode_redispatch_same_value_still_emits_effect_and_toast() {
     // `Some(_)` here proves the second dispatch re-fired the
     // toast (not just "carried over from the first").
     assert!(
-        app.agents[&AgentId(0)].toast.is_some(),
+        test_agent(&app, AgentId(0)).toast.is_some(),
         "second dispatch must re-fire the toast (proved by clearing between dispatches)",
     );
 }
@@ -1067,7 +1131,7 @@ fn set_yolo_mode_toast_format() {
     let check = crate::glyphs::check_mark();
     let warn = crate::glyphs::legacy_glyph_fallback("\u{26A0}").into_owned();
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    let toast = app.agents[&AgentId(0)]
+    let toast = test_agent(&app, AgentId(0))
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
@@ -1075,7 +1139,7 @@ fn set_yolo_mode_toast_format() {
     assert_eq!(toast, format!("{warn} Always-approve ON"));
 
     let _ = dispatch(Action::SetYoloMode(false), &mut app);
-    let toast = app.agents[&AgentId(0)]
+    let toast = test_agent(&app, AgentId(0))
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
@@ -1095,7 +1159,7 @@ fn set_yolo_mode_on_blocked_by_policy_pin() {
         "blocked enable must not emit any Effect (no persist), got {effects:?}",
     );
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "session.yolo_mode must stay off under the pin"
     );
     assert!(!app.default_yolo, "app.default_yolo must stay off");
@@ -1111,22 +1175,22 @@ fn set_yolo_mode_off_allowed_under_policy_pin() {
     let mut app = test_app_with_agent();
     // ON while unpinned (e.g. state restored from before the pin landed).
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    assert!(app.agents[&AgentId(0)].session.is_yolo());
+    assert!(test_agent(&app, AgentId(0)).session.is_yolo());
     app.yolo_policy_block = Some(POLICY_WARNING);
 
     let effects = dispatch(Action::SetYoloMode(false), &mut app);
 
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "the pin must not block flipping always-approve OFF"
     );
     assert_eq!(effects.len(), 1, "OFF persists normally");
     assert!(matches!(
-        &effects[0],
-        Effect::PersistPermissionMode {
+        effects.first(),
+        Some(Effect::PersistPermissionMode {
             canonical: "ask",
             ..
-        }
+        })
     ));
 }
 
@@ -1140,10 +1204,10 @@ fn cycle_mode_plan_to_auto_includes_persist_auto() {
     let effects = dispatch(Action::CycleMode, &mut app);
 
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "auto mode must not enable yolo"
     );
-    assert_eq!(app.agents[&AgentId(0)].plan_mode_pending, Some(false));
+    assert_eq!(test_agent(&app, AgentId(0)).plan_mode_pending, Some(false));
     assert_eq!(app.current_ui.permission_mode.as_deref(), Some("auto"));
     assert!(
         effects.iter().any(|e| matches!(
@@ -1214,7 +1278,7 @@ fn cycle_mode_auto_to_always_approve_blocked_by_policy_pin() {
     let effects = dispatch(Action::CycleMode, &mut app);
 
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "the pin must keep yolo off through the cycle"
     );
     assert_eq!(app.current_ui.permission_mode.as_deref(), Some("ask"));
@@ -1241,7 +1305,7 @@ fn cycle_mode_plan_to_always_approve_blocked_by_policy_pin() {
 
     let effects = dispatch(Action::CycleMode, &mut app);
 
-    assert!(!app.agents[&AgentId(0)].session.is_yolo());
+    assert!(!test_agent(&app, AgentId(0)).session.is_yolo());
     assert_eq!(app.current_ui.permission_mode.as_deref(), Some("auto"));
     assert!(effects.iter().any(|e| matches!(
         e,
@@ -1264,10 +1328,10 @@ fn cycle_mode_plan_plus_auto_keeps_auto_not_reset() {
     let effects = dispatch(Action::CycleMode, &mut app);
 
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "Plan+Auto cycle must not enable yolo"
     );
-    assert_eq!(app.agents[&AgentId(0)].plan_mode_pending, Some(false));
+    assert_eq!(test_agent(&app, AgentId(0)).plan_mode_pending, Some(false));
     assert_eq!(
         app.current_ui.permission_mode.as_deref(),
         Some("auto"),
@@ -1314,7 +1378,7 @@ fn cycle_mode_plan_plus_always_approve_exits_plan_keeps_yolo() {
 
     let effects = dispatch(Action::CycleMode, &mut app);
 
-    let agent = &app.agents[&AgentId(0)];
+    let agent = test_agent(&app, AgentId(0));
     assert_eq!(agent.plan_mode_pending, Some(false));
     assert!(agent.session.is_yolo(), "Plan+Always-Approve must keep yolo");
     assert!(app.default_yolo);
@@ -1345,7 +1409,7 @@ fn cycle_mode_plan_plus_always_approve_under_pin_still_resets() {
 
     let effects = dispatch(Action::CycleMode, &mut app);
 
-    let agent = &app.agents[&AgentId(0)];
+    let agent = test_agent(&app, AgentId(0));
     assert_eq!(agent.plan_mode_pending, Some(false));
     assert!(!agent.session.is_yolo(), "the pin must clear the stale yolo");
     assert_eq!(app.current_ui.permission_mode.as_deref(), Some("ask"));
@@ -1382,7 +1446,7 @@ fn cycle_mode_pre_session_plan_plus_yolo_unstages_plan_keeps_yolo() {
 
     let effects = dispatch(Action::CycleMode, &mut app);
 
-    let agent = &app.agents[&AgentId(0)];
+    let agent = test_agent(&app, AgentId(0));
     assert_eq!(agent.plan_mode_pending, Some(false));
     assert_eq!(agent.deferred_session_mode, None);
     assert_eq!(
@@ -1422,8 +1486,11 @@ fn permission_setters_never_touch_plan_state() {
 
         let effects = dispatch(action, &mut app);
 
-        let agent = &app.agents[&AgentId(0)];
-        assert!(agent.plan_mode_active, "{label}: plan_mode_active must survive");
+        let agent = test_agent(&app, AgentId(0));
+        assert!(
+            agent.plan_mode_active,
+            "{label}: plan_mode_active must survive"
+        );
         assert_eq!(
             agent.plan_mode_pending,
             Some(true),
@@ -1458,7 +1525,7 @@ fn cycle_mode_pre_session_always_approve_to_normal_persists_ask() {
 
     let effects = dispatch(Action::CycleMode, &mut app);
 
-    let agent = &app.agents[&AgentId(0)];
+    let agent = test_agent(&app, AgentId(0));
     assert!(
         !agent.session.is_yolo(),
         "Always-Approve → Normal must clear the staged yolo"
@@ -1492,7 +1559,7 @@ fn cycle_mode_pre_session_normal_to_plan_does_not_persist_permission_mode() {
 
     let effects = dispatch(Action::CycleMode, &mut app);
 
-    assert_eq!(app.agents[&AgentId(0)].plan_mode_pending, Some(true));
+    assert_eq!(test_agent(&app, AgentId(0)).plan_mode_pending, Some(true));
     assert!(
         !effects
             .iter()
@@ -1619,7 +1686,7 @@ fn set_permission_mode_default_overrides_canonical_to_default() {
     use crate::app::actions::PermissionModeKind;
     let mut app = test_app_with_agent();
     // Starts at default (yolo=false, permission_mode=None).
-    assert!(!app.agents[&AgentId(0)].session.is_yolo());
+    assert!(!test_agent(&app, AgentId(0)).session.is_yolo());
 
     let effects = dispatch(
         Action::SetPermissionMode(PermissionModeKind::Default),
@@ -1627,9 +1694,8 @@ fn set_permission_mode_default_overrides_canonical_to_default() {
     );
 
     // Yolo stays false (Default projects onto bool=false).
-    assert!(!app.agents[&AgentId(0)].session.is_yolo());
-    // Headline contract: the canonical override survives
-    // `set_yolo_mode_inner`'s bool-projection write to "ask".
+    assert!(!test_agent(&app, AgentId(0)).session.is_yolo());
+    // Headline contract: the canonical override survives `set_yolo_mode_inner`'s bool-projection write to "ask"
     assert_eq!(
         app.current_ui.permission_mode.as_deref(),
         Some("default"),
@@ -1641,7 +1707,10 @@ fn set_permission_mode_default_overrides_canonical_to_default() {
     // pre-dispatch canonical "ask" (the prior `permission_mode`
     // was None, falling through to "ask").
     assert_eq!(effects.len(), 1);
-    match &effects[0] {
+    let Some(effect) = effects.first() else {
+        panic!("expected an effect, got {effects:?}");
+    };
+    match effect {
         Effect::PersistPermissionMode {
             canonical,
             persist,
@@ -1658,10 +1727,9 @@ fn set_permission_mode_default_overrides_canonical_to_default() {
         other => panic!("expected PersistPermissionMode, got {other:?}"),
     }
 
-    // Toast is the dedicated Default string, NOT
-    // `yolo_toast(false)` (`"✓ Always-approve: off"` would be
-    // wrong-brand for a Permission-mode picker commit).
-    let toast = app.agents[&AgentId(0)]
+    // Toast is the dedicated Default string, NOT `yolo_toast(false)`
+    // `"✓ Always-approve: off"` would be the wrong wording for a Permission-mode picker commit
+    let toast = test_agent(&app, AgentId(0))
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
@@ -1697,7 +1765,7 @@ fn set_permission_mode_always_approve_from_default_captures_prev_canonical() {
         &mut app,
     );
 
-    assert!(app.agents[&AgentId(0)].session.is_yolo());
+    assert!(test_agent(&app, AgentId(0)).session.is_yolo());
     assert_eq!(
         app.current_ui.permission_mode.as_deref(),
         Some("always-approve"),
@@ -1707,7 +1775,10 @@ fn set_permission_mode_always_approve_from_default_captures_prev_canonical() {
     // here must roll back to "default", NOT "ask" (which a bool
     // projection of the prior yolo=false would produce).
     assert_eq!(effects.len(), 1);
-    match &effects[0] {
+    let Some(effect) = effects.first() else {
+        panic!("expected an effect, got {effects:?}");
+    };
+    match effect {
         Effect::PersistPermissionMode {
             canonical, persist, ..
         } => {
@@ -1722,10 +1793,9 @@ fn set_permission_mode_always_approve_from_default_captures_prev_canonical() {
         other => panic!("expected PersistPermissionMode, got {other:?}"),
     }
 
-    // Toast is the destructive ⚠ variant — AlwaysApprove still
-    // reuses yolo_toast(true) because the user IS enabling YOLO,
-    // and the weight of the destructive warning is correct.
-    let toast = app.agents[&AgentId(0)]
+    // Toast is the destructive ⚠ variant
+    // AlwaysApprove still reuses yolo_toast(true) because the user IS enabling YOLO, and the weight of the destructive warning is correct
+    let toast = test_agent(&app, AgentId(0))
         .toast
         .as_ref()
         .map(|(s, _)| s.clone())
@@ -1764,7 +1834,10 @@ fn set_yolo_mode_with_live_yolo_and_default_ui_mirror_rolls_back_to_default() {
     // LIVE yolo wins in `current_value_for`, it must also win
     // here.
     let effects = dispatch(Action::SetYoloMode(false), &mut app);
-    match &effects[0] {
+    let Some(effect) = effects.first() else {
+        panic!("expected an effect, got {effects:?}");
+    };
+    match effect {
         Effect::PersistPermissionMode { persist, .. } => {
             assert_eq!(
                 *persist,
@@ -1806,28 +1879,28 @@ fn permission_mode_toast_returns_brand_consistent_strings() {
 #[test]
 fn dispatch_cycle_mode_normal_to_plan_does_not_touch_yolo() {
     let mut app = test_app_with_agent();
-    assert!(!app.agents[&AgentId(0)].session.is_yolo());
+    assert!(!test_agent(&app, AgentId(0)).session.is_yolo());
 
     let effects = dispatch(Action::CycleMode, &mut app);
 
     // Plan mode requested.
     assert_eq!(
-        app.agents[&AgentId(0)].plan_mode_pending,
+        test_agent(&app, AgentId(0)).plan_mode_pending,
         Some(true),
         "Normal → Plan must set plan_mode_pending"
     );
     // YOLO state unchanged.
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "Normal → Plan must NOT flip YOLO state",
     );
     assert!(!app.default_yolo, "app.default_yolo must remain false");
     // Single effect: SetSessionMode (no PersistPermissionMode).
     assert_eq!(effects.len(), 1, "Normal → Plan must emit one effect");
     assert!(
-        matches!(effects[0], Effect::SetSessionMode { .. }),
+        matches!(effects.first(), Some(Effect::SetSessionMode { .. })),
         "Normal → Plan effect must be SetSessionMode, got {:?}",
-        effects[0],
+        effects.first(),
     );
 }
 
@@ -1865,12 +1938,12 @@ fn cycle_into_plan_with_nudge_showing_accepts_and_retires_nudge() {
     let _ = dispatch(Action::CycleMode, &mut app);
 
     assert_eq!(
-        app.agents[&AgentId(0)].plan_mode_pending,
+        test_agent(&app, AgentId(0)).plan_mode_pending,
         Some(true),
         "shift+tab still enters plan mode when the nudge is showing"
     );
     assert_eq!(
-        app.agents[&AgentId(0)].ephemeral_tip.current_key(),
+        test_agent(&app, AgentId(0)).ephemeral_tip.current_key(),
         None,
         "accepting the nudge via shift+tab must retire it (one impression → one accept)"
     );
@@ -1891,12 +1964,12 @@ fn cycle_into_plan_without_nudge_leaves_other_tip_intact() {
     let _ = dispatch(Action::CycleMode, &mut app);
 
     assert_eq!(
-        app.agents[&AgentId(0)].plan_mode_pending,
+        test_agent(&app, AgentId(0)).plan_mode_pending,
         Some(true),
         "shift+tab still enters plan mode"
     );
     assert_eq!(
-        app.agents[&AgentId(0)].ephemeral_tip.current_key(),
+        test_agent(&app, AgentId(0)).ephemeral_tip.current_key(),
         Some(crate::tips::clipboard_focus::CLIPBOARD_IMAGE_TIP_KEY),
         "a shift+tab with no plan nudge up must not retire another tip",
     );
@@ -1918,7 +1991,7 @@ fn dispatch_cycle_mode_plan_to_always_approve_delegates_through_inner() {
 
     // YOLO ON via delegation through set_yolo_mode_inner.
     assert!(
-        app.agents[&AgentId(0)].session.is_yolo(),
+        test_agent(&app, AgentId(0)).session.is_yolo(),
         "Auto → Always-Approve must flip yolo_mode through the inner",
     );
     assert!(app.default_yolo, "default_yolo must flip in lock-step");
@@ -2003,7 +2076,7 @@ fn dispatch_cycle_mode_plan_to_always_approve_drains_queue_via_inner() {
 
     // Queue drained.
     assert!(
-        app.agents[&AgentId(0)].permission_queue.is_empty(),
+        test_agent(&app, AgentId(0)).permission_queue.is_empty(),
         "cycle_mode Auto → Always-Approve must drain the queue via set_yolo_mode_inner",
     );
     // AllowOnce was sent (NOT Cancelled).
@@ -2036,7 +2109,7 @@ fn dispatch_cycle_mode_plan_to_always_approve_drains_queue_via_inner() {
 fn cycle_always_approve_with_nudge_jumps_to_plan() {
     let mut app = test_app_with_agent();
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    assert!(app.agents[&AgentId(0)].session.is_yolo());
+    assert!(test_agent(&app, AgentId(0)).session.is_yolo());
     let _ = app.agents.get_mut(&AgentId(0)).unwrap().ephemeral_tip.show(
         crate::tips::plan_nudge::plan_nudge_tip(),
         &mut std::collections::HashMap::new(),
@@ -2045,12 +2118,12 @@ fn cycle_always_approve_with_nudge_jumps_to_plan() {
     let effects = dispatch(Action::CycleMode, &mut app);
 
     assert_eq!(
-        app.agents[&AgentId(0)].plan_mode_pending,
+        test_agent(&app, AgentId(0)).plan_mode_pending,
         Some(true),
         "nudge + Always-Approve must jump to Plan"
     );
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "jump to Plan must clear yolo"
     );
     assert_eq!(
@@ -2059,7 +2132,7 @@ fn cycle_always_approve_with_nudge_jumps_to_plan() {
         "canonical permission mode must leave always-approve"
     );
     assert_eq!(
-        app.agents[&AgentId(0)].ephemeral_tip.current_key(),
+        test_agent(&app, AgentId(0)).ephemeral_tip.current_key(),
         None,
         "accepting the nudge must retire it"
     );
@@ -2097,16 +2170,16 @@ fn cycle_auto_with_nudge_jumps_to_plan() {
     let effects = dispatch(Action::CycleMode, &mut app);
 
     assert_eq!(
-        app.agents[&AgentId(0)].plan_mode_pending,
+        test_agent(&app, AgentId(0)).plan_mode_pending,
         Some(true),
         "nudge + Auto must jump to Plan"
     );
     assert!(
-        !app.agents[&AgentId(0)].session.is_auto(),
+        !test_agent(&app, AgentId(0)).session.is_auto(),
         "jump to Plan must clear auto"
     );
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "jump to Plan must not enable yolo"
     );
     assert_eq!(
@@ -2115,7 +2188,7 @@ fn cycle_auto_with_nudge_jumps_to_plan() {
         "canonical permission mode must leave auto"
     );
     assert_eq!(
-        app.agents[&AgentId(0)].ephemeral_tip.current_key(),
+        test_agent(&app, AgentId(0)).ephemeral_tip.current_key(),
         None,
         "accepting the nudge must retire it"
     );
@@ -2145,7 +2218,7 @@ fn cycle_auto_with_nudge_jumps_to_plan() {
 fn dispatch_cycle_mode_and_sync_always_approve_with_nudge_takes_ring_to_normal() {
     let mut app = test_app_with_agent();
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    assert!(app.agents[&AgentId(0)].session.is_yolo());
+    assert!(test_agent(&app, AgentId(0)).session.is_yolo());
     let _ = app.agents.get_mut(&AgentId(0)).unwrap().ephemeral_tip.show(
         crate::tips::plan_nudge::plan_nudge_tip(),
         &mut std::collections::HashMap::new(),
@@ -2154,12 +2227,12 @@ fn dispatch_cycle_mode_and_sync_always_approve_with_nudge_takes_ring_to_normal()
     let effects = dispatch_cycle_mode_and_sync(&mut app);
 
     assert_ne!(
-        app.agents[&AgentId(0)].plan_mode_pending,
+        test_agent(&app, AgentId(0)).plan_mode_pending,
         Some(true),
         "shared body must not enter Plan when nudge is showing"
     );
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "Always-Approve → Normal must still clear yolo"
     );
     assert_eq!(
@@ -2168,7 +2241,7 @@ fn dispatch_cycle_mode_and_sync_always_approve_with_nudge_takes_ring_to_normal()
         "ring lands on Normal/ask"
     );
     assert_eq!(
-        app.agents[&AgentId(0)].ephemeral_tip.current_key(),
+        test_agent(&app, AgentId(0)).ephemeral_tip.current_key(),
         Some(crate::tips::plan_nudge::PLAN_NUDGE_KEY),
         "shared/peek body must not retire the nudge"
     );
@@ -2199,7 +2272,7 @@ fn dispatch_cycle_mode_always_approve_to_normal_delegates_off() {
     // Enter Always-Approve state via the typed setter (sets up
     // the lock-step properly).
     let _ = dispatch(Action::SetYoloMode(true), &mut app);
-    assert!(app.agents[&AgentId(0)].session.is_yolo());
+    assert!(test_agent(&app, AgentId(0)).session.is_yolo());
 
     // Clear the toast so we're not confused about which dispatch
     // set it.
@@ -2209,7 +2282,7 @@ fn dispatch_cycle_mode_always_approve_to_normal_delegates_off() {
 
     // YOLO OFF via delegation.
     assert!(
-        !app.agents[&AgentId(0)].session.is_yolo(),
+        !test_agent(&app, AgentId(0)).session.is_yolo(),
         "Always-Approve → Normal must flip yolo_mode off through the inner",
     );
     assert!(!app.default_yolo, "default_yolo must flip in lock-step");
@@ -2221,7 +2294,10 @@ fn dispatch_cycle_mode_always_approve_to_normal_delegates_off() {
 
     // Single effect: PersistPermissionMode{BestEffort}.
     assert_eq!(effects.len(), 1);
-    match &effects[0] {
+    let Some(effect) = effects.first() else {
+        panic!("expected an effect, got {effects:?}");
+    };
+    match effect {
         Effect::PersistPermissionMode {
             persist, canonical, ..
         } => {
@@ -2252,7 +2328,10 @@ fn set_theme_auto_enables_auto_mode_and_persists_auto() {
         assert!(!crate::theme::cache::is_auto_mode());
         let effects = dispatch(Action::SetTheme("auto".into()), &mut app);
         assert_eq!(effects.len(), 1);
-        match &effects[0] {
+        let Some(effect) = effects.first() else {
+            panic!("expected an effect, got {effects:?}");
+        };
+        match effect {
             Effect::PersistSetting { key, value, .. } => {
                 assert_eq!(*key, "theme");
                 assert_eq!(
@@ -2448,7 +2527,7 @@ fn set_plan_mode_idempotency_uses_pending_over_active() {
         "OFF from EFFECTIVE-ON must emit Effect::SetSessionMode (not idempotent)"
     );
     assert!(
-        matches!(&effects[0], Effect::SetSessionMode { mode_id, .. } if &*mode_id.0 == "default"),
+        matches!(effects.first(), Some(Effect::SetSessionMode { mode_id, .. }) if &*mode_id.0 == "default"),
         "OFF transition must emit SetSessionMode(default): {effects:?}"
     );
     let agent = app.agents.get(&AgentId(0)).unwrap();
@@ -2471,7 +2550,7 @@ fn show_export_copy_tip_no_op_when_flag_off() {
     let shown = present_export_copy_tip(agent, &mut app.tip_seen_counts, gate);
     assert!(!shown);
     assert!(app.tip_seen_counts.is_empty(), "no count burned");
-    assert!(!app.agents[&id].ephemeral_tip.is_active());
+    assert!(!test_agent(&app, id).ephemeral_tip.is_active());
 }
 
 #[test]
@@ -2486,6 +2565,141 @@ fn show_export_copy_tip_shows_and_counts_when_flag_on() {
     let agent = app.agents.get_mut(&id).unwrap();
     let shown = present_export_copy_tip(agent, &mut app.tip_seen_counts, gate);
     assert!(shown);
-    assert!(app.agents[&id].ephemeral_tip.is_active());
+    assert!(test_agent(&app, id).ephemeral_tip.is_active());
     assert_eq!(app.tip_seen_counts.get(EXPORT_COPY_TIP_SEEN_KEY), Some(&1));
+}
+
+#[test]
+fn cycle_mode_walks_the_agents_published_modes() {
+    use xai_grok_tools::types::SessionMode;
+    let mut app = test_app_with_agent();
+    app.agents
+        .get_mut(&AgentId(0))
+        .unwrap()
+        .apply_session_modes(Some(acp::SessionModeState::new(
+            "default",
+            vec![
+                acp::SessionMode::new("default", "Agent"),
+                acp::SessionMode::new("ask", "Ask"),
+                acp::SessionMode::new("plan", "Plan"),
+            ],
+        )));
+
+    let mut sent = Vec::new();
+    for _ in 0..3 {
+        let effects = dispatch(Action::CycleMode, &mut app);
+        let [Effect::SetSessionMode { mode_id, .. }] = effects.as_slice() else {
+            panic!("a published-mode cycle is one set_mode and nothing else: {effects:?}");
+        };
+        sent.push(mode_id.0.to_string());
+    }
+
+    assert_eq!(vec!["ask", "plan", "default"], sent);
+    let agent = test_agent(&app, AgentId(0));
+    assert_eq!(
+        SessionMode::Default,
+        agent.effective_session_mode(),
+        "three presses come back around before any confirmation arrives"
+    );
+    assert_eq!(Some(false), agent.plan_mode_pending);
+    assert!(
+        !agent.session.is_yolo() && !agent.session.is_auto(),
+        "the permission axis stays put"
+    );
+    assert_eq!(
+        Some("Switched to mode: Agent".to_owned()),
+        agent
+            .mode_switch_banner
+            .as_ref()
+            .map(|(msg, _)| msg.clone()),
+        "the banner uses the name the agent gave the mode"
+    );
+}
+
+#[test]
+fn published_mode_confirmation_clears_the_pick_and_labels_the_row() {
+    use xai_grok_tools::types::SessionMode;
+    let mut app = test_app_with_agent();
+    let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+    agent.apply_session_modes(Some(acp::SessionModeState::new(
+        "default",
+        vec![
+            acp::SessionMode::new("default", "Agent"),
+            acp::SessionMode::new("ask", "Ask"),
+        ],
+    )));
+    assert_eq!(None, agent.published_mode_label());
+
+    dispatch(Action::CycleMode, &mut app);
+    let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+    assert_eq!(Some(SessionMode::Ask), agent.session_mode_pending);
+    assert_eq!(Some("ask"), agent.published_mode_label());
+
+    crate::app::acp_handler::detect_plan_mode_change_replayed(
+        &acp::SessionUpdate::CurrentModeUpdate(acp::CurrentModeUpdate::new("ask")),
+        agent,
+        false,
+    );
+
+    assert_eq!(SessionMode::Ask, agent.session_mode);
+    assert_eq!(None, agent.session_mode_pending);
+    assert!(!agent.plan_mode_active);
+    assert_eq!(Some("ask"), agent.published_mode_label());
+}
+
+/// Pre-session Always-Approve must not survive a published mode list with no permission arm.
+#[test]
+fn published_modes_drop_the_permission_the_pre_session_ring_staged() {
+    let mut app = test_app_with_agent();
+    app.auto_mode_gate = false;
+    app.agents.get_mut(&AgentId(0)).unwrap().session.session_id = None;
+
+    // Normal → Plan → Always-Approve (auto gated off), all before a session exists
+    dispatch(Action::CycleMode, &mut app);
+    dispatch(Action::CycleMode, &mut app);
+    let agent = test_agent(&app, AgentId(0));
+    assert!(
+        agent.session.is_yolo(),
+        "the Grok ring staged Always-Approve"
+    );
+    assert_eq!(Some("always-approve"), agent.deferred_permission_mode);
+    assert_eq!(
+        Some("always-approve"),
+        app.current_ui.permission_mode.as_deref()
+    );
+
+    let effects = dispatch(
+        Action::TaskComplete(TaskResult::SessionCreated {
+            agent_id: AgentId(0),
+            session_id: "sess-1".into(),
+            models: None,
+            modes: Some(acp::SessionModeState::new(
+                "default",
+                vec![
+                    acp::SessionMode::new("default", "Agent"),
+                    acp::SessionMode::new("ask", "Ask"),
+                ],
+            )),
+        }),
+        &mut app,
+    );
+
+    let agent = test_agent(&app, AgentId(0));
+    assert!(!agent.session.is_yolo() && !agent.session.is_auto());
+    assert_eq!(None, agent.deferred_permission_mode);
+    assert_eq!(Some("ask"), app.current_ui.permission_mode.as_deref());
+    assert!(!app.default_yolo);
+    assert!(
+        !effects
+            .iter()
+            .any(|e| matches!(e, Effect::PersistPermissionMode { .. })),
+        "a permission the published ring cannot show must not be persisted: {effects:?}"
+    );
+
+    let effects = dispatch(Action::CycleMode, &mut app);
+    let [Effect::SetSessionMode { mode_id, .. }] = effects.as_slice() else {
+        panic!("Shift+Tab now walks the published list: {effects:?}");
+    };
+    assert_eq!("ask", &*mode_id.0);
+    assert!(!test_agent(&app, AgentId(0)).session.is_yolo());
 }

@@ -7,15 +7,19 @@ use crate::appearance::AppearanceConfig;
 use crate::inline_media_ffmpeg::inline_media_reserved_rows;
 use crate::prompt_images::{InlineMediaInfo, ScrollbackImageRef, ScrollbackVideoRef};
 use xai_grok_pager_diff::DiffHunk;
+#[path = "blocks/request_metrics.rs"]
+mod request_metrics;
 
 use super::blocks::mermaid_content::DiagramAffordance;
 use super::blocks::{
     AgentMessageBlock, BgTaskBlock, BtwBlock, ContextInfoBlock, EditToolCallBlock,
-    ExecuteToolCallBlock, LineRange, ListDirToolCallBlock, OtherToolCallBlock, ReadToolCallBlock,
-    RequestMetricsBlock, SearchFileMatch, SearchToolCallBlock, SessionEvent, SessionEventBlock,
+    ExecuteToolCallBlock, LineRange, ListDirToolCallBlock, MemoryCaptureBlock, OtherToolCallBlock,
+    ReadToolCallBlock, SearchFileMatch, SearchToolCallBlock, SessionEvent, SessionEventBlock,
+
     SubagentBlock, SubagentBlockKind, SystemMessageBlock, ThinkingBlock, ToolCallBlock,
     UserPromptBlock, WorkflowBlock,
 };
+pub use self::request_metrics::RequestMetricsBlock;
 use super::types::{
     AccentStyle, BlockBackground, BlockContext, BlockOutput, DisplayMode, RenderedBlockOutput,
     Selectable, SelectionBoundaries, derive_selection_text,
@@ -321,6 +325,8 @@ pub enum RenderBlock {
     Btw(BtwBlock),
     /// `/context` snapshot with categorical bar and breakdown.
     ContextInfo(ContextInfoBlock),
+    /// Debug-only generated memory details.
+    MemoryCapture(MemoryCaptureBlock),
 }
 
 /// Delegate a method call to the inner block variant.
@@ -340,6 +346,7 @@ macro_rules! delegate_block {
             RenderBlock::Workflow(b) => b.$method($($arg),*),
             RenderBlock::Btw(b) => b.$method($($arg),*),
             RenderBlock::ContextInfo(b) => b.$method($($arg),*),
+            RenderBlock::MemoryCapture(b) => b.$method($($arg),*),
         }
     };
 }
@@ -544,6 +551,14 @@ impl RenderBlock {
 
     pub fn agent_message(text: impl Into<String>) -> Self {
         RenderBlock::AgentMessage(AgentMessageBlock::new(text))
+    }
+
+    pub fn memory_capture(
+        from_turn: u32,
+        through_turn: u32,
+        entries: Vec<xai_grok_shell::extensions::notification::MemoryCaptureDebugEntry>,
+    ) -> Self {
+        RenderBlock::MemoryCapture(MemoryCaptureBlock::new(from_turn, through_turn, entries))
     }
 
     /// Create an empty streaming agent message block.
@@ -896,8 +911,10 @@ impl RenderBlock {
             }
             RenderBlock::System(_)
             | RenderBlock::SessionEvent(_)
-            | RenderBlock::RequestMetrics(_)
-            | RenderBlock::ContextInfo(_) => None,
+            | RenderBlock::ContextInfo(_)
+            | RenderBlock::MemoryCapture(_)
+            | RenderBlock::RequestMetrics(_) => None,
+
             RenderBlock::Btw(_) => Some(theme.accent_plan),
             RenderBlock::Stub(block) => Some(block.accent_color),
         }
@@ -927,6 +944,18 @@ impl RenderBlock {
         self.has_normal_fullscreen_viewer()
             || !self.image_references().is_empty()
             || !self.video_references().is_empty()
+    }
+
+    /// The child session this row can open in the takeover: a Subagent row, or a sent-message row whose target
+    /// resolved through a spawn. The caller still has to own that child view.
+    pub(crate) fn child_session_id(&self) -> Option<&str> {
+        if let RenderBlock::Subagent(block) = self {
+            Some(&block.child_session_id)
+        } else if let RenderBlock::ToolCall(ToolCallBlock::SentMessage(block)) = self {
+            block.child_session_id()
+        } else {
+            None
+        }
     }
 
     pub fn supports_copy(&self) -> bool {
@@ -1027,6 +1056,7 @@ impl RenderBlock {
                 Some(b.content().rendered_plain_text()),
             ]),
             RenderBlock::ContextInfo(b) => join_searchable([Some(b.model.clone())]),
+            RenderBlock::MemoryCapture(b) => join_searchable([Some(b.searchable_text())]),
             RenderBlock::ToolCall(tc) => tc.searchable_text(),
         }
     }
@@ -1160,7 +1190,9 @@ mod tests {
         let c = ctx(DisplayMode::Expanded, false);
         let placements = block.inline_media_placements(&c);
         assert_eq!(placements.len(), 1);
-        let p = &placements[0];
+        let Some(p) = placements.first() else {
+            panic!("expected one placement: {placements:?}");
+        };
         assert_eq!(
             p.row_offset, 3,
             "image trails the 2 text lines + 1 padding row"
@@ -1335,7 +1367,9 @@ mod tests {
             ],
         };
         prepend_bullet(&mut output, &ctx(DisplayMode::Expanded, false), None);
-        let line = &output.lines[0];
+        let Some(line) = output.lines.first() else {
+            panic!("expected a prepended line: {output:?}");
+        };
 
         assert_eq!(line.selection_range, Some(3));
         assert_eq!(line.selection_text.as_deref(), Some("body"));
