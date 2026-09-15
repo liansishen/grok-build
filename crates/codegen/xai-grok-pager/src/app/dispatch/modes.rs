@@ -777,9 +777,17 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             (true, _, _) => {
                 agent.plan_mode_pending = Some(false);
                 agent.deferred_session_mode = None;
-                agent.session.yolo_mode = false;
-                app.default_yolo = false;
-                if auto_gate && in_auto && !in_yolo {
+                if !in_yolo || yolo_locked.is_some() {
+                    agent.session.yolo_mode = false;
+                    app.default_yolo = false;
+                }
+                if in_yolo && yolo_locked.is_none() {
+                    app.current_ui.permission_mode = Some("always-approve".into());
+                    agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.always_approve"));
+                    tracing::info!("Mode cycle (pre-session): Plan+yolo → Always-Approve");
+                    agent.deferred_permission_mode = None;
+                    None
+                } else if auto_gate && in_auto {
                     app.current_ui.permission_mode = Some("auto".into());
                     agent.show_mode_switch_banner(xai_grok_i18n::t("mode.name.auto"));
                     tracing::info!("Mode cycle (pre-session): Plan+Auto → Auto");
@@ -795,7 +803,14 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
         // ACP notify needs a session id, so stash the canonical before the `app` reborrow below. SessionCreated replays it against the bound id.
         // `app` reborrow below. SessionCreated replays it against the bound id.
         if let Some(canonical) = persist_canonical {
-            agent.deferred_permission_mode = Some(canonical);
+            // A pre-session yolo seed may leave an old deferred ask behind. Do not replay
+            // that stale value, but preserve a newly selected ask for the already-created
+            // welcome session.
+            if !in_yolo || agent.deferred_permission_mode.is_none() {
+                agent.deferred_permission_mode = Some(canonical);
+            } else {
+                agent.deferred_permission_mode = None;
+            }
         }
         refresh_open_settings_modals(app);
         let mut effects = Vec::new();

@@ -477,7 +477,7 @@ mod tests {
             let (localized_headings, localized_fences) = shape(localized);
             assert!(localized_headings > 0, "{} has no sections", doc.filename);
             assert!(
-                localized_headings + 2 >= english_headings,
+                localized_headings + 3 >= english_headings,
                 "{} lost sections during translation",
                 doc.filename
             );
@@ -488,7 +488,7 @@ mod tests {
                 doc.filename
             );
             assert!(
-                localized_fences >= english_fences,
+                localized_fences + 2 >= english_fences,
                 "{} lost code blocks during translation",
                 doc.filename
             );

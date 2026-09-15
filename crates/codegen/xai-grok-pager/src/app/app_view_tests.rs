@@ -1490,11 +1490,13 @@ fn dashboard_tick_requests_a_redraw_exactly_when_the_frame_changes() {
     assert_eq!(cycle / SPINNER_DIVISOR, frames, "spinner frames per cycle");
 }
 #[test]
-#[serial_test::serial(MEMORY_RELEASE_DEFER)]
+#[serial_test::serial(GROK_THEME)]
 fn collapsed_needs_input_row_paints_no_blink() {
     use crate::views::dashboard::animation::{NEEDS_INPUT_BLINK_DIVISOR, SPINNER_DIVISOR};
     use crate::views::dashboard::{RowState, SectionKey};
     let _theme = crate::theme::cache::pin_theme();
+    crate::theme::color_support::set_level_for_test(crate::theme::color_support::ColorLevel::TrueColor);
+    crate::theme::Theme::apply_kind(crate::theme::ThemeKind::TokyoNight);
     let (mut terminal, _frame_rx) = test_terminal();
     let mut app = test_app_with_agent();
     let id = super::super::agent::AgentId(0);
@@ -1625,10 +1627,14 @@ fn tick_demand_dashboard_parks_when_filter_hides_the_working_row() {
     );
 }
 #[test]
-#[serial_test::serial(MEMORY_RELEASE_DEFER)]
+#[serial_test::serial(GROK_THEME)]
 fn tick_demand_dashboard_fast_for_animated_roster_row() {
     use crate::app::agent_test_fixtures::roster_entry;
     use crate::app::roster::RosterActivity;
+    crate::theme::color_support::set_level_for_test(
+        crate::theme::color_support::ColorLevel::TrueColor,
+    );
+    crate::theme::Theme::apply_kind(crate::theme::ThemeKind::TokyoNight);
     let (mut terminal, _frame_rx) = test_terminal();
     let mut app = test_app();
     app.active_view = ActiveView::AgentDashboard;

@@ -279,6 +279,9 @@ Grok 按以下顺序（从高到低）为每个请求解析凭据：
 会话期间，活动方法负责处理所有会话内刷新。
 
 ---
+## Grove Git 凭据（不是本页的 `grok login`）
+
+本页的所有内容都用于向模型 API 验证 Grok。Grove 挂载背后的 Git 远程仓库（即 [`grok clone`](27-grok-clone.md) 提取的对象）属于由 Grove 守护进程管理的独立领域。
 
 <a id="related-settings"></a>
 ## 相关设置

@@ -64,6 +64,11 @@ pub(super) fn handle_permission_request(
         return false; // no redraw needed
     }
 
+    // A live permission card takes precedence over feedback composition.
+    agent.displace_feedback_modal(
+        crate::views::feedback_modal::FeedbackModalDisplacement::Permission,
+    );
+
     // 3. Fire notification so the user notices the pending approval.
     //    Rate-limit: only fire the bell/popup on the empty→non-empty
     //    transition to avoid stacking notifications during concurrent

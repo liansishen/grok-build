@@ -274,25 +274,35 @@ pub(super) fn handle_session_notification_with_origin(
     };
     let parent_id = matched.agent_id();
     let is_active = is_matched_agent_active(app, parent_id);
+    let session_update_prompt_id = session_notif
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.get("promptId"))
+        .and_then(serde_json::Value::as_str);
     let agent = app
         .agents
         .get_mut(&parent_id)
         .expect("find_session_match returned an existing AgentId");
-    let prior_prompt_ack = agent.prompt_ack.clone();
     if matches!(matched, SessionMatch::Child(_)) {
         let child_sid: &str = session_notif.session_id.0.as_ref();
+        if let Some(prompt_id) = session_update_prompt_id
+            && let Some(child) = agent.subagent_views.get_mut(child_sid)
+            && child
+                .prompt_ack
+                .as_ref()
+                .is_some_and(|watch| watch.prompt_id() == prompt_id)
+        {
+            child.note_prompt_ack(
+                crate::app::prompt_ack::AckSignal::SessionUpdate,
+                std::time::Instant::now(),
+            );
+        }
         let changed = handle_child_session_notification(
             session_notif.update,
             child_sid,
             agent,
             is_api_key_auth,
         );
-        if agent.prompt_ack.is_none()
-            && agent.session.state.is_turn_running()
-            && let Some(watch) = prior_prompt_ack
-        {
-            agent.prompt_ack = Some(watch);
-        }
         return changed && is_active;
     }
     let meta = NotificationMeta::from_json(session_notif.meta.as_ref().and_then(|v| v.as_object()));
@@ -1520,13 +1530,6 @@ pub(super) fn handle_session_notification_with_origin(
         }
     };
     let mut changed = changed;
-    if terminal_outcome.is_none()
-        && agent.prompt_ack.is_none()
-        && agent.session.state.is_turn_running()
-        && let Some(watch) = prior_prompt_ack
-    {
-        agent.prompt_ack = Some(watch);
-    }
     if status_snapshot_applied && is_active {
         app.refresh_status_line_now();
         changed |= app.status_line.take_changed();

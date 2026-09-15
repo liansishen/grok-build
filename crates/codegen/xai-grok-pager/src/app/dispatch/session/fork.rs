@@ -483,6 +483,11 @@ pub(in crate::app::dispatch) fn handle_worktree_forked(
             }
             _ => {}
         }
+        if let Some(summary) = strategy_summary {
+            agent
+                .scrollback
+                .push_block(RenderBlock::system(summary));
+        }
         let effective_chat = conversation_entry || app.chat_mode;
         agent.chat_kind = effective_chat;
         agent.conversation_entry = rename_entry;

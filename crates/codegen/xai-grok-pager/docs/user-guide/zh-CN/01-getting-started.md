@@ -13,6 +13,29 @@ Agent Client Protocol（ACP）集成到编辑器中。
 ---
 
 ## 安装
+安装最新稳定版（macOS、Linux，或通过 Git Bash 使用 Windows）：
+
+```bash
+curl -fsSL https://x.ai/cli/install.sh | bash
+```
+
+安装指定版本：
+
+```bash
+curl -fsSL https://x.ai/cli/install.sh | bash -s 0.1.42
+```
+
+在 **Windows（PowerShell）** 上使用原生 PowerShell 安装器：
+
+```powershell
+irm https://x.ai/cli/install.ps1 | iex
+```
+
+安装指定版本：
+
+```powershell
+$env:GROK_VERSION="0.1.42"; irm https://x.ai/cli/install.ps1 | iex
+```
 
 社区 Windows 包由本仓库 Releases 和 `CI` 工作流生成。
 Release ZIP 下载后只需解压一次；所有 `release-v*` 包（包括
@@ -50,15 +73,14 @@ grok --version
 随后重新运行 `grok`。默认通道为稳定版；`grok update --alpha` 可显式选择预发布版，
 `grok update --stable` 可切回稳定版。
 
-在 Grove 配置中启用 `[clone] enabled = true` 后，可以通过 Grove 提取仓库
-（macOS 使用 NFS，Linux 使用 FUSE）：
+要通过 Grove 提取仓库（macOS 使用 NFS，Linux 使用 FUSE），可在 Grove 配置中启用 `grok clone` 的 `[clone] enabled = true`，设置 `GROK_CLONE=1`，或在 `~/.grok/config.toml` 中使用同时启用两者的便捷设置 `GROK_GROVE=1` / `[cli] grove = true`：
 
 ```bash
 grok clone <url> [dir]
 ```
 
 默认会对所选分支进行深度为 1 的检出。需要完整历史时请传入
-`--full-history`。详情见 [grok clone](27-grok-clone.md)。
+`--full-history`。克隆开关与会话 / `-w` Grove 工作树彼此独立（上述便捷设置会同时启用两者；具体开关仍优先）。详情见 [grok clone](27-grok-clone.md) 和 [配置参考](26-config-reference.md)。
 
 ---
 
@@ -287,73 +309,3 @@ grok -p "Review changes for bugs" --output-format json --yolo | jq -r '.text'
 | [键盘快捷键](03-keyboard-shortcuts.md) | 所有按键绑定的完整参考 |
 | [斜杠命令](04-slash-commands.md) | 全部 `/` 命令 |
 | [配置](05-configuration.md) | config.toml、pager.toml 和环境变量 |
-
-### 当前版本命令与配置补充
-
-以下示例保留当前版本的可执行命令和配置格式：
-
-```bash
-# Launch the interactive TUI and submit an initial prompt as the first turn
-grok "fix the failing auth test and run it"
-
-# Initial prompt in a new git worktree. Use --worktree=<name> (with `=`) so the
-# prompt isn't swallowed as the worktree name — `grok -w "refactor module X"`
-# would treat "refactor module X" as the worktree label, not the prompt.
-grok --worktree=feat "refactor module X"
-
-# Base the worktree on a specific branch (e.g. main) instead of the current HEAD:
-grok -w --ref main "implement feature from main"
-
-
-# Start in a specific project directory
-grok --cwd ~/projects/my-app
-
-# Add project-specific rules
-grok --rules "Always use TypeScript. Prefer functional components."
-
-# Auto-approve all tool executions
-grok --yolo
-
-# Use a specific model
-grok -m grok-4.6
-
-# Resume a previous session
-grok --resume <session-id>
-
-# Continue the most recent session
-grok -c
-
-# Experimental scrollback-native render mode. Sticky: plain `grok` reopens in
-# the mode last chosen via --minimal/--fullscreen (or /minimal//fullscreen).
-grok --minimal
-
-# Back to the standard fullscreen TUI (and make it sticky again)
-grok --fullscreen
-
-# Headless mode (for scripts)
-grok -p "Explain this codebase"
-```
-
-```
-/model grok-4.6                 # Switch model
-/compact                          # Compress conversation history
-/always-approve                   # Toggle always-approve mode
-/new                              # Start a new session
-```
-
-```
-@src/main.rs              # Attach a file
-@src/main.rs:10-50        # Attach lines 10-50
-@src/                     # Browse a directory
-```
-
-```
-~/.grok/AGENTS.md           # Global rules (apply to all projects)
-<repo-root>/AGENTS.md       # Repository-level rules
-<cwd>/AGENTS.md             # Directory-level rules (highest priority)
-```
-
-```
-@!.github                 # Search hidden files
-@!.env                    # Attach a .env file
-```

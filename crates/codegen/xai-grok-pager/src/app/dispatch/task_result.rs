@@ -682,6 +682,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             balance,
             subscription_tier,
             autotopup,
+            nonce,
             ..
         } => {
             // Reject hidden, old-account, and out-of-order results before they
@@ -709,6 +710,13 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             app.sync_billing_cache_to_agents();
             if let Some(agent_id) = app.active_view.agent_id() {
                 app.refresh_status_line_for(agent_id);
+            }
+            if let Some(state) = app.dashboard.as_mut().and_then(|d| d.usage_modal.as_mut())
+                && state.fetch_nonce == nonce
+            {
+                state.billing_loading = false;
+                state.billing_error = None;
+                state.ctx.subscription_tier = app.subscription_tier.clone();
             }
             vec![]
         }
@@ -1659,7 +1667,12 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     .retain(|entry| entry.session_id != session_id);
                 app.leader_roster
                     .retain(|entry| entry.session_id != session_id);
-                app.show_toast(xai_grok_i18n::t("toast.session_deleted"));
+                let notice = if membership_removal_failed {
+                    xai_grok_i18n::t("toast.session_deleted_membership_failed")
+                } else {
+                    xai_grok_i18n::t("toast.session_deleted")
+                };
+                app.show_toast(notice);
                 return vec![];
             }
             let sid = acp::SessionId::new(session_id.clone());

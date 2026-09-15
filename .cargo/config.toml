@@ -74,6 +74,11 @@ rustflags = ["-C", "force-unwind-tables=yes", "-C", "target-feature=+crt-static"
 # env vars below for those platforms.
 # See: https://github.com/tikv/jemallocator/issues/122
 [env]
+# The session/turn futures are as deeply nested as production, which runs them on
+# SESSION_THREAD_STACK_SIZE (8 MiB, see session/acp_session_impl/spawn.rs). Test threads get
+# 2 MiB by default, so driving a full turn in a test overflows the stack; give every test
+# binary the production-sized stack. An externally set RUST_MIN_STACK still wins.
+RUST_MIN_STACK = { value = "8388608", force = false }
 SYSTEM_DEPS_DAV1D_BUILD_INTERNAL = "auto"
 # rusty_ffmpeg (rsmpeg): link the hermetic static FFmpeg staged by
 # third_party/ffmpeg/fetch_local.py and use the pregenerated bindings

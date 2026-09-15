@@ -181,6 +181,17 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         .agents
                         .get_mut(&id)
                         .expect("find_session_match returned an existing AgentId");
+                    if let Some(prompt_id) = meta.prompt_id.as_deref()
+                        && agent
+                            .prompt_ack
+                            .as_ref()
+                            .is_some_and(|watch| watch.prompt_id() == prompt_id)
+                    {
+                        agent.note_prompt_ack(
+                            crate::app::prompt_ack::AckSignal::SessionUpdate,
+                            std::time::Instant::now(),
+                        );
+                    }
 
                     // Live-only dedup: a per-session `eventId` highwater drops
                     // re-delivered live duplicates (leader fan-out, reconnect
@@ -620,6 +631,17 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         let child_view = parent
                             .child_view_for_live_update_mut(child_key)
                             .expect("find_session_match returned an existing subagent_views key");
+                        if let Some(prompt_id) = meta.prompt_id.as_deref()
+                            && child_view
+                                .prompt_ack
+                                .as_ref()
+                                .is_some_and(|watch| watch.prompt_id() == prompt_id)
+                        {
+                            child_view.note_prompt_ack(
+                                crate::app::prompt_ack::AckSignal::SessionUpdate,
+                                std::time::Instant::now(),
+                            );
+                        }
                         if let Some(tokens) = meta.total_tokens {
                             confirm_context_used(child_view, tokens);
                         }

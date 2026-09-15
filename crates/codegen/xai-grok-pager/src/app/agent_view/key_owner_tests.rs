@@ -203,7 +203,7 @@ fn permission_hints_follow_focus() {
 
     let focused = hint_labels(&agent);
     assert!(
-        focused.contains(&"next option".to_string()),
+        focused.contains(&xai_grok_i18n::t("hint.next_answer").to_string()),
         "the bar names the option walk, got {focused:?}"
     );
     assert!(
@@ -214,7 +214,7 @@ fn permission_hints_follow_focus() {
     agent.active_pane = AgentPane::Scrollback;
     let parked = hint_labels(&agent);
     assert!(
-        !parked.contains(&"next option".to_string())
+        !parked.contains(&xai_grok_i18n::t("hint.next_answer").to_string())
             && !parked.contains(&"always-approve".to_string()),
         "parked in the scrollback the bar must drop the card's keys, got {parked:?}"
     );
@@ -289,12 +289,12 @@ fn cancel_turn_tab_walks_the_choices_and_wraps() {
 fn cancel_turn_panel_parks_and_returns_like_the_others() {
     let mut agent = make_agent();
     open_cancel_turn(&mut agent);
-    assert!(hint_labels(&agent).contains(&"next choice".to_string()));
+    assert!(hint_labels(&agent).contains(&xai_grok_i18n::t("hint.confirm").to_string()));
 
     agent.active_pane = AgentPane::Scrollback;
     let parked = hint_labels(&agent);
     assert!(
-        !parked.contains(&"next choice".to_string()),
+        !parked.contains(&xai_grok_i18n::t("hint.confirm").to_string()),
         "parked, the panel's keys leave the bar, got {parked:?}"
     );
     assert!(
@@ -351,7 +351,8 @@ fn the_bar_follows_the_router_when_two_cards_are_open() {
 
     let labels = hint_labels(&agent);
     assert!(
-        labels.contains(&"next choice".to_string()) && !labels.contains(&"next answer".to_string()),
+        labels.contains(&xai_grok_i18n::t("hint.confirm").to_string())
+            && !labels.contains(&xai_grok_i18n::t("hint.next_answer").to_string()),
         "the cancel-turn panel takes the keys, so it takes the bar too, got {labels:?}"
     );
 
@@ -359,7 +360,8 @@ fn the_bar_follows_the_router_when_two_cards_are_open() {
     assert_eq!(agent.focused_card(), Some(BlockingCard::Permission));
     let labels = hint_labels(&agent);
     assert!(
-        labels.contains(&"next option".to_string()) && !labels.contains(&"next choice".to_string()),
+        labels.contains(&xai_grok_i18n::t("hint.next_answer").to_string())
+            && !labels.contains(&xai_grok_i18n::t("hint.confirm").to_string()),
         "and the permission card outranks both, got {labels:?}"
     );
 }
@@ -393,7 +395,8 @@ fn elicitation_shares_the_question_layer_under_cancel_turn() {
     assert_eq!(agent.focused_card(), Some(BlockingCard::CancelTurn));
     let labels = hint_labels(&agent);
     assert!(
-        labels.contains(&"next choice".to_string()) && !labels.contains(&"next answer".to_string()),
+        labels.contains(&xai_grok_i18n::t("hint.confirm").to_string())
+            && !labels.contains(&xai_grok_i18n::t("hint.next_answer").to_string()),
         "the cancel-turn panel takes the keys, so it takes the bar too, got {labels:?}"
     );
 
@@ -653,7 +656,7 @@ fn the_cancel_turn_panel_resolves_instead_of_parking() {
     open_cancel_turn(&mut agent);
 
     assert_eq!(agent.card_esc(), Some(EscStep::KeepRunning));
-    assert!(hint_labels(&agent).contains(&"keep running".to_string()));
+    assert!(hint_labels(&agent).contains(&xai_grok_i18n::t("modal.continue_to_run").to_string()));
 
     let outcome = agent.handle_cancel_turn_key(&KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     assert!(

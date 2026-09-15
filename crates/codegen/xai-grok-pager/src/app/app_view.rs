@@ -1563,7 +1563,7 @@ impl AppView {
                 .subscription_tier
                 .as_deref()
                 .is_some_and(is_api_key_label);
-        self.usage_visible = self.team_name.is_none() && self.consumer_account();
+        self.usage_visible = !self.is_team_principal && self.team_name.is_none() && self.consumer_account();
         self.sync_billing_surface_to_agents();
         let billing_refresh_needed =
             self.usage_visible && (!was_usage_visible || account_key_changed);

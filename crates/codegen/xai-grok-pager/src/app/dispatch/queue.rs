@@ -1286,7 +1286,10 @@ pub(super) fn dispatch_run_edited_queued_command(
             }
             true
         }
-        EditedCommandGate::RefusedBySendPath => true,
+        EditedCommandGate::RefusedBySendPath => {
+            preserve_queued_image_paths(app, &mut submission);
+            true
+        }
         // Row kept and nothing runs: a command that ignores the missing session (`/compact`
         // enqueues regardless) would leave a second row.
         EditedCommandGate::NeedsSession => {

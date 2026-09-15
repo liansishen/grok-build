@@ -221,8 +221,10 @@ fn provider_params(issuer: String, expires_at: Option<DateTime<Utc>>) -> Proacti
     }
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn current_never_blocks_or_touches_network() {
+    let _metrics = lock_metrics();
     let provider = ProactiveOidcAuthProvider::new(provider_params(
         "http://127.0.0.1:1".into(),
         Some(Utc::now() - chrono::TimeDelta::hours(1)),
@@ -240,8 +242,10 @@ async fn current_never_blocks_or_touches_network() {
     }
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn principal_key_is_stable_across_rotation() {
+    let _metrics = lock_metrics();
     let provider = ProactiveOidcAuthProvider::new(provider_params(
         "https://auth.example.com".into(),
         Some(Utc::now() + chrono::TimeDelta::hours(1)),
@@ -258,8 +262,10 @@ async fn principal_key_is_stable_across_rotation() {
     }
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn principal_key_includes_empty_user_id() {
+    let _metrics = lock_metrics();
     let mut params = provider_params("https://auth.example.com".into(), None);
     params.identity.user_id.clear();
     let empty = ProactiveOidcAuthProvider::new(params).principal_key();
@@ -308,8 +314,10 @@ async fn disabled_flag_does_not_refresh_or_spawn() {
     }
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn debug_does_not_leak_tokens() {
+    let _metrics = lock_metrics();
     let provider =
         ProactiveOidcAuthProvider::new(provider_params("https://auth.example.com".into(), None));
     let debug = format!("{provider:?}");
@@ -812,8 +820,10 @@ async fn invalid_expires_in_keeps_rotated_refresh_token() {
     );
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn drop_aborts_background_task() {
+    let _metrics = lock_metrics();
     let hits = Arc::new(AtomicU32::new(0));
     let base = spawn_mock_idp(
         serde_json::json!({"error": "no"}),
@@ -1117,8 +1127,10 @@ async fn rate_limit_429_zero_retry_after_uses_backoff() {
     );
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn stale_persist_does_not_clobber_newer_token() {
+    let _metrics = lock_metrics();
     let dir = tempfile::tempdir().unwrap();
     let auth_path = write_auth_json(dir.path());
     let mut params = provider_params("https://auth.example.com".into(), None);

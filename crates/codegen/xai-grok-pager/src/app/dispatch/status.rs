@@ -144,9 +144,16 @@ fn open_dashboard_usage_modal(
     let mut state = UsageInfoModalState::new(tab, ctx);
     let mut effects = Vec::new();
     if billing_reachable {
+        app.billing_request_seq = app.billing_request_seq.wrapping_add(1);
+        let request = crate::app::actions::BillingRequestId {
+            generation: app.billing_generation,
+            sequence: app.billing_request_seq,
+        };
         state.fetch_nonce = next_usage_fetch_nonce();
         state.billing_loading = true;
-        effects.push(Effect::FetchAppBilling { request: None });
+        effects.push(Effect::FetchAppBilling {
+            request: Some(request),
+        });
     }
     dashboard.usage_modal = Some(Box::new(state));
     effects

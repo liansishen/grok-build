@@ -1128,7 +1128,7 @@ pub(in crate::app::dispatch) fn dispatch_new_worktree_session(
         return vec![];
     }
     if !app.cwd_has_git_ancestor {
-        let msg = xai_grok_i18n::t("toast.worktree_not_git_repository").to_string();
+        let msg = xai_grok_i18n::t("toast.not_inside_git_repository").to_string();
         if !app.startup_warnings.iter().any(|w| w.message == msg) {
             app.startup_warnings.push(crate::startup::StartupWarning {
                 severity: crate::startup::WarningSeverity::Warning,
@@ -1333,7 +1333,7 @@ pub(in crate::app::dispatch) fn handle_session_created(
     let switch_hint =
         crate::views::dashboard::session_switch_hint_command(app.screen_mode.is_minimal());
     let has_switch_target =
-        agent_count > 1 || (app.screen_mode.is_minimal() && app.next_agent_id > 1);
+        agent_count > 1 || app.screen_mode.is_minimal();
     if let Some(agent) = app.agents.get_mut(&agent_id) {
         let session_id_clone = session_id.clone();
         if agent.session.created_via_new
@@ -1487,6 +1487,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
             app.models = Some(m).into();
             agent.session.models = app.models.clone();
         }
+        let deferred_permission = agent.deferred_permission_mode.take();
         if agent.apply_session_modes(modes) {
             app.default_yolo = false;
             app.current_ui.permission_mode = Some("ask".into());
@@ -1502,7 +1503,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
         }
         let deferred = apply_deferred_model_switch(agent, app.cli_effort_token.as_deref());
         let deferred_mode = agent.deferred_session_mode.take();
-        let deferred_permission = agent.deferred_permission_mode.take();
+        let deferred_permission = deferred_permission;
         let cwd = agent.session.cwd.clone();
         if deferred.is_some() {
             agent.session.model_switch_pending = true;

@@ -333,7 +333,6 @@ impl AgentView {
                 }),
             KeyOwner::Card(BlockingCard::CancelTurn) => ShortcutsBarContent::Surface(vec![
                 HintItem::paired(key!('1'), key!('4'), xai_grok_i18n::t("hint.select")),
-                HintItem::new(key!(Tab), xai_grok_i18n::t("hint.next_answer")),
                 HintItem::new(key!(Enter), xai_grok_i18n::t("hint.confirm")),
                 self.card_esc_hint(),
             ]),

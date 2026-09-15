@@ -240,15 +240,6 @@ fn mode_specific_builtin_refusals_are_pinned() {
                     "/fullscreen",
                 )
             ),
-            (
-                "workflows",
-                switch(
-                    "workflows",
-                    minimal,
-                    "the workflow run pane needs fullscreen",
-                    "/fullscreen",
-                )
-            ),
         ]
     );
 }

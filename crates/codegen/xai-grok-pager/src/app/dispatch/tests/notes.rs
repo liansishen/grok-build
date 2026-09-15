@@ -547,7 +547,7 @@ fn auth_meta_refreshes_feedback_trace_offer_for_feedback_modal() {
 
     let effects = dispatch(
         Action::OpenFeedbackModal(crate::views::feedback_modal::OpenFeedbackModal {
-            text: Some("feedback draft".into()),
+            text: None,
             ..Default::default()
         }),
         &mut app,

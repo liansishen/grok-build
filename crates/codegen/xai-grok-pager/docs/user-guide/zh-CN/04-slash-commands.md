@@ -177,10 +177,12 @@
 ### `/memory`
 
 浏览、查看和管理已保存的记忆。传入 `on` 或 `off` 可启用或禁用记忆。别名：`/mem`。
+在 memory-v2 会话中传入 `status`，可显示不含内容的队列、租约、保留期限和固定发布诊断。
 
 ```
 /memory
 /memory off
+/memory status
 ```
 
 ### `/flush`
@@ -326,7 +328,7 @@ Shell 还支持子命令（`/plugins list`、`/plugins install <source>`、`/plu
 
 ### `/feedback [message]`
 
-报告问题或发送反馈。命令会打开报告面板：`Enter` 发送，`Esc` 丢弃。带消息时会将其预填到面板中，发送前仍可编辑；在 `--minimal` 模式下，带消息仍会立即发送。
+报告问题或发送反馈。单独使用 `/feedback` 时，在所有模式（包括 `--minimal`）中都会打开反馈表单。其 **Write** 标签页是报告输入框：`Enter` 发送，`Esc` 关闭；**Drafts** 标签页（按 `Ctrl+Tab` 切换）保存稍后处理的报告，包括发送失败的报告和由代理起草的反馈；按 `Enter` 可将选中项加载到 Write，以便审查、选择类型并发送。`/feedback <message>` 在任何模式下都会立即发送消息；如果发送失败，消息会保存到 Drafts。
 
 ```
 /feedback
@@ -337,8 +339,11 @@ Shell 还支持子命令（`/plugins list`、`/plugins install <source>`、`/plu
 
 在不中断当前任务的情况下向智能体发送旁注。在精简模式（`--minimal`）中，答案会显示在提示框上方、可关闭的面板中：`Esc` 关闭面板，完成的答案会保存到原生回滚区，已经关闭的面板收到迟到回复时会丢弃该回复。旁问题及其答案不会成为主轮次的一部分。
 
+`/btw` 也可以出现在消息中间：整条消息（去掉该 token）都会成为旁问题，不会发送到主轮次。只有 `/btw` 支持这种写法；其他命令必须位于消息开头。
+
 ```
-/btw 还要检查错误处理
+/btw also check the error handling
+fix the retry loop first. /btw what does WBC stand for?
 ```
 
 ### `/mcps`

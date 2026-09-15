@@ -494,7 +494,7 @@ fn human_mixed_fixture_is_exact() {
             "  · color                        256\n",
             "  · themes                       3/6: groknight, grokday, terminal\n",
             "  · keyboard                     cmd=dropped, opt=native (OS rescue active)\n",
-            "  · newline                      Alt+Enter (Cursor: xterm.js cannot distinguish Shift+Enter)\n",
+            "  · newline                      Alt+Enter (Cursor: xterm.js can't distinguish Shift+Enter)\n",
             "\n",
             "Clipboard\n",
             "  · native                       local (pbcopy)\n",

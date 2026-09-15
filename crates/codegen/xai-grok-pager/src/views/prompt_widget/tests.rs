@@ -3750,9 +3750,13 @@
     /// The "plan" mode flag on the bottom divider keeps its accent color on the terminal theme: the
     /// subtle toward-bg dimming blend cannot be computed against a Reset bg, and the old gray fallback
     /// (Reset there) erased the plan-mode cue entirely. RGB themes keep the dimmed blend.
+    #[serial_test::serial(GROK_THEME)]
     #[test]
     fn plan_flag_keeps_accent_color_on_terminal_theme() {
         let _guard = crate::theme::cache::pin_theme();
+        crate::theme::color_support::set_level_for_test(
+            crate::theme::color_support::ColorLevel::TrueColor,
+        );
         let area = Rect::new(0, 0, 60, 4);
 
         let render = || {
@@ -3786,14 +3790,6 @@
             panic!("plan flag not rendered");
         };
 
-        crate::theme::cache::set(crate::theme::ThemeKind::Terminal);
-        let style = render();
-        assert_eq!(
-            style.fg,
-            Some(Theme::current().accent_plan),
-            "terminal theme keeps the solid plan accent"
-        );
-
         // GrokNight: dimmed toward bg at truecolor; where quantization makes
         // the palette named (blend inexpressible), the solid accent — never
         // the old gray fallback.
@@ -3807,6 +3803,14 @@
             }
             _ => assert_eq!(style.fg, Some(theme.accent_plan), "quantized keeps accent"),
         }
+
+        crate::theme::cache::set(crate::theme::ThemeKind::Terminal);
+        let style = render();
+        assert_eq!(
+            style.fg,
+            Some(Theme::current().accent_plan),
+            "terminal theme keeps the solid plan accent"
+        );
     }
 
     /// Plan mode recolors the composer border (`border_color_override`), but the model-name caption

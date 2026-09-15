@@ -398,13 +398,6 @@ pub(crate) fn sanitize_user_error(raw: &str) -> String {
         return xai_fast_worktree::ENOSPC_OS_MESSAGE.to_string();
     }
     static REPLACEMENTS: &[(&str, &str)] = &[
-        ("cli-chat-proxy", "server"),
-        ("cli_chat_proxy", "server"),
-        ("inference-api", "server"),
-        ("inference_api", "server"),
-        ("research-api", "server"),
-        ("research_api", "server"),
-        ("grok-code-backend", "server"),
         ("ACP error:", "error:"),
         ("ACP request failed:", "request failed:"),
         ("JSON-RPC error", "request error"),
@@ -414,7 +407,7 @@ pub(crate) fn sanitize_user_error(raw: &str) -> String {
         ("Authentication required: ", ""),
         ("Authentication failed: ", ""),
     ];
-    let mut result = raw.to_string();
+    let mut result = xai_grok_shell::sampling::error::rewrite_service_names(raw);
     for (pattern, replacement) in REPLACEMENTS {
         result = result.replace(pattern, replacement);
     }

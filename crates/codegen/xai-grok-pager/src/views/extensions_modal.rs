@@ -1509,6 +1509,7 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
         // Toggle enable/disable on the selected plugin.
         (ExtensionsTab::Plugins, ' ') => Some(ButtonAction::ToggleSelectedPlugin),
         (ExtensionsTab::Plugins, 'x') => Some(ButtonAction::UninstallSelectedPlugin),
+        (ExtensionsTab::Plugins, 'd') => Some(ButtonAction::UninstallSelectedPlugin),
         // Hooks tab
         (ExtensionsTab::Hooks, 'r') => Some(ButtonAction::HooksAction(HooksAction::Reload)),
         (ExtensionsTab::Hooks, 'a') => Some(ButtonAction::StartInput {

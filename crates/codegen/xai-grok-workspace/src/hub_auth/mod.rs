@@ -1096,8 +1096,10 @@ mod tests {
         }
     }
 
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test(flavor = "current_thread")]
     async fn build_oidc_provider_flag_on_uses_proactive_provider() {
+        let _metrics = super::proactive::lock_metrics();
         let refresh = ProactiveRefreshConfig {
             enabled: true,
             ..ProactiveRefreshConfig::default()

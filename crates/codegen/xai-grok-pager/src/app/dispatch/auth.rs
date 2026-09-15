@@ -17,8 +17,11 @@ use crate::scrollback::blocks::SessionEvent;
 
 /// `/logout` -- ask the shell to clear auth, then return to the login screen.
 pub(super) fn dispatch_logout(app: &mut AppView) -> Vec<Effect> {
-    app.invalidate_billing_account();
     app.usage_visible = false;
+    app.welcome_prompt
+        .slash_controller
+        .set_billing_surface_visible(false);
+    app.invalidate_billing_account();
     app.sync_billing_surface_to_agents();
     vec![Effect::Logout]
 }

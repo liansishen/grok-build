@@ -313,7 +313,6 @@ impl AgentView {
     }
 
     /// Shared tail of every turn-end marker push (`push_turn_terminal_marker`).
-    /// Shared tail of every turn-end marker push (`push_turn_terminal_marker`).
     pub(crate) fn push_end_marker_block(
         &mut self,
         event: crate::scrollback::blocks::SessionEvent,
@@ -366,7 +365,7 @@ impl AgentView {
 
     /// Send one merged-queue row now (cancel-and-send), by selection id. The shell cancels the running turn and runs this row as the next turn.
     pub(in crate::app) fn force_interject_queue_row(&mut self, id: u64) -> InputOutcome {
-        if !self.session.state.is_turn_running() {
+        if !self.can_send_now() {
             self.show_toast(xai_grok_i18n::t("toast.no_turn_running"));
             return InputOutcome::Changed;
         }

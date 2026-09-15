@@ -289,9 +289,14 @@ MCP 服务器也可以在 `.grok/config.toml` 中按项目设置。项目级配�
 <a id="memory"></a>
 ### 记忆
 
-跨会话持久化知识（需要 `--experimental-memory` 或 `GROK_MEMORY=1`）。
+跨会话持久化知识。新用户应使用 memory v2：在 `[memory_v2]` 中设置 `enabled = true`。已有的 `GROK_MEMORY=1`、`[memory] enabled = true` 和托管的 `memory_enabled` 设置仍会启用旧版记忆，除非启用了 v2 开关。
 
 ```toml
+[memory_v2]
+enabled = true                        # primary memory-v2 switch
+capture_status_enabled = false        # expandable capture diagnostics
+
+# Legacy memory compatibility settings:
 [memory]
 enabled = false                       # 启用记忆
 
@@ -877,83 +882,3 @@ disable_plugins = false               # 完全隐藏钩子/插件 UI
 3. **插件**——基于文件的 `.lsp.json`，然后是内联 `lspServers`，按插件加载顺序
 
 项目和用户条目会替换同名的低优先级条目。插件条目只会添加本地文件尚未定义的名称，因此本地 `lsp.json` 始终优先于插件。只有在插件受信任后才会加载插件 LSP 服务器（见[插件](09-plugins.md)）。
-
-### 当前版本命令与配置补充
-
-以下示例保留当前版本的可执行命令和配置格式：
-
-```toml
-[cli]
-auto_update = true                     # check for updates on launch
-
-[models]
-default = "grok-4.5"                   # model used for new sessions
-web_search = "grok-4.5"                # model used by the web_search tool
-# Optional picker allowlist (globs on catalog key or model id). Empty = unrestricted.
-# A signed policy pin replaces this list (model id only) and cannot be widened from here.
-# allowed_models = ["grok-4.5", "grok-4*"]
-
-# Defaults applied to every model; a per-model [model.<id>] value always wins.
-# See "Custom Models" for the per-model overrides and full details.
-extra_headers = { "X-Request-Tags" = "team=example,env=prod" }
-temperature = 0.7
-top_p = 0.95
-max_completion_tokens = 8192
-max_retries = 8
-inference_idle_timeout_secs = 600
-subagent_rate_limit_max_attempts = 8
-stream_tool_calls = true
-
-[ui]
-simple_mode = true                     # readline-style prompt editing (default); false = vim editing in the prompt
-vim_mode = false                       # vim-style scrollback navigation keys (default: false)
-max_thoughts_width = 120               # max column width for reasoning display
-default_selected_permission = "always_allow_all_sessions" # preselected row on the FIRST approval prompt
-remember_tool_approvals = true         # show per-command "Always allow" options on permission prompts;
-                                       # grants are remembered per project (default: true); see 22-permissions-and-safety.md
-show_thinking_blocks = true            # show agent thinking blocks in the TUI (default: true)
-show_shortcuts_bar = true                 # 显示底部上下文快捷键提示栏（默认：true）
-transparent_bg = false                     # 让终端背景透过全屏主题显示；需要重启
-# 不再自动将请求指标添加到对话中；仍可使用 `/usage` 显式查看详细信息。
-group_tool_verbs = true                # fold runs of read/search/list tool calls and subagent rows
-                                       # — and finished thoughts among them — into one row (default: true)
-collapsed_edit_blocks = false          # show edits as one-line +N/-M diffstat summaries and merge
-                                       # back-to-back same-file edits into one row, expand for the
-                                       # diffs (default: false; pager.toml [scrollback.blocks.edit]
-                                       # expanded_by_default/line_summary override its fold shape)
-page_flip_on_send = true               # pin a just-sent prompt at the top of the viewport so the
-                                       # response starts on a fresh page (default: true); set false
-                                       # so sending never moves the scroll position
-follow_up_behavior = "queue"           # mid-turn follow-ups: "queue" (wait for turn end; default) or
-                                       # "steer" (plain Enter still queues visibly, then injects at the
-                                       # next tool/model safe gap). See Keyboard Shortcuts → Mid-turn.
-screen_mode = "fullscreen"             # default render mode: "fullscreen" | "minimal"
-                                       # (unset → fullscreen); set via /settings → Default screen mode
-
-[features]
-telemetry = false                      # anonymous usage telemetry
-feedback = true                        # feedback system (default: true)
-lsp_tools = false                      # expose the lsp tool
-codebase_indexing = true               # code graph indexing (default: true)
-two_pass_compaction = true             # prefire two-pass compaction (default: true)
-remote_fetch = true                    # allow optional online model-catalog fetches (default: true;
-                                       # set false for firewalled/air-gapped deployments; background
-                                       # managed-config sync has its own switch: managed_config)
-
-[session]
-auto_compact_threshold_percent = 85    # auto-compact at this % of context window (default: 85)
-load_envrc = true                      # load .envrc environment variables
-
-[tools]
-respect_gitignore = false              # default: false; set true to make every tool skip gitignored files
-
-# Optional caps on parallel media generation in a single model step.
-# Per tool name. First 2×-or-more burst: discard that step and retry once.
-# Any other over-cap (including a second 2× burst) keeps the first K.
-# Defaults: image 8, video 4.
-# Env vars GROK_MAX_PARALLEL_IMAGE_GEN_CALLS / GROK_MAX_PARALLEL_VIDEO_GEN_CALLS
-# override these values (see environment-variables doc).
-# [tools.media_gen]
-# max_parallel_image_gen_calls = 8
-# max_parallel_video_gen_calls = 4
-```

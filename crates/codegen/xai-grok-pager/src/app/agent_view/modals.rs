@@ -641,6 +641,15 @@ impl AgentView {
         &mut self,
         key: &crossterm::event::KeyEvent,
     ) -> InputOutcome {
+        if let Some(outcome) = self
+            .extensions_modal
+            .as_ref()
+            .and_then(|s| s.active_managed_connectors_wait())
+            .map(|wait| wait.handle_key(key))
+        {
+            return self
+                .apply_managed_connectors_wait_outcome(outcome, ExtensionsInputMethod::Keyboard);
+        }
         // Handle modal messages (errors and confirmations) FIRST, before
         // the pending_action guard. Some error paths (e.g. structured
         // OutcomeStatus::ValidationError) leave pending_action set when
@@ -1196,11 +1205,7 @@ impl AgentView {
                     {
                         // Clears Add form, error overlay, and pending
                         // badge in addition to resetting picker state.
-                        state.switch_tab(tab);
-                        // Clicking a tab implies interaction with the tab list;
-                        // show the focused highlight and keep arrow nav on tabs.
-                        state.picker_state.tabs_focused = true;
-                        state.window.tabs_focused = true;
+                        state.switch_tab_focus_list(tab);
                     }
                     return InputOutcome::Changed;
                 }
@@ -1225,9 +1230,7 @@ impl AgentView {
                             // Clears Add form, error overlay, and
                             // pending badge in addition to resetting
                             // picker state.
-                            state.switch_tab(tab);
-                            state.picker_state.tabs_focused = true;
-                            state.window.tabs_focused = true;
+                            state.switch_tab_focus_list(tab);
                         }
                         return InputOutcome::Changed;
                     } else if id == WAIT_BACK_SHORTCUT_ID {
@@ -1282,6 +1285,11 @@ impl AgentView {
         let Some(ref mut state) = self.extensions_modal else {
             return InputOutcome::Changed;
         };
+        if let Some(wait) = state.active_managed_connectors_wait_mut() {
+            let outcome = wait.handle_mouse(mouse, copy);
+            return self
+                .apply_managed_connectors_wait_outcome(outcome, ExtensionsInputMethod::Mouse);
+        }
 
         // Modal overlay covers picker rows but not their hit-rects: dismiss
         // on any mouse-down so a click-through doesn't re-trigger the row
@@ -2109,19 +2117,13 @@ impl AgentView {
                 InputOutcome::Changed
             }
             ButtonAction::UpdateSelectedPlugin => {
-                // Fetch latest from the plugin's source for the selected plugin
-                // only (`plugin_id: Some(..)`) — distinct from `r` reload, which
-                // re-copies installed plugins at their current version.
-                if let Some(ref state) = self.extensions_modal
-                    && let crate::views::extensions_modal::TabDataState::Loaded(ref data) =
-                        state.plugins_data
-                    && let Some(idx) = state.selected_data_index()
-                    && let Some(plugin) = data.plugins.get(idx)
-                {
-                    let action = xai_hooks_plugins_types::PluginsAction::Update {
-                        plugin_id: Some(plugin.id.clone()),
-                    };
-                    return self.execute_modal_button_action(ButtonAction::PluginsAction(action));
+                // Fetch latest from the plugin's source for the selected plugin.
+                if let Some(plugin) = self.selected_plugin_for_action(ActionVerb::Update) {
+                    return self.execute_modal_button_action(
+                        ButtonAction::PluginsAction(xai_hooks_plugins_types::PluginsAction::Update {
+                            plugin_id: Some(plugin.id),
+                        }),
+                    );
                 }
                 InputOutcome::Changed
             }
@@ -2307,51 +2309,67 @@ impl AgentView {
                 InputOutcome::Changed
             }
             ButtonAction::UninstallSelectedMarketplacePlugin => {
-                if let Some(ref state) = self.extensions_modal {
+                let mut confirm = None;
+                if let Some(state) = self.extensions_modal.as_mut() {
                     use crate::views::extensions_modal::TabDataState;
-                    if let TabDataState::Loaded(ref response) = state.marketplace_data
-                        && let Some((si, Some(pi))) =
-                            state.resolve_marketplace_selection(&response.sources)
-                    {
-                        let source = &response.sources[si];
-                        let plugin = &source.plugins[pi];
-                        return self.prompt_extensions_confirm(
-                            xai_grok_i18n::t_fmt(
-                                "ext_confirm.uninstall_marketplace_plugin",
-                                &[("name", &plugin.name)],
-                            ),
-                            crate::views::extensions_modal::ConfirmationAction::Marketplace(
-                                xai_hooks_plugins_types::MarketplaceAction::Uninstall {
-                                    source_url_or_path: source.source_url_or_path.clone(),
-                                    plugin_relative_path: plugin.relative_path.clone(),
-                                },
-                            ),
-                        );
+                    if let TabDataState::Loaded(ref response) = state.marketplace_data {
+                        match state.resolve_marketplace_selection(&response.sources) {
+                            Some((si, Some(pi))) => {
+                                let source = &response.sources[si];
+                                let plugin = &source.plugins[pi];
+                                confirm = Some((
+                                    plugin.name.clone(),
+                                    source.source_url_or_path.clone(),
+                                    plugin.relative_path.clone(),
+                                ));
+                            }
+                            Some((si, None)) if !response.sources[si].plugins.is_empty() => {
+                                state.post_select_row_hint("plugin", ActionVerb::Uninstall);
+                            }
+                            _ => {}
+                        }
                     }
+                }
+                if let Some((name, source_url_or_path, plugin_relative_path)) = confirm {
+                    return self.prompt_extensions_confirm(
+                        xai_grok_i18n::t_fmt(
+                            "ext_confirm.uninstall_marketplace_plugin",
+                            &[("name", &name)],
+                        ),
+                        crate::views::extensions_modal::ConfirmationAction::Marketplace(
+                            xai_hooks_plugins_types::MarketplaceAction::Uninstall {
+                                source_url_or_path,
+                                plugin_relative_path,
+                            },
+                        ),
+                    );
                 }
                 InputOutcome::Changed
             }
             ButtonAction::RemoveSelectedMarketplaceSource => {
-                if let Some(ref state) = self.extensions_modal {
+                let mut source_to_remove = None;
+                if let Some(state) = self.extensions_modal.as_mut() {
                     use crate::views::extensions_modal::TabDataState;
                     if let TabDataState::Loaded(ref response) = state.marketplace_data {
-                        let source = state
-                            .resolve_marketplace_selection(&response.sources)
-                            .and_then(|(si, _)| response.sources.get(si));
-                        if let Some(source) = source {
-                            return self.prompt_extensions_confirm(
-                                xai_grok_i18n::t_fmt(
-                                    "ext_confirm.remove_source",
-                                    &[("name", &source.source_name)],
-                                ),
-                                crate::views::extensions_modal::ConfirmationAction::Marketplace(
-                                    xai_hooks_plugins_types::MarketplaceAction::RemoveSource {
-                                        source_url_or_path: source.source_url_or_path.clone(),
-                                    },
-                                ),
-                            );
+                        let selection = state.resolve_marketplace_selection(&response.sources);
+                        if selection.is_some_and(|(_, plugin_index)| plugin_index.is_some()) {
+                            state.post_select_row_hint("source", ActionVerb::RemoveSource);
+                        } else if let Some((source_index, _)) = selection
+                            && let Some(source) = response.sources.get(source_index)
+                        {
+                            source_to_remove = Some((source.source_name.clone(), source.source_url_or_path.clone()));
                         }
                     }
+                }
+                if let Some((name, source_url_or_path)) = source_to_remove {
+                    return self.prompt_extensions_confirm(
+                        xai_grok_i18n::t_fmt("ext_confirm.remove_source", &[("name", &name)]),
+                        crate::views::extensions_modal::ConfirmationAction::Marketplace(
+                            xai_hooks_plugins_types::MarketplaceAction::RemoveSource {
+                                source_url_or_path,
+                            },
+                        ),
+                    );
                 }
                 InputOutcome::Changed
             }
@@ -2428,7 +2446,6 @@ impl AgentView {
     }
 
     /// The selected Marketplace-tab plugin row. Marketplace plugin actions are per-plugin, so a source header has no target and posts the row hint instead.
-    /// source header has no target and posts the row hint instead.
     fn selected_marketplace_plugin_for_action(
         &mut self,
         verb: ActionVerb,
@@ -2438,9 +2455,16 @@ impl AgentView {
         let TabDataState::Loaded(ref response) = state.marketplace_data else {
             return None;
         };
-        let (source, plugin_index) = state
+        let Some((source, plugin_index)) = state
             .resolve_marketplace_selection(&response.sources)
-            .and_then(|(si, pi)| Some((response.sources.get(si)?, pi)))?;
+            .and_then(|(si, pi)| Some((response.sources.get(si)?, pi))) else {
+            if !response.sources.is_empty() {
+                state.modal_message = Some(crate::views::extensions_modal::ModalMessage::Info(
+                    format!("Select a plugin row to {}.", verb.label()),
+                ));
+            }
+            return None;
+        };
         match plugin_index.and_then(|pi| source.plugins.get(pi)) {
             Some(plugin) => Some(SelectedMarketplacePlugin {
                 source_url_or_path: source.source_url_or_path.clone(),
@@ -2448,9 +2472,10 @@ impl AgentView {
                 name: plugin.name.clone(),
             }),
             None => {
-                // A source whose scan failed or found nothing has no plugin row to point at
                 if !source.plugins.is_empty() {
-                    state.post_select_row_hint("plugin", verb);
+                    state.modal_message = Some(crate::views::extensions_modal::ModalMessage::Info(
+                        format!("Select a plugin row to {}.", verb.label()),
+                    ));
                 }
                 None
             }
@@ -2482,7 +2507,6 @@ impl AgentView {
     }
 
     /// The selected Plugins-tab row. A group header spans repos, so it has no target and posts the row hint instead.
-    /// row hint instead.
     fn selected_plugin_for_action(&mut self, verb: ActionVerb) -> Option<SelectedPlugin> {
         use crate::views::extensions_modal::TabDataState;
         let state = self.extensions_modal.as_mut()?;
@@ -4467,7 +4491,11 @@ mod extensions_modal_confirmation_tests {
         let source = "/tmp/my-hooks-dir";
         let mut hooks = ExtensionsModalState::new(ExtensionsTab::Hooks);
         hooks.hooks_data = TabDataState::Loaded(xai_hooks_plugins_types::HooksListResponse {
-            hooks: vec![hook_info("hook-a", source)],
+            hooks: vec![{
+                let mut hook = hook_info("hook-a", source);
+                hook.removable = true;
+                hook
+            }],
             project_trusted: true,
             load_errors: Vec::new(),
         });

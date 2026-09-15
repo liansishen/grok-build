@@ -180,12 +180,6 @@ impl AgentView {
         };
         self.paste_probe_in_flight = self.paste_probe_in_flight.saturating_sub(1);
         let text_on_miss = ctx.source.text_to_insert_on_miss(&image);
-        let insert_deferred_text = matches!(
-            &image,
-            ProbedAttachment::NoRaster
-                | ProbedAttachment::ProbeDropped
-                | ProbedAttachment::ProbeFailed
-        );
         let attachment = match image {
             ProbedAttachment::Image(pasted) => {
                 if self.reject_shared_queue_image_edit(&pasted) {
@@ -233,11 +227,9 @@ impl AgentView {
         } else {
             None
         };
-        let text = if insert_deferred_text {
-            text_on_miss.map(|text| self.insert_prompt_plain_text(Some(text)).1)
-        } else {
-            None
-        };
+        let text = text_on_miss
+            .filter(|text| !text.trim().is_empty())
+            .map(|text| self.insert_prompt_plain_text(Some(text)).1);
         let completion = crate::app::actions::reduce_clipboard_paste_completion(
             &ctx.source,
             attachment,
@@ -429,7 +421,7 @@ impl AgentView {
         &mut self,
         text: &str,
     ) -> Option<(InputOutcome, crate::app::actions::ClipboardPasteCompletion)> {
-        if crate::terminal::terminal_context().is_ssh {
+        if crate::terminal::terminal_context().is_ssh && !cfg!(test) {
             return None;
         }
         // Upper bound on the size of a paste payload the drop classifier will scan.

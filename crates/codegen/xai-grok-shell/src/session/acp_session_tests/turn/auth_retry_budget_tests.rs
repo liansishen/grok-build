@@ -407,68 +407,72 @@ fn fail_closed_401_is_uncharged_and_turn_survives() {
 
 /// Rule: kill switch off, a recovered fail-closed 401 resubmits un-parked (no
 /// prepare/preflight skips) — full pre-park behavior on rollback.
-#[tokio::test(flavor = "current_thread")]
-async fn park_disabled_recovered_401_still_resubmits() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
-            let server = MockInferenceServer::start_with_required_auth(
-                vec![MockModelEntry::new("test")],
-                FRESH_TOKEN,
-            )
-            .await
-            .expect("mock inference server");
-            let calls = Arc::new(AtomicU32::new(0));
-            // The minted TTL sits inside the pre-request buffer: wire-valid for the
-            // resubmit, yet every refresh-driving prepare stays observable in `calls`.
-            let refresher = Arc::new(WakeGapRefresher {
-                calls: calls.clone(),
-                fail_pre_request: true,
-                mint_ttl: chrono::Duration::minutes(4),
-            });
-            let (_dir, am) = expired_auth_manager(refresher);
-            let (actor, updates) = session_token_actor(
-                &server,
-                am,
-                ActorShape {
-                    park_disabled: true,
-                    ..Default::default()
-                },
-            )
-            .await;
+#[test]
+fn park_disabled_recovered_401_still_resubmits() {
+    on_session_stack(|| {
+        run_current_thread(false, || async {
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async {
+                    let server = MockInferenceServer::start_with_required_auth(
+                        vec![MockModelEntry::new("test")],
+                        FRESH_TOKEN,
+                    )
+                    .await
+                    .expect("mock inference server");
+                    let calls = Arc::new(AtomicU32::new(0));
+                    // The minted TTL sits inside the pre-request buffer: wire-valid for the
+                    // resubmit, yet every refresh-driving prepare stays observable in `calls`.
+                    let refresher = Arc::new(WakeGapRefresher {
+                        calls: calls.clone(),
+                        fail_pre_request: true,
+                        mint_ttl: chrono::Duration::minutes(4),
+                    });
+                    let (_dir, am) = expired_auth_manager(refresher);
+                    let (actor, updates) = session_token_actor(
+                        &server,
+                        am,
+                        ActorShape {
+                            park_disabled: true,
+                            ..Default::default()
+                        },
+                    )
+                    .await;
 
-            let outcome = run_prompt(&actor, "park-disabled-recovered").await;
-            assert!(
-                outcome.is_ok(),
-                "flag off must not break recovered fail-closed 401s: {outcome:?}"
-            );
-            let inference: Vec<_> = server
-                .requests()
-                .into_iter()
-                .filter(|r| r.path.contains("/responses"))
-                .collect();
-            assert_eq!(
-                inference
-                    .last()
-                    .expect("at least one send")
-                    .authorization
-                    .as_deref(),
-                Some(&format!("Bearer {FRESH_TOKEN}") as &str),
-                "resubmit must carry the recovered bearer"
-            );
-            assert!(
-                terminal_failure(&updates).is_none(),
-                "a surviving turn must not report a terminal retryState"
-            );
-            // Mirror of the flag-on `== 4` pin, exact by design: dropping the
-            // kill-switch conjunct from `turn_parked` shows up as missing calls.
-            assert_eq!(
-                calls.load(Ordering::SeqCst),
-                10,
-                "flag off must restore every pre-park refresh attempt"
-            );
-        })
-        .await;
+                    let outcome = run_prompt(&actor, "park-disabled-recovered").await;
+                    assert!(
+                        outcome.is_ok(),
+                        "flag off must not break recovered fail-closed 401s: {outcome:?}"
+                    );
+                    let inference: Vec<_> = server
+                        .requests()
+                        .into_iter()
+                        .filter(|r| r.path.contains("/responses"))
+                        .collect();
+                    assert_eq!(
+                        inference
+                            .last()
+                            .expect("at least one send")
+                            .authorization
+                            .as_deref(),
+                        Some(&format!("Bearer {FRESH_TOKEN}") as &str),
+                        "resubmit must carry the recovered bearer"
+                    );
+                    assert!(
+                        terminal_failure(&updates).is_none(),
+                        "a surviving turn must not report a terminal retryState"
+                    );
+                    // Mirror of the flag-on `== 4` pin, exact by design: dropping the
+                    // kill-switch conjunct from `turn_parked` shows up as missing calls.
+                    assert_eq!(
+                        calls.load(Ordering::SeqCst),
+                        10,
+                        "flag off must restore every pre-park refresh attempt"
+                    );
+                })
+                .await;
+        });
+    });
 }
 
 /// Real credential rejections must still terminate: the escalating budget exhausts after `MAX_RETRIES` when every request carries a rejected bearer.
@@ -569,11 +573,13 @@ impl xai_grok_login::refresh::TokenRefresher for DeferredRefreshNeverLands {
 /// Rule, end to end: a credential-less 401 with transiently-failing recovery parks and the
 /// turn completes once a refresh lands. Deliberate exclusions (budgeted children,
 /// compact-path 401s) stay terminal.
-#[tokio::test(flavor = "current_thread", start_paused = true)]
-async fn deferred_recovery_credential_less_401_parks_and_survives() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
+#[test]
+fn deferred_recovery_credential_less_401_parks_and_survives() {
+    on_session_stack(|| {
+        run_current_thread(true, || async {
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async {
             let server = MockInferenceServer::start_with_required_auth(
                 vec![MockModelEntry::new("test")],
                 FRESH_TOKEN,
@@ -660,62 +666,70 @@ async fn deferred_recovery_credential_less_401_parks_and_survives() {
                 AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS,
                 &["Re-authenticating after 401", "carried no credential"],
             );
-        })
-        .await;
+                })
+                .await;
+        });
+    });
 }
 
 /// Rule: budgeted workflow children are excluded from the park — the output-budget gate
 /// fails the turn closed before the auth arms run.
-#[tokio::test(flavor = "current_thread", start_paused = true)]
-async fn budgeted_workflow_child_credential_less_401_stays_terminal() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
-            let server = MockInferenceServer::start_with_required_auth(
-                vec![MockModelEntry::new("test")],
-                "never-issued-token",
-            )
-            .await
-            .expect("mock inference server");
+#[test]
+fn budgeted_workflow_child_credential_less_401_stays_terminal() {
+    on_session_stack(|| {
+        run_current_thread(true, || async {
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async {
+                    let server = MockInferenceServer::start_with_required_auth(
+                        vec![MockModelEntry::new("test")],
+                        "never-issued-token",
+                    )
+                    .await
+                    .expect("mock inference server");
 
-            let refresher = Arc::new(DeferredRefreshNeverLands::default());
-            let server_rejected_calls = refresher.server_rejected_calls.clone();
-            let (_dir, am) = expired_auth_manager(refresher);
-            let (actor, _updates) = session_token_actor(
-                &server,
-                am,
-                ActorShape {
-                    task_output_budget: Some(100_000),
-                    ..Default::default()
-                },
-            )
-            .await;
+                    let refresher = Arc::new(DeferredRefreshNeverLands::default());
+                    let server_rejected_calls = refresher.server_rejected_calls.clone();
+                    let (_dir, am) = expired_auth_manager(refresher);
+                    let (actor, _updates) = session_token_actor(
+                        &server,
+                        am,
+                        ActorShape {
+                            task_output_budget: Some(100_000),
+                            ..Default::default()
+                        },
+                    )
+                    .await;
 
-            let outcome = run_prompt_with_cap(&actor, "budgeted-child-terminal", 86_400).await;
-            let err = outcome.expect_err("a budgeted child's credential-less 401 must be terminal");
-            let rendered = serde_json::to_string(&err.data).unwrap_or_default();
-            assert!(
-                rendered.contains("budgeted workflow child model request failed"),
-                "failure must classify via the output-budget gate, got: {rendered}"
-            );
+                    let outcome =
+                        run_prompt_with_cap(&actor, "budgeted-child-terminal", 86_400).await;
+                    let err = outcome
+                        .expect_err("a budgeted child's credential-less 401 must be terminal");
+                    let rendered = serde_json::to_string(&err.data).unwrap_or_default();
+                    assert!(
+                        rendered.contains("budgeted workflow child model request failed"),
+                        "failure must classify via the output-budget gate, got: {rendered}"
+                    );
 
-            let inference: Vec<_> = server
-                .requests()
-                .into_iter()
-                .filter(|r| r.path.contains("/responses"))
-                .collect();
-            assert_eq!(
-                inference.len(),
-                1,
-                "budgeted children fail on the first 401: no parked resubmits"
-            );
-            assert_eq!(
-                server_rejected_calls.load(Ordering::SeqCst),
-                0,
-                "the output-budget gate runs before any recovery dispatch"
-            );
-        })
-        .await;
+                    let inference: Vec<_> = server
+                        .requests()
+                        .into_iter()
+                        .filter(|r| r.path.contains("/responses"))
+                        .collect();
+                    assert_eq!(
+                        inference.len(),
+                        1,
+                        "budgeted children fail on the first 401: no parked resubmits"
+                    );
+                    assert_eq!(
+                        server_rejected_calls.load(Ordering::SeqCst),
+                        0,
+                        "the output-budget gate runs before any recovery dispatch"
+                    );
+                })
+                .await;
+        });
+    });
 }
 
 /// Rule: a transient Api 5xx mid-park proves nothing about the credential — the next
@@ -782,246 +796,262 @@ fn api_5xx_during_park_does_not_unpark_or_redispatch() {
                 terminal_failure(&updates).is_none(),
                 "a surviving turn must not report a terminal retryState"
             );
-        })
-        );
+        }));
     });
 }
 
 /// Rule: a parked resubmit's 429 waits never re-prepare — the mid-wait
 /// re-prepare is park-gated, else each wait drives one refresh through the
 /// shared budget. Subagent-shaped: only subagent turns get a wait budget.
-#[tokio::test(flavor = "current_thread", start_paused = true)]
-async fn parked_429_wait_does_not_drive_refreshes() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
-            let server = MockInferenceServer::start_with_models(vec![MockModelEntry::new("test")])
-                .await
-                .expect("mock inference server");
-            // One 429 rung, then the default 200: exactly one paced wait.
-            server.enqueue_response(
-                "/v1/responses",
-                ScriptedResponse::json(429, serde_json::json!({ "error": "rate limited" })),
-            );
+#[test]
+fn parked_429_wait_does_not_drive_refreshes() {
+    on_session_stack(|| {
+        run_current_thread(true, || async {
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async {
+                    let server =
+                        MockInferenceServer::start_with_models(vec![MockModelEntry::new("test")])
+                            .await
+                            .expect("mock inference server");
+                    // One 429 rung, then the default 200: exactly one paced wait.
+                    server.enqueue_response(
+                        "/v1/responses",
+                        ScriptedResponse::json(429, serde_json::json!({ "error": "rate limited" })),
+                    );
 
-            let refresher = Arc::new(DeferredRefreshNeverLands::default());
-            let pre_request_calls = refresher.pre_request_calls.clone();
-            let server_rejected_calls = refresher.server_rejected_calls.clone();
-            let (_dir, am) = expired_auth_manager(refresher);
-            let (actor, _updates) = session_token_actor(
-                &server,
-                am,
-                ActorShape {
-                    is_subagent: true,
-                    ..Default::default()
-                },
-            )
-            .await;
+                    let refresher = Arc::new(DeferredRefreshNeverLands::default());
+                    let pre_request_calls = refresher.pre_request_calls.clone();
+                    let server_rejected_calls = refresher.server_rejected_calls.clone();
+                    let (_dir, am) = expired_auth_manager(refresher);
+                    let (actor, _updates) = session_token_actor(
+                        &server,
+                        am,
+                        ActorShape {
+                            is_subagent: true,
+                            ..Default::default()
+                        },
+                    )
+                    .await;
 
-            let request = super::rate_limit_backoff_tests::conversation_request(&actor).await;
-            let mut budget = actor.rate_limit_wait_budget(None);
-            let outcome = tokio::time::timeout(
-                Duration::from_secs(300),
-                actor.run_turn_via_sampler(
-                    request,
-                    &mut budget,
-                    transient_state(0, true),
-                    false,
-                    TurnParkState::Parked,
-                ),
-            )
-            .await
-            .expect("turn must finish within timeout");
-            assert!(
-                matches!(outcome, Ok(SamplerTurnOutcome::Response(..))),
-                "the parked resubmit must recover after the paced wait"
-            );
-            assert_eq!(budget.attempts_used(), 1, "the pacer must own the 429 wait");
-            // The expired token makes every prepare observable: a re-prepare
-            // during the wait would dispatch at least one preflight refresh.
-            assert_eq!(
-                pre_request_calls.load(Ordering::SeqCst),
-                0,
-                "a parked iteration's 429 waits must not drive preflight refreshes"
-            );
-            assert_eq!(
-                server_rejected_calls.load(Ordering::SeqCst),
-                0,
-                "no recovery dispatch may run inside the rate-limit wait loop"
-            );
-        })
-        .await;
+                    let request =
+                        super::rate_limit_backoff_tests::conversation_request(&actor).await;
+                    let mut budget = actor.rate_limit_wait_budget(None);
+                    let outcome = tokio::time::timeout(
+                        Duration::from_secs(300),
+                        actor.run_turn_via_sampler(
+                            request,
+                            &mut budget,
+                            transient_state(0, true),
+                            false,
+                            TurnParkState::Parked,
+                        ),
+                    )
+                    .await
+                    .expect("turn must finish within timeout");
+                    assert!(
+                        matches!(outcome, Ok(SamplerTurnOutcome::Response(..))),
+                        "the parked resubmit must recover after the paced wait"
+                    );
+                    assert_eq!(budget.attempts_used(), 1, "the pacer must own the 429 wait");
+                    // The expired token makes every prepare observable: a re-prepare
+                    // during the wait would dispatch at least one preflight refresh.
+                    assert_eq!(
+                        pre_request_calls.load(Ordering::SeqCst),
+                        0,
+                        "a parked iteration's 429 waits must not drive preflight refreshes"
+                    );
+                    assert_eq!(
+                        server_rejected_calls.load(Ordering::SeqCst),
+                        0,
+                        "no recovery dispatch may run inside the rate-limit wait loop"
+                    );
+                })
+                .await;
+        });
+    });
 }
 
 /// Rule: two-pass prefire must not re-arm while parked — pass-1 drives auth, and each
 /// spawn costs an extra credential-less send the runaway guard never counts.
-#[tokio::test(flavor = "current_thread", start_paused = true)]
-async fn parked_turn_does_not_respawn_two_pass_prefire() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
-            let server = MockInferenceServer::start_with_required_auth(
-                vec![MockModelEntry::new("test")],
-                FRESH_TOKEN,
-            )
-            .await
-            .expect("mock inference server");
+#[test]
+fn parked_turn_does_not_respawn_two_pass_prefire() {
+    on_session_stack(|| {
+        run_current_thread(true, || async {
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async {
+                    let server = MockInferenceServer::start_with_required_auth(
+                        vec![MockModelEntry::new("test")],
+                        FRESH_TOKEN,
+                    )
+                    .await
+                    .expect("mock inference server");
 
-            let refresher = Arc::new(DeferredRefreshNeverLands::default());
-            let (_dir, am) = expired_auth_manager(refresher);
-            let (actor, _updates) = session_token_actor(&server, am, ActorShape::default()).await;
+                    let refresher = Arc::new(DeferredRefreshNeverLands::default());
+                    let (_dir, am) = expired_auth_manager(refresher);
+                    let (actor, _updates) =
+                        session_token_actor(&server, am, ActorShape::default()).await;
 
-            // Two-pass on, usage in the prefire band: 77% of 100k vs the 85%
-            // threshold (the band opens at threshold − 10).
-            {
-                let mut agent_slot = actor.agent.borrow_mut();
-                let agent = &*agent_slot;
-                let mut policy = agent.compaction_policy().clone();
-                policy.two_pass_enabled = true;
-                *agent_slot = xai_grok_agent::Agent::new(
-                    agent.definition().clone(),
-                    agent.prompt_context().clone(),
-                    agent.system_prompt().to_string(),
-                    std::sync::Arc::clone(agent.tool_bridge()),
-                    agent.reminder_policy().clone(),
-                    policy,
-                    vec![],
-                    false,
-                );
-            }
-            let mut cfg = actor
-                .chat_state_handle
-                .get_sampling_config()
-                .await
-                .expect("test actor has sampling config");
-            cfg.context_window = std::num::NonZeroU64::new(100_000).expect("non-zero");
-            actor.chat_state_handle.update_sampling_config(cfg);
-            // ≥4 items so pass-1 survives its too-small check and reaches the auth-driving stage.
-            use xai_grok_sampling_types::ConversationItem;
-            actor.chat_state_handle.replace_conversation(vec![
-                ConversationItem::system("you are a coding agent"),
-                ConversationItem::user("q1"),
-                ConversationItem::assistant("a1"),
-                ConversationItem::user("q2"),
-                ConversationItem::assistant("a2"),
-            ]);
-            actor.chat_state_handle.record_token_usage(77_000);
+                    // Two-pass on, usage in the prefire band: 77% of 100k vs the 85%
+                    // threshold (the band opens at threshold − 10).
+                    {
+                        let mut agent_slot = actor.agent.borrow_mut();
+                        let agent = &*agent_slot;
+                        let mut policy = agent.compaction_policy().clone();
+                        policy.two_pass_enabled = true;
+                        *agent_slot = xai_grok_agent::Agent::new(
+                            agent.definition().clone(),
+                            agent.prompt_context().clone(),
+                            agent.system_prompt().to_string(),
+                            std::sync::Arc::clone(agent.tool_bridge()),
+                            agent.reminder_policy().clone(),
+                            policy,
+                            vec![],
+                            false,
+                        );
+                    }
+                    let mut cfg = actor
+                        .chat_state_handle
+                        .get_sampling_config()
+                        .await
+                        .expect("test actor has sampling config");
+                    cfg.context_window = std::num::NonZeroU64::new(100_000).expect("non-zero");
+                    actor.chat_state_handle.update_sampling_config(cfg);
+                    // ≥4 items so pass-1 survives its too-small check and reaches the auth-driving stage.
+                    use xai_grok_sampling_types::ConversationItem;
+                    actor.chat_state_handle.replace_conversation(vec![
+                        ConversationItem::system("you are a coding agent"),
+                        ConversationItem::user("q1"),
+                        ConversationItem::assistant("a1"),
+                        ConversationItem::user("q2"),
+                        ConversationItem::assistant("a2"),
+                    ]);
+                    actor.chat_state_handle.record_token_usage(77_000);
 
-            let waker = actor.auth_manager.clone().expect("actor has auth manager");
-            tokio::task::spawn_local(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                waker.hot_swap(GrokAuth {
-                    key: FRESH_TOKEN.to_string(),
-                    auth_mode: AuthMode::Oidc,
-                    refresh_token: Some("rt-new".into()),
-                    expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
-                    ..GrokAuth::test_default()
-                });
-                waker.refresh_notifier().notify_waiters();
-            });
+                    let waker = actor.auth_manager.clone().expect("actor has auth manager");
+                    tokio::task::spawn_local(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                        waker.hot_swap(GrokAuth {
+                            key: FRESH_TOKEN.to_string(),
+                            auth_mode: AuthMode::Oidc,
+                            refresh_token: Some("rt-new".into()),
+                            expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
+                            ..GrokAuth::test_default()
+                        });
+                        waker.refresh_notifier().notify_waiters();
+                    });
 
-            let outcome = run_prompt_with_cap(&actor, "parked-prefire", 86_400).await;
-            assert!(outcome.is_ok(), "parked turn must survive: {outcome:?}");
+                    let outcome = run_prompt_with_cap(&actor, "parked-prefire", 86_400).await;
+                    assert!(outcome.is_ok(), "parked turn must survive: {outcome:?}");
 
-            // Pass-1 sends: /responses requests without the foreground turn header.
-            let pass1_sends = server
-                .requests()
-                .into_iter()
-                .filter(|r| r.path.contains("/responses"))
-                .filter(|r| r.header("x-grok-turn-idx").is_none())
-                .count();
-            assert_eq!(
-                pass1_sends, 1,
-                "parked cycles must not re-spawn prefire pass-1"
-            );
-        })
-        .await;
+                    // Pass-1 sends: /responses requests without the foreground turn header.
+                    let pass1_sends = server
+                        .requests()
+                        .into_iter()
+                        .filter(|r| r.path.contains("/responses"))
+                        .filter(|r| r.header("x-grok-turn-idx").is_none())
+                        .count();
+                    assert_eq!(
+                        pass1_sends, 1,
+                        "parked cycles must not re-spawn prefire pass-1"
+                    );
+                })
+                .await;
+        });
+    });
 }
 
 /// Rule: parked turns must not fire the pre-sampling auto-compact — the
 /// credential-less compact 401s into `surface_compact_auth_failure` and aborts
 /// the very turn the park is keeping alive.
-#[tokio::test(flavor = "current_thread", start_paused = true)]
-async fn parked_turn_past_compact_threshold_does_not_auto_compact() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
-            let server = MockInferenceServer::start_with_required_auth(
-                vec![MockModelEntry::new("test")],
-                FRESH_TOKEN,
-            )
-            .await
-            .expect("mock inference server");
+#[test]
+fn parked_turn_past_compact_threshold_does_not_auto_compact() {
+    on_session_stack(|| {
+        run_current_thread(true, || async {
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async {
+                    let server = MockInferenceServer::start_with_required_auth(
+                        vec![MockModelEntry::new("test")],
+                        FRESH_TOKEN,
+                    )
+                    .await
+                    .expect("mock inference server");
 
-            let refresher = Arc::new(DeferredRefreshNeverLands::default());
-            let (_dir, am) = expired_auth_manager(refresher);
-            let (actor, updates) = session_token_actor(&server, am, ActorShape::default()).await;
+                    let refresher = Arc::new(DeferredRefreshNeverLands::default());
+                    let (_dir, am) = expired_auth_manager(refresher);
+                    let (actor, updates) =
+                        session_token_actor(&server, am, ActorShape::default()).await;
 
-            // 100k window, 85% threshold (create_test_actor): the seeded 90k
-            // usage puts every check past the auto-compact trigger.
-            let mut cfg = actor
-                .chat_state_handle
-                .get_sampling_config()
-                .await
-                .expect("test actor has sampling config");
-            cfg.context_window = std::num::NonZeroU64::new(100_000).expect("non-zero");
-            actor.chat_state_handle.update_sampling_config(cfg);
-            // Enough items that a leaked compact would really sample instead of
-            // short-circuiting on a too-small conversation.
-            use xai_grok_sampling_types::ConversationItem;
-            actor.chat_state_handle.replace_conversation(vec![
-                ConversationItem::system("you are a coding agent"),
-                ConversationItem::user("q1"),
-                ConversationItem::assistant("a1"),
-                ConversationItem::user("q2"),
-                ConversationItem::assistant("a2"),
-            ]);
+                    // 100k window, 85% threshold (create_test_actor): the seeded 90k
+                    // usage puts every check past the auto-compact trigger.
+                    let mut cfg = actor
+                        .chat_state_handle
+                        .get_sampling_config()
+                        .await
+                        .expect("test actor has sampling config");
+                    cfg.context_window = std::num::NonZeroU64::new(100_000).expect("non-zero");
+                    actor.chat_state_handle.update_sampling_config(cfg);
+                    // Enough items that a leaked compact would really sample instead of
+                    // short-circuiting on a too-small conversation.
+                    use xai_grok_sampling_types::ConversationItem;
+                    actor.chat_state_handle.replace_conversation(vec![
+                        ConversationItem::system("you are a coding agent"),
+                        ConversationItem::user("q1"),
+                        ConversationItem::assistant("a1"),
+                        ConversationItem::user("q2"),
+                        ConversationItem::assistant("a2"),
+                    ]);
 
-            // Usage crosses the threshold only after the first iteration's compact check (which runs un-parked at t=0): the first parked resubmit is paced ≥1s out, so a 500ms seed lands between the park and every parked.
-            let usage_seeder = actor.chat_state_handle.clone();
-            tokio::task::spawn_local(async move {
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                usage_seeder.record_token_usage(90_000);
-            });
+                    // Usage crosses the threshold only after the first iteration's compact check (which runs un-parked at t=0): the first parked resubmit is paced ≥1s out, so a 500ms seed lands between the park and every parked.
+                    let usage_seeder = actor.chat_state_handle.clone();
+                    tokio::task::spawn_local(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                        usage_seeder.record_token_usage(90_000);
+                    });
 
-            // Out-of-band recovery, 30 virtual seconds in.
-            let waker = actor.auth_manager.clone().expect("actor has auth manager");
-            tokio::task::spawn_local(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                waker.hot_swap(GrokAuth {
-                    key: FRESH_TOKEN.to_string(),
-                    auth_mode: AuthMode::Oidc,
-                    refresh_token: Some("rt-new".into()),
-                    expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
-                    ..GrokAuth::test_default()
-                });
-                waker.refresh_notifier().notify_waiters();
-            });
+                    // Out-of-band recovery, 30 virtual seconds in.
+                    let waker = actor.auth_manager.clone().expect("actor has auth manager");
+                    tokio::task::spawn_local(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                        waker.hot_swap(GrokAuth {
+                            key: FRESH_TOKEN.to_string(),
+                            auth_mode: AuthMode::Oidc,
+                            refresh_token: Some("rt-new".into()),
+                            expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
+                            ..GrokAuth::test_default()
+                        });
+                        waker.refresh_notifier().notify_waiters();
+                    });
 
-            let outcome = run_prompt_with_cap(&actor, "parked-no-auto-compact", 86_400).await;
-            assert!(
-                outcome.is_ok(),
-                "a parked turn past the compact threshold must stay parked and \
+                    let outcome =
+                        run_prompt_with_cap(&actor, "parked-no-auto-compact", 86_400).await;
+                    assert!(
+                        outcome.is_ok(),
+                        "a parked turn past the compact threshold must stay parked and \
                  survive: {outcome:?}"
-            );
-            assert!(
-                terminal_failure(&updates).is_none(),
-                "a surviving turn must not report a terminal retryState"
-            );
-            // Compact sends are the only /responses requests without the
-            // foreground turn header (two-pass prefire stays off here).
-            let compact_sends = server
-                .requests()
-                .into_iter()
-                .filter(|r| r.path.contains("/responses"))
-                .filter(|r| r.header("x-grok-turn-idx").is_none())
-                .count();
-            assert_eq!(
-                compact_sends, 0,
-                "parked iterations must not send a credential-less compact"
-            );
-        })
-        .await;
+                    );
+                    assert!(
+                        terminal_failure(&updates).is_none(),
+                        "a surviving turn must not report a terminal retryState"
+                    );
+                    // Compact sends are the only /responses requests without the
+                    // foreground turn header (two-pass prefire stays off here).
+                    let compact_sends = server
+                        .requests()
+                        .into_iter()
+                        .filter(|r| r.path.contains("/responses"))
+                        .filter(|r| r.header("x-grok-turn-idx").is_none())
+                        .count();
+                    assert_eq!(
+                        compact_sends, 0,
+                        "parked iterations must not send a credential-less compact"
+                    );
+                })
+                .await;
+        });
+    });
 }
 
 /// Fails transiently until `recovers` flips, then mints [`FRESH_TOKEN`]; counts
@@ -1058,151 +1088,167 @@ impl xai_grok_login::refresh::TokenRefresher for DeferredThenRecovers {
 
 /// Rule: a `Sent` rejection leaves the park path onto the charged budget (terminating
 /// after `MAX_RETRIES`) — pins the `is_missing()` conjunct of the re-park arm.
-#[tokio::test(flavor = "current_thread", start_paused = true)]
-async fn parked_turn_authenticated_rejection_dispatches_and_exhausts_charged() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
-            // The server accepts a token nobody mints: 401s before and after the landing.
-            let server = MockInferenceServer::start_with_required_auth(
-                vec![MockModelEntry::new("test")],
-                "never-issued-token",
-            )
-            .await
-            .expect("mock inference server");
+#[test]
+fn parked_turn_authenticated_rejection_dispatches_and_exhausts_charged() {
+    on_session_stack(|| {
+        run_current_thread(true, || async {
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async {
+                    // The server accepts a token nobody mints: 401s before and after the landing.
+                    let server = MockInferenceServer::start_with_required_auth(
+                        vec![MockModelEntry::new("test")],
+                        "never-issued-token",
+                    )
+                    .await
+                    .expect("mock inference server");
 
-            let refresher = Arc::new(DeferredThenRecovers::default());
-            let server_rejected_calls = refresher.server_rejected_calls.clone();
-            let recovers = refresher.recovers.clone();
-            let (_dir, am) = expired_auth_manager(refresher);
-            let (actor, updates) = session_token_actor(&server, am, ActorShape::default()).await;
+                    let refresher = Arc::new(DeferredThenRecovers::default());
+                    let server_rejected_calls = refresher.server_rejected_calls.clone();
+                    let recovers = refresher.recovers.clone();
+                    let (_dir, am) = expired_auth_manager(refresher);
+                    let (actor, updates) =
+                        session_token_actor(&server, am, ActorShape::default()).await;
 
-            // 30 virtual seconds in, a wire-valid token lands — the server keeps rejecting.
-            let waker = actor.auth_manager.clone().expect("actor has auth manager");
-            tokio::task::spawn_local(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                recovers.store(true, Ordering::SeqCst);
-                waker.hot_swap(GrokAuth {
-                    key: FRESH_TOKEN.to_string(),
-                    auth_mode: AuthMode::Oidc,
-                    refresh_token: Some("rt-new".into()),
-                    expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
-                    ..GrokAuth::test_default()
-                });
-                waker.refresh_notifier().notify_waiters();
-            });
+                    // 30 virtual seconds in, a wire-valid token lands — the server keeps rejecting.
+                    let waker = actor.auth_manager.clone().expect("actor has auth manager");
+                    tokio::task::spawn_local(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                        recovers.store(true, Ordering::SeqCst);
+                        waker.hot_swap(GrokAuth {
+                            key: FRESH_TOKEN.to_string(),
+                            auth_mode: AuthMode::Oidc,
+                            refresh_token: Some("rt-new".into()),
+                            expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(1)),
+                            ..GrokAuth::test_default()
+                        });
+                        waker.refresh_notifier().notify_waiters();
+                    });
 
-            let outcome = run_prompt_with_cap(&actor, "parked-then-sent-401", 86_400).await;
-            let err =
-                outcome.expect_err("authenticated rejections must exhaust the charged budget");
-            let rendered = serde_json::to_string(&err.data).unwrap_or_default();
-            assert!(
-                rendered.contains("authenticated inference requests were still rejected"),
-                "exhaustion must name authenticated rejections, got: {rendered}"
-            );
+                    let outcome = run_prompt_with_cap(&actor, "parked-then-sent-401", 86_400).await;
+                    let err = outcome
+                        .expect_err("authenticated rejections must exhaust the charged budget");
+                    let rendered = serde_json::to_string(&err.data).unwrap_or_default();
+                    assert!(
+                        rendered.contains("authenticated inference requests were still rejected"),
+                        "exhaustion must name authenticated rejections, got: {rendered}"
+                    );
 
-            let authenticated = server
-                .requests()
-                .into_iter()
-                .filter(|r| r.path.contains("/responses"))
-                .filter(|r| r.authorization.as_deref() == Some(&format!("Bearer {FRESH_TOKEN}")))
-                .count();
-            assert_eq!(
-                authenticated,
-                (AuthRetrySchedule::MAX_RETRIES + 1) as usize,
-                "first authenticated resubmit plus MAX_RETRIES charged retries"
-            );
-            // Sent rejections dispatch recovery, but it short-circuits on the wire-valid
-            // landed token — only the pre-park dispatch reaches the refresher.
-            assert_eq!(
-                server_rejected_calls.load(Ordering::SeqCst),
-                2,
-                "only the pre-park recovery dispatch may reach the refresher"
-            );
-            // The budget flips at the landing: exactly MAX_RETRIES charged backoffs after,
-            // all uncharged before — a dropped `is_missing()` conjunct breaks both halves.
-            let retrying = retrying_updates(&updates);
-            let (parked, charged) =
-                retrying.split_at(retrying.len() - AuthRetrySchedule::MAX_RETRIES as usize);
-            assert!(
-                !parked.is_empty()
-                    && parked
-                        .iter()
-                        .all(|(_, max, _)| *max == AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS),
-                "pre-landing rejections ride the uncharged budget: {retrying:?}"
-            );
-            for (i, (attempt, max, _)) in charged.iter().enumerate() {
-                assert_eq!(*attempt, (i + 1) as u32, "charged attempts renumber from 1");
-                assert_eq!(
-                    *max,
-                    AuthRetrySchedule::MAX_RETRIES,
-                    "post-landing rejections ride the charged budget: {retrying:?}"
-                );
-            }
+                    let authenticated = server
+                        .requests()
+                        .into_iter()
+                        .filter(|r| r.path.contains("/responses"))
+                        .filter(|r| {
+                            r.authorization.as_deref() == Some(&format!("Bearer {FRESH_TOKEN}"))
+                        })
+                        .count();
+                    assert_eq!(
+                        authenticated,
+                        (AuthRetrySchedule::MAX_RETRIES + 1) as usize,
+                        "first authenticated resubmit plus MAX_RETRIES charged retries"
+                    );
+                    // Sent rejections dispatch recovery, but it short-circuits on the wire-valid
+                    // landed token — only the pre-park dispatch reaches the refresher.
+                    assert_eq!(
+                        server_rejected_calls.load(Ordering::SeqCst),
+                        2,
+                        "only the pre-park recovery dispatch may reach the refresher"
+                    );
+                    // The budget flips at the landing: exactly MAX_RETRIES charged backoffs after,
+                    // all uncharged before — a dropped `is_missing()` conjunct breaks both halves.
+                    let retrying = retrying_updates(&updates);
+                    let (parked, charged) =
+                        retrying.split_at(retrying.len() - AuthRetrySchedule::MAX_RETRIES as usize);
+                    assert!(
+                        !parked.is_empty()
+                            && parked
+                                .iter()
+                                .all(|(_, max, _)| *max
+                                    == AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS),
+                        "pre-landing rejections ride the uncharged budget: {retrying:?}"
+                    );
+                    for (i, (attempt, max, _)) in charged.iter().enumerate() {
+                        assert_eq!(*attempt, (i + 1) as u32, "charged attempts renumber from 1");
+                        assert_eq!(
+                            *max,
+                            AuthRetrySchedule::MAX_RETRIES,
+                            "post-landing rejections ride the charged budget: {retrying:?}"
+                        );
+                    }
 
-            let (error_type, message) = terminal_failure(&updates)
-                .expect("an exhausted turn must report a terminal retryState");
-            assert_eq!(error_type, "auth", "{message}");
-        })
-        .await;
+                    let (error_type, message) = terminal_failure(&updates)
+                        .expect("an exhausted turn must report a terminal retryState");
+                    assert_eq!(error_type, "auth", "{message}");
+                })
+                .await;
+        });
+    });
 }
 
 /// Rule: with a refresh that never lands, the runaway guard fails the turn with a
 /// client-visible terminal retryState — not an infinite loop.
-#[tokio::test(flavor = "current_thread", start_paused = true)]
-async fn never_recovering_credential_less_401_hits_runaway_guard() {
-    let local = tokio::task::LocalSet::new();
-    local
-        .run_until(async {
-            let server = MockInferenceServer::start_with_required_auth(
-                vec![MockModelEntry::new("test")],
-                "never-issued-token",
-            )
-            .await
-            .expect("mock inference server");
+#[test]
+fn never_recovering_credential_less_401_hits_runaway_guard() {
+    on_session_stack(|| {
+        run_current_thread(true, || async {
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async {
+                    let server = MockInferenceServer::start_with_required_auth(
+                        vec![MockModelEntry::new("test")],
+                        "never-issued-token",
+                    )
+                    .await
+                    .expect("mock inference server");
 
-            let (_dir, am) = expired_auth_manager(Arc::new(DeferredRefreshNeverLands::default()));
-            let (actor, updates) = session_token_actor(&server, am, ActorShape::default()).await;
+                    let (_dir, am) =
+                        expired_auth_manager(Arc::new(DeferredRefreshNeverLands::default()));
+                    let (actor, updates) =
+                        session_token_actor(&server, am, ActorShape::default()).await;
 
-            let outcome = run_prompt_with_cap(&actor, "runaway-guard-bounded", 86_400).await;
+                    let outcome =
+                        run_prompt_with_cap(&actor, "runaway-guard-bounded", 86_400).await;
 
-            let err = outcome.expect_err("a never-landing refresh must fail the turn bounded");
-            let rendered = serde_json::to_string(&err.data).unwrap_or_default();
-            assert!(
-                rendered.contains("runaway guard"),
-                "failure must name the runaway guard, got: {rendered}"
-            );
+                    let err =
+                        outcome.expect_err("a never-landing refresh must fail the turn bounded");
+                    let rendered = serde_json::to_string(&err.data).unwrap_or_default();
+                    assert!(
+                        rendered.contains("runaway guard"),
+                        "failure must name the runaway guard, got: {rendered}"
+                    );
 
-            let unauthenticated = server
-                .requests()
-                .into_iter()
-                .filter(|r| r.path.contains("/responses"))
-                .filter(|r| r.authorization.is_none())
-                .count();
-            assert_eq!(
-                unauthenticated,
-                (AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS + 1) as usize,
-                "initial send plus MAX_UNCHARGED_RESUBMITS parked resubmits, all \
+                    let unauthenticated = server
+                        .requests()
+                        .into_iter()
+                        .filter(|r| r.path.contains("/responses"))
+                        .filter(|r| r.authorization.is_none())
+                        .count();
+                    assert_eq!(
+                        unauthenticated,
+                        (AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS + 1) as usize,
+                        "initial send plus MAX_UNCHARGED_RESUBMITS parked resubmits, all \
                  credential-less"
-            );
+                    );
 
-            let (error_type, message) =
-                terminal_failure(&updates).expect("bounded failure must reach the client");
-            assert_eq!(
-                error_type, "auth",
-                "retries exhausted escalates SelfHealing to ManualLogin: {message}"
-            );
-            assert!(
-                message.contains("runaway guard"),
-                "the notification must carry the runaway-guard story: {message}"
-            );
-            // A charged `max_retries: 3` leaking in here renders "attempt 27/3" in the pager.
-            assert_retrying(
-                &updates,
-                AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS as usize,
-                AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS,
-                &["Re-authenticating after 401", "carried no credential"],
-            );
-        })
-        .await;
+                    let (error_type, message) =
+                        terminal_failure(&updates).expect("bounded failure must reach the client");
+                    assert_eq!(
+                        error_type, "auth",
+                        "retries exhausted escalates SelfHealing to ManualLogin: {message}"
+                    );
+                    assert!(
+                        message.contains("runaway guard"),
+                        "the notification must carry the runaway-guard story: {message}"
+                    );
+                    // A charged `max_retries: 3` leaking in here renders "attempt 27/3" in the pager.
+                    assert_retrying(
+                        &updates,
+                        AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS as usize,
+                        AuthRetrySchedule::MAX_UNCHARGED_RESUBMITS,
+                        &["Re-authenticating after 401", "carried no credential"],
+                    );
+                })
+                .await;
+        });
+    });
 }

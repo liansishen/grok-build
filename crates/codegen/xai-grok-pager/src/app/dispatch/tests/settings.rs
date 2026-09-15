@@ -1849,6 +1849,9 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
                 app,
             );
         }
+        "show_background_task_completion_reminders" => {
+            let _ = dispatch(Action::SetShowBackgroundTaskCompletionReminders(false), app);
+        }
         other => {
             panic!(
                 "move_setting_away_from_default: no arm for `{other}`. \
@@ -3489,12 +3492,16 @@ fn set_auto_dark_theme_does_not_apply_when_theme_is_not_auto() {
 /// uncertainty. The "live apply" contract is what we're testing
 /// — the specific theme picked is incidental.
 #[test]
+#[serial_test::serial(GROK_THEME)]
 fn set_auto_dark_theme_applies_when_theme_is_auto_and_system_is_dark() {
     with_theme_test_env(|| {
         crate::theme::system_appearance::set_mock(Some(
             crate::theme::system_appearance::SystemAppearance::Dark,
         ));
         let mut app = test_app_with_agent();
+        app.current_ui.auto_dark_theme = Some("groknight".into());
+        crate::theme::Theme::apply_kind(crate::theme::ThemeKind::GrokNight);
+        crate::theme::cache::seed_auto_theme_defaults_for_test();
         let _ = dispatch(Action::SetTheme("auto".into()), &mut app);
         assert!(crate::theme::cache::is_auto_mode());
         assert_eq!(
@@ -3516,12 +3523,16 @@ fn set_auto_dark_theme_applies_when_theme_is_auto_and_system_is_dark() {
 /// concrete kind that's clearly different from GrokDay, the
 /// active resolved theme).
 #[test]
+#[serial_test::serial(GROK_THEME)]
 fn set_auto_dark_theme_does_not_apply_when_system_is_light() {
     with_theme_test_env(|| {
         crate::theme::system_appearance::set_mock(Some(
             crate::theme::system_appearance::SystemAppearance::Light,
         ));
         let mut app = test_app_with_agent();
+        app.current_ui.auto_dark_theme = Some("groknight".into());
+        crate::theme::Theme::apply_kind(crate::theme::ThemeKind::GrokDay);
+        crate::theme::cache::seed_auto_theme_defaults_for_test();
         let _ = dispatch(Action::SetTheme("auto".into()), &mut app);
         assert_eq!(
             crate::theme::cache::current_kind(),
@@ -3540,12 +3551,16 @@ fn set_auto_dark_theme_does_not_apply_when_system_is_light() {
 /// when theme=auto + system=Light. Uses a non-truecolor theme
 /// (`groknight`) for the same clamp reason as the dark variant.
 #[test]
+#[serial_test::serial(GROK_THEME)]
 fn set_auto_light_theme_applies_when_theme_is_auto_and_system_is_light() {
     with_theme_test_env(|| {
         crate::theme::system_appearance::set_mock(Some(
             crate::theme::system_appearance::SystemAppearance::Light,
         ));
         let mut app = test_app_with_agent();
+        app.current_ui.auto_light_theme = Some("grokday".into());
+        crate::theme::Theme::apply_kind(crate::theme::ThemeKind::GrokDay);
+        crate::theme::cache::seed_auto_theme_defaults_for_test();
         let _ = dispatch(Action::SetTheme("auto".into()), &mut app);
         assert_eq!(
             crate::theme::cache::current_kind(),

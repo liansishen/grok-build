@@ -33,7 +33,7 @@
 可通过环境变量或配置文件禁用子智能体：
 
 ```bash
-export GROK_SUBAGENTS=0              # 环境变量
+export GROK_SUBAGENTS=0              # Environment variable
 ```
 
 ```toml
@@ -164,12 +164,36 @@ description = "Path to write review notes"
 
 后台运行子智能体时，稍后使用 `get_command_or_subagent_output` 获取其结果。
 
-### 向活动中的子智能体发送消息
+### 向子智能体发送消息
 
-`send_subagent_message` 工具目前仅根会话可用，而且只能向该会话拥有的活动子智能体发送消息。可选参数 `queue` 控制投递方式：
+`send_subagent_message` 工具默认关闭。使用 `GROK_ACTIVE_AGENT_MESSAGES` 或 `[features] active_agent_messages` 启用它。
 
-- 省略或设为 `false` 时使用 **Steer**。若子智能体空闲，该消息会成为一个受保护的排队轮次；若其正在运行，消息会在下一个安全点注入当前轮次。
-- 设为 `true` 时使用 **Queue**，保留排队轮次行为：消息会作为受保护轮次等待，而不会进入活动轮次。
+根会话可以向自己拥有的子智能体发送后续消息。开关启用后，获授权的子级也会获得该工具：
+
+- `subagent_id: "parent"` 指向该子级当前的父智能体。
+- 持久智能体 ID 可指向另一个本地子智能体。符合条件的已完成子智能体会以相同身份恢复。
+
+父级是根会话的子级不能向根会话发消息。精选 harness 工具集不会获得该工具；排除这类工具的能力模式也会将其排除。
+
+每个发送者-目标对最多允许 4 条在途消息，每次发送尝试最多 32 条出站消息。超过限制会返回 `QuotaExceeded`。
+
+不活跃的子智能体会将消息作为下一轮唤醒。对于活跃的子智能体，可选的 `delivery` 参数控制消息到达方式：
+
+- `steer`（默认）在下一个安全点加入当前轮次。
+- `queue` 作为受保护的后续轮次等待，不进入当前轮次。
+- `interject` 为紧急模式：在最早安全点排在待处理 steer 之前；如果子智能体正在等待后台工作，还会中断等待，让它立即读取消息。只有等待调用提前结束，后台工作仍会继续。
+
+如果子智能体处于活跃状态但正处于轮次之间，`steer` 和 `interject` 都会变成一个受保护的排队轮次，随后子智能体开始处理。旧版 `queue: true` 仍受支持，并表示 `delivery: "queue"`；两者同时存在时以 `delivery` 为准。
+
+记录会将每次发送显示为一行 `Message`：先显示结果动词，再显示子智能体标签（类型、Persona 或角色）以及花括号引号中的描述；其 `Subagent …: “…”` 回滚行会引用该描述，并截断到首行 40 个字符。动词体现投递方式，因此 steer 不带标记：
+
+- `Message sent to Explore “find callers”`（steer）
+- `Message queued for Explore “find callers”` / `Message interjected to Explore “find callers”`
+- 发送进行中显示带动画项目符号的 `Message sending to …`
+- 拒绝发送显示 `Message rejected · Explore “find callers”`，Shell 无法确认的发送显示 `Message unconfirmed · Explore “find callers”`
+- 子级向父级发送消息时显示 `Message sent to parent`
+
+折叠行不会显示消息或原因。**Right**（Vim 模式下为 `l`/`e`）展开后会显示请求的投递方式、完整消息文本以及拒绝或未确认发送的原因；**Left**（或 `h`）再次折叠。按 **Enter**、**Ctrl+F** 或双击该行会打开对应子智能体的视图，与其 `Subagent` 行完全相同（Right/Left 仍用于折叠）。如果子智能体未在本会话中生成（无头 `grok export` 或来自其他会话的 ID），该行会用 ID 最后 8 个字符命名为 `subagent …xxxxxxxx`，展开时显示原始 `Subagent ID:`，且无法打开。
 
 ---
 
@@ -260,11 +284,11 @@ Grok Build 通过 `x.ai/git/worktree/*` 扩展方法管理工作树，其中包�
 
 ```toml
 [subagents.toggle]
-explore = true                       # 默认——省略以保持启用
-plan = false                         # 禁用 plan 子智能体
+explore = true                       # default -- omit to keep enabled
+plan = false                         # disable the plan subagent
 
 [subagents.models]
-explore = "grok-build"               # 将 explore 路由到特定模型
+explore = "grok-4.6"                 # route explore to a specific model
 ```
 
 按类型的模型覆盖适用于任何父级。没有覆盖时，子智能体继承父级模型。
@@ -278,7 +302,7 @@ explore = "grok-build"               # 将 explore 路由到特定模型
 [subagents.roles.researcher]
 description = "Deep research agent"
 default_capability_mode = "read-only"
-model = "grok-build"
+model = "grok-4.6"
 prompt_file = ".grok/prompts/researcher.md"
 ```
 
@@ -287,7 +311,7 @@ prompt_file = ".grok/prompts/researcher.md"
 ```toml
 [subagents.personas.concise]
 instructions = "Be concise. No filler words."
-# instructions_file = ".grok/personas/concise.md"  # 或从文件加载
+# instructions_file = ".grok/personas/concise.md"  # or load from a file
 ```
 
 Grok Build 还会从 `.grok/roles/*.toml` 发现角色，从 `.grok/personas/*.toml` 发现 Persona。内联 `config.toml` 定义的优先级高于文件。
@@ -330,18 +354,50 @@ Grok Build 会在智能体屏幕的侧窗格中显示运行中和已完成的工
 <a id="tasks-pane-ctrl-g"></a>
 ### 任务窗格（Ctrl+G）
 
-如上所述——任务窗格按“Subagents”分组显示子智能体，并提供旋转指示器、耗时以及快速终止或检查的入口。
+如上所述——任务窗格按“Subagents”分组显示子智能体，并提供旋转指示器、耗时以及快速终止或检查的入口。按 `h` 切换隐藏已完成/显示全部。
 
 <a id="fullscreen-framed-view-the-child-transcript"></a>
+### 停靠栏（启用时）
+
+提示框上方的停靠栏会列出子智能体。停靠栏获得焦点时，按 `h` 切换隐藏已完成/显示全部（与任务窗格相同的过滤器）；按 Left / Right 折叠或展开分组标题。
+
 ### 全屏框架视图（子级记录）
 
-从回滚区块或任务窗格打开子智能体时，父级视图会被替换为一个带边框的框架，其中包含子级的完整记录：
+从回滚区块、任务窗格或 dashboard 行打开子智能体时，父级视图会被一个带边框的框架替换，其中显示子级的完整记录：
 
 - 框架内的标题栏：状态图标（旋转指示器 / ✓ / ✗）、标签 + 粗体描述 + 模型、可选的“resumed”/“forked”徽章、实时活动 · 已耗时，以及 [✗] 关闭按钮。
-- 子智能体自己的回滚、思考、工具调用和（有限的）提示区域会在框架内渲染。
-- 子智能体视图主要用于观察——通常不能像对父级会话那样，直接向子级发送新的顶层提示。
+- 子智能体自己的回滚、思考和工具调用会在框架内渲染。
+- 父级任务窗格、待办窗格、停靠栏和目录在视图期间隐藏。
 
-使用 `q`、`Esc` 或点击关闭按钮返回父级视图。父级回滚区会继续显示子智能体的状态。
+该视图用于观察。编写器隐藏（零行），无法聚焦、输入提示、暂存草稿或发送后续消息。提示仍由父会话拥有；要引导运行中的子级，请关闭此视图，在父级使用 `send_subagent_message`（参见[向子智能体发送消息](#向子智能体发送消息)）。
+
+**仍然有效**
+
+- 滚动、折叠、复制、打开链接，以及在子级记录中打开块查看器。
+- `Ctrl+C` 取消**子级**轮次，不会取消父级。
+- `Ctrl+.` / `Ctrl+X` 打开子级按键的快捷键速查表。
+- 接管标题中的 dashboard 控件（`[Dashboard]`、`‹` / `›`）仍作用于**父级**。
+- 块查看器中空闲时按 `Enter` 会将选中行引用到父级编写器并关闭视图。
+
+**无效操作（安全关闭）**
+
+根级快捷键不会在此界面启动，不会在子级打开模态框，也不会泄漏到父级：
+
+- 命令面板（`Ctrl+P`）、模型选择器（`Alt+M`）、会话选择器（`Ctrl+R`）
+- 设置、扩展、始终批准（`Ctrl+O`）、发送到后台（`Ctrl+B`）
+- 外部提示编辑器、Shift+Tab 模式循环
+
+被拒绝的操作只会静默重绘，不会显示提示。
+
+如果出现提示队列覆盖层，它只是**只读镜像**。无法编辑、立即发送或移除行；队列 RPC 始终指向父会话。
+
+**如何离开**
+
+- 在普通回滚区按 `q` 或 `Esc`，或点击 [✗]。
+- 若回滚搜索已打开，`q` / `Esc` 会先关闭搜索；之后再次按键才关闭视图。
+- `Ctrl+Q` 始终退出 Grok，在此处不会被吞掉。
+
+关闭后，父级回滚区仍会显示子智能体状态。
 
 ---
 

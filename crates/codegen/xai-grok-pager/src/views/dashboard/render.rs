@@ -2097,12 +2097,18 @@ fn render_row(
     } else {
         state_color(row.state, theme)
     };
-    match row.state.animation() {
-        Some(Animation::Spinner) => state.painted_animations.mark(Animation::Spinner),
-        Some(Animation::Blink) if needs_input_blink_visible(theme) => {
-            state.painted_animations.mark(Animation::Blink);
+    let roster_static = matches!(
+        row.id,
+        super::DashboardRowId::Roster { .. } | super::DashboardRowId::Workspace { .. }
+    ) && row.state == RowState::NeedsInput;
+    if !roster_static {
+        match row.state.animation() {
+            Some(Animation::Spinner) => state.painted_animations.mark(Animation::Spinner),
+            Some(Animation::Blink) if needs_input_blink_visible(theme) => {
+                state.painted_animations.mark(Animation::Blink);
+            }
+            Some(Animation::Blink) | None => {}
         }
-        Some(Animation::Blink) | None => {}
     }
     let icon_w = UnicodeWidthStr::width(icon) as u16;
     // Title-row paint cursor. Title-only rows sit padded above and below, while 2-line rows stay
@@ -3303,6 +3309,7 @@ fn render_footer(
         xai_grok_i18n::t("dashboard.hint.delete")
     };
 
+
     // Overview list focused (via Tab), navigation hints: arrows / j-k move between agents, Enter opens
     // the focused one, Tab returns to the input.
     if state.list_focused && !peek_active {
@@ -3315,6 +3322,25 @@ fn render_footer(
             key!('.', CONTROL),
         );
         // The ↑/↓ (and vim j/k) nav chip is intentionally omitted.
+        if let Some(label) = state.focused_action_label() {
+            let label = if state.focused_new_agent_sends_draft() {
+                xai_grok_i18n::t("dashboard.footer.send")
+            } else if state.new_agent_button_focused() {
+                xai_grok_i18n::t("dashboard.footer.create")
+            } else if state.open_session_button_focused() {
+                xai_grok_i18n::t("dashboard.footer.open_previous")
+            } else if state.worktree_armed() {
+                xai_grok_i18n::t("dashboard.footer.disable_worktree")
+            } else {
+                xai_grok_i18n::t("dashboard.footer.enable_worktree")
+            };
+            let mut hints = vec![HintItem::new(key!(Enter), label), HintItem::new(key!(Tab), xai_grok_i18n::t("dashboard.footer.input"))];
+            if state.focused_new_agent_sends_draft() {
+                hints.insert(1, HintItem::new(key!('s', CONTROL), xai_grok_i18n::t("dashboard.footer.send_open")));
+            }
+            ShortcutsBar::new(&hints).compact(4, Some(HintItem::new(help, xai_grok_i18n::t("dashboard.footer.shortcuts")))).render(inner, buf);
+            return;
+        }
         if state.selected_idle_overflow {
             let toggle = if state.idle_show_all {
                 xai_grok_i18n::t("dashboard.footer.show_fewer")
@@ -3626,6 +3652,14 @@ fn render_footer(
                 HintItem::new(key!(BackTab), xai_grok_i18n::t("dashboard.footer.mode")),
             ]
         }
+    } else if state.open_session_button_focused() {
+        vec![HintItem::new(enter, xai_grok_i18n::t("dashboard.footer.open_previous"))]
+    } else if state.worktree_toggle_focused() {
+        if prompt_empty {
+            vec![HintItem::new(enter, xai_grok_i18n::t(if state.worktree_armed() { "dashboard.footer.disable_worktree" } else { "dashboard.footer.enable_worktree" }))]
+        } else {
+            vec![HintItem::new(send_key, xai_grok_i18n::t("dashboard.footer.send")), HintItem::new(send_open, xai_grok_i18n::t("dashboard.footer.send_open"))]
+        }
     } else if button_focused {
         let mut h: Vec<HintItem> = vec![];
         if prompt_empty {
@@ -3726,7 +3760,16 @@ fn needs_input_bullet_color(tick: u64, theme: &Theme) -> Color {
 }
 
 fn needs_input_dim_color(theme: &Theme) -> Option<Color> {
-    crate::render::color::blend_color(theme.bg_base, theme.warning, 0.5)
+    crate::render::color::blend_color(theme.bg_base, theme.warning, 0.5).or_else(|| {
+        match theme.warning {
+            Color::Rgb(..) => crate::render::color::blend_color(
+                Color::Rgb(20, 20, 20),
+                theme.warning,
+                0.5,
+            ),
+            _ => None,
+        }
+    })
 }
 
 fn needs_input_blink_visible(theme: &Theme) -> bool {

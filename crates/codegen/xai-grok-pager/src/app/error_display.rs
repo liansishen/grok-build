@@ -1028,7 +1028,7 @@ mod tests {
         );
         assert_eq!(
             format_retry_activity_label(2, 5, "", None, RetryLabelStyle::Status),
-            "Retrying (attempt 2)..."
+            "Retrying (attempt 2)…"
         );
         assert_eq!(
             format_retry_activity_label(
@@ -1038,11 +1038,11 @@ mod tests {
                 None,
                 RetryLabelStyle::Status
             ),
-            "Retrying (attempt 1)..."
+            "Retrying (attempt 1)…"
         );
         assert_eq!(
             format_retry_activity_label(3, 5, "weird dump", Some("http"), RetryLabelStyle::Status),
-            "Connection failed | Retrying (attempt 3)..."
+            "Connection failed | Retrying (attempt 3)…"
         );
         assert_eq!(
             format_retry_activity_label(
@@ -1056,7 +1056,7 @@ mod tests {
         );
         assert_eq!(
             format_retry_activity_label(1, 3, dns, Some("a_future_kind"), RetryLabelStyle::Status),
-            "Retrying (attempt 1)..."
+            "Retrying (attempt 1)…"
         );
         assert_eq!(
             format_request_failure(
