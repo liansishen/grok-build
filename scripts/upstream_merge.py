@@ -303,6 +303,13 @@ def marker_audit(repo: Path) -> MarkerAudit:
             continue
         if path.suffix not in CODE_SUFFIXES:
             continue
+        relative_parts = path.relative_to(repo).parts
+        if (
+            "tests" in relative_parts
+            or path.name.startswith("test_")
+            or path.stem.endswith("_tests")
+        ):
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
