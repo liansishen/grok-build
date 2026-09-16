@@ -245,6 +245,13 @@ pub(super) fn handle_session_notification_with_origin(
         tracing::warn!("Failed to parse {}", notif.method.as_ref());
         return false;
     };
+    let envelope = SessionUpdateEnvelope::from_method_and_meta(
+        notif.method.as_ref(),
+        session_notif.meta.as_ref().and_then(|value| value.as_object()),
+    )
+    .expect("xAI session update has a known carrier");
+    let carrier = envelope.carrier;
+    let mut meta = envelope.meta;
     match &session_notif.update {
         XaiSessionUpdate::TaskBackgrounded { .. } => {
             return handle_task_backgrounded(notif, app);
@@ -274,11 +281,7 @@ pub(super) fn handle_session_notification_with_origin(
     };
     let parent_id = matched.agent_id();
     let is_active = is_matched_agent_active(app, parent_id);
-    let session_update_prompt_id = session_notif
-        .meta
-        .as_ref()
-        .and_then(|meta| meta.get("promptId"))
-        .and_then(serde_json::Value::as_str);
+    let session_update_prompt_id = meta.prompt_id.as_deref();
     let agent = app
         .agents
         .get_mut(&parent_id)
@@ -305,12 +308,11 @@ pub(super) fn handle_session_notification_with_origin(
         );
         return changed && is_active;
     }
-    let meta = NotificationMeta::from_json(session_notif.meta.as_ref().and_then(|v| v.as_object()));
     if drop_unexpected_replay(
         agent,
         &meta,
         session_notif.session_id.0.as_ref(),
-        "x.ai/session/update",
+        carrier.method(),
     ) {
         return false;
     }

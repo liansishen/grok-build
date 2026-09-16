@@ -233,6 +233,22 @@ impl PermissionRequest {
             hook_ask: None,
         }
     }
+
+    /// Attach the requester's path and provenance without constructing a second
+    /// request shape at an ACP or session call site.
+    pub fn with_request_context(
+        mut self,
+        path_context: Option<RequestPathContext>,
+        session_id: Option<String>,
+        subagent_type: Option<String>,
+        subagent_description: Option<String>,
+    ) -> Self {
+        self.path_context = path_context;
+        self.session_id = session_id;
+        self.subagent_type = subagent_type;
+        self.subagent_description = subagent_description;
+        self
+    }
 }
 #[allow(clippy::large_enum_variant)]
 pub enum PermissionCommand {

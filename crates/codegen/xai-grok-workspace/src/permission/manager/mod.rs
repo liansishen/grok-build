@@ -372,16 +372,13 @@ impl PermissionHandle {
         subagent_type: Option<String>,
         subagent_description: Option<String>,
     ) -> PermissionResolution {
-        self.request_permission(PermissionRequest {
-            access,
-            tool_call_update,
+        let request = PermissionRequest::new(access, tool_call_update).with_request_context(
             path_context,
             session_id,
             subagent_type,
             subagent_description,
-            hook_ask: None,
-        })
-        .await
+        );
+        self.request_permission(request).await
     }
 }
 

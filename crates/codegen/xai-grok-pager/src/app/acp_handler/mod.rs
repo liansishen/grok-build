@@ -21,7 +21,7 @@ use xai_grok_shell::tools::todo::todo_item_from_plan_entry;
 use xai_grok_tools::notification::ScheduledTaskRemovedReason;
 use xai_grok_workspace::permission::bash_command_splitting::BashCommandHighlights;
 
-use crate::acp::meta::NotificationMeta;
+use crate::acp::meta::{NotificationMeta, SessionUpdateEnvelope};
 use crate::acp::tracker::AcpUpdateTracker;
 use crate::acp::tracker::TurnActivity;
 use crate::app::agent::{
@@ -167,7 +167,13 @@ fn is_replay_bash_execute(update: &acp::SessionUpdate) -> bool {
 pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
     match msg {
         AcpClientMessage::SessionNotification(notif) => {
-            let mut meta = NotificationMeta::from_json(notif.request.meta.as_ref());
+            let envelope = SessionUpdateEnvelope::from_method_and_meta(
+                "session/update",
+                notif.request.meta.as_ref(),
+            )
+            .expect("standard session update has a known carrier");
+            let carrier = envelope.carrier;
+            let mut meta = envelope.meta;
 
             let affected = match find_session_match(app, &notif.request.session_id) {
                 Some(SessionMatch::Root(id)) => {
@@ -228,7 +234,7 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         agent,
                         &meta,
                         notif.request.session_id.0.as_ref(),
-                        "session/update",
+                        carrier.method(),
                     ) {
                         notif.response_tx.send(Ok(())).ok();
                         return false;

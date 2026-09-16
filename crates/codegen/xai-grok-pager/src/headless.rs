@@ -660,6 +660,7 @@ async fn fork_then_open(
     use crate::app::session_startup::{
         effective_fork_new_cwd, ensure_session_id_available, fork_response_error,
         fork_response_new_session_id, fork_session_params, parent_session_is_worktree,
+        SessionRequestContext,
     };
     let launch_cwd_str = launch_cwd.to_string_lossy().into_owned();
     // Match interactive: child lands under the parent session cwd, not the launch cwd.
@@ -675,13 +676,13 @@ async fn fork_then_open(
         crate::app::session_startup::effective_fork_secondary_model_id(&ui.fork_secondary_model)
             .map(|s| s.to_string())
     };
-    let mut payload = fork_session_params(
+    let mut payload = fork_session_params(SessionRequestContext::new(
         parent_id,
         &write_cwd,
         new_id,
         parent_is_worktree,
         fork_model.as_deref(),
-    );
+    ));
     // Shared helper stamps `fork` for interactive `/fork`. `-p` children must
     // stay headless: the load path below never restamps.
     if let Some(obj) = payload.as_object_mut() {

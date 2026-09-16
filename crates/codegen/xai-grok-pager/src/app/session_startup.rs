@@ -83,6 +83,34 @@ impl DeferredStartupActions {
             || self.open_dashboard
     }
 }
+
+/// Shared inputs for all `x.ai/session/fork` request builders.
+#[derive(Debug, Clone, Copy)]
+pub struct SessionRequestContext<'a> {
+    pub parent_session_id: &'a str,
+    pub parent_cwd: &'a Path,
+    pub new_session_id: Option<&'a str>,
+    pub parent_is_worktree: bool,
+    pub new_model_id: Option<&'a str>,
+}
+
+impl<'a> SessionRequestContext<'a> {
+    pub const fn new(
+        parent_session_id: &'a str,
+        parent_cwd: &'a Path,
+        new_session_id: Option<&'a str>,
+        parent_is_worktree: bool,
+        new_model_id: Option<&'a str>,
+    ) -> Self {
+        Self {
+            parent_session_id,
+            parent_cwd,
+            new_session_id,
+            parent_is_worktree,
+            new_model_id,
+        }
+    }
+}
 /// Build `x.ai/session/fork` params shared by TUI effects and headless.
 ///
 /// `new_cwd` is the write namespace for the child (parent session cwd when
@@ -90,13 +118,14 @@ impl DeferredStartupActions {
 ///
 /// LOCAL-PATCH(upstream-fork-secondary-model): `new_model_id` applies
 /// `[ui].fork_secondary_model` when non-empty. Revert with the patch.
-pub fn fork_session_params(
-    parent_session_id: &str,
-    parent_cwd: &Path,
-    new_session_id: Option<&str>,
-    parent_is_worktree: bool,
-    new_model_id: Option<&str>,
-) -> serde_json::Value {
+pub fn fork_session_params(context: SessionRequestContext<'_>) -> serde_json::Value {
+    let SessionRequestContext {
+        parent_session_id,
+        parent_cwd,
+        new_session_id,
+        parent_is_worktree,
+        new_model_id,
+    } = context;
     let parent_cwd_str = parent_cwd.to_string_lossy().into_owned();
     let source_cwd = xai_grok_shell::session::resolve_local_session_any_cwd(parent_session_id)
         .unwrap_or_else(|| parent_cwd_str.clone());
@@ -1825,7 +1854,7 @@ mod tests {
     #[test]
     fn fork_session_params_sets_new_session_id_and_workspace_dir() {
         let cwd = PathBuf::from("/wt");
-        let p = fork_session_params("parent-1", &cwd, Some("child-uuid"), true, None);
+        let p = fork_session_params(SessionRequestContext::new("parent-1", &cwd, Some("child-uuid"), true, None));
         assert_eq!(j(&p, "sourceSessionId"), "parent-1");
         assert_eq!(j(&p, "newCwd"), "/wt");
         assert_eq!(j(&p, "newSessionId"), "child-uuid");
@@ -1835,7 +1864,7 @@ mod tests {
     #[test]
     fn fork_session_params_omits_workspace_dir_when_not_worktree() {
         let cwd = PathBuf::from("/proj");
-        let p = fork_session_params("parent-1", &cwd, None, false, None);
+        let p = fork_session_params(SessionRequestContext::new("parent-1", &cwd, None, false, None));
         assert!(p.get("sourceWorkspaceDir").is_none());
         assert!(p.get("newSessionId").is_none());
     }
@@ -1843,13 +1872,13 @@ mod tests {
     #[test]
     fn fork_session_params_includes_new_model_id_when_set() {
         let cwd = PathBuf::from("/proj");
-        let p = fork_session_params(
+        let p = fork_session_params(SessionRequestContext::new(
             "parent-1",
             &cwd,
             None,
             false,
             Some("grok-4.5"),
-        );
+        ));
         assert_eq!(p["newModelId"], "grok-4.5");
     }
     #[test]

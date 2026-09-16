@@ -4706,11 +4706,13 @@ pub(crate) fn execute(
                     }
                     // LOCAL-PATCH(upstream-fork-secondary-model)
                     let payload = crate::app::session_startup::fork_session_params(
-                        &sid_str,
-                        &parent_cwd,
-                        new_session_id.as_deref(),
-                        parent_is_worktree,
-                        new_model_id.as_deref(),
+                        crate::app::session_startup::SessionRequestContext::new(
+                            &sid_str,
+                            &parent_cwd,
+                            new_session_id.as_deref(),
+                            parent_is_worktree,
+                            new_model_id.as_deref(),
+                        ),
                     );
                     let req = acp::ExtRequest::new(
                         "x.ai/session/fork",
