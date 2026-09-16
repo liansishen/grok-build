@@ -65,6 +65,15 @@ impl InferenceLatencyStats {
         }
     }
 
+    /// Compute latency stats from text chunk timestamps using the upstream-compatible API.
+    pub fn from_timestamps(
+        stream_start: Instant,
+        chunk_timestamps: &[Instant],
+        stream_end: Instant,
+    ) -> Self {
+        Self::from_observations(stream_start, None, chunk_timestamps, stream_end)
+    }
+
 
     /// Compute latency stats from the first model output and text chunk timestamps.
     ///
@@ -74,7 +83,7 @@ impl InferenceLatencyStats {
     /// * `chunk_timestamps` - `Instant` recorded on each text content chunk.
     /// * `stream_end` - `Instant::now()` captured after the stream is fully exhausted
     ///   (after trailing metadata/`[DONE]` chunks). Used for TTLB.
-    pub fn from_timestamps(
+    pub fn from_observations(
         stream_start: Instant,
         first_output_at: Option<Instant>,
         chunk_timestamps: &[Instant],
@@ -144,7 +153,7 @@ mod tests {
         let start = Instant::now();
         let end = start + Duration::from_millis(500);
 
-        let stats = InferenceLatencyStats::from_timestamps(start, None, &[], end);
+        let stats = InferenceLatencyStats::from_timestamps(start, &[], end);
 
         assert_eq!(stats.time_to_first_token_ms, None);
         assert_eq!(stats.time_to_last_byte_ms, 500);
@@ -161,7 +170,7 @@ mod tests {
         let chunks = vec![offset(start, 100)];
         let end = offset(start, 200);
 
-        let stats = InferenceLatencyStats::from_timestamps(start, Some(chunks[0]), &chunks, end);
+        let stats = InferenceLatencyStats::from_observations(start, Some(chunks[0]), &chunks, end);
 
         assert_eq!(stats.time_to_first_token_ms, Some(100));
         assert_eq!(stats.time_to_last_byte_ms, 200);
@@ -179,7 +188,7 @@ mod tests {
         let chunks = vec![offset(start, 100), offset(start, 150)];
         let end = offset(start, 200);
 
-        let stats = InferenceLatencyStats::from_timestamps(start, Some(chunks[0]), &chunks, end);
+        let stats = InferenceLatencyStats::from_observations(start, Some(chunks[0]), &chunks, end);
 
         assert_eq!(stats.time_to_first_token_ms, Some(100));
         assert_eq!(stats.time_to_last_byte_ms, 200);
@@ -204,7 +213,7 @@ mod tests {
             .collect();
         let end = offset(start, 1000);
 
-        let stats = InferenceLatencyStats::from_timestamps(start, Some(chunks[0]), &chunks, end);
+        let stats = InferenceLatencyStats::from_observations(start, Some(chunks[0]), &chunks, end);
 
         assert_eq!(stats.time_to_first_token_ms, Some(100));
         assert_eq!(stats.time_to_last_byte_ms, 1000);
@@ -226,7 +235,7 @@ mod tests {
         let chunks: Vec<Instant> = (0..101).map(|i| offset(start, 100 + i * 10)).collect();
         let end = offset(start, 2000);
 
-        let stats = InferenceLatencyStats::from_timestamps(start, Some(chunks[0]), &chunks, end);
+        let stats = InferenceLatencyStats::from_observations(start, Some(chunks[0]), &chunks, end);
 
         assert_eq!(stats.chunk_count, 101);
         // All 100 intervals are 10ms
@@ -244,7 +253,7 @@ mod tests {
         // stream_end is 500ms after start, well past the last chunk at 200ms
         let end = offset(start, 500);
 
-        let stats = InferenceLatencyStats::from_timestamps(start, Some(chunks[0]), &chunks, end);
+        let stats = InferenceLatencyStats::from_observations(start, Some(chunks[0]), &chunks, end);
 
         assert_eq!(stats.time_to_last_byte_ms, 500);
         assert_eq!(stats.time_to_first_token_ms, Some(100));
@@ -256,7 +265,7 @@ mod tests {
         let chunks = vec![offset(start, 100), offset(start, 150)];
         let end = offset(start, 200);
 
-        let stats = InferenceLatencyStats::from_timestamps(start, None, &chunks, end);
+        let stats = InferenceLatencyStats::from_observations(start, None, &chunks, end);
 
         assert_eq!(stats.time_to_first_token_ms, Some(100));
         assert_eq!(stats.chunk_count, 2);
@@ -271,7 +280,7 @@ mod tests {
         let end = offset(start, 200);
 
         let stats =
-            InferenceLatencyStats::from_timestamps(start, Some(first_output), &chunks, end);
+            InferenceLatencyStats::from_observations(start, Some(first_output), &chunks, end);
 
         assert_eq!(stats.time_to_first_token_ms, Some(40));
         assert_eq!(stats.chunk_count, 2);
@@ -286,12 +295,25 @@ mod tests {
         let end = offset(start, 500);
 
         let stats =
-            InferenceLatencyStats::from_timestamps(start, Some(first_output), &[], end);
+            InferenceLatencyStats::from_observations(start, Some(first_output), &[], end);
 
         assert_eq!(stats.time_to_first_token_ms, Some(120));
         assert_eq!(stats.time_to_last_byte_ms, 500);
         assert_eq!(stats.chunk_count, 0);
         assert!(stats.itl_intervals_ms.is_empty());
         assert_eq!(stats.itl_p50_ms, None);
+    }
+
+    #[test]
+    fn upstream_shaped_timestamp_api_uses_first_text_chunk_for_ttft() {
+        let start = Instant::now();
+        let chunks = vec![offset(start, 75), offset(start, 100)];
+        let end = offset(start, 125);
+
+        let stats = InferenceLatencyStats::from_timestamps(start, &chunks, end);
+
+        assert_eq!(stats.time_to_first_token_ms, Some(75));
+        assert_eq!(stats.time_to_last_byte_ms, 125);
+        assert_eq!(stats.itl_intervals_ms, vec![25]);
     }
 }

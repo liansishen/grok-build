@@ -278,7 +278,7 @@ pub fn stream_chat_completions<'a>(
         }
 
         let stream_end = Instant::now();
-        let metrics = InferenceLatencyStats::from_timestamps(
+        let metrics = InferenceLatencyStats::from_observations(
             stream_start,
             first_output_at,
             &chunk_timestamps,
