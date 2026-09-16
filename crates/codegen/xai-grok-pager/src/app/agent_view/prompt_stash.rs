@@ -38,9 +38,6 @@ pub(in crate::app) fn prompt_history_text(text: &str, input_mode: PromptInputMod
     }
 }
 
-/// Top-border caption shown while a draft sits in the stash.
-const STASH_CAPTION: &str = "Stashed";
-
 impl AgentView {
     /// The prompt's top-border caption: the stash label, the `/rename` title, or both joined the way the bottom info line joins its parts.
     pub(super) fn prompt_caption(&self) -> Option<String> {
@@ -50,9 +47,10 @@ impl AgentView {
             .as_deref()
             .map(|s| crate::views::session_title::sanitize_display_text(s).into_owned());
 
+        let stash_caption = xai_grok_i18n::t("prompt.stash.caption");
         match (self.prompt_stash.is_some(), title) {
-            (true, Some(title)) => Some(format!("{STASH_CAPTION} · {title}")),
-            (true, None) => Some(STASH_CAPTION.to_owned()),
+            (true, Some(title)) => Some(format!("{stash_caption} · {title}")),
+            (true, None) => Some(stash_caption.to_owned()),
             (false, title) => title,
         }
     }
@@ -76,9 +74,7 @@ impl AgentView {
         // The history does not hold it: `Ctrl+S` was the only way back
         self.prompt_stash = Some(entry);
 
-        self.note_stash_change_in_minimal(
-            "Draft stashed. Press the stash key again to restore it.",
-        );
+        self.note_stash_change_in_minimal(xai_grok_i18n::t("prompt.stash.saved"));
     }
 
     /// An explicit stash means "get this out of my way", so the composer drops its `!`/`#` mode too.
@@ -112,7 +108,7 @@ impl AgentView {
         };
 
         self.restore_stash_entry(entry);
-        self.note_stash_change_in_minimal("Stashed draft restored.");
+        self.note_stash_change_in_minimal(xai_grok_i18n::t("prompt.stash.restored"));
     }
 
     /// A browse that commits the stashed draft is a pop: two live copies means the next send restores what the user just sent.
@@ -159,7 +155,7 @@ impl AgentView {
         };
 
         self.restore_stash_entry(entry);
-        self.note_stash_change_in_minimal("Stashed draft restored.");
+        self.note_stash_change_in_minimal(xai_grok_i18n::t("prompt.stash.restored"));
         InputOutcome::Changed
     }
 
@@ -190,6 +186,20 @@ mod tests {
     use super::super::test_fixtures;
     use super::*;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    struct LocaleGuard(xai_grok_i18n::Locale);
+
+    impl Drop for LocaleGuard {
+        fn drop(&mut self) {
+            xai_grok_i18n::set_locale(self.0);
+        }
+    }
+
+    fn set_test_locale(locale: xai_grok_i18n::Locale) -> LocaleGuard {
+        let guard = LocaleGuard(xai_grok_i18n::current_locale());
+        xai_grok_i18n::set_locale(locale);
+        guard
+    }
 
     /// The matcher runs off-thread, so an accept fired before it answers finds no selection and backs out of the browse instead.
     fn await_history_results(agent: &mut AgentView) {
@@ -289,8 +299,10 @@ mod tests {
     }
 
     /// The prompt border is the only place the stash reports itself, and it shares that row with the `/rename` title.
+    #[serial_test::serial(GROK_UI_LOCALE)]
     #[test]
     fn the_border_caption_reports_the_stash_and_the_rename_title() {
+        let _guard = set_test_locale(xai_grok_i18n::Locale::En);
         let mut agent = test_fixtures::make_agent();
         assert_eq!(agent.prompt_caption(), None);
 
@@ -299,13 +311,32 @@ mod tests {
 
         agent.prompt.set_text("draft");
         agent.stash_prompt_draft(StashCause::Chord);
-        assert_eq!(
-            agent.prompt_caption().as_deref(),
-            Some("Stashed · payment retries")
+        let expected = format!(
+            "{} · payment retries",
+            xai_grok_i18n::t("prompt.stash.caption")
         );
+        assert_eq!(agent.prompt_caption().as_deref(), Some(expected.as_str()));
 
         agent.display_name = None;
-        assert_eq!(agent.prompt_caption().as_deref(), Some("Stashed"));
+        assert_eq!(
+            agent.prompt_caption().as_deref(),
+            Some(xai_grok_i18n::t("prompt.stash.caption"))
+        );
+    }
+
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    #[test]
+    fn the_border_caption_uses_the_selected_locale() {
+        let _guard = set_test_locale(xai_grok_i18n::Locale::ZhCn);
+        let mut agent = test_fixtures::make_agent();
+        agent.display_name = Some("payment retries".to_owned());
+        agent.prompt.set_text("draft");
+        agent.stash_prompt_draft(StashCause::Chord);
+
+        assert_eq!(
+            agent.prompt_caption().as_deref(),
+            Some("已暂存 · payment retries")
+        );
     }
 
     /// A pasted image still landing must not be split from its draft.
@@ -557,8 +588,10 @@ mod tests {
     }
 
     /// Minimal mode has no prompt border for the caption and never renders toasts, so the stash has to report itself in the scrollback.
+    #[serial_test::serial(GROK_UI_LOCALE)]
     #[test]
     fn minimal_mode_reports_the_stash_in_the_scrollback() {
+        let _guard = set_test_locale(xai_grok_i18n::Locale::En);
         let mut agent = test_fixtures::make_agent();
         agent
             .prompt
@@ -576,11 +609,15 @@ mod tests {
             .collect();
 
         assert!(
-            blocks.iter().any(|b| b.contains("Draft stashed")),
+            blocks
+                .iter()
+                .any(|b| b.contains(xai_grok_i18n::t("prompt.stash.saved"))),
             "stash must be announced: {blocks:?}"
         );
         assert!(
-            blocks.iter().any(|b| b.contains("Stashed draft restored")),
+            blocks
+                .iter()
+                .any(|b| b.contains(xai_grok_i18n::t("prompt.stash.restored"))),
             "restore must be announced: {blocks:?}"
         );
     }

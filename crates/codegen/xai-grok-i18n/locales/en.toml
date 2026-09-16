@@ -4618,3 +4618,18 @@ Run the task below. End with a short status: what changed or needs attention. Th
 {prior}</system-reminder>
 
 {prompt}'''
+
+[goal.detail]
+resume_hint = "Status: {status}. Type /goal resume to continue"
+
+clear_hint = "Status: {status}. Type /goal clear, then start a new goal"
+
+[goal]
+time_just_now = "just now"
+
+[prompt.stash]
+caption = "Stashed"
+
+saved = "Draft stashed. Press the stash key again to restore it."
+
+restored = "Stashed draft restored."

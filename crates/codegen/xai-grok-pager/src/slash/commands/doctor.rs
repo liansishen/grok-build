@@ -177,6 +177,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn rejects_unknown_and_extra_arguments() {
         let usage = xai_grok_i18n::t("slash.doctor.usage");
         for value in ["unknown", "fix unknown", "fix ssh-wrap extra", "report now"] {

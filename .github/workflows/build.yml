@@ -250,7 +250,7 @@ jobs:
       - name: Test pager library
         if: runner.os == 'Linux'
         shell: bash
-        run: cargo +1.92.0 test --locked -p xai-grok-pager --lib
+        run: cargo +1.92.0 test --locked -p xai-grok-pager --lib -- --test-threads=1
 
       - name: Test shell library
         if: runner.os == 'Linux'

@@ -3919,6 +3919,7 @@ fn mouse_reporting_toggle_inactive_without_config() {
 /// Config on: toggle off sets process atomic + sticky banner that survives
 /// transient toasts and tick/keypress dismissal of transients.
 #[serial_test::serial(MOUSE_CAPTURE_ENABLED)]
+#[serial_test::serial(GROK_UI_LOCALE)]
 #[test]
 fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
     reset_mouse_capture_enabled(true);
@@ -3939,10 +3940,11 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
     );
     {
         let agent = app.agents.get_mut(&id).unwrap();
-        agent.show_toast(xai_grok_i18n::t("toast.copied"));
+        let copied_toast = xai_grok_i18n::t("toast.copied");
+        agent.show_toast(copied_toast);
         assert_eq!(
             agent.toast.as_ref().map(|(m, _)| m.as_str()),
-            Some("Copied!"),
+            Some(copied_toast),
             "transient wins while active"
         );
         assert_eq!(agent.sticky_toast.as_deref(), Some(mouse_off_sticky()));
@@ -3966,7 +3968,7 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
     assert!(parent.sticky_toast.is_none());
     assert_eq!(
         parent.toast.as_ref().map(|(m, _)| m.as_str()),
-        Some("Mouse reporting on"),
+        Some(xai_grok_i18n::t("toast.mouse_reporting_on")),
     );
     reset_mouse_capture_enabled(true);
 }

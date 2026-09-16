@@ -4608,3 +4608,18 @@ print("Hello World")
 {prior}</system-reminder>
 
 {prompt}'''
+
+[goal.detail]
+resume_hint = "状态：{status}。输入 /goal resume 继续"
+
+clear_hint = "状态：{status}。输入 /goal clear，然后开始新目标"
+
+[goal]
+time_just_now = "刚刚"
+
+[prompt.stash]
+caption = "已暂存"
+
+saved = "草稿已暂存。再次按下暂存键即可恢复。"
+
+restored = "已恢复暂存的草稿。"
