@@ -4,6 +4,8 @@ Track temporary fork-only fixes that should be **reverted** when upstream
 (`xai-org/grok-build`) lands an equivalent fix. Search the codebase for
 `LOCAL-PATCH(upstream-fork-secondary-model)` to find every touch point.
 
+The broader disposition of Fork features (including candidates that should be upstreamed or removed) is tracked in [`FORK_FEATURES.md`](FORK_FEATURES.md). Every remaining code marker must use a patch id documented here; features that are not temporary patches belong in the feature ledger rather than receiving an untracked marker.
+
 ## `upstream-fork-secondary-model` (2026-08-01)
 
 ### Problems (present on upstream; not introduced by this fork)
