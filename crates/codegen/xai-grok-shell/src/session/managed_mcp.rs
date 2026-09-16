@@ -782,6 +782,7 @@ mod tests {
     fn client_cursor_server_kept_when_cursor_mcps_enabled() {
         let cwd = empty_cwd();
         write_cursor_project_mcp(cwd.path(), "killswitch-cache");
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
         let merged = merge_managed_mcp_servers(
             vec![client_stdio("killswitch-cache")],
@@ -841,6 +842,7 @@ args = ["ok"]
         )
         .unwrap();
         git2::Repository::init(cwd.path()).unwrap();
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
 
         let mut compat = xai_grok_tools::types::compat::CompatConfig::default();
         compat.cursor.mcps = false;
@@ -1001,6 +1003,7 @@ url = "https://denied.corp.com/mcp"
 "#,
         )
         .unwrap();
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
 
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
         let inputs = McpDiscoveryInputs {
@@ -1630,6 +1633,7 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
             }}"#,
         )
         .unwrap();
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
         let merge = |ms: &ManagedSettings| {
             let merged =
@@ -2175,6 +2179,7 @@ Authorization = "Bearer org2-token"
 
         let cwd = empty_cwd();
         write_cursor_project_mcp(cwd.path(), "projsrv");
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
         let inputs = McpDiscoveryInputs {
             cwd: cwd.path(),

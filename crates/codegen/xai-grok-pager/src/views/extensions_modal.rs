@@ -2239,7 +2239,10 @@ impl ExtensionsModalState {
     /// or a plugin row for a source verb. The key stays bound even when the footer hides it. Callers
     /// return before this on non-Loaded tab states, so the error placeholder never reaches it.
     pub fn post_select_row_hint(&mut self, noun: &str, verb: ActionVerb) {
-        if self.entry_data_indices.is_empty() {
+        // The picker's row index is a render artifact (empty before the first paint), so the
+        // "no rows at all" case is read from the tab data: with nothing to select, a row-scoped
+        // key stays silent instead of posting a hint that names no target.
+        if !self.active_tab_has_selectable_rows() {
             return;
         }
         let sel = self.picker_state.selected;
@@ -2254,6 +2257,30 @@ impl ExtensionsModalState {
         } else {
             format!("Select a {noun} row to {verb}.")
         }));
+    }
+
+    /// Whether the active tab currently offers at least one selectable data row, honouring the
+    /// plugins status filter; tabs without a data-backed list keep the hint.
+    fn active_tab_has_selectable_rows(&self) -> bool {
+        // A populated render index means the picker has rows; before the first paint the same question
+        // is answered from the tab data.
+        if !self.entry_data_indices.is_empty() {
+            return true;
+        }
+        match self.active_tab {
+            ExtensionsTab::Plugins => match &self.plugins_data {
+                TabDataState::Loaded(data) => data
+                    .plugins
+                    .iter()
+                    .any(|plugin| self.plugins_filter.matches(plugin.enabled)),
+                _ => false,
+            },
+            ExtensionsTab::Marketplace => match &self.marketplace_data {
+                TabDataState::Loaded(data) => data.sources.iter().any(|s| !s.plugins.is_empty()),
+                _ => false,
+            },
+            _ => true,
+        }
     }
 
     pub fn selected_item_enabled(&self) -> Option<bool> {

@@ -700,6 +700,9 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
         // when it is untouched, i.e. Normal → Plan); see the push below.
         let in_plan = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
         let in_yolo = agent.session.is_yolo();
+        if in_yolo && agent.deferred_permission_mode == Some("ask") {
+            agent.deferred_permission_mode = None;
+        }
         let persist_canonical: Option<&'static str> = match (in_plan, in_auto, in_yolo) {
             // Normal → Plan
             (false, false, false) => {

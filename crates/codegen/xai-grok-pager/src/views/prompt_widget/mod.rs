@@ -3504,6 +3504,7 @@ impl PromptWidget {
                     // No dimmed variant on profile palettes (Reset bg): keep
                     // the flag's own color rather than dropping to gray.
                     let dimmed = crate::render::color::blend_color(bg, color, flag_opacity)
+                        .filter(|dimmed| *dimmed != color)
                         .or_else(|| match color {
                             ratatui::style::Color::Rgb(..) => crate::render::color::blend_color(
                                 ratatui::style::Color::Rgb(20, 20, 20),

@@ -1872,6 +1872,7 @@ mod tests {
             format!("[plugins]\npaths = [\"{}\"]\n", plugin_dir.display()),
         )
         .unwrap();
+        crate::agent::folder_trust::record_for_test(repo.path(), true);
 
         let registry = load_cli_plugin_registry(repo.path());
         assert!(
