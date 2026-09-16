@@ -102,7 +102,11 @@ mod tests {
                 ),
                 "",
             ),
-            CommandResult::Error(message) if message.contains("No active session")
+            // The message is catalog-backed, so compare against the localized text rather than
+            // the English literal: a concurrent test that switches the process locale must not
+            // change what this asserts.
+            CommandResult::Error(message)
+                if message == xai_grok_i18n::t("slash.edit_prompt.no_active_session")
         ));
     }
 }

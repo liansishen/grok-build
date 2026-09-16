@@ -1376,7 +1376,7 @@ fn painted_tick_demand(app: &mut AppView, terminal: &mut PagerTerminal) -> TickD
     app.tick_demand()
 }
 #[test]
-#[serial_test::serial(MEMORY_RELEASE_DEFER)]
+#[serial_test::serial(GROK_THEME)]
 fn tick_demand_dashboard_fast_while_background_work_runs() {
     use crate::app::agent_test_fixtures::{running_bg_task, scheduled_loop};
     let (mut terminal, _frame_rx) = test_terminal();
@@ -1470,7 +1470,7 @@ fn tick_a_full_cycle(app: &mut AppView, terminal: &mut PagerTerminal) -> u64 {
     frames
 }
 #[test]
-#[serial_test::serial(MEMORY_RELEASE_DEFER)]
+#[serial_test::serial(GROK_THEME)]
 fn dashboard_tick_requests_a_redraw_exactly_when_the_frame_changes() {
     use crate::app::agent_test_fixtures::running_bg_task;
     use crate::views::dashboard::animation::{NEEDS_INPUT_BLINK_DIVISOR, SPINNER_DIVISOR};
@@ -1540,7 +1540,7 @@ fn collapsed_needs_input_row_paints_no_blink() {
     );
 }
 #[test]
-#[serial_test::serial(MEMORY_RELEASE_DEFER)]
+#[serial_test::serial(GROK_THEME)]
 fn dashboard_tick_requests_no_redraw_when_nothing_animated_is_painted() {
     use crate::app::agent_test_fixtures::running_bg_task;
     use crate::views::dashboard::Filter;
@@ -1563,7 +1563,7 @@ fn dashboard_tick_requests_no_redraw_when_nothing_animated_is_painted() {
     );
 }
 #[test]
-#[serial_test::serial(MEMORY_RELEASE_DEFER)]
+#[serial_test::serial(GROK_THEME)]
 fn first_spinner_frame_arms_the_tick_only_after_the_paint() {
     use crate::app::agent_test_fixtures::running_bg_task;
     use crate::app::event_loop::schedule_tick;
@@ -1594,7 +1594,7 @@ fn first_spinner_frame_arms_the_tick_only_after_the_paint() {
     );
 }
 #[test]
-#[serial_test::serial(MEMORY_RELEASE_DEFER)]
+#[serial_test::serial(GROK_THEME)]
 fn tick_demand_dashboard_parks_when_filter_hides_the_working_row() {
     use crate::app::agent_test_fixtures::running_bg_task;
     use crate::views::dashboard::Filter;
@@ -1628,7 +1628,9 @@ fn tick_demand_dashboard_parks_when_filter_hides_the_working_row() {
 }
 #[test]
 #[serial_test::serial(GROK_THEME)]
+#[serial_test::serial(GROK_AGENT_DASHBOARD)]
 fn tick_demand_dashboard_fast_for_animated_roster_row() {
+    let _theme = crate::theme::cache::pin_theme();
     use crate::app::agent_test_fixtures::roster_entry;
     use crate::app::roster::RosterActivity;
     crate::theme::color_support::set_level_for_test(
@@ -1653,6 +1655,14 @@ fn tick_demand_dashboard_fast_for_animated_roster_row() {
         (RosterActivity::NeedsInput, TickDemand::Fast),
     ] {
         app.leader_roster = vec![entry(activity)];
+        // The blink cadence is only painted where a blendable warning colour exists, so re-assert the
+        // theme this test needs right before measuring: production-path theme writers in other
+        // modules run concurrently and can otherwise flip the gate between iterations.
+        crate::theme::color_support::set_level_for_test(
+            crate::theme::color_support::ColorLevel::TrueColor,
+        );
+        // `apply_kind` clamps against the colour level, so set the level first.
+        crate::theme::Theme::apply_kind(crate::theme::ThemeKind::TokyoNight);
         assert_eq!(
             expected,
             painted_tick_demand(&mut app, &mut terminal),

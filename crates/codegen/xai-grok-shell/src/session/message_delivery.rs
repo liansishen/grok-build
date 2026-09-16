@@ -161,7 +161,7 @@ impl MessageDeliveryHandle {
             return ActiveMessageAdmission::Rejected;
         }
         if operation != Operation::from(delivery.operation())
-            || authorize_operation(OperationSet::QUEUE_AND_STEER, operation).is_err()
+            || authorize_operation(OperationSet::QUEUE_STEER_AND_INTERJECT, operation).is_err()
         {
             return ActiveMessageAdmission::Unsupported;
         }
