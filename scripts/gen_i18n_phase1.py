@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import re
+import tomllib
+
+from i18n_catalog import flatten_catalog, merge_catalog_file
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -706,10 +709,22 @@ def main() -> None:
 
     en_path = ROOT / "crates/codegen/xai-grok-i18n/locales/en.toml"
     zh_path = ROOT / "crates/codegen/xai-grok-i18n/locales/zh-CN.toml"
-    en_path.write_text("\n".join(en) + "\n", encoding="utf-8")
-    zh_path.write_text("\n".join(zh) + "\n", encoding="utf-8")
-    print(f"wrote {en_path}")
-    print(f"wrote {zh_path}")
+    en_generated = flatten_catalog(tomllib.loads("\n".join(en) + "\n"))
+    zh_generated = flatten_catalog(tomllib.loads("\n".join(zh) + "\n"))
+    en_result = merge_catalog_file(
+        en_path,
+        en_generated,
+        banner="Phase 1 additions",
+        overwrite=True,
+    )
+    zh_result = merge_catalog_file(
+        zh_path,
+        zh_generated,
+        banner="Phase 1 additions",
+        overwrite=True,
+    )
+    print(f"wrote {en_path} (+{en_result.added}, ~{en_result.updated})")
+    print(f"wrote {zh_path} (+{zh_result.added}, ~{zh_result.updated})")
     print(f"settings={len(settings)} slash={len(slash_en)} actions_fields={len(actions_en)}")
 
 
