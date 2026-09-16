@@ -76,6 +76,33 @@ class IncrementalCatalogTests(unittest.TestCase):
             self.assertEqual(load_catalog(path)["settings.new.label"], "新增")
             self.assertIn('[other]\nvalue = "值"', content)
 
+    def test_quoted_dotted_section_is_incrementally_merged_as_one_component(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "quoted-section.toml"
+            path.write_text(
+                '["foo.bar"]\n'
+                'value = "old"\n',
+                encoding="utf-8",
+            )
+
+            result = merge_catalog_file(
+                path,
+                {
+                    "foo.bar.value": "updated",
+                    "foo.bar.other": "new",
+                },
+                banner="quoted section",
+            )
+
+            content = path.read_text(encoding="utf-8")
+            loaded = load_catalog(path)
+            self.assertEqual(result.updated, 1)
+            self.assertEqual(result.added, 1)
+            self.assertEqual(content.count('["foo.bar"]'), 1)
+            self.assertNotIn("[foo.bar]", content)
+            self.assertEqual(loaded["foo.bar.value"], "updated")
+            self.assertEqual(loaded["foo.bar.other"], "new")
+
     def test_pair_report_distinguishes_duplicates_from_ambiguous_translations(self) -> None:
         english = {
             "first": "Same source",

@@ -110,6 +110,7 @@ def catalog_pair_is_valid(report: Mapping[str, object]) -> bool:
 
 
 def _decode_key(token: str) -> str:
+    token = token.strip()
     if token.startswith('"'):
         try:
             value = json.loads(token)
@@ -118,14 +119,57 @@ def _decode_key(token: str) -> str:
         if not isinstance(value, str):
             raise CatalogError(f"TOML key is not a string: {token!r}")
         return value
+    if token.startswith("'"):
+        if not token.endswith("'") or len(token) < 2:
+            raise CatalogError(f"invalid literal TOML key {token!r}")
+        return token[1:-1].replace("''", "'")
     return token
 
 
+def _split_dotted_key(value: str) -> list[str]:
+    """Split dotted TOML keys without splitting dots inside quoted segments."""
+
+    parts: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    for character in value:
+        if quote == '"':
+            current.append(character)
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+        elif quote == "'":
+            current.append(character)
+            if character == quote:
+                quote = None
+        elif character in {'"', "'"}:
+            quote = character
+            current.append(character)
+        elif character == ".":
+            part = "".join(current).strip()
+            if not part:
+                raise CatalogError(f"empty TOML key segment in {value!r}")
+            parts.append(part)
+            current = []
+        else:
+            current.append(character)
+    if quote is not None:
+        raise CatalogError(f"unterminated quoted TOML key in {value!r}")
+    part = "".join(current).strip()
+    if not part:
+        raise CatalogError(f"empty TOML key segment in {value!r}")
+    parts.append(part)
+    return parts
+
+
 def _decode_section(section: str) -> str:
-    # Catalog sections currently use bare dotted names. Keep quoted components
-    # intact for future generated sections instead of guessing at their value.
-    parts = [part.strip() for part in section.split(".")]
-    return ".".join(_decode_key(part) for part in parts)
+    return ".".join(_decode_key(part) for part in _split_dotted_key(section))
+
+
 
 
 def _line_keys(lines: list[str]) -> dict[str, list[int]]:
@@ -166,6 +210,11 @@ def _section_header(section: str) -> str:
     return f"[{'.'.join(encoded)}]"
 
 
+def _section_value(line: str) -> str | None:
+    match = SECTION_RE.match(line)
+    return _decode_section(match.group("section")) if match else None
+
+
 def _ensure_newline(line: str) -> str:
     return line if line.endswith(("\n", "\r")) else line + "\n"
 
@@ -201,8 +250,7 @@ def _insert_new_keys(lines: list[str], additions: list[tuple[str, str]], banner:
             (
                 index
                 for index, line in enumerate(lines)
-                if SECTION_RE.match(line)
-                and SECTION_RE.match(line).group("section").strip() == header[1:-1]
+                if _section_value(line) == section
             ),
             None,
         )
