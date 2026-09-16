@@ -325,7 +325,7 @@ impl ClipboardFeedback {
     /// Must start with [`Self::message_lead`] (asserted in tests) so the path-bearing toast built from the lead never rewords the static copy.
     fn message(self) -> &'static str {
         match self {
-            Self::Copied => xai_grok_i18n::t_or("clipboard.copied", "Copied!"),
+            Self::Copied => xai_grok_i18n::tr("Copied!"),
             Self::CopiedTmux => xai_grok_i18n::t_or(
                 "clipboard.copied_tmux",
                 "Copied to tmux buffer, paste with prefix + ]",
@@ -355,7 +355,7 @@ impl ClipboardFeedback {
     /// Compact lead of [`Self::message`] (no trailing guidance sentence).
     fn message_lead(self) -> &'static str {
         match self {
-            Self::Copied => xai_grok_i18n::t_or("clipboard.copied_lead", "Copied!"),
+            Self::Copied => xai_grok_i18n::tr("Copied!"),
             Self::CopiedTmux => xai_grok_i18n::t_or(
                 "clipboard.copied_tmux_lead",
                 "Copied to tmux buffer, paste with prefix + ]",

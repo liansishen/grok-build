@@ -37,7 +37,7 @@ use crate::views::modal_window::{
 use xai_grok_shell::extensions::memory::{MEMORY_FORGET_MAX_FILE_BYTES, MemoryForgetResponse};
 use xai_grok_shell::extensions::notification::MemoryDisabledReason;
 
-fn tr_fmt(key: &str, fallback: &'static str, args: &[(&str, &str)]) -> String {
+fn format_keyed_text(key: &str, fallback: &'static str, args: &[(&str, &str)]) -> String {
     let mut text = xai_grok_i18n::t_or(key, fallback).to_string();
     for (name, value) in args {
         text = text.replace(&format!("{{{name}}}"), value);
@@ -1482,7 +1482,7 @@ fn format_modified(epoch_secs: Option<u64>, now_secs: u64) -> String {
     }
     if delta < 3600 {
         let mins = delta / 60;
-        return tr_fmt(
+        return format_keyed_text(
             "session_picker.time.minutes_ago",
             "{count}m ago",
             &[("count", &mins.to_string())],
@@ -1490,14 +1490,14 @@ fn format_modified(epoch_secs: Option<u64>, now_secs: u64) -> String {
     }
     if delta < 86400 {
         let hours = delta / 3600;
-        return tr_fmt(
+        return format_keyed_text(
             "session_picker.time.hours_ago",
             "{count}h ago",
             &[("count", &hours.to_string())],
         );
     }
     let days = delta / 86400;
-    tr_fmt(
+    format_keyed_text(
         "session_picker.time.days_ago",
         "{count}d ago",
         &[("count", &days.to_string())],

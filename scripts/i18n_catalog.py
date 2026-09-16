@@ -1,6 +1,7 @@
 """Small, incremental helpers for the checked-in locale catalogs."""
 
 from __future__ import annotations
+import argparse
 
 import json
 import re
@@ -52,6 +53,60 @@ def load_catalog(path: Path) -> dict[str, str]:
     except (OSError, tomllib.TOMLDecodeError) as error:
         raise CatalogError(f"cannot read or parse {path}: {error}") from error
     return flatten_catalog(parsed)
+
+
+PLACEHOLDER_RE = re.compile(r"\{([A-Za-z0-9_]+)\}")
+
+
+def placeholder_names(value: str) -> frozenset[str]:
+    return frozenset(PLACEHOLDER_RE.findall(value))
+
+
+def catalog_pair_report(
+    english: Mapping[str, str], translated: Mapping[str, str]
+) -> dict[str, object]:
+    """Report key, placeholder, and source-text issues without hiding duplicates."""
+
+    missing = sorted(set(english) - set(translated))
+    extra = sorted(set(translated) - set(english))
+    placeholder_mismatches = {
+        key: {
+            "english": sorted(placeholder_names(english[key])),
+            "translated": sorted(placeholder_names(translated[key])),
+        }
+        for key in sorted(set(english) & set(translated))
+        if placeholder_names(english[key]) != placeholder_names(translated[key])
+    }
+
+    source_keys: dict[str, list[str]] = {}
+    for key, source in english.items():
+        source_keys.setdefault(source, []).append(key)
+    duplicate_sources = {
+        source: sorted(keys) for source, keys in source_keys.items() if len(keys) > 1
+    }
+    ambiguous_sources = {
+        source: keys
+        for source, keys in duplicate_sources.items()
+        if len({translated.get(key, source) for key in keys}) > 1
+    }
+    return {
+        "missing_keys": missing,
+        "extra_keys": extra,
+        "placeholder_mismatches": placeholder_mismatches,
+        "duplicate_sources": duplicate_sources,
+        "ambiguous_sources": ambiguous_sources,
+    }
+
+
+def catalog_pair_report_from_paths(english_path: Path, translated_path: Path) -> dict[str, object]:
+    return catalog_pair_report(load_catalog(english_path), load_catalog(translated_path))
+
+
+def catalog_pair_is_valid(report: Mapping[str, object]) -> bool:
+    return not any(
+        report.get(field)
+        for field in ("missing_keys", "extra_keys", "placeholder_mismatches")
+    )
 
 
 def _decode_key(token: str) -> str:
@@ -237,3 +292,17 @@ def merge_catalog_file(
         unchanged=unchanged,
         keys=tuple(key for key, _ in added) + tuple(key for _, _, key in updates),
     )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--english", type=Path, required=True)
+    parser.add_argument("--translated", type=Path, required=True)
+    args = parser.parse_args(argv)
+    report = catalog_pair_report_from_paths(args.english, args.translated)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if catalog_pair_is_valid(report) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

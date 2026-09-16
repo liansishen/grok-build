@@ -752,45 +752,66 @@ fn scan_missing_translation_keys(
             && changed_lines.is_none_or(|lines| literal_intersects_lines(node, lines))
             && let Some(name) = call_name(node, source)
         {
-            let indexes: &[usize] = if name_matches(&name, "t_for") {
-                &[1]
+            let source_lookup = name_matches(&name, "tr")
+                || name_matches(&name, "tr_for")
+                || name_matches(&name, "tr_fmt")
+                || name_matches(&name, "tr_fmt_for");
+            let source_index = if name_matches(&name, "t_for")
+                || name_matches(&name, "tr_for")
+                || name_matches(&name, "tr_fmt_for")
+            {
+                1
             } else {
-                &[0]
+                0
             };
+            let legacy_lookup = name_matches(&name, "t")
+                || name_matches(&name, "t_for")
+                || name_matches(&name, "t_fmt")
+                || name_matches(&name, "t_or");
             if matches_any_name(&name, &config.translation_functions)
-                && (name_matches(&name, "t")
-                    || name_matches(&name, "t_for")
-                    || name_matches(&name, "t_fmt")
-                    || name_matches(&name, "t_or"))
+                && (source_lookup || legacy_lookup)
                 && let Some(arguments) = node.child_by_field_name("arguments")
             {
                 let mut named = arguments.walk();
                 let args = arguments.named_children(&mut named).collect::<Vec<_>>();
-                for &index in indexes {
-                    let Some(argument) = args.get(index) else {
-                        continue;
-                    };
-                    if !matches!(argument.kind(), "string_literal" | "raw_string_literal") {
-                        continue;
-                    }
-                    if !changed_lines.is_none_or(|lines| literal_intersects_lines(*argument, lines))
-                    {
-                        continue;
-                    }
-                    let Ok(raw) = argument.utf8_text(source) else {
-                        continue;
-                    };
-                    let Some(key) = string_value(raw) else {
-                        continue;
-                    };
-                    if !xai_grok_i18n::has_en(&key) {
+                let Some(argument) = args.get(source_index) else {
+                    return;
+                };
+                if !matches!(argument.kind(), "string_literal" | "raw_string_literal") {
+                    return;
+                }
+                if !changed_lines.is_none_or(|lines| literal_intersects_lines(*argument, lines)) {
+                    return;
+                }
+                let Ok(raw) = argument.utf8_text(source) else {
+                    return;
+                };
+                let Some(value) = string_value(raw) else {
+                    return;
+                };
+                if source_lookup {
+                    if !xai_grok_i18n::has_source(&value) {
                         findings.push(Finding {
                             path: path.to_owned(),
                             line: argument.start_position().row + 1,
-                            sink: "missing translation key".to_owned(),
-                            literal: key,
+                            sink: "missing source translation".to_owned(),
+                            literal: value,
+                        });
+                    } else if xai_grok_i18n::source_is_ambiguous(&value) {
+                        findings.push(Finding {
+                            path: path.to_owned(),
+                            line: argument.start_position().row + 1,
+                            sink: "ambiguous source translation; use a stable key".to_owned(),
+                            literal: value,
                         });
                     }
+                } else if !xai_grok_i18n::has_en(&value) {
+                    findings.push(Finding {
+                        path: path.to_owned(),
+                        line: argument.start_position().row + 1,
+                        sink: "missing translation key".to_owned(),
+                        literal: value,
+                    });
                 }
             }
         }
@@ -1037,6 +1058,8 @@ fn fixture_flags_direct_output_but_allows_translation_and_opaque_values() {
         fn render() {
             show_toast("Waiting for approval");
             show_toast(t("toast.waiting"));
+            show_toast(xai_grok_i18n::tr("Copied!"));
+            show_toast(xai_grok_i18n::tr("source text absent from the catalog"));
             Span::styled("Enter", style);
             println!("https://example.com");
         }
@@ -1063,6 +1086,25 @@ fn fixture_flags_direct_output_but_allows_translation_and_opaque_values() {
     assert_eq!(missing.len(), 1);
     assert_eq!(missing[0].sink, "missing translation key");
     assert_eq!(missing[0].literal, "i18n.audit.missing_fixture");
+
+    let missing_source_text = br#"
+        fn render() {
+            show_toast(xai_grok_i18n::tr("source text absent from the catalog"));
+        }
+    "#;
+    let missing_source = scan_missing_translation_keys(
+        "missing_source_fixture.rs",
+        missing_source_text,
+        &config,
+        None,
+    )
+    .expect("missing-source fixture parses");
+    assert_eq!(missing_source.len(), 1);
+    assert_eq!(missing_source[0].sink, "missing source translation");
+    assert_eq!(
+        missing_source[0].literal,
+        "source text absent from the catalog"
+    );
 }
 
 #[test]

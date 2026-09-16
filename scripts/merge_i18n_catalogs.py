@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -12,7 +13,12 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from i18n_catalog import load_catalog, merge_catalog_file
+from i18n_catalog import (
+    catalog_pair_is_valid,
+    catalog_pair_report,
+    load_catalog,
+    merge_catalog_file,
+)
 
 
 def load_remaining() -> tuple[dict[str, str], dict[str, str]]:
@@ -40,11 +46,26 @@ def merge_into(path: Path, extra: dict[str, str]) -> None:
         raise RuntimeError(f"catalog key count decreased for {path}")
 
 
+def validate_catalog_pair(en_path: Path, zh_path: Path) -> None:
+    report = catalog_pair_report(load_catalog(en_path), load_catalog(zh_path))
+    print(
+        "source report: "
+        f"duplicates={len(report['duplicate_sources'])}, "
+        f"ambiguous={len(report['ambiguous_sources'])}"
+    )
+    if not catalog_pair_is_valid(report):
+        raise RuntimeError(json.dumps(report, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     subprocess.check_call([sys.executable, str(SCRIPTS / "gen_i18n_phase1.py")])
     en_extra, zh_extra = load_remaining()
     merge_into(ROOT / "crates/codegen/xai-grok-i18n/locales/en.toml", en_extra)
     merge_into(ROOT / "crates/codegen/xai-grok-i18n/locales/zh-CN.toml", zh_extra)
+    validate_catalog_pair(
+        ROOT / "crates/codegen/xai-grok-i18n/locales/en.toml",
+        ROOT / "crates/codegen/xai-grok-i18n/locales/zh-CN.toml",
+    )
     print("merge ok")
 
 

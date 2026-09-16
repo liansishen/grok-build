@@ -40,16 +40,25 @@ pub fn browser_open_likely_available() -> bool {
 
 /// Multi-line copy for agent scrollback: notice, then the full URL alone so it is easy to select/copy in the TUI.
 pub fn browser_unavailable_message(url: &str) -> String {
-    xai_grok_i18n::t_fmt("link.browser_unavailable", &[("url", url)])
+    xai_grok_i18n::tr_fmt(
+        "Could not open a browser. Open this URL manually:\n{url}",
+        &[("url", url)],
+    )
 }
 
 /// Single-line welcome toast: URL first so prefix truncation keeps the destination.
 /// `copied` is true only when clipboard delivery reported success, so the toast never claims a copy that did not happen.
 pub fn browser_unavailable_line(url: &str, copied: bool) -> String {
     if copied {
-        xai_grok_i18n::t_fmt("link.browser_unavailable_line_copied", &[("url", url)])
+        xai_grok_i18n::tr_fmt(
+            "{url} — Could not open a browser. Open this URL manually (URL copied)",
+            &[("url", url)],
+        )
     } else {
-        xai_grok_i18n::t_fmt("link.browser_unavailable_line", &[("url", url)])
+        xai_grok_i18n::tr_fmt(
+            "{url} — Could not open a browser. Open this URL manually",
+            &[("url", url)],
+        )
     }
 }
 

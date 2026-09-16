@@ -226,6 +226,102 @@ fn flatten_toml(value: &toml::Value, prefix: &str, out: &mut HashMap<&'static st
     }
 }
 
+#[derive(Debug)]
+struct SourceCatalog {
+    translations: HashMap<&'static str, &'static str>,
+    ambiguous: Vec<&'static str>,
+}
+
+static SOURCE_CATALOG: LazyLock<SourceCatalog> = LazyLock::new(build_source_catalog);
+
+fn build_source_catalog() -> SourceCatalog {
+    let mut candidates: HashMap<&'static str, Option<&'static str>> = HashMap::new();
+    for (&key, &source) in EN.iter() {
+        let translation = ZH_CN.get(key).copied().unwrap_or(source);
+        match candidates.entry(source) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(Some(translation));
+            }
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                if entry.get().is_some_and(|existing| existing != translation) {
+                    entry.insert(None);
+                }
+            }
+        }
+    }
+
+    let mut ambiguous = candidates
+        .iter()
+        .filter_map(|(source, translation)| translation.is_none().then_some(*source))
+        .collect::<Vec<_>>();
+    ambiguous.sort_unstable();
+
+    let translations = candidates
+        .into_iter()
+        .filter_map(|(source, translation)| translation.map(|value| (source, value)))
+        .collect();
+    SourceCatalog {
+        translations,
+        ambiguous,
+    }
+}
+
+fn lookup_source(locale: Locale, source: &'static str) -> &'static str {
+    if pseudo_locale_enabled() {
+        return leak_fallback(&format!("⟦{source}⟧"));
+    }
+    match locale {
+        Locale::En => source,
+        Locale::ZhCn => SOURCE_CATALOG
+            .translations
+            .get(source)
+            .copied()
+            .unwrap_or(source),
+    }
+}
+
+/// Look up an English source string for the current locale.
+///
+/// Source strings are the default lookup identity for migrated call sites. If
+/// several catalog keys share a source string but have different translations,
+/// this function deliberately falls back to the source; use [`t`] for that
+/// context-sensitive message instead.
+pub fn tr(source: &'static str) -> &'static str {
+    lookup_source(current_locale(), source)
+}
+
+/// Look up an English source string for an explicit locale.
+pub fn tr_for(locale: Locale, source: &'static str) -> &'static str {
+    lookup_source(locale, source)
+}
+
+/// Format a source-string translation with `{name}`-style placeholders.
+pub fn tr_fmt(source: &'static str, args: &[(&str, &str)]) -> String {
+    tr_fmt_for(current_locale(), source, args)
+}
+
+/// Format a source-string translation for an explicit locale.
+pub fn tr_fmt_for(locale: Locale, source: &'static str, args: &[(&str, &str)]) -> String {
+    let mut rendered = tr_for(locale, source).to_string();
+    for (key, value) in args {
+        rendered = rendered.replace(&format!("{{{key}}}"), value);
+    }
+    rendered
+}
+
+/// Source strings whose catalog keys have conflicting translations.
+pub fn ambiguous_source_texts() -> &'static [&'static str] {
+    SOURCE_CATALOG.ambiguous.as_slice()
+}
+
+/// Whether a source string needs a context-specific key instead of source lookup.
+pub fn source_is_ambiguous(source: &str) -> bool {
+    SOURCE_CATALOG
+        .ambiguous
+        .iter()
+        .any(|candidate| *candidate == source)
+}
+
 /// Look up a message key for the current locale (English fallback).
 pub fn t(key: &str) -> &'static str {
     lookup(current_locale(), key)
@@ -255,6 +351,11 @@ pub fn intern_key(key: &str) -> &'static str {
 /// Whether `key` exists in the English catalog.
 pub fn has_en(key: &str) -> bool {
     EN.contains_key(key)
+}
+
+/// Whether an English source string exists in the catalog.
+pub fn has_source(source: &str) -> bool {
+    EN.values().any(|value| *value == source)
 }
 
 fn lookup_optional(locale: Locale, key: &str) -> Option<&'static str> {
@@ -434,5 +535,53 @@ mod tests {
             assert!(EN.contains_key(key), "en missing {key}");
             assert!(ZH_CN.contains_key(key), "zh-CN missing {key}");
         }
+    }
+
+    #[test]
+    fn source_lookup_translates_and_falls_back_to_source() {
+        assert_eq!(tr_for(Locale::En, "Copied!"), "Copied!");
+        assert_eq!(tr_for(Locale::ZhCn, "Copied!"), "已复制！");
+        assert_eq!(
+            tr_for(Locale::ZhCn, "source text absent from the catalog"),
+            "source text absent from the catalog"
+        );
+    }
+
+    #[test]
+    fn ambiguous_source_text_requires_the_stable_key_path() {
+        assert!(source_is_ambiguous("Open the settings modal"));
+        assert!(ambiguous_source_texts().contains(&"Open the settings modal"));
+        assert_eq!(
+            tr_for(Locale::ZhCn, "Open the settings modal"),
+            "Open the settings modal"
+        );
+        assert_eq!(
+            t_for(Locale::ZhCn, "actions.OpenSettings.description"),
+            "打开设置"
+        );
+    }
+
+    #[test]
+    fn source_formatter_preserves_named_placeholders() {
+        assert_eq!(
+            tr_fmt_for(
+                Locale::ZhCn,
+                "Could not open a browser. Open this URL manually:\n{url}",
+                &[("url", "https://example.test")]
+            ),
+            "无法打开浏览器。请手动打开此 URL：\nhttps://example.test"
+        );
+    }
+
+    #[test]
+    fn source_lookup_poc_falls_back_after_an_upstream_rewording() {
+        const OLD_SOURCE: &str = "Could not open a browser. Open this URL manually:\n{url}";
+        const NEW_SOURCE: &str = "Open this URL manually when no browser is available:\n{url}";
+
+        assert_eq!(
+            tr_for(Locale::ZhCn, OLD_SOURCE),
+            "无法打开浏览器。请手动打开此 URL：\n{url}"
+        );
+        assert_eq!(tr_for(Locale::ZhCn, NEW_SOURCE), NEW_SOURCE);
     }
 }

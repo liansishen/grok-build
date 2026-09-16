@@ -4,7 +4,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.i18n_catalog import CatalogError, load_catalog, merge_catalog_file
+from scripts.i18n_catalog import (
+    CatalogError,
+    catalog_pair_is_valid,
+    catalog_pair_report,
+    load_catalog,
+    merge_catalog_file,
+)
 
 
 class IncrementalCatalogTests(unittest.TestCase):
@@ -69,6 +75,25 @@ class IncrementalCatalogTests(unittest.TestCase):
             self.assertEqual(load_catalog(path)["settings.language.description"], "界面语言")
             self.assertEqual(load_catalog(path)["settings.new.label"], "新增")
             self.assertIn('[other]\nvalue = "值"', content)
+
+    def test_pair_report_distinguishes_duplicates_from_ambiguous_translations(self) -> None:
+        english = {
+            "first": "Same source",
+            "second": "Same source",
+            "placeholder": "Hello {name}",
+        }
+        translated = {
+            "first": "相同",
+            "second": "不同",
+            "placeholder": "你好 {user}",
+        }
+
+        report = catalog_pair_report(english, translated)
+
+        self.assertIn("Same source", report["duplicate_sources"])
+        self.assertIn("Same source", report["ambiguous_sources"])
+        self.assertIn("placeholder", report["placeholder_mismatches"])
+        self.assertFalse(catalog_pair_is_valid(report))
 
     def test_non_overwrite_mode_refuses_translation_conflicts_without_writing(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
