@@ -11,6 +11,7 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 use serde::Deserialize;
 use thiserror::Error;
+use xai_grok_i18n::t;
 
 use crate::oidc::with_alpha_test_key;
 use crate::{AuthChannels, AuthManager, AuthMode, AuthUrlInfo, AuthUrlMode, GrokAuth};
@@ -320,31 +321,28 @@ async fn prompt_and_poll(
         .unwrap_or(&device_code.verification_uri);
 
     eprintln!();
-    eprintln!("To sign in, open this URL in your browser:");
+    eprintln!("{}", t("auth.device.open_url"));
     eprintln!();
     eprintln!("  {}", display_uri);
     eprintln!();
 
     if !open_browser_detached(display_uri).await {
-        eprintln!("  (Could not open browser automatically — open the URL above manually.)");
+        eprintln!("  {}", t("auth.device.browser_open_failed"));
         eprintln!();
     }
 
     // Show the code to confirm it matches the browser (anti-phishing): a complete URL pre-fills it (just confirm), otherwise the user types it
     if device_code.verification_uri_complete.is_some() {
-        eprintln!("Confirm this code in your browser:");
+        eprintln!("{}", t("auth.device.confirm_code"));
     } else {
-        eprintln!("Then enter this code:");
+        eprintln!("{}", t("auth.device.enter_code"));
     }
     eprintln!();
     eprintln!("  {}", device_code.user_code);
     eprintln!();
-    eprintln!(
-        "\x1b[90mOnly continue with a code you requested. \
-         Don't share it with anyone.\x1b[0m"
-    );
+    eprintln!("\u{1b}[90m{}\u{1b}[0m", t("auth.device.code_safety_warning"));
     eprintln!();
-    eprintln!("Waiting for authorization...");
+    eprintln!("{}", t("auth.device.waiting_authorization"));
 
     // The caller prints the `✓ Signed in` confirmation (it also owns the external-provider and devbox early-return paths that never reach here)
     complete_device_code_login(issuer, client_id, device_code, auth_manager, surface).await

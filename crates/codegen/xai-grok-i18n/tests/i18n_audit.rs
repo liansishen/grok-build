@@ -393,6 +393,33 @@ fn rust_files_under(root: &Path, repo_root: &Path, config: &AuditConfig) -> Vec<
     files
 }
 
+/// Source trees of the first-party workspace crates, as paths relative to the repository root.
+///
+/// Read from the workspace manifest so a crate added by a merge cannot stay invisible to the
+/// audit; `third_party/` holds vendored upstream sources and is covered by its upstream project.
+fn workspace_source_trees(repo_root: &Path) -> Vec<String> {
+    let manifest = fs::read_to_string(repo_root.join("Cargo.toml"))
+        .expect("the workspace manifest must be readable");
+    let document: toml::Value =
+        toml::from_str(&manifest).expect("the workspace manifest must be valid TOML");
+    document
+        .get("workspace")
+        .and_then(|workspace| workspace.get("members"))
+        .and_then(toml::Value::as_array)
+        .expect("the workspace manifest must list members")
+        .iter()
+        .map(|member| {
+            member
+                .as_str()
+                .expect("workspace members must be strings")
+                .to_owned()
+        })
+        .filter(|member| !member.starts_with("third_party/"))
+        .map(|member| format!("{member}/src"))
+        .filter(|source| repo_root.join(source).is_dir())
+        .collect()
+}
+
 fn call_is_visible_sink(node: Node<'_>, source: &[u8], config: &AuditConfig) -> bool {
     let Some(name) = call_name(node, source) else {
         return false;
@@ -1183,6 +1210,101 @@ fn markdown_fixture_detects_missing_translation_without_scanning_code() {
     assert!(findings.iter().any(|finding| {
         finding.sink == "untranslated Markdown content" && finding.literal == "copied.md"
     }));
+    fs::remove_dir_all(root).unwrap();
+}
+
+/// The scan scope must stay at workspace granularity: every first-party crate's sources are inside
+/// a configured root, so a new crate or a new render mode cannot silently fall outside the audit.
+#[test]
+fn configured_scan_roots_cover_every_first_party_crate() {
+    let root = repo_root();
+    let config = AuditConfig::load(&root);
+    let trees = workspace_source_trees(&root);
+    assert!(
+        trees.len() > 50,
+        "expected the workspace to list its crates, found {}",
+        trees.len()
+    );
+
+    let uncovered = trees
+        .iter()
+        .filter(|tree| {
+            !config.roots.iter().any(|configured| {
+                tree.starts_with(configured.as_str())
+                    && tree[configured.len()..].starts_with('/')
+            })
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        uncovered.is_empty(),
+        "crates outside the configured i18n scan roots: {uncovered:?}"
+    );
+
+    // The minimal render mode paints its own UI, so its prose must stay in the full-prose scan.
+    assert!(
+        config
+            .current_full_scan_roots
+            .iter()
+            .any(|configured| configured == "crates/codegen/xai-grok-pager-minimal/src"),
+        "the minimal render mode must stay in the full-prose scan: {:?}",
+        config.current_full_scan_roots
+    );
+}
+
+/// The full scan must actually report untranslated copy inside a scanned crate — including a crate
+/// the previous three-directory whitelist never looked at — and must stay quiet once the same
+/// literal goes through the catalog.
+#[test]
+fn full_scan_reports_untranslated_copy_in_a_crate_outside_the_old_whitelist() {
+    let root = std::env::temp_dir().join(format!(
+        "xai-grok-i18n-scope-fixture-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&root).unwrap();
+    let config = AuditConfig {
+        settings_files: Vec::new(),
+        ..AuditConfig::load(&repo_root())
+    };
+    // Mirror the real configured scope as an empty tree, so the fixture exercises the shipped scan
+    // configuration instead of a hand-written copy of it.
+    for configured in config
+        .roots
+        .iter()
+        .chain(config.current_full_scan_roots.iter())
+    {
+        let path = root.join(configured);
+        if configured.ends_with(".rs") {
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(&path, "").unwrap();
+        } else {
+            fs::create_dir_all(&path).unwrap();
+        }
+    }
+    let fixture = root.join("crates/codegen/xai-grok-pager-minimal/src/scope_fixture.rs");
+    fs::write(
+        &fixture,
+        "fn render() {\n    Line::from(\"Untranslated scope fixture copy\");\n}\n",
+    )
+    .unwrap();
+    let findings = audit_current_full_scan(&root, &config).expect("the scope fixture parses");
+    assert!(
+        findings.iter().any(|finding| {
+            finding.literal == "Untranslated scope fixture copy"
+                && finding.path.ends_with("scope_fixture.rs")
+        }),
+        "the full scan must report untranslated copy inside a scanned crate: {findings:?}"
+    );
+
+    // Same fixture, same sink, translated: the scan must go quiet, so a pass cannot come from the
+    // scanner skipping the file altogether.
+    fs::write(
+        &fixture,
+        "fn render() {\n    Line::from(xai_grok_i18n::tr(\"Do you trust the contents of this directory?\"));\n}\n",
+    )
+    .unwrap();
+    let translated = audit_current_full_scan(&root, &config).expect("the scope fixture parses");
+    assert_no_findings("translated scope fixture", &translated);
+
     fs::remove_dir_all(root).unwrap();
 }
 

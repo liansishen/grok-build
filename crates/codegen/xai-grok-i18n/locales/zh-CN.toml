@@ -3126,6 +3126,7 @@
 "update.background_running" = "自动更新正在后台运行。"
 "update.channel_switched" = "已切换到 {channel} 渠道。"
 "update.downloading" = "  正在下载 grok v{version}（{platform}）..."
+"update.downloading_bundled_git" = "  正在下载内置 git {version}..."
 "update.downloading_github" = "  正在从 GitHub Releases 下载 grok v{version}（{platform}）..."
 "update.error.checksum_entry_missing" = "SHA256SUMS 中没有 '{asset}' 的有效条目"
 "update.error.checksum_mismatch" = "'{asset}' 的 SHA-256 不匹配：预期 {expected}，实际为 {actual}"
@@ -3174,6 +3175,7 @@
 "update.restart_required" = "  请重启 Grok。"
 "update.restarting" = "正在重启 Grok..."
 "update.run_manual" = "请运行 `grok update` 获取最新版本。"
+"update.skipped_not_allowed" = "最新版本（{latest}）不在允许更新的范围内；继续保留当前版本（{current_version}）。"
 "update.status.check_failed" = "更新检查失败：{error}"
 "update.status.current_channel" = "Grok Build - v{current} [{channel}]"
 "update.status.current_latest_channel" = "Grok Build - v{current}（最新：{latest}）[{channel}]"
@@ -4623,3 +4625,85 @@ caption = "已暂存"
 saved = "草稿已暂存。再次按下暂存键即可恢复。"
 
 restored = "已恢复暂存的草稿。"
+
+[minimal.auth]
+sign_in_header = "登录 Grok"
+
+open_url_approve = "请在浏览器中打开此 URL 以完成批准："
+
+code_prefix = "代码："
+
+waiting_approval = "等待批准…"
+
+opening_browser = "正在打开浏览器以登录…"
+
+sign_in_failed = "登录失败"
+
+trust_hint = "按 Enter 或 y 信任 · 按 n 或 Esc 退出"
+
+starting_session = "正在登录… 即将启动会话。"
+
+[minimal.commit]
+more_lines_footer = "… 还有 {count} 行 · 用 /transcript 查看"
+
+[minimal.feedback]
+band_too_small_hint = "反馈表单需要更大的终端，按 Esc 关闭"
+
+[minimal.live]
+transcript_hint = "ctrl+o 查看对话记录"
+
+rendering_transcript = "正在生成对话记录… {done}/{total}"
+
+idle_hint = "极简模式 · /help"
+
+idle_hint_switch_back = "极简模式 · 输入 /fullscreen 返回 · /help"
+
+idle_hint_auto = "极简模式 · 因 JetBrains 鼠标上报问题已在 JetBrains/Windows 上自动切换 · /help"
+
+idle_hint_auto_switch_back = "极简模式 · 因 JetBrains 鼠标上报问题已在 JetBrains/Windows 上自动切换 · 输入 /fullscreen 返回 · /help"
+
+context_usage = "{used} / {total} 词元（{percent}%）"
+
+queued = "{count} 条已排队"
+
+press_again = "再次按下 {chord} 即可{label}"
+
+[minimal.panel]
+resume_footer = "↑/↓ 导航 · enter 确认 · esc 取消"
+
+mcps_footer = "↑/↓ 导航 · space 启用/停用 · r 刷新 · enter 展开 · esc 取消"
+
+mcps_title = "管理 MCP 服务器"
+
+mcp_badge_blocked = "被策略阻止"
+
+mcp_badge_disabled = "已禁用"
+
+mcps_loading = "加载中…"
+
+[minimal.plan]
+empty_notice = "尚未编写计划。\n\n批准即可退出规划模式并开始实现，请求修改会将智能体退回规划，退出则放弃。"
+
+header_ready = "计划已就绪，等待审阅"
+
+header_empty = "尚未编写计划"
+
+controls_request_changes = "enter 请求修改 · tab 计划 · esc 返回"
+
+controls_approve = "enter 批准 · tab 计划 · esc 返回"
+
+controls_save_comment = "enter 保存评论 · esc 取消"
+
+controls_preview = "a 批准 · s 修改 · q 继续规划"
+
+[minimal.todo]
+overflow_more = "… 另有 {remaining} 项"
+
+overflow_expand = "… 另有 {remaining} 项 · ctrl+t 展开"
+
+[minimal.welcome]
+version = "  版本 v{version}"
+
+model = "模型 · {model}"
+
+help_hint = "/help 查看可用命令"

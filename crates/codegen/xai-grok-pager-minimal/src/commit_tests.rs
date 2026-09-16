@@ -727,28 +727,64 @@ fn large_commit_is_capped_with_footer() {
     entry.set_display_mode(minimal_commit_display_mode(&entry.block, &appearance));
 
     let width = 80u16;
-    let renderer = minimal_renderer(&entry, &theme, appearance, test_cwd(), COMMITTED_TICK);
-    let full_h = renderer.desired_height(width);
+    let full_h = minimal_renderer(
+        &entry,
+        &theme,
+        appearance.clone(),
+        test_cwd(),
+        COMMITTED_TICK,
+    )
+    .desired_height(width);
     assert!(full_h > 12, "expected a tall block, got {full_h}");
 
     // Paint into a cap-height buffer (what `insert_committed` allocates).
     let cap = 12u16;
     let area = Rect::new(0, 0, width, cap);
-    let mut buf = Buffer::empty(area);
-    paint_committed(&mut buf, renderer, width, full_h, theme.dim());
+    let paint = |buf: &mut Buffer| {
+        let renderer = minimal_renderer(
+            &entry,
+            &theme,
+            appearance.clone(),
+            test_cwd(),
+            COMMITTED_TICK,
+        );
+        paint_committed(buf, renderer, width, full_h, theme.dim());
+    };
+    // The final row is the overflow footer; the buffer is exactly `cap` rows (bounded)
+    let last_row = |buf: &Buffer| -> String {
+        (0..width)
+            .filter_map(|x| buf.cell((x, cap - 1)).map(|c| c.symbol().to_string()))
+            .collect()
+    };
 
-    // The final row is the overflow footer naming the hidden line count and pointing at /transcript; the buffer is exactly `cap` rows (bounded)
-    let last: String = (0..width)
-        .filter_map(|x| buf.cell((x, cap - 1)).map(|c| c.symbol().to_string()))
-        .collect();
-    assert!(last.contains("more lines"), "footer row: {last:?}");
-    assert!(last.contains("/transcript"), "footer row: {last:?}");
-    // A hidden-line count is present (full_h minus the kept content rows).
+    let mut buf = Buffer::empty(area);
+    paint(&mut buf);
+    let last = last_row(&buf);
+    // The hidden-line count is substituted into the catalog template (full_h minus the kept content rows).
     let hidden = full_h - (cap - 1);
+    let expected = xai_grok_i18n::t_fmt(
+        "minimal.commit.more_lines_footer",
+        &[("count", &hidden.to_string())],
+    );
     assert!(
-        last.contains(&hidden.to_string()),
+        last.contains(&expected),
         "footer should name {hidden} hidden lines: {last:?}"
     );
+
+    // The footer sentence is catalog copy: under the pseudo locale the row carries the key, never the English text.
+    xai_grok_i18n::with_pseudo_locale(|| {
+        let mut buf = Buffer::empty(area);
+        paint(&mut buf);
+        let last = last_row(&buf);
+        assert!(
+            last.contains("⟦minimal.commit.more_lines_footer⟧"),
+            "footer row must be the catalog template: {last:?}"
+        );
+        assert!(
+            !last.contains("more lines") && !last.contains("/transcript to view"),
+            "the English footer must come from the catalog: {last:?}"
+        );
+    });
 }
 
 #[test]
@@ -762,24 +798,40 @@ fn small_commit_is_not_capped() {
     entry.set_display_mode(minimal_commit_display_mode(&entry.block, &appearance));
 
     let width = 80u16;
-    let renderer = minimal_renderer(&entry, &theme, appearance, test_cwd(), COMMITTED_TICK);
-    let full_h = renderer.desired_height(width);
+    let full_h = minimal_renderer(
+        &entry,
+        &theme,
+        appearance.clone(),
+        test_cwd(),
+        COMMITTED_TICK,
+    )
+    .desired_height(width);
 
-    // Buffer is exactly the block's height, so there is no footer (uncapped path)
-    let area = Rect::new(0, 0, width, full_h);
-    let mut buf = Buffer::empty(area);
-    paint_committed(&mut buf, renderer, width, full_h, theme.dim());
+    // Buffer is exactly the block's height, so there is no footer (uncapped path); the pseudo locale would paint
+    // `⟦minimal.commit.more_lines_footer⟧` here if any row were reserved for one.
+    xai_grok_i18n::with_pseudo_locale(|| {
+        let area = Rect::new(0, 0, width, full_h);
+        let mut buf = Buffer::empty(area);
+        let renderer = minimal_renderer(
+            &entry,
+            &theme,
+            appearance.clone(),
+            test_cwd(),
+            COMMITTED_TICK,
+        );
+        paint_committed(&mut buf, renderer, width, full_h, theme.dim());
 
-    let mut all = String::new();
-    for y in 0..full_h {
-        for x in 0..width {
-            all.push_str(buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "));
+        let mut all = String::new();
+        for y in 0..full_h {
+            for x in 0..width {
+                all.push_str(buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "));
+            }
         }
-    }
-    assert!(
-        !all.contains("more lines"),
-        "no footer when uncapped: {all:?}"
-    );
+        assert!(
+            !all.contains("⟦minimal.commit.more_lines_footer⟧"),
+            "no footer when uncapped: {all:?}"
+        );
+    });
 }
 
 #[test]

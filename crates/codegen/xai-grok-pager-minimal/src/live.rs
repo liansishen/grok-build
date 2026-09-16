@@ -10,6 +10,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Widget};
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_pager::app::PagerTerminal;
 use xai_grok_pager::app::app_view::{ActiveView, AppView};
 use xai_grok_pager::minimal_api;
@@ -89,7 +90,7 @@ pub fn draw_live(app: &mut AppView, terminal: &mut PagerTerminal, ctx: &Terminal
     );
     let pending_hint = minimal_pending_hint(&app.pending_action);
     let transcript_hint = if minimal_api::minimal_ctrl_o_opens_transcript(app) {
-        "ctrl+o transcript"
+        t("minimal.live.transcript_hint")
     } else {
         "/transcript"
     };
@@ -542,7 +543,13 @@ fn render_minimal_status(
         buf.set_span(
             area.x,
             area.y,
-            &Span::styled(format!("rendering transcript… {done}/{total}"), style),
+            &Span::styled(
+                t_fmt(
+                    "minimal.live.rendering_transcript",
+                    &[("done", &done.to_string()), ("total", &total.to_string())],
+                ),
+                style,
+            ),
             area.width,
         );
         return;
@@ -624,15 +631,10 @@ fn render_idle_hint(buf: &mut Buffer, area: Rect, theme: &Theme) {
     let auto = xai_grok_pager::app::minimal_auto_set_for_mouse_leak();
     let switch_back = xai_grok_pager::app::minimal_show_switch_back_to_fullscreen();
     let hint = match (auto, switch_back) {
-        (true, true) => {
-            "minimal · auto-set on JetBrains/Windows due to JetBrains mouse reporting issues \
-             · /fullscreen to go back · /help"
-        }
-        (true, false) => {
-            "minimal · auto-set on JetBrains/Windows due to JetBrains mouse reporting issues · /help"
-        }
-        (false, true) => "minimal · /fullscreen to go back · /help",
-        (false, false) => "minimal · /help",
+        (true, true) => t("minimal.live.idle_hint_auto_switch_back"),
+        (true, false) => t("minimal.live.idle_hint_auto"),
+        (false, true) => t("minimal.live.idle_hint_switch_back"),
+        (false, false) => t("minimal.live.idle_hint"),
     };
     buf.set_span(area.x, area.y, &Span::styled(hint, style), area.width);
 }
@@ -664,11 +666,11 @@ fn render_prompt_info(
         let effective_plan =
             minimal_api::plan_mode_pending(agent).unwrap_or(minimal_api::plan_mode_active(agent));
         let mode_flag: Option<(&str, Color)> = if effective_plan {
-            Some(("plan", theme.accent_plan))
+            Some((t("mode.flag.plan"), theme.accent_plan))
         } else if agent.session.is_yolo() {
-            Some(("always-approve", theme.warning))
+            Some((t("mode.flag.always_approve"), theme.warning))
         } else if agent.session.is_auto() {
-            Some(("auto", theme.accent_system))
+            Some((t("mode.flag.auto"), theme.accent_system))
         } else {
             None
         };
@@ -686,13 +688,23 @@ fn render_prompt_info(
         {
             let pct = xai_token_estimation::usage_percentage(used, total);
             segs.push((
-                format!("{} / {} ({:.0}%)", fmt_tokens(used), fmt_tokens(total), pct),
+                t_fmt(
+                    "minimal.live.context_usage",
+                    &[
+                        ("used", &fmt_tokens(used)),
+                        ("total", &fmt_tokens(total)),
+                        ("percent", &format!("{pct:.0}")),
+                    ],
+                ),
                 base,
             ));
         }
     }
     if queued > 0 {
-        segs.push((format!("{queued} queued"), base));
+        segs.push((
+            t_fmt("minimal.live.queued", &[("count", &queued.to_string())]),
+            base,
+        ));
         segs.push(("/queue".to_string(), base));
     }
     segs.push((transcript_hint.to_string(), base));
@@ -720,9 +732,9 @@ fn minimal_pending_hint(
         return None;
     }
     let label = pending.label?;
-    Some(format!(
-        "press {} again to {label}",
-        pending.shortcut.display()
+    Some(t_fmt(
+        "minimal.live.press_again",
+        &[("chord", &pending.shortcut.display()), ("label", label)],
     ))
 }
 /// One-row warning-color hint (double-press confirmation, too-small feedback band).
@@ -924,23 +936,34 @@ mod tests {
         };
         xai_grok_pager::app::set_minimal_show_switch_back_to_fullscreen_for_test(false);
         let a = agent();
-        let mut buf = Buffer::empty(area);
-        render_minimal_status(&mut buf, area, &a, &None, None, &theme);
-        let idle = read(&buf);
-        assert!(idle.contains("/help"), "idle hint: {idle:?}");
-        assert!(
-            !idle.contains("/fullscreen"),
-            "cold start must not show switch-back: {idle:?}"
-        );
-        xai_grok_pager::app::set_minimal_show_switch_back_to_fullscreen_for_test(true);
-        let mut buf = Buffer::empty(area);
-        render_minimal_status(&mut buf, area, &a, &None, None, &theme);
-        let switched = read(&buf);
-        assert!(
-            switched.contains("/fullscreen to go back"),
-            "relaunch into minimal must show switch-back: {switched:?}"
-        );
-        xai_grok_pager::app::set_minimal_show_switch_back_to_fullscreen_for_test(false);
+        // The idle hint is catalog copy: under the pseudo locale the row carries the key, never the English text.
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_minimal_status(&mut buf, area, &a, &None, None, &theme);
+            let idle = read(&buf);
+            assert!(
+                idle.contains("⟦minimal.live.idle_hint⟧"),
+                "idle hint: {idle:?}"
+            );
+            assert!(
+                !idle.contains("/fullscreen to go back"),
+                "cold start must not show switch-back: {idle:?}"
+            );
+            xai_grok_pager::app::set_minimal_show_switch_back_to_fullscreen_for_test(true);
+            let mut buf = Buffer::empty(area);
+            render_minimal_status(&mut buf, area, &a, &None, None, &theme);
+            let switched = read(&buf);
+            assert!(
+                switched.contains("⟦minimal.live.idle_hint_switch_back⟧"),
+                "relaunch into minimal must show switch-back: {switched:?}"
+            );
+            assert!(
+                !switched.contains("⟦minimal.live.idle_hint⟧"),
+                "switch-back replaces the plain idle hint: {switched:?}"
+            );
+            xai_grok_pager::app::set_minimal_show_switch_back_to_fullscreen_for_test(false);
+        });
+        // The activity labels come from the pager's `turn_status`, which is localized there.
         let mut a = agent();
         a.session.state = AgentState::TurnRunning;
         let mut buf = Buffer::empty(area);
@@ -969,6 +992,32 @@ mod tests {
             &theme,
         );
         assert!(read(&buf).contains("Retrying"), "retry: {:?}", read(&buf));
+    }
+
+    /// The `/transcript` build's progress row is catalog copy, not an English `format!` left in the render path.
+    #[test]
+    fn transcript_progress_row_comes_from_the_catalog() {
+        let theme = Theme::current();
+        let area = Rect::new(0, 0, 60, 1);
+        let read = |buf: &Buffer| -> String {
+            (0..area.width)
+                .filter_map(|x| buf.cell((x, 0)).map(|c| c.symbol().to_string()))
+                .collect()
+        };
+        let a = agent();
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_minimal_status(&mut buf, area, &a, &None, Some((3, 10)), &theme);
+            let text = read(&buf);
+            assert!(
+                text.contains("⟦minimal.live.rendering_transcript⟧"),
+                "transcript progress: {text:?}"
+            );
+            assert!(
+                !text.contains("rendering transcript"),
+                "the progress row must come from the catalog: {text:?}"
+            );
+        });
     }
     #[test]
     fn minimal_status_shows_idle_watching_cue() {
@@ -1003,6 +1052,21 @@ mod tests {
             "watching cue: {text:?}"
         );
         assert!(!text.contains("/help"), "not the idle hint: {text:?}");
+        // The cue itself comes from the pager's `turn_status`; the pseudo locale proves the minimal idle hint
+        // below the prompt did not take its place.
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_minimal_status(&mut buf, area, &a, &None, None, &theme);
+            let text = read(&buf);
+            assert!(
+                text.contains("⟦turn.watchers.still_running⟧"),
+                "watching cue: {text:?}"
+            );
+            assert!(
+                !text.contains("⟦minimal.live.idle_hint"),
+                "not the idle hint: {text:?}"
+            );
+        });
     }
     #[test]
     fn prompt_style_bash_mode_shows_bang_prefix() {
@@ -1035,19 +1099,32 @@ mod tests {
             ..Default::default()
         });
         let theme = Theme::current();
-        let area = Rect::new(0, 0, 80, 1);
-        let mut buf = Buffer::empty(area);
-        render_prompt_info(&mut buf, area, &a, 3, "ctrl+o transcript", &theme);
-        let text: String = (0..area.width)
-            .filter_map(|x| buf.cell((x, 0)).map(|c| c.symbol().to_string()))
-            .collect();
-        assert!(text.contains("276K"), "absolute used tokens: {text:?}");
-        assert!(text.contains("2.0M"), "total context window: {text:?}");
-        assert!(text.contains('%'), "percentage: {text:?}");
-        assert!(text.contains("3 queued"), "queued count: {text:?}");
+        // Wide enough for the pseudo-locale markers this row paints.
+        let area = Rect::new(0, 0, 120, 1);
+        // The row's copy is catalog-owned: under the pseudo locale it carries the keys, never the English text.
+        let text: String = xai_grok_i18n::with_pseudo_locale(|| {
+            let hint = xai_grok_i18n::t("minimal.live.transcript_hint");
+            let mut buf = Buffer::empty(area);
+            render_prompt_info(&mut buf, area, &a, 3, hint, &theme);
+            (0..area.width)
+                .filter_map(|x| buf.cell((x, 0)).map(|c| c.symbol().to_string()))
+                .collect()
+        });
         assert!(
-            text.trim_end().ends_with("ctrl+o transcript"),
+            text.contains("⟦minimal.live.context_usage⟧"),
+            "used / total / percentage template: {text:?}"
+        );
+        assert!(
+            text.contains("⟦minimal.live.queued⟧"),
+            "queued count: {text:?}"
+        );
+        assert!(
+            text.trim_end().ends_with("⟦minimal.live.transcript_hint⟧"),
             "trailing transcript hint: {text:?}"
+        );
+        assert!(
+            !text.contains("3 queued") && !text.contains("276K"),
+            "the row must not paint the English copy: {text:?}"
         );
     }
     #[test]
@@ -1061,25 +1138,51 @@ mod tests {
             ..Default::default()
         });
         let theme = Theme::current();
-        let area = Rect::new(0, 0, 80, 1);
+        // Wide enough for the pseudo-locale markers this row paints.
+        let area = Rect::new(0, 0, 120, 1);
+        let read = |buf: &Buffer| -> String {
+            (0..area.width)
+                .filter_map(|x| buf.cell((x, 0)).map(|c| c.symbol().to_string()))
+                .collect()
+        };
+        // The bash-mode label is the pager's own `prompt_info_override` lookup, so it is asserted in the default locale.
         let mut buf = Buffer::empty(area);
-        render_prompt_info(&mut buf, area, &a, 2, "ctrl+o transcript", &theme);
-        let text: String = (0..area.width)
-            .filter_map(|x| buf.cell((x, 0)).map(|c| c.symbol().to_string()))
-            .collect();
+        render_prompt_info(
+            &mut buf,
+            area,
+            &a,
+            2,
+            xai_grok_i18n::t("minimal.live.transcript_hint"),
+            &theme,
+        );
+        let text = read(&buf);
         assert!(
             text.contains("Run shell command"),
             "bash mode info label: {text:?}"
         );
-        assert!(
-            !text.contains("276K"),
-            "context usage hidden under bash mode: {text:?}"
-        );
-        assert!(text.contains("2 queued"), "queued still shown: {text:?}");
-        assert!(
-            text.trim_end().ends_with("ctrl+o transcript"),
-            "transcript hint still trails: {text:?}"
-        );
+        // The minimal copy on the row is catalog-owned: under the pseudo locale it carries the keys.
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let hint = xai_grok_i18n::t("minimal.live.transcript_hint");
+            let mut buf = Buffer::empty(area);
+            render_prompt_info(&mut buf, area, &a, 2, hint, &theme);
+            let text = read(&buf);
+            assert!(
+                !text.contains("⟦minimal.live.context_usage⟧"),
+                "context usage hidden under bash mode: {text:?}"
+            );
+            assert!(
+                text.contains("⟦minimal.live.queued⟧"),
+                "queued still shown: {text:?}"
+            );
+            assert!(
+                text.trim_end().ends_with("⟦minimal.live.transcript_hint⟧"),
+                "transcript hint still trails: {text:?}"
+            );
+            assert!(
+                !text.contains("2 queued"),
+                "the counter must come from the catalog: {text:?}"
+            );
+        });
     }
     /// Where Ctrl+O is the interject chord (Apple Terminal) the caller passes the `/transcript` fallback, and the info row advertises that instead.
     #[test]
@@ -1104,26 +1207,43 @@ mod tests {
                 .filter_map(|x| buf.cell((x, 0)).map(|c| c.symbol().to_string()))
                 .collect()
         };
+        // The mode flags are the catalog's `mode.flag.*` labels: the pseudo locale paints the keys.
         let render = |a: &xai_grok_pager::app::agent_view::AgentView| -> String {
-            let mut buf = Buffer::empty(area);
-            render_prompt_info(&mut buf, area, a, 0, "ctrl+o transcript", &theme);
-            read(&buf)
+            xai_grok_i18n::with_pseudo_locale(|| {
+                let hint = xai_grok_i18n::t("minimal.live.transcript_hint");
+                let mut buf = Buffer::empty(area);
+                render_prompt_info(&mut buf, area, a, 0, hint, &theme);
+                read(&buf)
+            })
         };
         let mut a = agent();
         let text = render(&a);
-        assert!(!text.contains("plan"), "normal shows no flag: {text:?}");
-        assert!(!text.contains("always-approve"), "normal: {text:?}");
+        assert!(
+            !text.contains("⟦mode.flag.plan⟧"),
+            "normal shows no flag: {text:?}"
+        );
+        assert!(
+            !text.contains("⟦mode.flag.always_approve⟧"),
+            "normal: {text:?}"
+        );
         minimal_api::set_plan_mode_pending(&mut a, Some(true));
-        assert!(render(&a).contains("plan"), "plan flag: {:?}", render(&a));
+        assert!(
+            render(&a).contains("⟦mode.flag.plan⟧"),
+            "plan flag: {:?}",
+            render(&a)
+        );
         minimal_api::set_plan_mode_pending(&mut a, None);
         minimal_api::set_plan_mode_active(&mut a, false);
         minimal_api::set_yolo_mode_for_test(&mut a.session, true);
         minimal_api::set_auto_mode_for_test(&mut a.session, true);
         let text = render(&a);
-        assert!(text.contains("always-approve"), "yolo flag: {text:?}");
+        assert!(
+            text.contains("⟦mode.flag.always_approve⟧"),
+            "yolo flag: {text:?}"
+        );
         minimal_api::set_yolo_mode_for_test(&mut a.session, false);
         let text = render(&a);
-        assert!(text.contains("auto"), "auto flag: {text:?}");
+        assert!(text.contains("⟦mode.flag.auto⟧"), "auto flag: {text:?}");
     }
     #[test]
     fn pending_hint_formats_press_again() {
@@ -1134,10 +1254,15 @@ mod tests {
         assert!(minimal_pending_hint(&None).is_none());
         let shortcut = KeyShortcut::new(KeyCode::Char('q'), KeyModifiers::CONTROL);
         let pending = Some(PendingAction::new(Action::Quit, shortcut, "quit"));
-        assert_eq!(
-            minimal_pending_hint(&pending).as_deref(),
-            Some("press Ctrl+q again to quit")
-        );
+        // The sentence is catalog copy; the chord and the action label stay template params.
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let hint = minimal_pending_hint(&pending).expect("a pending action shows a hint");
+            assert!(hint.contains("⟦minimal.live.press_again⟧"), "{hint:?}");
+            assert!(
+                !hint.contains("press Ctrl+q again to quit"),
+                "the sentence must come from the catalog: {hint:?}"
+            );
+        });
         let silent = Some(PendingAction::with_ttl(
             Action::Quit,
             shortcut,

@@ -2508,3 +2508,18 @@ fn npm_entry_is_recognized_by_the_binary_location() {
     assert!(super::is_under_node_modules(&resolved));
     assert!(!super::is_under_node_modules(&root.join("home/bin/grok")));
 }
+
+#[test]
+fn skipped_not_allowed_notice_is_localized() {
+    xai_grok_i18n::with_pseudo_locale(|| {
+        let notice = skipped_not_allowed_notice("0.1.220", "0.1.219");
+        assert!(
+            notice.contains("⟦update.skipped_not_allowed⟧"),
+            "{notice:?}"
+        );
+        assert!(
+            !notice.contains("is not an allowed update"),
+            "English copy must come from the catalog: {notice:?}"
+        );
+    });
+}

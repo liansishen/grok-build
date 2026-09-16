@@ -31,18 +31,16 @@ fn focus(agent: &AgentView) -> PlanApprovalFocus {
 
 /// Scrollback notice when exit_plan_mode parks with no plan body.
 /// Kept short and plain (no markdown chrome) so native scrollback reads cleanly under minimal mode's chromeless commit path.
-const EMPTY_PLAN_SCROLLBACK: &str = "\
-No plan written yet.
-
-Approve to leave plan mode and start implementing, request changes to send the \
-agent back to planning, or quit to abandon.";
+fn empty_plan_scrollback() -> &'static str {
+    xai_grok_i18n::t("minimal.plan.empty_notice")
+}
 
 /// Controls-strip header for a parked plan approval.
 fn plan_header(has_plan: bool) -> &'static str {
     if has_plan {
-        "Plan ready for review"
+        xai_grok_i18n::t("minimal.plan.header_ready")
     } else {
-        "No plan written yet"
+        xai_grok_i18n::t("minimal.plan.header_empty")
     }
 }
 
@@ -51,7 +49,7 @@ fn plan_scrollback_body(plan_content: Option<&str>) -> String {
     plan_content
         .filter(|s| !s.trim().is_empty())
         .map(str::to_owned)
-        .unwrap_or_else(|| EMPTY_PLAN_SCROLLBACK.to_owned())
+        .unwrap_or_else(|| empty_plan_scrollback().to_owned())
 }
 
 /// Commit each plan (and revision) once, anchored above the still-running `exit_plan_mode` row so the clipped live tail cannot hide its head.
@@ -156,11 +154,11 @@ pub fn render(
     // Tab reopens the preview (including the empty-plan placeholder).
     let hint = match foc {
         PlanApprovalFocus::Prompt if has_content => {
-            "enter request changes \u{00b7} tab plan \u{00b7} esc back"
+            xai_grok_i18n::t("minimal.plan.controls_request_changes")
         }
-        PlanApprovalFocus::Prompt => "enter approve \u{00b7} tab plan \u{00b7} esc back",
-        PlanApprovalFocus::Commenting => "enter save comment \u{00b7} esc cancel",
-        PlanApprovalFocus::Preview => "a approve \u{00b7} s revise \u{00b7} q keep planning",
+        PlanApprovalFocus::Prompt => xai_grok_i18n::t("minimal.plan.controls_approve"),
+        PlanApprovalFocus::Commenting => xai_grok_i18n::t("minimal.plan.controls_save_comment"),
+        PlanApprovalFocus::Preview => xai_grok_i18n::t("minimal.plan.controls_preview"),
     };
     let hint_style = theme.dim().bg(Color::Reset);
     let controls_rect = Rect {
@@ -224,14 +222,61 @@ mod tests {
 
     #[test]
     fn empty_plan_scrollback_uses_notice_not_silence() {
-        let body = plan_scrollback_body(None);
-        assert!(body.contains("No plan written yet"));
-        assert!(body.contains("Approve"));
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let body = plan_scrollback_body(None);
+            assert!(body.contains("⟦minimal.plan.empty_notice⟧"), "{body:?}");
+            assert!(
+                !body.contains("No plan written yet"),
+                "the empty-plan notice must come from the catalog: {body:?}"
+            );
 
-        let whitespace = plan_scrollback_body(Some("  \n\t  "));
-        assert_eq!(whitespace, body, "whitespace-only counts as empty");
+            let whitespace = plan_scrollback_body(Some("  \n\t  "));
+            assert_eq!(whitespace, body, "whitespace-only counts as empty");
 
-        let real = plan_scrollback_body(Some("# Plan\n- do it"));
-        assert_eq!(real, "# Plan\n- do it");
+            let real = plan_scrollback_body(Some("# Plan\n- do it"));
+            assert_eq!(real, "# Plan\n- do it");
+        });
+    }
+
+    #[test]
+    fn plan_header_readiness_comes_from_the_catalog() {
+        xai_grok_i18n::with_pseudo_locale(|| {
+            assert_eq!(plan_header(true), "⟦minimal.plan.header_ready⟧");
+            assert_eq!(plan_header(false), "⟦minimal.plan.header_empty⟧");
+        });
+    }
+
+    /// The controls strip paints its header and decision hint straight from the catalog.
+    #[test]
+    fn controls_strip_paints_catalog_copy() {
+        let theme = Theme::terminal_default();
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let area = Rect::new(0, 0, 80, 2);
+            let mut buf = Buffer::empty(area);
+            let mut agent =
+                minimal_api::test_agent_view(Some("s1"), std::path::PathBuf::from("/tmp"));
+            assert!(
+                render(&mut buf, area, &mut agent, &theme).is_none(),
+                "Preview focus owns no feedback editor row"
+            );
+
+            let row = |y: u16| -> String {
+                (0..area.width)
+                    .filter_map(|x| buf.cell((x, y)).map(|c| c.symbol().to_string()))
+                    .collect()
+            };
+
+            let header = row(0);
+            assert!(header.contains("⟦minimal.plan.header_empty⟧"), "{header:?}");
+            let controls = row(1);
+            assert!(
+                controls.contains("⟦minimal.plan.controls_preview⟧"),
+                "{controls:?}"
+            );
+            assert!(
+                !controls.contains("keep planning"),
+                "the decision hint must come from the catalog: {controls:?}"
+            );
+        });
     }
 }

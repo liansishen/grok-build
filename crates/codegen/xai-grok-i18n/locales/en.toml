@@ -3126,6 +3126,7 @@
 "update.background_running" = "Auto-update running in background."
 "update.channel_switched" = "Switched to {channel} channel."
 "update.downloading" = "  Downloading grok v{version} ({platform})..."
+"update.downloading_bundled_git" = "  Downloading bundled git {version}..."
 "update.downloading_github" = "  Downloading grok v{version} ({platform}) from GitHub Releases..."
 "update.error.checksum_entry_missing" = "SHA256SUMS has no valid entry for '{asset}'"
 "update.error.checksum_mismatch" = "SHA-256 mismatch for '{asset}': expected {expected}, got {actual}"
@@ -3174,6 +3175,7 @@
 "update.restart_required" = "  Please restart Grok."
 "update.restarting" = "Restarting Grok..."
 "update.run_manual" = "Run `grok update` to get the latest version."
+"update.skipped_not_allowed" = "The latest release ({latest}) is not an allowed update; keeping the current version ({current_version})."
 "update.status.check_failed" = "Update check failed: {error}"
 "update.status.current_channel" = "Grok Build - v{current} [{channel}]"
 "update.status.current_latest_channel" = "Grok Build - v{current} (latest: {latest}) [{channel}]"
@@ -4633,3 +4635,85 @@ caption = "Stashed"
 saved = "Draft stashed. Press the stash key again to restore it."
 
 restored = "Stashed draft restored."
+
+[minimal.auth]
+sign_in_header = "Sign in to Grok"
+
+open_url_approve = "Open this URL in your browser to approve:"
+
+code_prefix = "Code: "
+
+waiting_approval = "Waiting for approval…"
+
+opening_browser = "Opening your browser to sign in…"
+
+sign_in_failed = "Sign-in failed"
+
+trust_hint = "Enter or y to trust · n or Esc to quit"
+
+starting_session = "Signing in… starting your session."
+
+[minimal.commit]
+more_lines_footer = "… {count} more lines · /transcript to view"
+
+[minimal.feedback]
+band_too_small_hint = "Feedback form needs a bigger terminal - press Esc to close"
+
+[minimal.live]
+transcript_hint = "ctrl+o transcript"
+
+rendering_transcript = "rendering transcript… {done}/{total}"
+
+idle_hint = "minimal · /help"
+
+idle_hint_switch_back = "minimal · /fullscreen to go back · /help"
+
+idle_hint_auto = "minimal · auto-set on JetBrains/Windows due to JetBrains mouse reporting issues · /help"
+
+idle_hint_auto_switch_back = "minimal · auto-set on JetBrains/Windows due to JetBrains mouse reporting issues · /fullscreen to go back · /help"
+
+context_usage = "{used} / {total} ({percent}%)"
+
+queued = "{count} queued"
+
+press_again = "press {chord} again to {label}"
+
+[minimal.panel]
+resume_footer = "↑/↓ navigate · enter confirm · esc cancel"
+
+mcps_footer = "↑/↓ navigate · space enable/disable · r refresh · enter expand · esc cancel"
+
+mcps_title = "Manage MCP servers"
+
+mcp_badge_blocked = "blocked by policy"
+
+mcp_badge_disabled = "disabled"
+
+mcps_loading = "loading…"
+
+[minimal.plan]
+empty_notice = "No plan written yet.\n\nApprove to leave plan mode and start implementing, request changes to send the agent back to planning, or quit to abandon."
+
+header_ready = "Plan ready for review"
+
+header_empty = "No plan written yet"
+
+controls_request_changes = "enter request changes · tab plan · esc back"
+
+controls_approve = "enter approve · tab plan · esc back"
+
+controls_save_comment = "enter save comment · esc cancel"
+
+controls_preview = "a approve · s revise · q keep planning"
+
+[minimal.todo]
+overflow_more = "… +{remaining} more"
+
+overflow_expand = "… +{remaining} more · ctrl+t to expand"
+
+[minimal.welcome]
+version = "  v{version}"
+
+model = "Model · {model}"
+
+help_hint = "/help for commands"

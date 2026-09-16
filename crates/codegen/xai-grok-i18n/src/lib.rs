@@ -505,6 +505,31 @@ mod tests {
         }
     }
 
+    /// The `minimal` (`grok --minimal`) render mode's copy is user-visible English, so every one of
+    /// its keys must carry a real Chinese translation rather than the English original.
+    #[test]
+    fn minimal_render_mode_keys_are_translated() {
+        let mut checked = 0usize;
+        for (key, en) in EN.iter() {
+            if !key.starts_with("minimal.") {
+                continue;
+            }
+            checked += 1;
+            let zh = ZH_CN
+                .get(key)
+                .unwrap_or_else(|| panic!("zh-CN missing key {key}"));
+            let has_chinese = zh
+                .chars()
+                .any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character));
+            assert!(has_chinese, "{key} has no Chinese text: {zh:?}");
+            assert_ne!(*en, *zh, "{key} is an English copy: {zh:?}");
+        }
+        assert!(
+            checked >= 30,
+            "expected the minimal render mode's keys, found {checked}"
+        );
+    }
+
     #[test]
     fn catalog_values_are_not_empty() {
         for (locale, catalog) in [("en", &*EN), ("zh-CN", &*ZH_CN)] {

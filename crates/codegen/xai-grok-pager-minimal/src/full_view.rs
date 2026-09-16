@@ -95,7 +95,7 @@ fn finish_transcript(app: &mut AppView, id: xai_grok_pager::app::agent::AgentId,
             agent
                 .scrollback
                 .push_block(xai_grok_pager::scrollback::block::RenderBlock::system(
-                    "No conversation transcript to view yet",
+                    xai_grok_i18n::t("transcript.no_transcript_yet"),
                 ));
         }
         return;
@@ -108,9 +108,11 @@ fn finish_transcript(app: &mut AppView, id: xai_grok_pager::app::agent::AgentId,
         }
         Err(e) => {
             if let Some(agent) = app.agents.get_mut(&id) {
+                let error = e.to_string();
                 agent.scrollback.push_block(
-                    xai_grok_pager::scrollback::block::RenderBlock::system(format!(
-                        "Failed to write transcript: {e}"
+                    xai_grok_pager::scrollback::block::RenderBlock::system(xai_grok_i18n::t_fmt(
+                        "transcript.write_transcript_failed",
+                        &[("error", &error)],
                     )),
                 );
             }
@@ -343,19 +345,26 @@ mod tests {
         ));
         assert_eq!(entry.display_mode(), DisplayMode::Collapsed);
 
-        xai_grok_pager::appearance::cache::set_show_thinking_blocks(true);
-        let mut out = String::new();
-        render_entry_to_ansi(&entry, &theme, &appearance, test_cwd(), &mut out);
-        xai_grok_pager::appearance::cache::set_show_thinking_blocks(false);
+        // The collapsed header's expand hint is catalog copy: under the pseudo locale it would paint the key.
+        xai_grok_i18n::with_pseudo_locale(|| {
+            xai_grok_pager::appearance::cache::set_show_thinking_blocks(true);
+            let mut out = String::new();
+            render_entry_to_ansi(&entry, &theme, &appearance, test_cwd(), &mut out);
+            xai_grok_pager::appearance::cache::set_show_thinking_blocks(false);
 
-        assert!(
-            out.contains("REASONINGBODY"),
-            "a collapsed commit must still expand in /transcript: {out:?}"
-        );
-        assert!(
-            !out.contains("ctrl+e to expand"),
-            "no expand hint in the fully-expanded transcript: {out:?}"
-        );
+            assert!(
+                out.contains("REASONINGBODY"),
+                "a collapsed commit must still expand in /transcript: {out:?}"
+            );
+            assert!(
+                !out.contains("⟦scrollback.thinking.expand_hint⟧"),
+                "no expand hint in the fully-expanded transcript: {out:?}"
+            );
+            assert!(
+                !out.contains("ctrl+e to expand"),
+                "the hint must come from the catalog: {out:?}"
+            );
+        });
     }
 
     #[test]

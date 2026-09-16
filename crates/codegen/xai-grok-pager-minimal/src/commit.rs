@@ -8,6 +8,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 
+use xai_grok_i18n::t_fmt;
 use xai_grok_pager::app::PagerTerminal;
 use xai_grok_pager::app::app_view::{ActiveView, AppView};
 use xai_grok_pager::appearance::AppearanceConfig;
@@ -284,7 +285,10 @@ fn paint_committed(
         let style = footer_style.bg(Color::Reset);
         // Clear any clipped content that landed on the footer row first.
         buf.set_style(row, style);
-        let text = format!("\u{2026} {hidden} more lines \u{00b7} /transcript to view");
+        let text = t_fmt(
+            "minimal.commit.more_lines_footer",
+            &[("count", &hidden.to_string())],
+        );
         buf.set_span(buf.area.x, y, &Span::styled(text, style), width);
     }
 }

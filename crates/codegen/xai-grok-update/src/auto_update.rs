@@ -2612,6 +2612,14 @@ pub async fn apply_channel_switch(channel_switch: Option<&str>, update_config: &
     }
 }
 
+/// Notice when the newest release is outside the allowed channel/minimum policy.
+fn skipped_not_allowed_notice(latest: &str, current: &str) -> String {
+    t_fmt(
+        "update.skipped_not_allowed",
+        &[("latest", latest), ("current_version", current)],
+    )
+}
+
 /// Returns `Ok(Some(version))` when the target version is present on disk afterwards. Callers use the returned version to
 /// signal a running leader to relaunch onto the new binary (see the pager's post-update leader relaunch). That signal
 /// must fire even when the download itself was skipped, so a stale leader still picks up a binary someone else installed.
@@ -2689,10 +2697,8 @@ pub async fn run_update(
             // Cache so an explicit `grok update` doesn't re-prompt every run.
             let stable_ptr = try_fetch_stable_pointer().await;
             write_version_cache(&latest, stable_ptr.as_deref()).await;
-            eprintln!(
-                "The latest release ({latest}) is not an allowed update; \
-                 keeping the current version ({current_version})."
-            );
+            let notice = skipped_not_allowed_notice(&latest, current_version.as_str());
+            eprintln!("{notice}");
             refresh_deployment_config().await;
             return Ok(None);
         }

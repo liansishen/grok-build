@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::io::AsyncBufReadExt as _;
 use tokio::sync::{mpsc, oneshot};
 use xai_grok_http::TransportFailureKind;
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_shell_base::util::grok_home;
 use xai_grok_telemetry::events::{LoginFailed, LoginFailureKind};
 pub type StderrCallback = Box<dyn Fn(&str)>;
@@ -560,7 +561,7 @@ pub(super) async fn run_auth_flow_steps(
                     error = %e,
                     "auth: external auth provider failed, falling through to interactive login"
                 );
-                eprintln!("Signing in with browser instead...");
+                eprintln!("{}", t("auth.flow.browser_fallback"));
             }
         }
     }
@@ -723,10 +724,11 @@ async fn persist_or_use_minted(auth_manager: &AuthManager, new_auth: GrokAuth) -
 /// Print the CLI "signed in" confirmation, clearing the spinner line first.
 pub fn report_signed_in(auth: &GrokAuth) {
     eprint!("\r\x1b[K");
-    match auth.email {
-        Some(ref email) => eprintln!("✓ Signed in as {email}"),
-        None => eprintln!("✓ Signed in"),
-    }
+    let confirmation = match auth.email {
+        Some(ref email) => t_fmt("auth.flow.signed_in_as", &[("email", email.as_str())]),
+        None => t("auth.flow.signed_in").to_owned(),
+    };
+    eprintln!("{confirmation}");
 }
 /// CLI auth entrypoint. For GUI, use `run_auth_flow_with_stderr_bridge`.
 pub async fn ensure_authenticated(
@@ -878,9 +880,7 @@ async fn run_cli_login_steps(
         auth
     } else {
         if device_auth && crate::oidc::is_configured(grok_com_config) {
-            eprintln!(
-                "Device-code login isn't available for your SSO provider; using browser sign-in."
-            );
+            eprintln!("{}", t("auth.flow.device_unavailable_for_sso"));
         }
         let (auth, did_auth) = run_auth_flow(
             auth_manager,

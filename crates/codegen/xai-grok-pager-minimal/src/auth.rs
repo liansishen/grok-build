@@ -10,6 +10,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
+use xai_grok_i18n::t;
 use xai_grok_pager::app::app_view::{AuthState, TrustState};
 use xai_grok_pager::theme::Theme;
 
@@ -190,7 +191,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 area,
                 y,
                 bottom,
-                Line::from(Span::styled("Sign in to Grok", bold)),
+                Line::from(Span::styled(t("minimal.auth.sign_in_header"), bold)),
             );
             y = put_line(buf, area, y, bottom, Line::default());
             match url {
@@ -200,10 +201,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                         area,
                         y,
                         bottom,
-                        Line::from(Span::styled(
-                            "Open this URL in your browser to approve:",
-                            gray,
-                        )),
+                        Line::from(Span::styled(t("minimal.auth.open_url_approve"), gray)),
                     );
                     y = render_url(
                         buf,
@@ -221,7 +219,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                             y,
                             bottom,
                             Line::from(vec![
-                                Span::styled("Code: ", gray),
+                                Span::styled(t("minimal.auth.code_prefix"), gray),
                                 Span::styled(code.clone(), bold),
                             ]),
                         );
@@ -232,7 +230,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                         area,
                         y,
                         bottom,
-                        Line::from(Span::styled("Waiting for approval\u{2026}", gray)),
+                        Line::from(Span::styled(t("minimal.auth.waiting_approval"), gray)),
                     );
                 }
                 None => {
@@ -241,10 +239,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                         area,
                         y,
                         bottom,
-                        Line::from(Span::styled(
-                            "Opening your browser to sign in\u{2026}",
-                            gray,
-                        )),
+                        Line::from(Span::styled(t("minimal.auth.opening_browser"), gray)),
                     );
                 }
             }
@@ -259,7 +254,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 area,
                 y,
                 bottom,
-                Line::from(Span::styled("Sign-in failed", warn)),
+                Line::from(Span::styled(t("minimal.auth.sign_in_failed"), warn)),
             );
             y = put_line(buf, area, y, bottom, Line::default());
             let _ = put_line(
@@ -277,10 +272,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 area,
                 y,
                 bottom,
-                Line::from(Span::styled(
-                    "Do you trust the contents of this directory?",
-                    bold,
-                )),
+                Line::from(Span::styled(t("welcome.trust.question"), bold)),
             );
             y = render_url(
                 buf,
@@ -296,17 +288,14 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 area,
                 y,
                 bottom,
-                Line::from(Span::styled(
-                    "Grok Build may run or modify contents in this directory,",
-                    gray,
-                )),
+                Line::from(Span::styled(t("welcome.trust.warning_line1"), gray)),
             );
             y = put_line(
                 buf,
                 area,
                 y,
                 bottom,
-                Line::from(Span::styled("posing security risks.", gray)),
+                Line::from(Span::styled(t("welcome.trust.warning_line2"), gray)),
             );
             y = put_line(buf, area, y, bottom, Line::default());
             y = put_line(
@@ -316,7 +305,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 bottom,
                 Line::from(vec![
                     Span::styled("y", bold),
-                    Span::styled("  Yes, proceed", gray),
+                    Span::styled(format!("  {}", t("welcome.trust.yes")), gray),
                 ]),
             );
             y = put_line(
@@ -326,7 +315,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 bottom,
                 Line::from(vec![
                     Span::styled("n", bold),
-                    Span::styled("  No, quit", gray),
+                    Span::styled(format!("  {}", t("welcome.trust.no")), gray),
                 ]),
             );
             y = put_line(buf, area, y, bottom, Line::default());
@@ -335,10 +324,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 area,
                 y,
                 bottom,
-                Line::from(Span::styled(
-                    "Enter or y to trust \u{00b7} n or Esc to quit",
-                    gray,
-                )),
+                Line::from(Span::styled(t("minimal.auth.trust_hint"), gray)),
             );
         }
         MinimalAuthHint::Starting => {
@@ -347,10 +333,7 @@ pub(super) fn render_auth(buf: &mut Buffer, area: Rect, theme: &Theme, hint: &Mi
                 area,
                 y,
                 bottom,
-                Line::from(Span::styled(
-                    "Signing in\u{2026} starting your session.",
-                    gray,
-                )),
+                Line::from(Span::styled(t("minimal.auth.starting_session"), gray)),
             );
         }
     }
@@ -462,44 +445,130 @@ mod tests {
     fn render_auth_shows_url_and_code() {
         let theme = Theme::current();
         let area = Rect::new(0, 0, 80, 12);
-        let mut buf = Buffer::empty(area);
         let hint = MinimalAuthHint::SigningIn {
             url: Some("https://accounts.x.ai/device?user_code=ABCD-EFGH".into()),
             code: Some("ABCD-EFGH".into()),
         };
-        render_auth(&mut buf, area, &theme, &hint);
-        let text = crate::buffer_text(&buf);
-        assert!(text.contains("Sign in to Grok"), "header: {text:?}");
-        assert!(text.contains("accounts.x.ai/device"), "url: {text:?}");
-        assert!(text.contains("ABCD-EFGH"), "device code: {text:?}");
-        assert!(
-            text.contains("Waiting for approval"),
-            "waiting line: {text:?}"
-        );
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_auth(&mut buf, area, &theme, &hint);
+            let text = crate::buffer_text(&buf);
+            assert!(
+                text.contains("⟦minimal.auth.sign_in_header⟧"),
+                "header: {text:?}"
+            );
+            assert!(
+                text.contains("⟦minimal.auth.open_url_approve⟧"),
+                "url prompt: {text:?}"
+            );
+            assert!(text.contains("accounts.x.ai/device"), "url: {text:?}");
+            assert!(text.contains("ABCD-EFGH"), "device code: {text:?}");
+            assert!(
+                text.contains("⟦minimal.auth.code_prefix⟧"),
+                "code label: {text:?}"
+            );
+            assert!(
+                text.contains("⟦minimal.auth.waiting_approval⟧"),
+                "waiting line: {text:?}"
+            );
+            // The copy lives in the catalog now: the English literal must not reappear here.
+            assert!(!text.contains("Sign in to Grok"), "header: {text:?}");
+            assert!(!text.contains("Waiting for approval"), "waiting: {text:?}");
+        });
     }
 
     #[test]
     fn render_auth_shows_trust_question() {
         let theme = Theme::current();
         let area = Rect::new(0, 0, 80, 14);
-        let mut buf = Buffer::empty(area);
         let hint = MinimalAuthHint::TrustFolder {
             workspace: PathBuf::from("/home/agent/project"),
         };
-        render_auth(&mut buf, area, &theme, &hint);
-        let text = crate::buffer_text(&buf);
-        assert!(
-            text.contains("Do you trust the contents of this directory?"),
-            "question: {text:?}"
-        );
-        assert!(
-            text.contains("/home/agent/project"),
-            "workspace path: {text:?}"
-        );
-        assert!(text.contains("Yes, proceed"), "yes option: {text:?}");
-        assert!(text.contains("No, quit"), "no option: {text:?}");
-        assert!(text.contains("Enter or y to trust"), "hint line: {text:?}");
-        assert!(text.contains("posing security risks"), "warning: {text:?}");
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_auth(&mut buf, area, &theme, &hint);
+            let text = crate::buffer_text(&buf);
+            assert!(
+                text.contains("⟦welcome.trust.question⟧"),
+                "question: {text:?}"
+            );
+            assert!(
+                text.contains("/home/agent/project"),
+                "workspace path: {text:?}"
+            );
+            assert!(
+                text.contains("⟦welcome.trust.warning_line1⟧"),
+                "warning line 1: {text:?}"
+            );
+            assert!(
+                text.contains("⟦welcome.trust.warning_line2⟧"),
+                "warning line 2: {text:?}"
+            );
+            assert!(text.contains("⟦welcome.trust.yes⟧"), "yes option: {text:?}");
+            assert!(text.contains("⟦welcome.trust.no⟧"), "no option: {text:?}");
+            assert!(
+                text.contains("⟦minimal.auth.trust_hint⟧"),
+                "hint line: {text:?}"
+            );
+            // The trust copy is shared with the welcome screen; it must come from the catalog.
+            assert!(
+                !text.contains("Do you trust the contents of this directory?"),
+                "question: {text:?}"
+            );
+            assert!(!text.contains("Yes, proceed"), "yes option: {text:?}");
+            assert!(!text.contains("No, quit"), "no option: {text:?}");
+            assert!(!text.contains("Enter or y to trust"), "hint line: {text:?}");
+            assert!(!text.contains("posing security risks"), "warning: {text:?}");
+        });
+    }
+
+    #[test]
+    fn render_auth_shows_browser_handoff_failure_and_starting() {
+        let theme = Theme::current();
+        let area = Rect::new(0, 0, 80, 8);
+        xai_grok_i18n::with_pseudo_locale(|| {
+            // Command flow: the provider opens its own browser, so there is no URL to show.
+            let mut buf = Buffer::empty(area);
+            render_auth(
+                &mut buf,
+                area,
+                &theme,
+                &MinimalAuthHint::SigningIn {
+                    url: None,
+                    code: None,
+                },
+            );
+            let text = crate::buffer_text(&buf);
+            assert!(
+                text.contains("⟦minimal.auth.opening_browser⟧"),
+                "browser handoff: {text:?}"
+            );
+            assert!(!text.contains("Opening your browser"), "handoff: {text:?}");
+
+            let mut buf = Buffer::empty(area);
+            render_auth(
+                &mut buf,
+                area,
+                &theme,
+                &MinimalAuthHint::Failed("nope".into()),
+            );
+            let text = crate::buffer_text(&buf);
+            assert!(
+                text.contains("⟦minimal.auth.sign_in_failed⟧"),
+                "failure header: {text:?}"
+            );
+            assert!(text.contains("nope"), "error text: {text:?}");
+            assert!(!text.contains("Sign-in failed"), "header: {text:?}");
+
+            let mut buf = Buffer::empty(area);
+            render_auth(&mut buf, area, &theme, &MinimalAuthHint::Starting);
+            let text = crate::buffer_text(&buf);
+            assert!(
+                text.contains("⟦minimal.auth.starting_session⟧"),
+                "starting line: {text:?}"
+            );
+            assert!(!text.contains("Signing in"), "starting line: {text:?}");
+        });
     }
 
     #[test]

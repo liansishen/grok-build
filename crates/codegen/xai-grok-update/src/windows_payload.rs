@@ -183,15 +183,21 @@ pub(super) fn extract_zip(zip_path: &Path, dest: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Notice printed while the bundled MinGit archive is downloaded.
+fn downloading_bundled_git_notice(version: &str) -> String {
+    xai_grok_i18n::t_fmt("update.downloading_bundled_git", &[("version", version)])
+}
+
 #[cfg(windows)]
 pub(super) use windows::{activate, download};
 
 #[cfg(windows)]
 mod windows {
     use super::{
-        GROVE_EXES, KEEP_MINGIT_VERSIONS, MAX_SIDECAR_BYTES, MinGitDownload, Payload, extract_zip,
-        grove_object_name, mingit_object_base, parse_sha256_sidecar, payload_usable, prune_plan,
-        sha256_hex_of_file, staging_dir_name, valid_mingit_version,
+        GROVE_EXES, KEEP_MINGIT_VERSIONS, MAX_SIDECAR_BYTES, MinGitDownload, Payload,
+        downloading_bundled_git_notice, extract_zip, grove_object_name, mingit_object_base,
+        parse_sha256_sidecar, payload_usable, prune_plan, sha256_hex_of_file, staging_dir_name,
+        valid_mingit_version,
     };
     use crate::auto_update::{
         download_cli_artifact_from_gcs, download_client, download_silent, replace_managed_bins,
@@ -372,7 +378,8 @@ mod windows {
             }
         };
         let zip = download_dir.join(format!("{object}.zip"));
-        eprintln!("  Downloading bundled git {version}...");
+        let notice = downloading_bundled_git_notice(&version);
+        eprintln!("{notice}");
         if let Err(e) = download_silent(&format!("{base}/{object}.zip"), &zip).await {
             tracing::warn!("MinGit payload: downloading {object}.zip failed: {e:#}");
             let _ = tokio::fs::remove_file(&zip).await;
@@ -748,5 +755,20 @@ mod tests {
         let err = extract_zip(&zip, &staging).unwrap_err();
         assert!(err.to_string().contains("escapes"), "{err:#}");
         assert!(!staging.join("cmd").join("git.exe").exists());
+    }
+
+    #[test]
+    fn downloading_bundled_git_notice_is_localized() {
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let notice = downloading_bundled_git_notice("0.2.10");
+            assert!(
+                notice.contains("⟦update.downloading_bundled_git⟧"),
+                "{notice:?}"
+            );
+            assert!(
+                !notice.contains("Downloading bundled git"),
+                "English copy must come from the catalog: {notice:?}"
+            );
+        });
     }
 }

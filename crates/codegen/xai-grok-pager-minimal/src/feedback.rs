@@ -6,14 +6,11 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 
+use xai_grok_i18n::t;
 use xai_grok_pager::terminal;
 use xai_grok_pager::terminal::overlay::PostFlush;
 use xai_grok_pager::theme::Theme;
 use xai_grok_pager::views::feedback_modal::FeedbackModalState;
-
-/// Shown when the band is too small for the form (`render` returns `None` below 6 rows or 20 columns).
-const FEEDBACK_BAND_TOO_SMALL_HINT: &str =
-    "Feedback form needs a bigger terminal - press Esc to close";
 
 /// Paint the form over `area` and hand back the Write caret plus the post-flush escapes.
 /// The minimal prompt paints inline image previews, so a frame without its own escapes must still clear a stale placement or it sits over the form.
@@ -31,12 +28,19 @@ pub(super) fn render(
                 .post_flush
                 .or_else(|| terminal::overlay::clear().map(PostFlush::from)),
         ),
+        // `render` returns `None` below 6 rows or 20 columns, and the form owns every key while open: the band must
+        // still paint a one-row Esc hint, or the key owner would be invisible.
         None => {
             let row = Rect {
                 height: 1u16.min(area.height),
                 ..area
             };
-            super::live::render_warning_hint(buf, row, theme, FEEDBACK_BAND_TOO_SMALL_HINT);
+            super::live::render_warning_hint(
+                buf,
+                row,
+                theme,
+                t("minimal.feedback.band_too_small_hint"),
+            );
             (None, terminal::overlay::clear().map(PostFlush::from))
         }
     }
@@ -78,6 +82,7 @@ mod tests {
         );
     }
 
+    /// The hint is catalog copy: under the pseudo locale the band paints the key instead of the sentence.
     #[test]
     #[serial_test::serial]
     fn feedback_modal_too_small_band_paints_the_esc_hint() {
@@ -87,12 +92,17 @@ mod tests {
         let theme = Theme::terminal_default();
         let area = Rect::new(0, 0, 80, 4);
         let mut buf = Buffer::empty(area);
-        let (cursor, _) = render(&mut buf, area, &mut modal, &theme, false);
+        let (cursor, _) =
+            xai_grok_i18n::with_pseudo_locale(|| render(&mut buf, area, &mut modal, &theme, false));
 
         let text = crate::buffer_text(&buf);
         assert!(
-            text.contains(FEEDBACK_BAND_TOO_SMALL_HINT),
+            text.contains("⟦minimal.feedback.band_too_small_hint⟧"),
             "the key owner must stay visible on a too-small band:\n{text}"
+        );
+        assert!(
+            !text.contains("needs a bigger terminal"),
+            "the hint must come from the catalog:\n{text}"
         );
         assert!(cursor.is_none());
     }
