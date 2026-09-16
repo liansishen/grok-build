@@ -4761,6 +4761,16 @@ undo = "undo"
 redo = "redo"
 
 dropdown_controls = "↑/↓ navigate · enter confirm · esc cancel"
+
+submit = "submit"
+
+accept_toggle = "accept / toggle"
+
+decline = "decline"
+
+next_field = "next field"
+
+quote = "quote"
 [settings.modal]
 preview_sample = "Let me trace through the call sites. First, I'll need to look at how the dispatch flow handles the new variant. Then I'll verify the rollback path preserves the previous state correctly."
 
@@ -4783,6 +4793,13 @@ expand_hint = " to expand"
 [memory.empty]
 title = "**Nothing remembered yet.**\n\n"
 
+bullet_capture = "- Keep working. Notes are saved automatically after each completed turn.\n"
+
+bullet_remember = "- `/remember <note>` saves something specific right now.\n"
+
+bullet_dream = "- `/dream` organizes saved notes into topics.\n"
+
+blurb = "\nGrok Build remembers conventions, decisions, and project facts across sessions so you don't have to repeat yourself. Notes live in **workspace** memory for this repository and **global** memory shared across all your projects; each has a generated `MEMORY.md` index that fills in as notes are saved.\n"
 [memory.scope]
 session_logs = "session logs"
 
@@ -4883,3 +4900,18 @@ hud = " HP {hp} · KILLS {kills}/{total} "
 controls = " WASD/←→ move · SPACE fire · ESC quit "
 
 controls_idle = " ESC quit "
+
+[memory.disabled]
+session_toggle = "**Memory is off for this session.**\n\n- Press **t** to turn it back on.\n- `/memory on` does the same from the prompt.\n\nWhile off, Grok isn't reading or saving notes; anything already remembered is kept on disk. Memory carries conventions, decisions, and project facts between sessions so you don't have to repeat yourself."
+
+rollout_restricted = "**Memory is unavailable in this session.** Start a new session to pick up your current settings.\n\nThis session's memory settings were pinned when it started, and they disable memory, so it can't be turned on here. `/memory status` shows the details."
+
+not_configured = "**Memory isn't configured.** `/memory status` shows the details.\n\nNo memory storage is set up for this session, so there is nothing to browse or turn on."
+
+unknown = "**Memory is off for this session.** `/memory status` shows the details.\n\nThis session reports a reason this version of Grok Build doesn't recognize; run `/memory on` from the prompt to try turning it back on."
+
+[memory]
+deleted = "Deleted {name}."
+
+[modal]
+vim_search_hint = "i search"

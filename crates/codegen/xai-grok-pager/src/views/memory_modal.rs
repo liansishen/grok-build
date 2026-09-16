@@ -55,54 +55,26 @@ const NOTICE_MAX_WIDTH: u16 = 72;
 fn empty_state_markdown(capture_enabled: bool, dream_enabled: bool) -> String {
     let mut text = String::from(xai_grok_i18n::t("memory.empty.title"));
     if capture_enabled {
-        text.push_str("- Keep working. Notes are saved automatically after each completed turn.\n");
+        text.push_str(xai_grok_i18n::t("memory.empty.bullet_capture"));
     }
-    text.push_str("- `/remember <note>` saves something specific right now.\n");
+    text.push_str(xai_grok_i18n::t("memory.empty.bullet_remember"));
     if dream_enabled {
-        text.push_str("- `/dream` organizes saved notes into topics.\n");
+        text.push_str(xai_grok_i18n::t("memory.empty.bullet_dream"));
     }
-    text.push_str(
-        "\nGrok Build remembers conventions, decisions, and project facts across sessions so you \
-         don't have to repeat yourself. Notes live in **workspace** memory for this repository and \
-         **global** memory shared across all your projects; each has a generated `MEMORY.md` index \
-         that fills in as notes are saved.\n",
-    );
+    text.push_str(xai_grok_i18n::t("memory.empty.blurb"));
     text
 }
 
 fn disabled_state_markdown(reason: Option<MemoryDisabledReason>) -> &'static str {
     match reason {
         None | Some(MemoryDisabledReason::SessionToggle) => {
-            "\
-**Memory is off for this session.**
-
-- Press **t** to turn it back on.
-- `/memory on` does the same from the prompt.
-
-While off, Grok isn't reading or saving notes; anything already remembered is kept on disk. \
-Memory carries conventions, decisions, and project facts between sessions so you don't have \
-to repeat yourself."
+            xai_grok_i18n::t("memory.disabled.session_toggle")
         }
         Some(MemoryDisabledReason::RolloutRestricted) => {
-            "\
-**Memory is unavailable in this session.** Start a new session to pick up your current settings.
-
-This session's memory settings were pinned when it started, and they disable memory, so it \
-can't be turned on here. `/memory status` shows the details."
+            xai_grok_i18n::t("memory.disabled.rollout_restricted")
         }
-        Some(MemoryDisabledReason::NotConfigured) => {
-            "\
-**Memory isn't configured.** `/memory status` shows the details.
-
-No memory storage is set up for this session, so there is nothing to browse or turn on."
-        }
-        Some(MemoryDisabledReason::Unknown) => {
-            "\
-**Memory is off for this session.** `/memory status` shows the details.
-
-This session reports a reason this version of Grok Build doesn't recognize; run `/memory on` \
-from the prompt to try turning it back on."
-        }
+        Some(MemoryDisabledReason::NotConfigured) => xai_grok_i18n::t("memory.disabled.not_configured"),
+        Some(MemoryDisabledReason::Unknown) => xai_grok_i18n::t("memory.disabled.unknown"),
     }
 }
 
@@ -317,7 +289,10 @@ impl MemoryModalState {
                 self.clamp_selected();
                 self.load_preview();
                 MemoryStatusLine {
-                    text: format!("Deleted {}.", label.unwrap_or_default()),
+                    text: xai_grok_i18n::t_fmt(
+                        "memory.deleted",
+                        &[("name", &label.unwrap_or_default())],
+                    ),
                     is_error: false,
                 }
             }

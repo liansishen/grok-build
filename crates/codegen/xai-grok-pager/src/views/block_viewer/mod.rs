@@ -1045,12 +1045,12 @@ impl BlockViewerPane {
     /// Build shortcuts bar hints for this viewer.
     pub fn shortcuts_hints(&self) -> Vec<HintItem> {
         let mut hints = vec![
-            HintItem::new(crate::key!(Esc), "close"),
-            HintItem::new(crate::key!(Enter), "quote"),
-            HintItem::new(crate::key!('/'), "search"),
-            HintItem::new(crate::key!('f'), "filter"),
-            HintItem::new(crate::key!('v'), "select"),
-            HintItem::new(crate::key!('w'), "wrap"),
+            HintItem::new(crate::key!(Esc), xai_grok_i18n::t("hint.close")),
+            HintItem::new(crate::key!(Enter), xai_grok_i18n::t("hint.quote")),
+            HintItem::new(crate::key!('/'), xai_grok_i18n::t("hint.search")),
+            HintItem::new(crate::key!('f'), xai_grok_i18n::t("hint.filter")),
+            HintItem::new(crate::key!('v'), xai_grok_i18n::t("hint.select")),
+            HintItem::new(crate::key!('w'), xai_grok_i18n::t("hint.wrap")),
         ];
         match self.kind {
             ViewerKind::Markdown => {

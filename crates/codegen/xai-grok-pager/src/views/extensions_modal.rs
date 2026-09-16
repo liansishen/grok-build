@@ -2789,7 +2789,11 @@ pub(crate) fn render_components_fields(
             .collect();
         let mut value = names.join(", ");
         if items.len() > COMPONENT_ITEMS_CAP {
-            value.push_str(&format!(" +{} more", items.len() - COMPONENT_ITEMS_CAP));
+            let more = xai_grok_i18n::t_fmt(
+                "extensions.components.more",
+                &[("count", &(items.len() - COMPONENT_ITEMS_CAP).to_string())],
+            );
+            value.push_str(&more);
         }
         fields.push((label.to_string(), value));
     }

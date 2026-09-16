@@ -3609,9 +3609,9 @@ fn render_footer(
         if prompt_empty {
             // ↑↓ navigate, Enter toggles collapse/expand, Esc returns to the `+ New Agent` button
             let toggle = if state.is_section_collapsed(section) {
-                "expand"
+                xai_grok_i18n::t("hint.expand")
             } else {
-                "collapse"
+                xai_grok_i18n::t("hint.collapse")
             };
             vec![
                 HintItem::new(enter, toggle),

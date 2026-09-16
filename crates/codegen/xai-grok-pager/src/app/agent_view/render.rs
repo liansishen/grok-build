@@ -210,9 +210,9 @@ impl AgentView {
                     esc,
                 ]
             }
-            QuestionFocus::InputMode => vec![HintItem::new(key!(Enter), "submit"), esc],
+            QuestionFocus::InputMode => vec![HintItem::new(key!(Enter), xai_grok_i18n::t("hint.submit")), esc],
             QuestionFocus::Navigation if qv.is_prompt_blocked() => {
-                vec![HintItem::new(key!(Tab), "next answer"), esc]
+                vec![HintItem::new(key!(Tab), xai_grok_i18n::t("hint.next_answer")), esc]
             }
             QuestionFocus::Navigation => {
                 vec![
@@ -342,10 +342,10 @@ impl AgentView {
                     .unwrap_or_default(),
             ),
             KeyOwner::Card(BlockingCard::McpElicitation) => ShortcutsBarContent::Surface(vec![
-                HintItem::new(key!(Enter), "accept / toggle"),
-                HintItem::new(key!('d'), "decline"),
-                HintItem::new(key!('c', CONTROL), "cancel"),
-                HintItem::new(key!(Tab), "next field"),
+                HintItem::new(key!(Enter), xai_grok_i18n::t("hint.accept_toggle")),
+                HintItem::new(key!('d'), xai_grok_i18n::t("hint.decline")),
+                HintItem::new(key!('c', CONTROL), xai_grok_i18n::t("hint.cancel")),
+                HintItem::new(key!(Tab), xai_grok_i18n::t("hint.next_field")),
                 self.card_esc_hint(),
             ]),
             KeyOwner::Pane => ShortcutsBarContent::Pane(self.normal_pane_hints(registry)),

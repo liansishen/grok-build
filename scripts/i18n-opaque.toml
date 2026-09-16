@@ -13,9 +13,8 @@ roots = [
   "prod",
 ]
 
-# Full-prose UI modules are scanned even when strings flow through locals or format!.
-# These are the modules that author user-visible copy (the pager's task/dashboard
-# surfaces, the `--minimal` render mode, and the sign-in flow).
+# The full-prose pass runs over the same trees as `roots`: every first-party file is checked for
+# copy reaching a terminal-UI sink, whether it is written inline, through a local, or into a buffer.
 current_full_scan_roots = [
   "crates",
   "prod",
@@ -150,6 +149,7 @@ exact = [
   "active",
   "bash",
   "bundled",
+  "ctrl+d",
   "ctrl+q",
   "ctrl+u",
   "done",

@@ -334,9 +334,9 @@ impl SearchToolCallBlock {
 
         // Mode comes first so the user sees what kind of search this is
         let mode_str = match self.meta.output_mode {
-            SearchOutputMode::Content => "pattern",
-            SearchOutputMode::FilesWithMatches => "files",
-            SearchOutputMode::Count => "count",
+            SearchOutputMode::Content => xai_grok_i18n::t("tool.search.mode_pattern"),
+            SearchOutputMode::FilesWithMatches => xai_grok_i18n::t("tool.search.mode_files"),
+            SearchOutputMode::Count => xai_grok_i18n::t("tool.search.mode_count"),
         };
         parts.push(vec![
             Span::styled("mode: ", label_style),
@@ -352,13 +352,13 @@ impl SearchToolCallBlock {
         if self.meta.case_insensitive {
             parts.push(vec![
                 Span::styled("case-insensitive: ", label_style),
-                Span::styled("true", value_style),
+                Span::styled(xai_grok_i18n::t("tool.search.true_value"), value_style),
             ]);
         }
         if self.meta.multiline {
             parts.push(vec![
                 Span::styled("multiline: ", label_style),
-                Span::styled("true", value_style),
+                Span::styled(xai_grok_i18n::t("tool.search.true_value"), value_style),
             ]);
         }
 

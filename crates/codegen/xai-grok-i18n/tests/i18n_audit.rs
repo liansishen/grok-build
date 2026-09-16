@@ -321,16 +321,20 @@ fn visible_sink_in<'a>(
             if matches_any_name(&name, &config.translation_functions) {
                 return None;
             }
-            // A translation call written inside the macro is not a parsed call expression, so ask
-            // the textual check before treating the macro as a sink for this literal.
-            if let Ok(text) = ancestor.utf8_text(source)
-                && offset_inside_translation_call(
-                    text,
-                    node.start_byte() - ancestor.start_byte(),
-                    config,
-                )
-            {
-                return None;
+            if let Ok(text) = ancestor.utf8_text(source) {
+                let offset = node.start_byte() - ancestor.start_byte();
+                // A translation call written inside the macro is not a parsed call expression, so ask
+                // the textual check before treating the macro as a sink for this literal.
+                if offset_inside_translation_call(text, offset, config) {
+                    return None;
+                }
+                // The same goes the other way: `vec![Span::styled("copy", …)]` hides a sink.
+                if let Some(sink) = sinks
+                    .iter()
+                    .find(|sink| offset_inside_call(text, offset, std::slice::from_ref(*sink)))
+                {
+                    return Some(sink.clone());
+                }
             }
             if let Some(sink) = sinks.iter().find(|sink| name_matches(&name, sink)) {
                 return Some(sink.clone());
@@ -455,6 +459,8 @@ fn call_is_visible_sink(node: Node<'_>, source: &[u8], config: &AuditConfig, sin
         && sinks.iter().any(|sink| name_matches(&name, sink))
 }
 
+/// The binding whose text a literal ends up in: the `let` / `const` it initializes, or the buffer a
+/// `push_str` / `push` writes it into (`body.push_str("…")` then `Line::from(body)`).
 fn literal_binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
     let mut current = Some(node);
     while let Some(item) = current {
@@ -466,6 +472,43 @@ fn literal_binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
                 .map(normalized);
         }
         current = item.parent();
+    }
+    text_buffer_receiver(node, source)
+}
+
+/// Receiver of the buffer-writing call a literal is an argument of, when that receiver is a plain
+/// identifier. Text built into a local buffer is only user-visible if that buffer reaches a sink,
+/// which the flow index decides — so prompt, SQL and file-format builders stay out.
+fn text_buffer_receiver(node: Node<'_>, source: &[u8]) -> Option<String> {
+    const BUFFER_METHODS: &[&str] = &[
+        // `push` is deliberately absent: `Vec::push` appends an element (status rows, hit-test
+        // keys), which is not text the buffer renders.
+        "insert_str",
+        "push_str",
+        "write_fmt",
+        "write_str",
+    ];
+    let mut current = node.parent();
+    while let Some(ancestor) = current {
+        if ancestor.kind() == "call_expression"
+            && let Some(name) = call_name(ancestor, source)
+            && BUFFER_METHODS.iter().any(|method| name_matches(&name, method))
+        {
+            let function = ancestor.child_by_field_name("function")?;
+            if function.kind() != "field_expression" {
+                return None;
+            }
+            let value = function.child_by_field_name("value")?;
+            if value.kind() != "identifier" {
+                return None;
+            }
+            return value.utf8_text(source).ok().map(normalized);
+        }
+        // Only the innermost statement matters: a literal further out is not what the call wrote.
+        if matches!(ancestor.kind(), "statement" | "function_item") {
+            return None;
+        }
+        current = ancestor.parent();
     }
     None
 }
@@ -530,6 +573,43 @@ fn collect_identifier_nodes(node: Node<'_>, source: &[u8], identifiers: &mut BTr
     }
 }
 
+/// Identifiers mentioned inside sink calls that a macro's token tree hides from the grammar.
+///
+/// `vec![Span::styled(mode_str.to_string(), style)]` produces no `call_expression`, so the parsed
+/// walk would miss that `mode_str` is rendered. The call is found textually and its argument text is
+/// tokenized for identifiers.
+fn hidden_sink_identifiers(text: &str, sinks: &[String], identifiers: &mut BTreeSet<String>) {
+    let bytes = text.as_bytes();
+    let identifier_char = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    for sink in sinks {
+        let mut search = 0;
+        while let Some(found) = text[search..].find(sink.as_str()) {
+            let start = search + found;
+            let open = start + sink.len();
+            let standalone = start == 0 || !identifier_char(bytes[start - 1]);
+            if standalone && bytes.get(open) == Some(&b'(') {
+                if let Some(close) = matching_delimiter(text, open, b'(', b')') {
+                    for token in text[open + 1..close]
+                        .split(|character: char| {
+                            !(character.is_ascii_alphanumeric() || character == '_')
+                        })
+                    {
+                        if !token.is_empty()
+                            && !token.starts_with(|character: char| character.is_ascii_digit())
+                        {
+                            identifiers.insert(token.to_owned());
+                        }
+                    }
+                }
+            }
+            search = open.max(start + 1);
+            if search >= text.len() {
+                break;
+            }
+        }
+    }
+}
+
 /// Index of the call argument a visible sink renders, for the sinks that take it past position 0.
 fn sink_argument_index(function_name: &str) -> usize {
     if name_matches(function_name, "set_string") || name_matches(function_name, "set_span") {
@@ -564,6 +644,12 @@ impl FlowIndex {
             sink_identifiers: &mut BTreeSet<String>,
             used_by: &mut BTreeMap<String, BTreeSet<String>>,
         ) {
+            // A macro's token tree hides its sink calls from the grammar; read those textually.
+            if node.kind() == "macro_invocation"
+                && let Ok(text) = node.utf8_text(source)
+            {
+                hidden_sink_identifiers(text, &config.prose_sinks, sink_identifiers);
+            }
             if node.kind() == "call_expression"
                 && call_is_visible_sink(node, source, config, &config.prose_sinks)
                 && let Some(function_name) = call_name(node, source)
@@ -631,9 +717,18 @@ impl FlowIndex {
 /// read as untranslated copy. The names are scanned textually, with balanced parentheses and
 /// string literals skipped.
 fn offset_inside_translation_call(text: &str, offset: usize, config: &AuditConfig) -> bool {
+    offset_inside_call(text, offset, &config.translation_functions)
+}
+
+/// Whether `offset` (relative to `text`) sits inside a call to one of `names`.
+///
+/// The Rust grammar leaves a macro invocation's interior as token trees, so a `t` / `t_fmt` call or
+/// a `Span::styled` sink written inside `println!` / `vec!` is not a `call_expression`. Both checks
+/// are therefore made textually, with balanced parentheses and string literals skipped.
+fn offset_inside_call(text: &str, offset: usize, names: &[String]) -> bool {
     let bytes = text.as_bytes();
     let identifier_char = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
-    for name in &config.translation_functions {
+    for name in names {
         let mut search = 0;
         while let Some(found) = text[search..].find(name.as_str()) {
             let start = search + found;
@@ -1518,6 +1613,20 @@ fn fixture_ignores_token_positions() {
         scan_full_prose_source("token_fixture.rs", tokens, &config).expect("fixture parses");
     assert!(findings.is_empty(), "{findings:?}");
 
+    // A match arm's *body* is still copy: only its pattern is a token.
+    let arm_body = br#"
+        fn render(mode: u8) {
+            let label = match mode { 1 => "files", _ => "count" };
+            Line::from(label);
+        }
+    "#;
+    let bodies = scan_full_prose_source("token_fixture.rs", arm_body, &config)
+        .expect("fixture parses");
+    assert!(
+        bodies.iter().any(|finding| finding.literal == "files"),
+        "a match arm body is painted copy: {bodies:?}"
+    );
+
     let copy = br#"
         fn render() {
             let label = "Painted label copy";
@@ -1556,6 +1665,39 @@ fn prose_sinks_stay_within_the_diff_sink_list() {
             "the prose pass must leave the CLI sink `{cli}` to the diff pass"
         );
     }
+}
+
+/// Copy written into a local buffer is user-visible only when that buffer reaches a painted sink:
+/// a prompt or file-format builder must stay out, a painted body must not.
+#[test]
+fn fixture_reports_copy_pushed_into_a_painted_buffer() {
+    let config = AuditConfig::load(&repo_root());
+    let painted = br#"
+        fn render() {
+            let mut body = String::new();
+            body.push_str("Pushed English copy");
+            Line::from(body);
+        }
+    "#;
+    let findings =
+        scan_full_prose_source("buffer_fixture.rs", painted, &config).expect("fixture parses");
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.literal == "Pushed English copy"),
+        "copy pushed into a painted buffer must be reported: {findings:?}"
+    );
+
+    let prompt_only = br#"
+        fn build() -> String {
+            let mut prompt = String::new();
+            prompt.push_str("Instructions for the model");
+            prompt
+        }
+    "#;
+    let quiet = scan_full_prose_source("buffer_fixture.rs", prompt_only, &config)
+        .expect("fixture parses");
+    assert!(quiet.is_empty(), "a prompt builder is not UI copy: {quiet:?}");
 }
 
 /// The scan scope must stay at workspace granularity: every first-party crate's sources are inside
