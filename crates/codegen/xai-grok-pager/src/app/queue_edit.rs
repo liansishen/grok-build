@@ -225,7 +225,7 @@ impl AgentView {
             && let Some(server_id) = row.as_ref().and_then(|row| row.server_id.as_deref())
             && !self.shared_queue.iter().any(|entry| entry.id == server_id)
         {
-            self.show_toast("Queued prompt is no longer in the queue");
+            self.show_toast(xai_grok_i18n::t("toast.queued_gone"));
             return;
         }
         if let Some(row) = row.as_ref()

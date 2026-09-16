@@ -1597,3 +1597,24 @@ fn cancel_deletes_staged_temp_files_of_owned_images() {
     assert!(agent.feedback_modal.is_none());
     assert!(!staged.exists(), "cancel must delete the staged temp file");
 }
+
+/// The one-shot consent scope notice is catalog copy, not a hardcoded literal.
+#[test]
+fn trace_disclosure_comes_from_the_catalog() {
+    let area = Rect::new(0, 0, 80, 24);
+    let mut modal = open_with_text("report");
+    modal.begin_trace_step();
+
+    let rendered = xai_grok_i18n::with_pseudo_locale(|| {
+        let mut buf = Buffer::empty(area);
+        modal
+            .render(&mut buf, area, &Theme::current(), false)
+            .expect("supported terminal should render the trace step");
+        buffer_text(&buf)
+    });
+
+    assert!(
+        rendered.contains("⟦feedback.trace_disclosure⟧"),
+        "the consent scope notice must come from the catalog:\n{rendered}"
+    );
+}

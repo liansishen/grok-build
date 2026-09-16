@@ -30,10 +30,11 @@ use xai_grok_telemetry::session_ctx::log_event;
 /// Shared by every submit guard that refuses while the session reconnects.
 
 pub(super) use crate::app::agent_view::{
-    BUILD_IN_FLIGHT_ABANDON_NOTICE, BUILD_IN_FLIGHT_REVISE_NOTICE, LEAVE_PLAN_REVISE_NOTICE,
+    build_in_flight_abandon_notice, build_in_flight_revise_notice, leave_plan_revise_notice,
 };
-pub(super) const LEAVE_PLAN_BUILD_NOTICE: &str =
-    "Wait for plan mode to finish switching before building the plan.";
+pub(super) fn leave_plan_build_notice() -> &'static str {
+    xai_grok_i18n::t("plan.notice.build_mode_switching")
+}
 
 /// Chat kind for the next create: CLI `--chat` (`app.chat_mode`) or one-shot
 /// `/chat` (`deferred_startup.pending_chat`, consumed here).
@@ -194,13 +195,13 @@ pub(super) fn dispatch_execute_plan(
         return vec![];
     };
     if !agent.session.state.is_idle() {
-        agent.show_toast("Wait for the current turn to end before building the plan.");
+        agent.show_toast(xai_grok_i18n::t("plan.notice.build_turn_active"));
         return vec![];
     }
     // Shift+Tab / set_mode Off stages leave-Plan first. Approve must not
     // start ExecutePlan while that switch can still clear last_plan.
     if agent.plan_mode_pending == Some(false) {
-        agent.show_toast(LEAVE_PLAN_BUILD_NOTICE);
+        agent.show_toast(leave_plan_build_notice());
         return vec![];
     }
     let prompt_id = uuid::Uuid::new_v4().to_string();
@@ -261,17 +262,17 @@ pub(super) fn dispatch_revise_plan(app: &mut AppView, text: String) -> Vec<Effec
     };
     if has_post_turn_review && leave_plan_pending {
         if let Some(agent) = get_active_agent_mut(app) {
-            agent.show_toast(LEAVE_PLAN_REVISE_NOTICE);
+            agent.show_toast(leave_plan_revise_notice());
         } else {
-            app.show_toast(LEAVE_PLAN_REVISE_NOTICE);
+            app.show_toast(leave_plan_revise_notice());
         }
         return vec![];
     }
     if has_post_turn_review && build_in_flight {
         if let Some(agent) = get_active_agent_mut(app) {
-            agent.show_toast(BUILD_IN_FLIGHT_REVISE_NOTICE);
+            agent.show_toast(build_in_flight_revise_notice());
         } else {
-            app.show_toast(BUILD_IN_FLIGHT_REVISE_NOTICE);
+            app.show_toast(build_in_flight_revise_notice());
         }
         return vec![];
     }

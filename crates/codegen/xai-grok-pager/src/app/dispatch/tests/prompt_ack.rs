@@ -272,3 +272,27 @@ fn late_prompt_response_after_the_fail_safe_leaves_the_pane_idle() {
         "the discarded response paints no marker and touches no state"
     );
 }
+/// The fail-safe toast is catalog copy: both dispositions paint the translation, not the key.
+#[test]
+fn prompt_ack_timeout_toasts_are_localized() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    let _pid = send_and_arm(&mut app, "restore me");
+    xai_grok_i18n::with_pseudo_locale(|| {
+        let effects = reconcile_overdue_prompt_acks_at(&mut app, &DEADLINES, past_hard_deadline())
+            .expect("the expired watch fires");
+        assert!(!effects.is_empty(), "the abort needs a redraw");
+    });
+    assert_eq!(
+        agent_ref(&app, id).toast.as_ref().map(|(msg, _)| msg.as_str()),
+        Some("\u{27e6}toast.prompt_not_accepted_restored\u{27e7}")
+    );
+    xai_grok_i18n::with_pseudo_locale(|| {
+        assert_eq!(
+            crate::app::dispatch::prompt_ack::prompt_ack_timeout_toast(
+                xai_grok_telemetry::events::PromptAckDisposition::NotRestorable,
+            ),
+            "\u{27e6}toast.prompt_not_accepted_stopped\u{27e7}"
+        );
+    });
+}

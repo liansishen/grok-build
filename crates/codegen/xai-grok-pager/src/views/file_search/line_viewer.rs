@@ -1680,17 +1680,18 @@ pub fn render_line_viewer(
         let (_action_label, action_w, action_spans): (&str, u16, Option<Vec<Span>>) = if is_approval
         {
             let label = if comment_count > 0 {
-                "approve w/ comments"
+                xai_grok_i18n::t("hint.approve_with_comments")
             } else {
-                "approve"
+                xai_grok_i18n::t("hint.approve")
             };
             let spans = build_shortcut_button('a', label, approve_hovered, theme);
             let w: u16 = spans.iter().map(|s| s.width() as u16).sum();
             (label, w, Some(spans))
         } else if comment_count > 0 {
-            let spans = build_shortcut_button('s', "send", approve_hovered, theme);
+            let label = xai_grok_i18n::t("hint.send");
+            let spans = build_shortcut_button('s', label, approve_hovered, theme);
             let w: u16 = spans.iter().map(|s| s.width() as u16).sum();
-            ("send", w, Some(spans))
+            (label, w, Some(spans))
         } else {
             ("", 0, None)
         };
@@ -1698,7 +1699,12 @@ pub fn render_line_viewer(
         // `s revise` button, always visible in approval mode so the user can request changes (switches to prompt for revision notes)
         let (revise_w, revise_spans): (u16, Option<Vec<Span>>) = if is_approval {
             let send_hovered = viewer.plan_ref().is_some_and(|p| p.send_hovered);
-            let spans = build_shortcut_button('s', "request changes", send_hovered, theme);
+            let spans = build_shortcut_button(
+                's',
+                xai_grok_i18n::t("hint.request_changes"),
+                send_hovered,
+                theme,
+            );
             let w: u16 = spans.iter().map(|s| s.width() as u16).sum();
             (w, Some(spans))
         } else {
@@ -1707,7 +1713,12 @@ pub fn render_line_viewer(
 
         // Quit button only renders in approval mode (casual closes via X).
         let quit_spans = if is_approval {
-            let s = build_shortcut_button('q', "quit plan", abandon_hovered, theme);
+            let s = build_shortcut_button(
+                'q',
+                xai_grok_i18n::t("hint.quit_plan"),
+                abandon_hovered,
+                theme,
+            );
             let w: u16 = s.iter().map(|s| s.width() as u16).sum();
             Some((s, w))
         } else {
@@ -2122,5 +2133,43 @@ mod tests {
 
         assert_eq!(viewer.selected_line_range(), Some(1..4));
         assert_eq!(viewer.line_range_suffix(), Some(":1-3".to_owned()));
+    }
+
+    /// The plan footer's action buttons are catalog copy, not hardcoded literals.
+    #[test]
+    fn plan_footer_buttons_come_from_the_catalog() {
+        let area = Rect::new(0, 0, 240, 24);
+        let mut viewer =
+            LineViewerState::open_markdown_content("plan.md", "# Plan".to_owned(), None)
+                .expect("in-memory markdown content opens");
+        viewer.plan_mut().feedback_active = true;
+
+        let painted = xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_line_viewer(
+                &mut buf,
+                area,
+                &mut viewer,
+                Path::new("."),
+                &Theme::groknight(),
+                1,
+            );
+            (0..area.height)
+                .map(|y| row_text(&buf, y))
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
+
+        for key in [
+            "hint.approve_with_comments",
+            "hint.request_changes",
+            "hint.quit_plan",
+        ] {
+            let marker = format!("⟦{key}⟧");
+            assert!(
+                painted.contains(&marker),
+                "{key} must be painted from the catalog:\n{painted}"
+            );
+        }
     }
 }

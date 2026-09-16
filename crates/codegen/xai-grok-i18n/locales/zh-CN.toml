@@ -4707,3 +4707,169 @@ version = "  版本 v{version}"
 model = "模型 · {model}"
 
 help_hint = "/help 查看可用命令"
+
+[block_viewer.web_search]
+sources = "来源（{count}）"
+
+[block_viewer.integration_search]
+result_count_one = "{count} 个结果"
+
+result_count_many = "{count} 个结果"
+
+[dock]
+show_more = "{indent}{arrow} 再显示 {hidden} 条"
+
+[elicitation.url]
+punycode_warning = "Punycode 主机：请确认这正是你预期的网站"
+
+waiting_confirm = "正在等待服务器确认…"
+
+[elicitation.field]
+required = " （必填）"
+
+unselected = "（请选择）"
+
+[feedback]
+trace_disclosure = "本次会话的一份存档会随这份报告一并发送，仅此一次。不会为后续会话开启任何内容。"
+
+unsent_image_dropped = " （其图片已被丢弃）"
+
+unsent_images_dropped = " （其 {count} 张图片已被丢弃）"
+
+unsent_saved_to_drafts = "{failure}。已保存到草稿{attachments}；打开 `/feedback` 重试。"
+
+unsent_draft_save_failed = "{failure}。无法将其保存为草稿（{error}）。未发送{attachments}：{text}"
+
+unsent_not_sent = "{failure}。未发送{attachments}：{text}"
+[hint]
+approve_with_comments = "带评论批准"
+
+paste = "粘贴"
+
+undo = "撤销"
+
+redo = "重做"
+
+dropdown_controls = "↑/↓ 导航 · enter 确认 · esc 取消"
+[settings.modal]
+preview_sample = "让我梳理一下这些调用点。首先，我需要看看分发流程如何处理这个新变体。然后我会确认回滚路径能正确保留先前的状态。"
+
+placeholder_empty_shell_default = "<空：使用 shell 默认值>"
+
+[announcements]
+hide_cta = "隐藏: /announcements hide"
+
+hide_button = "[隐藏]"
+
+[picker]
+loading = "{frame} 加载中…"
+
+[picker.empty]
+no_matches = "  无匹配项"
+
+[question]
+expand_hint = " 展开"
+
+[memory.empty]
+title = "**暂无记忆内容。**\n\n"
+
+[memory.scope]
+session_logs = "会话日志"
+
+source_memory = "{source} 记忆"
+
+[shortcuts]
+dimmed_note = "（在当前上下文中未激活）"
+
+[turn.queue]
+queued_send_now = " · {count} 条已排队，按 Enter 立即发送"
+
+[plan.notice]
+revise_turn_active = "请等待当前回合结束后再修改计划。"
+
+abandon_turn_active = "请等待当前回合结束后再放弃计划。"
+
+revise_mode_switching = "请等待计划模式切换完成后再修改计划。"
+
+changed_on_disk = "计划文件已在磁盘上更改。请先查看更新后的计划再批准。"
+
+build_mode_switching = "请等待计划模式切换完成后再开始实施计划。"
+
+build_turn_active = "请等待当前回合结束后再开始实施计划。"
+
+approve_slash_command_comment = "正在编辑的评论是一个斜杠命令：请先完成或丢弃它，再批准。"
+
+approve_slash_command_notes = "请先用 Enter 运行备注中的斜杠命令，或清除它，再批准。"
+
+[question.footer]
+navigate = " 导航"
+
+switch_question = " 切换问题"
+
+copy = " 复制"
+
+[history]
+panel_label = " 历史 "
+
+[debug]
+scroll_log_recording_to = "滚动日志：正在记录到 {path}"
+
+scroll_log_off = "滚动日志：关闭"
+
+toggles_status = "调试开关：滚动 {scroll} · 帧率 {fps} · 日志 {log}。使用 /debug <scroll|fps|log> 切换"
+
+[toast]
+workspace_layout_not_found = "会话已不在工作区中"
+
+workspace_layout_read_only = "仪表盘工作区为只读"
+
+workspace_layout_not_saved = "会话尚未保存到工作区"
+
+prompt_not_accepted_restored = "提示未被接受，文本已恢复"
+
+prompt_not_accepted_stopped = "提示未被接受，回合已停止"
+
+[task_result]
+workspace_archive_invalid_id = "无法归档会话：会话 ID 无效"
+
+[scrollback.memory_capture]
+observation = "模型生成的不可信观察 {index}"
+
+open_file = "打开文件 → "
+
+[scrollback.subagent]
+label = "子代理 "
+
+completed_in = "已在 {time} 内完成："
+
+failed_in = "已在 {time}{detail} 内失败："
+
+cancelled_in = "已在 {time} 内取消："
+
+[scrollback.verb_group.subagent]
+mixed = "{sep}{verb} {running} {noun}，{done} 个已完成"
+
+[tool.diff]
+hunk_gap_one = "{separator} 1 行未更改"
+
+hunk_gap_many = "{separator} {count} 行未更改"
+
+[tool.execute]
+user_label = "（用户）"
+
+[tool.question]
+no_answer = "     （无回答）"
+
+[tool.sent_message]
+header_label = "消息 "
+
+subagent_id_label = "子代理 ID："
+
+unavailable = "不可用"
+
+[gboom]
+hud = " HP {hp} · 击杀 {kills}/{total} "
+
+controls = " WASD/←→ 移动 · SPACE 开火 · ESC 退出 "
+
+controls_idle = " ESC 退出 "

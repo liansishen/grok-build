@@ -195,11 +195,13 @@ impl ExecuteToolCallBlock {
                 } else {
                     theme.primary().add_modifier(Modifier::BOLD)
                 };
-                let mut spans = vec![Span::styled("Run ".to_string(), label_style)];
-                let mut hang = UnicodeWidthStr::width("Run ");
+                let run_label = xai_grok_i18n::t("tool.prefix.run");
+                let user_label = xai_grok_i18n::t("tool.execute.user_label");
+                let mut spans = vec![Span::styled(run_label.to_string(), label_style)];
+                let mut hang = UnicodeWidthStr::width(run_label);
                 if self.bash_mode {
-                    spans.push(Span::styled("(user) ".to_string(), theme.muted()));
-                    hang += UnicodeWidthStr::width("(user) ");
+                    spans.push(Span::styled(user_label.to_string(), theme.muted()));
+                    hang += UnicodeWidthStr::width(user_label);
                 }
                 (spans, hang)
             }
@@ -288,10 +290,16 @@ impl ExecuteToolCallBlock {
         } else {
             theme.primary().add_modifier(Modifier::BOLD)
         };
-        let mut spans = vec![Span::styled("Run ", label_style)];
+        let mut spans = vec![Span::styled(
+            xai_grok_i18n::t("tool.prefix.run"),
+            label_style,
+        )];
         if self.bash_mode {
             // Same style as session event messages (e.g. "Worked for 2.3s")
-            spans.push(Span::styled("(user) ", theme.muted()));
+            spans.push(Span::styled(
+                xai_grok_i18n::t("tool.execute.user_label"),
+                theme.muted(),
+            ));
         }
         // Single ratatui Line: never pass raw newlines (callers that need multi-line command display use `push_command_soft_wrap`)
         let title_owned;
@@ -549,7 +557,10 @@ impl ExecuteToolCallBlock {
                     let hidden = total - threshold;
                     lines.push(apply_pad(
                         BlockLine::separator(Line::from(Span::styled(
-                            format!("\u{2026} +{hidden} lines"),
+                            xai_grok_i18n::t_fmt(
+                                "tool.execute.hidden_lines",
+                                &[("hidden", &hidden.to_string())],
+                            ),
                             theme.muted(),
                         )))
                         .with_panel_background(theme.bg_dark),
@@ -1054,6 +1065,51 @@ mod tests {
         assert_eq!(
             plain,
             vec!["$ export XAI_ROOT=/tmp", "  cd /tmp", "  echo start"]
+        );
+    }
+
+    /// The "Run" / "(user)" header chrome and the hidden-lines marker come from the catalog.
+    #[test]
+    fn execute_chrome_copy_comes_from_the_catalog() {
+        let mut block = ExecuteToolCallBlock::new("ls").with_output(
+            (1..=40)
+                .map(|i| format!("line{i}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+        block.bash_mode = true;
+        let mut appearance = AppearanceConfig::default();
+        appearance.scrollback.blocks.execute.header_style = ExecuteHeaderStyle::Label;
+        let ctx = BlockContext {
+            mode: DisplayMode::Truncated,
+            is_running: false,
+            width: 120,
+            raw: false,
+            max_lines: None,
+            appearance,
+            is_selected: false,
+            cwd: None,
+        };
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            block
+                .output(&ctx)
+                .lines
+                .iter()
+                .map(|line| crate::scrollback::types::line_plain_text(&line.content))
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
+        assert!(
+            text.contains("⟦tool.prefix.run⟧"),
+            "header label must come from the catalog: {text}"
+        );
+        assert!(
+            text.contains("⟦tool.execute.user_label⟧"),
+            "user-bash marker must come from the catalog: {text}"
+        );
+        assert!(
+            text.contains("⟦tool.execute.hidden_lines⟧"),
+            "hidden-line marker must come from the catalog: {text}"
         );
     }
 }

@@ -55,7 +55,7 @@ fn url_rows(rows: &mut Vec<BodyRow>, display: &UrlDisplay, content_w: usize, the
         ])));
         if display.punycode_host {
             rows.push(BodyRow::Text(Line::from(vec![Span::styled(
-                "Punycode host: check it is the site you expect".to_string(),
+                xai_grok_i18n::t("elicitation.url.punycode_warning").to_string(),
                 Style::default().fg(theme.accent_error),
             )])));
         }
@@ -95,7 +95,7 @@ fn build_body_rows(
         ElicitationStage::UrlWaiting(waiting) => {
             url_rows(&mut rows, &waiting.display, content_w, theme);
             rows.push(BodyRow::Text(Line::from(vec![Span::styled(
-                "Waiting for the server to confirm…".to_string(),
+                xai_grok_i18n::t("elicitation.url.waiting_confirm").to_string(),
                 Style::default().fg(theme.gray),
             )])));
         }
@@ -469,7 +469,11 @@ pub(super) fn form_value_column(fields: &[FormFieldUi], content_w: usize) -> usi
     let max_left = fields
         .iter()
         .map(|f| {
-            let req = if f.spec.required { " (required)" } else { "" };
+            let req = if f.spec.required {
+                xai_grok_i18n::t("elicitation.field.required")
+            } else {
+                ""
+            };
             2 + f.spec.title.width() + req.width()
         })
         .max()
@@ -537,7 +541,7 @@ fn field_row(
         ) => index
             .and_then(|i| options.get(i))
             .map(|o| o.label.clone())
-            .unwrap_or_else(|| "(select)".into()),
+            .unwrap_or_else(|| xai_grok_i18n::t("elicitation.field.unselected").to_string()),
         (super::state::FieldValueUi::Multi { .. }, _) => multi_select_summary(field),
         (super::state::FieldValueUi::Text { draft }, _) => {
             let mut draft = draft.clone();
@@ -552,7 +556,7 @@ fn field_row(
 
     let prefix = format!("{shortcut} ");
     let req = if field.spec.required {
-        " (required)"
+        xai_grok_i18n::t("elicitation.field.required")
     } else {
         ""
     };

@@ -1473,7 +1473,11 @@ pub fn tab_all_hints(tab: ExtensionsTab) -> Vec<crate::views::shortcuts_bar::Hin
         hints.push(item);
     }
     // Common navigation.
-    hints.push(HintItem::paired(crate::key!('j'), crate::key!('k'), "nav"));
+    hints.push(HintItem::paired(
+        crate::key!('j'),
+        crate::key!('k'),
+        t("extensions.hint.nav"),
+    ));
     hints.push(HintItem::new(crate::key!(Tab), t("extensions.hint.switch_tab")));
     hints.push(HintItem::new(crate::key!('/'), t("extensions.hint.search")));
     hints.push(HintItem::new(crate::key!(Enter), t("extensions.hint.expand")));
@@ -4101,7 +4105,7 @@ fn render_mcp_setup_form(buf: &mut Buffer, area: Rect, setup: &McpSetupFormState
             .bg(theme.bg_base)
             .add_modifier(Modifier::BOLD),
     );
-    let hint = "Save and authenticate";
+    let hint = t("extensions.save_and_authenticate");
     buf.set_string(
         x,
         top.saturating_add(1),
@@ -8079,6 +8083,55 @@ mod tests {
         assert_eq!(
             labels,
             ["on:Notification", "on:Pre-Tool Use /Bash", "on:Stop"]
+        );
+    }
+
+    /// Extension chrome reaches the catalog: the common `nav` hint and the MCP setup save hint.
+    #[test]
+    fn extension_chrome_copy_comes_from_the_catalog() {
+        let labels = xai_grok_i18n::with_pseudo_locale(|| {
+            tab_all_hints(ExtensionsTab::McpServers)
+                .iter()
+                .map(|hint| hint.label.to_string())
+                .collect::<Vec<_>>()
+        });
+        assert!(
+            labels.iter().any(|label| label == "⟦extensions.hint.nav⟧"),
+            "common nav hint must come from the catalog: {labels:?}"
+        );
+
+        let setup = McpSetupFormState {
+            server_name: "acme".into(),
+            field: crate::views::mcps_modal::McpSetupField {
+                id: "site".into(),
+                label: "Site".into(),
+                field_type: "select".into(),
+                required: true,
+                default: Some("us1".into()),
+                options: vec![crate::views::mcps_modal::McpSetupOption {
+                    label: "US1".into(),
+                    value: "us1".into(),
+                }],
+            },
+            selected: 0,
+            error: None,
+        };
+        let area = Rect::new(0, 0, 60, 12);
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_mcp_setup_form(&mut buf, area, &setup, &Theme::current());
+            (area.y..area.y + area.height)
+                .map(|y| {
+                    (area.x..area.x + area.width)
+                        .filter_map(|x| buf.cell((x, y)).map(|cell| cell.symbol().to_owned()))
+                        .collect::<String>()
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
+        assert!(
+            text.contains("⟦extensions.save_and_authenticate⟧"),
+            "MCP setup save hint must come from the catalog: {text:?}"
         );
     }
 }

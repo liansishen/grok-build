@@ -162,8 +162,8 @@ mod plan;
 #[cfg(test)]
 pub(crate) use plan::MAX_KEPT_PLAN_FILE_BYTES;
 pub(crate) use plan::{
-    BUILD_IN_FLIGHT_ABANDON_NOTICE, BUILD_IN_FLIGHT_REVISE_NOTICE, LEAVE_PLAN_REVISE_NOTICE,
-    PostTurnPlanCommit, capped_kept_plan_body,
+    PostTurnPlanCommit, build_in_flight_abandon_notice, build_in_flight_revise_notice,
+    capped_kept_plan_body, leave_plan_revise_notice,
 };
 mod prompt;
 mod prompt_stash;
@@ -1764,7 +1764,7 @@ pub(crate) fn render_dropdown_chrome(
         let divider_style = Style::default().fg(theme.gray_dim).bg(reset);
         let divider = Line::styled("\u{2500}".repeat(panel_width as usize), divider_style);
         buf.set_line_safe(panel_x, top_border_y, &divider, panel_width);
-        let footer = "\u{2191}/\u{2193} navigate \u{00b7} enter confirm \u{00b7} esc cancel";
+        let footer = xai_grok_i18n::t("hint.dropdown_controls");
         let footer_line = Line::styled(
             footer.to_string(),
             Style::default().fg(theme.gray_dim).bg(reset),
@@ -3531,5 +3531,47 @@ mod prompt_input_mode_tests {
             assert!(!mode.is_exit_key(&KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)));
             assert!(!mode.is_exit_key(&KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE)));
         }
+    }
+}
+#[cfg(test)]
+mod dropdown_footer_i18n_tests {
+    use super::*;
+    /// The embedded dropdown footer is a catalog lookup, so minimal mode paints translated hints.
+    #[test]
+    #[serial_test::serial]
+    fn embedded_dropdown_footer_is_drawn_from_the_catalog() {
+        struct EmbedReset;
+        impl Drop for EmbedReset {
+            fn drop(&mut self) {
+                crate::views::modal_window::set_embedded(false);
+            }
+        }
+        let _reset = EmbedReset;
+        crate::views::modal_window::set_embedded(true);
+        let theme = crate::theme::Theme::current();
+        let layout_cfg = crate::appearance::LayoutConfig::default();
+        let area = Rect::new(0, 0, 80, 25);
+        let prompt = Rect::new(0, 10, 80, 2);
+        let mut buf = Buffer::empty(area);
+        let _chrome = xai_grok_i18n::with_pseudo_locale(|| {
+            render_dropdown_chrome(
+                &mut buf,
+                3,
+                3,
+                None,
+                prompt,
+                area,
+                &layout_cfg,
+                false,
+                false,
+                &theme,
+            )
+            .expect("embedded chrome fits")
+        });
+        let screen: String = buf.content.iter().map(|cell| cell.symbol()).collect();
+        assert!(
+            screen.contains("\u{27e6}hint.dropdown_controls\u{27e7}"),
+            "got: {screen:?}"
+        );
     }
 }

@@ -17,10 +17,8 @@ roots = [
 # These are the modules that author user-visible copy (the pager's task/dashboard
 # surfaces, the `--minimal` render mode, and the sign-in flow).
 current_full_scan_roots = [
-  "crates/codegen/xai-grok-pager/src/views/tasks_pane.rs",
-  "crates/codegen/xai-grok-pager/src/views/dashboard",
-  "crates/codegen/xai-grok-pager-minimal/src",
-  "crates/codegen/xai-grok-login/src",
+  "crates",
+  "prod",
 ]
 # Markdown trees are checked by relative path against their translation trees.
 docs_roots = [
@@ -54,6 +52,32 @@ sinks = [
   "HintItem::new",
   "HintItem::paired",
 ]
+# Sinks whose output the user reads inside the terminal UI. Every first-party Rust file is scanned
+# for copy reaching one of these, however it is laundered through locals or `format!`. The CLI
+# `print*` sinks stay in `sinks` only: the fork's non-goals keep CLI help, error and log lines out
+# of the translation surface (new or changed ones are still gated by the diff audit).
+prose_sinks = [
+  "show_toast",
+  "show_toast_ticks",
+  "Span::raw",
+  "Span::styled",
+  "Span::from",
+  "Line::from",
+  "Line::raw",
+  "Line::styled",
+  "Line::from_iter",
+  "Text::from",
+  "Paragraph::new",
+  "Block::title",
+  "Block::title_bottom",
+  "ListItem::new",
+  "Cell::from",
+  "Table::new",
+  "set_string",
+  "set_span",
+  "HintItem::new",
+  "HintItem::paired",
+]
 translation_functions = [
   "t",
   "t_for",
@@ -72,6 +96,7 @@ excluded_path_fragments = [
   "/tests/",
   "/tests.rs",
   "/examples/",
+  "/benches/",
   "/bin/",
   "/testkit/",
   "_tests.rs",
@@ -109,6 +134,39 @@ exact = [
   # ANSI dim/reset wrapper around catalog copy (the sentence itself is a
   # `t(...)` lookup); terminal control sequences are never translated.
   "\u001b[90m{}\u001b[0m",
+  # Keyboard chords, the Mermaid diagram-language tokens and label, and the GBOOM overlay's title:
+  # opaque values rather than prose to translate.
+  "Ctrl+Y",
+  "TB",
+  "GBOOM",
+  "mermaid: {header}",
+  # Key/chord tokens, layout-only fragments, and compared identifiers (grammars, path
+  # components, protocol states) are matched or measured, never read as prose.
+  "L{}",
+  "SIGKILL",
+  "SIGTERM",
+  "[Esc]",
+  "[x]",
+  "active",
+  "bash",
+  "bundled",
+  "ctrl+q",
+  "ctrl+u",
+  "done",
+  "e",
+  "enter",
+  "esc",
+  "f",
+  "json",
+  "killed",
+  "logs",
+  "oom",
+  "personas",
+  "powershell",
+  "{prefix}P {}",
+  "{pos}-{end}/{total}  ↑↓  [Esc]",
+  "{pos}-{end}/{total}  [Esc]",
+  "{}x{} {}",
 ]
 prefix = [
   "/",

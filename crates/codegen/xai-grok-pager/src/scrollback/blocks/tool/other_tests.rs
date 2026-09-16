@@ -41,3 +41,15 @@ fn failed_call_expands_to_its_error() {
 fn success_without_output_stays_unfoldable() {
     assert!(!OtherToolCallBlock::new("tool", "done").is_foldable());
 }
+
+/// The empty-answer marker in an AskUserQuestion body is catalog-backed.
+#[test]
+fn empty_answer_copy_comes_from_the_catalog() {
+    let block = OtherToolCallBlock::new("AskUserQuestion", "")
+        .with_output("Questions asked\n- \"Which color?\"\n  (No answer provided)");
+    let text = xai_grok_i18n::with_pseudo_locale(|| rendered(&block, DisplayMode::Expanded));
+    assert!(
+        text.contains("⟦tool.question.no_answer⟧"),
+        "empty-answer marker: {text}"
+    );
+}

@@ -1763,7 +1763,7 @@ fn render_truncation_indicator(buf: &mut Buffer, x: u16, y: u16, width: u16, the
             "Ctrl-F",
             Style::default().fg(theme.accent_user).bg(theme.bg_light),
         ),
-        Span::styled(" to expand", style),
+        Span::styled(xai_grok_i18n::t("question.expand_hint"), style),
     ]);
     buf.set_line(x, y, &indicator, width);
 }
@@ -3313,5 +3313,22 @@ mod tests {
         let spans = collapsed_description_spans(&opt, 0, theme.bg_light, theme.gray);
         let w: usize = spans.iter().map(|s| s.content.width()).sum();
         assert_eq!(w, 0, "zero-width budget must produce no spans");
+    }
+
+    /// The truncation indicator's prose reaches the catalog; the `Ctrl-F` key name stays a token.
+    #[test]
+    fn truncation_indicator_copy_comes_from_the_catalog() {
+        let area = Rect::new(0, 0, 40, 1);
+        let mut buf = Buffer::empty(area);
+        xai_grok_i18n::with_pseudo_locale(|| {
+            render_truncation_indicator(&mut buf, area.x, area.y, area.width, &Theme::current())
+        });
+        let text = (area.x..area.x + area.width)
+            .filter_map(|x| buf.cell((x, area.y)).map(|cell| cell.symbol().to_owned()))
+            .collect::<String>();
+        assert!(
+            text.contains("⟦question.expand_hint⟧"),
+            "truncation indicator must come from the catalog: {text:?}"
+        );
     }
 }

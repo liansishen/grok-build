@@ -2006,7 +2006,8 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             let Some(agent) = app.agents.get_mut(&agent_id) else {
                 return vec![];
             };
-            let failure = format!("Couldn't send feedback: {error}");
+            let failure =
+                xai_grok_i18n::t_fmt("task_result.feedback_send_failed", &[("error", &error)]);
             if let crate::app::actions::FeedbackSendOrigin::Modal {
                 submission_id,
                 modal_id,

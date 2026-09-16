@@ -465,8 +465,11 @@ pub(super) fn keep_unsent_feedback_report(agent: &mut AgentView, report: UnsentF
     } = report;
     let attachments = match image_count {
         0 => String::new(),
-        1 => " (its image was dropped)".to_owned(),
-        count => format!(" (its {count} images were dropped)"),
+        1 => xai_grok_i18n::t("feedback.unsent_image_dropped").to_owned(),
+        count => xai_grok_i18n::t_fmt(
+            "feedback.unsent_images_dropped",
+            &[("count", &count.to_string())],
+        ),
     };
     // An image-only report has nothing the store could keep.
     if text.trim().is_empty() {
@@ -480,14 +483,31 @@ pub(super) fn keep_unsent_feedback_report(agent: &mut AgentView, report: UnsentF
     });
     let notice = match saved {
         Some(Ok(_)) => {
-            format!("{failure}. Saved to Drafts{attachments}; open `/feedback` to retry.")
-        }
-        Some(Err(error)) => {
-            format!(
-                "{failure}. Could not save it as a draft ({error}). Not sent{attachments}: {text}"
+            xai_grok_i18n::t_fmt(
+                "feedback.unsent_saved_to_drafts",
+                &[("failure", failure), ("attachments", &attachments)],
             )
         }
-        None => format!("{failure}. Not sent{attachments}: {text}"),
+        Some(Err(error)) => {
+            let error = error.to_string();
+            xai_grok_i18n::t_fmt(
+                "feedback.unsent_draft_save_failed",
+                &[
+                    ("failure", failure),
+                    ("error", &error),
+                    ("attachments", &attachments),
+                    ("text", text),
+                ],
+            )
+        }
+        None => xai_grok_i18n::t_fmt(
+            "feedback.unsent_not_sent",
+            &[
+                ("failure", failure),
+                ("attachments", &attachments),
+                ("text", text),
+            ],
+        ),
     };
     agent.scrollback.push_block(RenderBlock::system(notice));
 }

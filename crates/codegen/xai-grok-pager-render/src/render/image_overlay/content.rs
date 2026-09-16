@@ -18,9 +18,12 @@ pub(super) fn paint_path_line(
     bg: Color,
 ) {
     let raw = path.display().to_string();
-    let label = format!(
-        "Path: {}",
-        truncate_path_for_overlay(&raw, width.saturating_sub(6) as usize)
+    let label = xai_grok_i18n::t_fmt(
+        "img.path",
+        &[(
+            "path",
+            &truncate_path_for_overlay(&raw, width.saturating_sub(6) as usize),
+        )],
     );
     let clipped = crate::render::line_utils::truncate_str(&label, width as usize);
     buf.set_span_safe(

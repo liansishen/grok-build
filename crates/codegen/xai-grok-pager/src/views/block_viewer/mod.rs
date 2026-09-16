@@ -518,7 +518,10 @@ impl BlockViewerPane {
                 Style::default().fg(theme.gray_dim),
             )));
             lines.push(Line::from(Span::styled(
-                format!("Sources ({})", ws.citations.len()),
+                xai_grok_i18n::t_fmt(
+                    "block_viewer.web_search.sources",
+                    &[("count", &ws.citations.len().to_string())],
+                ),
                 Style::default().fg(theme.text_secondary),
             )));
             let url_style = Style::default().fg(theme.gray);
@@ -560,9 +563,13 @@ impl BlockViewerPane {
                 Span::styled(limit.to_string(), value),
             ]));
         }
-        let s = if st.result_count == 1 { "" } else { "s" };
+        let result_key = if st.result_count == 1 {
+            "block_viewer.integration_search.result_count_one"
+        } else {
+            "block_viewer.integration_search.result_count_many"
+        };
         lines.push(Line::from(Span::styled(
-            format!("{} result{s}", st.result_count),
+            xai_grok_i18n::t_fmt(result_key, &[("count", &st.result_count.to_string())]),
             label,
         )));
 
@@ -1047,25 +1054,43 @@ impl BlockViewerPane {
         ];
         match self.kind {
             ViewerKind::Markdown => {
-                hints.push(HintItem::new(crate::key!('r'), "raw"));
+                hints.push(HintItem::new(crate::key!('r'), xai_grok_i18n::t("hint.raw")));
             }
             ViewerKind::Execute => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy cmd"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_command"),
+                ));
             }
             ViewerKind::Edit => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy path"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_path"),
+                ));
             }
             ViewerKind::WebFetch => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy url"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_url"),
+                ));
             }
             ViewerKind::WebSearch => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy query"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_query"),
+                ));
             }
             ViewerKind::Read => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy path"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_path"),
+                ));
             }
             ViewerKind::Grep => {
-                hints.push(HintItem::new(crate::key!('Y'), "copy pattern"));
+                hints.push(HintItem::new(
+                    crate::key!('Y'),
+                    xai_grok_i18n::t("hint.copy_pattern"),
+                ));
             }
             ViewerKind::BgTask => {}
             ViewerKind::IntegrationSearch | ViewerKind::UseTool | ViewerKind::PlainText => {}

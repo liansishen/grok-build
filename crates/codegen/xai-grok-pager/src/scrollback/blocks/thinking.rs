@@ -273,7 +273,10 @@ impl ThinkingBlock {
         } else if let Some(time_str) = self.format_time() {
             Line::from(vec![
                 Span::styled(xai_grok_i18n::t("scrollback.thought"), label_style),
-                Span::styled(format!(" for {time_str}"), detail_style),
+                Span::styled(
+                    xai_grok_i18n::t_fmt("scrollback.for_time", &[("time", &time_str)]),
+                    detail_style,
+                ),
             ])
         } else {
             Line::from(Span::styled(xai_grok_i18n::t("scrollback.thought"), label_style))
@@ -869,5 +872,35 @@ mod tests {
             let out = empty.output(&hinted(mode, 60));
             assert!(!text_of(&out).contains(EXPAND_HINT), "empty/{mode:?}");
         }
+    }
+
+    /// The "Thought" label and its elapsed suffix are catalog-backed.
+    #[test]
+    fn thought_header_copy_comes_from_the_catalog() {
+        let mut appearance = AppearanceConfig::default();
+        appearance.scrollback.blocks.thinking.header = true;
+        let ctx = BlockContext {
+            appearance,
+            ..ctx(DisplayMode::Expanded, 60)
+        };
+        let mut block = ThinkingBlock::new("hello world");
+        block.set_elapsed_time_ms(Some(2_300));
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            block
+                .output(&ctx)
+                .lines
+                .iter()
+                .map(|line| crate::scrollback::types::line_plain_text(&line.content))
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
+        assert!(
+            text.contains("⟦scrollback.thought⟧"),
+            "thought label: {text}"
+        );
+        assert!(
+            text.contains("⟦scrollback.for_time⟧"),
+            "elapsed suffix: {text}"
+        );
     }
 }

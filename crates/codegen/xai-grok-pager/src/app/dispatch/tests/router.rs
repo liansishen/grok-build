@@ -2947,3 +2947,28 @@ fn refresh_mcp_list_clears_managed_connectors_wait() {
         [Effect::FetchMcpsList { cache: false, .. }]
     ));
 }
+/// `/debug` output is catalog copy: both the toggles line and the recorder status are translated.
+#[test]
+fn debug_status_and_scroll_log_copy_are_localized() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    if app.scroll_state.scroll_log_active() {
+        let _ = app.scroll_state.toggle_scroll_log();
+    }
+    xai_grok_i18n::with_pseudo_locale(|| {
+        let _ = dispatch(Action::ShowDebugStatus, &mut app);
+        let _ = dispatch(Action::ToggleScrollLog, &mut app);
+        let _ = dispatch(Action::ToggleScrollLog, &mut app);
+    });
+    let texts = system_texts(&app, id);
+    for expected in [
+        "\u{27e6}debug.toggles_status\u{27e7}",
+        "\u{27e6}debug.scroll_log_recording_to\u{27e7}",
+        "\u{27e6}debug.scroll_log_off\u{27e7}",
+    ] {
+        assert!(
+            texts.iter().any(|text| text == expected),
+            "missing {expected} in {texts:?}"
+        );
+    }
+}

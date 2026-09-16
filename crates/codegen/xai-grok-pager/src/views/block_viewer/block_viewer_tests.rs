@@ -415,3 +415,27 @@ fn selected_plain_text_visual_includes_preamble() {
     pane.prepare_for_test(area());
     assert_eq!(pane.selected_plain_text(), "header\nhello");
 }
+
+/// The viewer's shortcut-bar labels are catalog copy, not hardcoded literals.
+#[test]
+fn shortcut_hints_come_from_the_catalog() {
+    let entry = ScrollbackEntry::new(RenderBlock::agent_message("hello"));
+    let markdown = BlockViewerPane::for_markdown(entry.id, &entry).expect("markdown viewer");
+    let read = BlockViewerPane::for_static_content(EntryId::new(7), ViewerKind::Read, Vec::new());
+
+    let labels = xai_grok_i18n::with_pseudo_locale(|| {
+        [markdown, read]
+            .iter()
+            .flat_map(BlockViewerPane::shortcuts_hints)
+            .map(|hint| hint.label.to_string())
+            .collect::<Vec<_>>()
+    });
+
+    for key in ["hint.raw", "hint.copy_path"] {
+        let marker = format!("⟦{key}⟧");
+        assert!(
+            labels.iter().any(|label| *label == marker),
+            "{key} must be painted from the catalog: {labels:?}"
+        );
+    }
+}

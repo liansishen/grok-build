@@ -568,3 +568,61 @@ fn integer_field_submits_lossless_i64() {
     set_draft(&mut state, 0, "1e20");
     assert!(state.try_accept().is_none(), "1e20 is not an integer");
 }
+
+// ── catalog copy ────────────────────────────────────────────────
+
+/// One required `enum` field with no default: its value column paints the "(select)" placeholder.
+fn single_select_req() -> McpElicitExtRequest {
+    let mut req = form_req();
+    req.mode = McpElicitModeFields::Form {
+        requested_schema: Some(json!({
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string", "enum": ["red", "green"], "enumNames": ["Red", "Green"]
+                }
+            },
+            "required": ["color"]
+        })),
+    };
+    req
+}
+
+/// The prose these surfaces paint is catalog copy: under the pseudo locale the row carries the key
+/// marker instead of the English text.
+#[test]
+fn elicitation_copy_comes_from_the_catalog() {
+    let mut form = ElicitationViewState::from_request(single_select_req(), None, None);
+    let height = elicitation_view_height(&form, 40, 75);
+    let form_text = xai_grok_i18n::with_pseudo_locale(|| render_to_text(&mut form, 80, height));
+    assert!(
+        form_text.contains("⟦elicitation.field.required⟧"),
+        "the required marker must come from the catalog:\n{form_text}"
+    );
+    assert!(
+        form_text.contains("⟦elicitation.field.unselected⟧"),
+        "the empty-selection placeholder must come from the catalog:\n{form_text}"
+    );
+
+    let mut punycode =
+        ElicitationViewState::from_request(url_req("https://аррӏе.com/login"), None, None);
+    let height = elicitation_view_height(&punycode, 40, 75);
+    let punycode_text =
+        xai_grok_i18n::with_pseudo_locale(|| render_to_text(&mut punycode, 80, height));
+    assert!(
+        punycode_text.contains("⟦elicitation.url.punycode_warning⟧"),
+        "the punycode warning must come from the catalog:\n{punycode_text}"
+    );
+
+    let mut waiting =
+        ElicitationViewState::from_request(url_req("https://example.com/cb"), None, None);
+    assert!(waiting.try_accept().is_some(), "valid URL accepts");
+    waiting.begin_url_waiting();
+    let height = elicitation_view_height(&waiting, 40, 75);
+    let waiting_text =
+        xai_grok_i18n::with_pseudo_locale(|| render_to_text(&mut waiting, 80, height));
+    assert!(
+        waiting_text.contains("⟦elicitation.url.waiting_confirm⟧"),
+        "the waiting caption must come from the catalog:\n{waiting_text}"
+    );
+}

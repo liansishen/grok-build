@@ -173,19 +173,22 @@ impl ReadToolCallBlock {
         // SKILL.md reads render as "Skill {skill_name}".
         if let Some(skill) = self.skill_name() {
             return Line::from(vec![
-                Span::styled("Skill ", bold_style),
+                Span::styled(xai_grok_i18n::t("tool.prefix.skill"), bold_style),
                 Span::styled(skill.to_owned(), path_style),
             ]);
         }
 
-        let prefix = "Read ";
+        let prefix = xai_grok_i18n::t("tool.prefix.read");
         let range_suffix = self
             .line_range
             .map(|r| {
                 if let Some(total) = self.total_lines
                     && total > r.end.saturating_sub(r.start) + 1
                 {
-                    format!(" ({} of {total})", r)
+                    xai_grok_i18n::t_fmt(
+                        "tool.read.range_of_total",
+                        &[("range", &r.to_string()), ("total", &total.to_string())],
+                    )
                 } else {
                     format!(" ({})", r)
                 }
@@ -193,11 +196,13 @@ impl ReadToolCallBlock {
             .unwrap_or_default();
         // Extra suffix for errors or empty content
         let extra_suffix = if self.content.as_ref().is_some_and(|c| c.is_empty()) {
-            " (empty)".to_string()
+            xai_grok_i18n::t("tool.read.empty").to_string()
         } else if let Some(media) = &self.media_kind {
             match media {
-                ReadMediaKind::Image => " (image)".to_string(),
-                ReadMediaKind::Pdf { pages } => format!(" ({pages} pages)"),
+                ReadMediaKind::Image => xai_grok_i18n::t("tool.read.image").to_string(),
+                ReadMediaKind::Pdf { pages } => {
+                    xai_grok_i18n::t_fmt("tool.read.pdf_many", &[("count", &pages.to_string())])
+                }
             }
         } else {
             String::new()
@@ -765,5 +770,73 @@ mod tests {
             .join("\n");
         assert!(all_text.contains("50"), "should show line 50");
         assert!(all_text.contains("52"), "should show line 52");
+    }
+
+    /// Read chrome (Skill/Read labels, range suffix, empty/image/PDF suffixes) is catalog-backed.
+    #[test]
+    fn read_chrome_copy_comes_from_the_catalog() {
+        let skill = ReadToolCallBlock::new("/home/user/.grok/skills/deploy/SKILL.md");
+        let plain = ReadToolCallBlock::new("src/main.rs");
+        let mut ranged = ReadToolCallBlock::new("src/main.rs");
+        ranged.line_range = Some(LineRange::new(1, 10));
+        ranged.total_lines = Some(500);
+        let empty = ReadToolCallBlock::new("src/empty.rs").with_content(String::new(), 0);
+        let mut image = ReadToolCallBlock::new("shot.png");
+        image.media_kind = Some(ReadMediaKind::Image);
+        let mut pdf = ReadToolCallBlock::new("spec.pdf");
+        pdf.media_kind = Some(ReadMediaKind::Pdf { pages: 12 });
+
+        let (skill_text, plain_text, ranged_text, empty_text, image_text, pdf_text) =
+            xai_grok_i18n::with_pseudo_locale(|| {
+                let ctx = make_ctx();
+                let text = |block: &ReadToolCallBlock| {
+                    block
+                        .output(&ctx)
+                        .lines
+                        .iter()
+                        .map(|line| {
+                            line.content
+                                .spans
+                                .iter()
+                                .map(|span| span.content.as_ref())
+                                .collect::<String>()
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                (
+                    text(&skill),
+                    text(&plain),
+                    text(&ranged),
+                    text(&empty),
+                    text(&image),
+                    text(&pdf),
+                )
+            });
+
+        assert!(
+            skill_text.contains("⟦tool.prefix.skill⟧"),
+            "skill label: {skill_text}"
+        );
+        assert!(
+            plain_text.contains("⟦tool.prefix.read⟧"),
+            "read label: {plain_text}"
+        );
+        assert!(
+            ranged_text.contains("⟦tool.read.range_of_total⟧"),
+            "range suffix: {ranged_text}"
+        );
+        assert!(
+            empty_text.contains("⟦tool.read.empty⟧"),
+            "empty suffix: {empty_text}"
+        );
+        assert!(
+            image_text.contains("⟦tool.read.image⟧"),
+            "image suffix: {image_text}"
+        );
+        assert!(
+            pdf_text.contains("⟦tool.read.pdf_many⟧"),
+            "pdf suffix: {pdf_text}"
+        );
     }
 }

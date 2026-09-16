@@ -194,7 +194,12 @@ impl AgentView {
             self.subagent_views.get(child_sid).and_then(|cv| {
                 cv.resolve_turn_activity()
                     .map(|a| crate::app::subagent::format_activity_label(&a))
-                    .or_else(|| cv.session.state.is_busy().then(|| "Waiting".to_string()))
+                    .or_else(|| {
+                        cv.session
+                            .state
+                            .is_busy()
+                            .then(|| xai_grok_i18n::t("notification.title.waiting").to_string())
+                    })
             })
         } else {
             None

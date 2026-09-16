@@ -214,7 +214,7 @@ pub fn build_entries(
         }
         // Scrollback search (`/`) has no registered ActionDef yet (vim-only, handled inline); list it here for discoverability
         if vim_mode && cat == Category::ConversationNav {
-            let mut item = HintItem::new(crate::key!('/'), "search");
+            let mut item = HintItem::new(crate::key!('/'), t("hint.search"));
             item.description = Some(t("shortcuts.pseudo.search_scrollback").into());
             let dimmed = !active_contexts.contains(&When::ScrollbackFocused);
             entries.push(ShortcutsHelpEntry::Hint {
@@ -227,7 +227,7 @@ pub fn build_entries(
         // Simple mode reaches scrollback search via the `/find` slash command, not a keystroke
         // Use a null key and a custom display so the raw key list stays empty of `/`
         if !vim_mode && cat == Category::ConversationNav {
-            let mut item = HintItem::new(crate::key!(Null), "search");
+            let mut item = HintItem::new(crate::key!(Null), t("hint.search"));
             item.custom_display = Some("/find");
             item.description = Some(t("shortcuts.pseudo.search_scrollback").into());
             // `/find` is a slash command typed at the prompt (not a scrollback keystroke like the vim `/` above)
@@ -256,18 +256,18 @@ pub fn build_entries(
                 });
             };
 
-            let mut paste = HintItem::new(crate::key!('v', CONTROL), "paste");
+            let mut paste = HintItem::new(crate::key!('v', CONTROL), t("hint.paste"));
             paste.description = Some(t("shortcuts.pseudo.paste_clipboard").into());
             #[cfg(target_os = "windows")]
             paste.keys.push(crate::key!('v', ALT));
             push_pseudo(&mut entries, paste, Some(paste_long_help()));
 
-            let mut undo = HintItem::new(crate::key!('z', CONTROL), "undo");
+            let mut undo = HintItem::new(crate::key!('z', CONTROL), t("hint.undo"));
             undo.description = Some(t("shortcuts.pseudo.undo").into());
             push_pseudo(&mut entries, undo, Some(undo_long_help()));
 
             // Alt+Z is the fallback on terminals that send Ctrl+Shift+Z as plain Ctrl+Z
-            let mut redo = HintItem::new(crate::key!('z', CONTROL | SHIFT), "redo");
+            let mut redo = HintItem::new(crate::key!('z', CONTROL | SHIFT), t("hint.redo"));
             redo.description = Some(t("shortcuts.pseudo.redo").into());
             redo.keys.push(crate::key!('z', ALT));
             push_pseudo(&mut entries, redo, Some(redo_long_help()));
@@ -638,7 +638,7 @@ pub fn render_detail_body<'a>(
     if dimmed_note {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "(not active in current context)",
+            t("shortcuts.dimmed_note"),
             Style::default().fg(theme.gray_dim),
         )));
     }

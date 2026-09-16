@@ -1567,9 +1567,9 @@ fn int_stepper_right_glyph() -> &'static str {
 }
 
 /// Sample text for the `max_thoughts_width` live wrap preview.
-const MAX_THOUGHTS_WIDTH_PREVIEW_SAMPLE: &str = "Let me trace through the call sites. First, \
-    I'll need to look at how the dispatch flow handles the new variant. Then I'll verify the \
-    rollback path preserves the previous state correctly.";
+fn max_thoughts_width_preview_sample() -> &'static str {
+    xai_grok_i18n::t("settings.modal.preview_sample")
+}
 
 /// Min width to render the wrap preview.
 pub(super) const MAX_THOUGHTS_WIDTH_PREVIEW_MIN_WIDTH: u16 = 30;
@@ -1682,9 +1682,13 @@ pub(super) fn render_editing_value(
     if buffer.is_empty() {
         let placeholder = match &meta.kind {
             SettingKind::String { validator, .. } => match validator {
-                StringValidator::KnownModel => "<empty: uses shell default>",
-                StringValidator::NonEmptyToken => "<type a value>",
-                StringValidator::Any => "<type a value>",
+                StringValidator::KnownModel => {
+                    xai_grok_i18n::t("settings.modal.placeholder_empty_shell_default")
+                }
+                StringValidator::NonEmptyToken => {
+                    xai_grok_i18n::t("settings.modal.placeholder_value")
+                }
+                StringValidator::Any => xai_grok_i18n::t("settings.modal.placeholder_value"),
             },
             _ => "",
         };
@@ -1902,9 +1906,9 @@ fn render_max_thoughts_width_preview(
     // Defensive guard: catch future editors who add `\n` / `\t` (or any other control char that bypasses word_wrap_line's flow) to the sample
     // `wrap_description` has the same debug_assert for the same reason
     debug_assert!(
-        !MAX_THOUGHTS_WIDTH_PREVIEW_SAMPLE.contains('\n')
-            && !MAX_THOUGHTS_WIDTH_PREVIEW_SAMPLE.contains('\t'),
-        "MAX_THOUGHTS_WIDTH_PREVIEW_SAMPLE must not contain `\\n` or `\\t`; \
+        !max_thoughts_width_preview_sample().contains('\n')
+            && !max_thoughts_width_preview_sample().contains('\t'),
+        "the max_thoughts_width preview sample must not contain `\\n` or `\\t`; \
          word_wrap_line flattens spans byte-for-byte and would render control \
          cells as glyphs",
     );
@@ -1915,7 +1919,7 @@ fn render_max_thoughts_width_preview(
     let clamped = pending_w > area.width;
 
     // Wrap the sample text at the effective width.
-    let sample_line = Line::from(Span::raw(MAX_THOUGHTS_WIDTH_PREVIEW_SAMPLE));
+    let sample_line = Line::from(Span::raw(max_thoughts_width_preview_sample()));
     let wrapped = crate::render::wrapping::word_wrap_line(&sample_line, effective_width as usize);
     // Defensive: a degenerate wrap (zero lines) means we have no meaningful preview to show
     // The MIN_WIDTH=30 gate above makes this practically unreachable

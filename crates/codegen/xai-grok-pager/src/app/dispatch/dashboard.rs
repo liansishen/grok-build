@@ -2202,14 +2202,20 @@ fn workspace_layout_target(
     Ok(target)
 }
 
+/// Toast for a refused dashboard pin/reorder gesture; `None` for rows that have no layout of their own.
+fn layout_refusal_toast(refusal: LayoutRefusal) -> Option<&'static str> {
+    match refusal {
+        LayoutRefusal::NotWorkspaceRow => None,
+        LayoutRefusal::NotFound => Some(xai_grok_i18n::t("toast.workspace_layout_not_found")),
+        LayoutRefusal::ReadOnly => Some(xai_grok_i18n::t("toast.workspace_layout_read_only")),
+        LayoutRefusal::NotSavedYet => Some(xai_grok_i18n::t("toast.workspace_layout_not_saved")),
+    }
+}
+
 fn refuse_workspace_layout(app: &mut AppView, refusal: impl Into<LayoutRefusal>) {
-    let message = match refusal.into() {
-        LayoutRefusal::NotWorkspaceRow => return,
-        LayoutRefusal::NotFound => "Session is no longer in the workspace",
-        LayoutRefusal::ReadOnly => "Dashboard workspace is read-only",
-        LayoutRefusal::NotSavedYet => "Session isn't saved to the workspace yet",
-    };
-    app.show_toast(message);
+    if let Some(message) = layout_refusal_toast(refusal.into()) {
+        app.show_toast(message);
+    }
 }
 
 pub(super) fn dispatch_dashboard_toggle_pin(app: &mut AppView) -> Vec<Effect> {
@@ -3293,4 +3299,24 @@ pub(super) fn dispatch_dashboard_question_answer(
         crate::app::agent_view::PeekAnswerOutcome::NoOp => {}
     }
     vec![]
+}
+#[cfg(test)]
+mod layout_refusal_i18n_tests {
+    use super::*;
+    /// The refusal toasts are catalog lookups, so the dashboard paints translated copy.
+    #[test]
+    fn layout_refusal_toasts_are_drawn_from_the_catalog() {
+        let rendered = xai_grok_i18n::with_pseudo_locale(|| {
+            [
+                (LayoutRefusal::NotFound, Some("\u{27e6}toast.workspace_layout_not_found\u{27e7}")),
+                (LayoutRefusal::ReadOnly, Some("\u{27e6}toast.workspace_layout_read_only\u{27e7}")),
+                (LayoutRefusal::NotSavedYet, Some("\u{27e6}toast.workspace_layout_not_saved\u{27e7}")),
+                (LayoutRefusal::NotWorkspaceRow, None),
+            ]
+            .map(|(refusal, expected)| (layout_refusal_toast(refusal), expected))
+        });
+        for (got, expected) in rendered {
+            assert_eq!(expected, got);
+        }
+    }
 }

@@ -53,7 +53,7 @@ const NOTICE_MAX_WIDTH: u16 = 72;
 // Notices use bold leads rather than `#` headings: heading text takes the theme accent color.
 /// Only advertises the actions the shell reported as available in this session.
 fn empty_state_markdown(capture_enabled: bool, dream_enabled: bool) -> String {
-    let mut text = String::from("**Nothing remembered yet.**\n\n");
+    let mut text = String::from(xai_grok_i18n::t("memory.empty.title"));
     if capture_enabled {
         text.push_str("- Keep working. Notes are saved automatically after each completed turn.\n");
     }
@@ -1317,8 +1317,10 @@ fn handle_browse(state: &mut MemoryModalState, key: &KeyEvent) -> InputOutcome {
                 return InputOutcome::Changed;
             }
             let scope = match entry.source.as_str() {
-                "session" => "session logs".to_owned(),
-                source => format!("{source} memory"),
+                "session" => xai_grok_i18n::t("memory.scope.session_logs").to_owned(),
+                source => {
+                    xai_grok_i18n::t_fmt("memory.scope.source_memory", &[("source", source)])
+                }
             };
             state.status = Some(MemoryStatusLine {
                 text: format!(
@@ -2360,5 +2362,68 @@ mod tests {
                 size_bytes: 0,
             },
         ]
+    }
+
+    /// The onboarding headline and the delete-confirmation scope wording are catalog copy.
+    #[test]
+    fn memory_copy_comes_from_the_catalog() {
+        use xai_grok_shell::extensions::notification::MemoryFileInfo;
+
+        let manifest = |scope: &str| MemoryFileInfo {
+            path: format!("/store/{scope}/MEMORY.md"),
+            source: scope.to_string(),
+            size_bytes: 183,
+            modified_epoch_secs: None,
+            generated: true,
+        };
+        let mut empty = MemoryModalState::new(build_entries(vec![
+            manifest("global"),
+            manifest("workspace"),
+        ]));
+        let headline = xai_grok_i18n::with_pseudo_locale(|| render_full(&mut empty));
+        assert!(
+            headline.contains("⟦memory.empty.title⟧"),
+            "onboarding headline must come from the catalog: {headline:?}"
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let session_path = dir.path().join("sessions/2026-01-15-fix-bug.md");
+        std::fs::create_dir_all(session_path.parent().unwrap()).unwrap();
+        std::fs::write(&session_path, "# session\n").unwrap();
+        let mut state = MemoryModalState::new(build_entries(vec![MemoryFileInfo {
+            path: session_path.to_string_lossy().into_owned(),
+            source: "session".into(),
+            size_bytes: 10,
+            modified_epoch_secs: None,
+            generated: false,
+        }]));
+        select_label(&mut state, "2026-01-15-fix-bug.md");
+        let scope = xai_grok_i18n::with_pseudo_locale(|| {
+            handle_memory_key(&mut state, &plain_key('x'));
+            state
+                .status
+                .as_ref()
+                .map(|status| status.text.clone())
+                .unwrap_or_default()
+        });
+        assert!(
+            scope.contains("⟦memory.scope.session_logs⟧"),
+            "delete-confirmation scope must come from the catalog: {scope:?}"
+        );
+
+        let (_dir, mut workspace) = v2_store_state();
+        select_label(&mut workspace, "anyrun.md");
+        let source_memory = xai_grok_i18n::with_pseudo_locale(|| {
+            handle_memory_key(&mut workspace, &plain_key('x'));
+            workspace
+                .status
+                .as_ref()
+                .map(|status| status.text.clone())
+                .unwrap_or_default()
+        });
+        assert!(
+            source_memory.contains("⟦memory.scope.source_memory⟧"),
+            "delete-confirmation scope must name the source through the catalog: {source_memory:?}"
+        );
     }
 }

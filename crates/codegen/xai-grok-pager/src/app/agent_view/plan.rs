@@ -20,14 +20,18 @@ use crossterm::event::{KeyCode, KeyEvent};
 use std::io::Read;
 pub(crate) const MAX_KEPT_PLAN_FILE_BYTES: u64 = crate::acp::MAX_PLAN_FILE_BYTES as u64;
 /// Shared by post-turn revise / abandon while ExecutePlan is already in flight.
-pub(crate) const BUILD_IN_FLIGHT_REVISE_NOTICE: &str =
-    "Wait for the current turn to end before revising the plan.";
-pub(crate) const BUILD_IN_FLIGHT_ABANDON_NOTICE: &str =
-    "Wait for the current turn to end before abandoning the plan.";
-pub(crate) const LEAVE_PLAN_REVISE_NOTICE: &str =
-    "Wait for plan mode to finish switching before revising the plan.";
-pub(crate) const PLAN_CHANGED_ON_DISK_NOTICE: &str =
-    "The plan changed on disk. Review the updated plan before approving.";
+pub(crate) fn build_in_flight_revise_notice() -> &'static str {
+    xai_grok_i18n::t("plan.notice.revise_turn_active")
+}
+pub(crate) fn build_in_flight_abandon_notice() -> &'static str {
+    xai_grok_i18n::t("plan.notice.abandon_turn_active")
+}
+pub(crate) fn leave_plan_revise_notice() -> &'static str {
+    xai_grok_i18n::t("plan.notice.revise_mode_switching")
+}
+pub(crate) fn plan_changed_on_disk_notice() -> &'static str {
+    xai_grok_i18n::t("plan.notice.changed_on_disk")
+}
 pub(crate) fn capped_kept_plan_body(text: String) -> Option<String> {
     let len = u64::try_from(text.len()).ok()?;
     (len <= MAX_KEPT_PLAN_FILE_BYTES && !text.trim().is_empty()).then_some(text)
@@ -419,11 +423,11 @@ impl AgentView {
         {
             let msg = match pav.focus {
                 PlanApprovalFocus::Commenting => {
-                    "The comment in progress is a slash command: finish or discard it before approving."
+                    xai_grok_i18n::t("plan.notice.approve_slash_command_comment")
                 }
                 PlanApprovalFocus::Preview | PlanApprovalFocus::Prompt => {
                     pav.focus = PlanApprovalFocus::Prompt;
-                    "Run the slash command in the notes with Enter, or clear it, before approving."
+                    xai_grok_i18n::t("plan.notice.approve_slash_command_notes")
                 }
             };
             if crate::app::minimal_mode_active() {
@@ -473,7 +477,7 @@ impl AgentView {
                     pav.has_plan = true;
                 }
                 self.show_plan_preview_if_available();
-                self.show_toast(PLAN_CHANGED_ON_DISK_NOTICE);
+                self.show_toast(plan_changed_on_disk_notice());
                 return InputOutcome::Changed;
             }
             let notes = review_comments.as_deref();
@@ -575,7 +579,7 @@ impl AgentView {
             return InputOutcome::Changed;
         };
         if self.is_post_turn_build_starting() {
-            self.show_toast("Wait for the current turn to end before abandoning the plan.");
+            self.show_toast(build_in_flight_abandon_notice());
             return InputOutcome::Changed;
         }
         if pav.is_after_turn() {
@@ -654,7 +658,7 @@ impl AgentView {
                 pav.send_cancelled(None);
                 self.kept_plan.drop_body_if_pathed();
                 self.prompt.textarea.cancel_undo_group();
-                self.show_toast("Plan revision sent.");
+                self.show_toast(xai_grok_i18n::t("toast.plan_revision_sent"));
                 log_plan_submit("revise");
             }
         }
@@ -678,15 +682,15 @@ impl AgentView {
                 .push_block(crate::scrollback::RenderBlock::user_prompt(msg.to_string()));
         }
         if post_turn && to_send.as_deref().is_none_or(|text| text.trim().is_empty()) {
-            self.show_toast("Type revision notes, or press a to approve.");
+            self.show_toast(xai_grok_i18n::t("plan.approval.revision_hint"));
             return InputOutcome::Changed;
         }
         if self.is_post_turn_build_starting() {
-            self.show_toast(BUILD_IN_FLIGHT_REVISE_NOTICE);
+            self.show_toast(build_in_flight_revise_notice());
             return InputOutcome::Changed;
         }
         if post_turn && self.plan_mode_pending == Some(false) {
-            self.show_toast(LEAVE_PLAN_REVISE_NOTICE);
+            self.show_toast(leave_plan_revise_notice());
             return InputOutcome::Changed;
         }
         if post_turn {
@@ -2111,7 +2115,7 @@ mod plan_approval_optimistic_mode_tests {
         assert!(matches!(agent.approve_plan(), InputOutcome::Changed));
         assert_eq!(
             agent.toast.as_ref().map(|(msg, _)| msg.as_str()),
-            Some(PLAN_CHANGED_ON_DISK_NOTICE),
+            Some(plan_changed_on_disk_notice()),
         );
         assert_eq!(
             agent
@@ -2536,6 +2540,26 @@ mod plan_approval_optimistic_mode_tests {
             agent.toast.as_ref().map(|(msg, _)| msg.as_str()),
             Some("Wait for the current turn to end before revising the plan.")
         );
+    }
+    #[test]
+    fn build_in_flight_refusals_are_drawn_from_the_catalog() {
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let mut agent = agent_with_post_turn_review();
+            agent.set_execute_plan_prompt("build-1");
+            assert!(matches!(agent.abandon_plan(), InputOutcome::Changed));
+            assert_eq!(
+                agent.toast.as_ref().map(|(msg, _)| msg.as_str()),
+                Some("\u{27e6}plan.notice.abandon_turn_active\u{27e7}")
+            );
+            assert!(matches!(
+                agent.send_plan_feedback(Some("add a rollback".into())),
+                InputOutcome::Changed
+            ));
+            assert_eq!(
+                agent.toast.as_ref().map(|(msg, _)| msg.as_str()),
+                Some("\u{27e6}plan.notice.revise_turn_active\u{27e7}")
+            );
+        });
     }
     #[test]
     fn dismiss_in_turn_leaves_a_post_turn_review_and_its_comments() {

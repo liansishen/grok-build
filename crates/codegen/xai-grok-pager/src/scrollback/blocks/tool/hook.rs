@@ -322,7 +322,13 @@ fn render_hooks_expanded_inner(runs: &[HookRunEntry]) -> Vec<BlockLine> {
                         Span::styled(format!("{}  ", INDENT), theme.muted()),
                         Span::styled("\u{21a9} ", theme.fg(theme.accent_running)),
                         Span::styled(run.name.clone(), theme.muted()),
-                        Span::styled(format!(" ({}ms)", elapsed.as_millis()), theme.muted()),
+                        Span::styled(
+                            xai_grok_i18n::t_fmt(
+                                "tool.hooks.elapsed_ms",
+                                &[("count", &elapsed.as_millis().to_string())],
+                            ),
+                            theme.muted(),
+                        ),
                     ])
                     .into(),
                 );

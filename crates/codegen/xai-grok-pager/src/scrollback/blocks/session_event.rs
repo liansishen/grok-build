@@ -237,7 +237,10 @@ impl BlockContent for MemoryCaptureBlock {
             for (index, entry) in self.entries.iter().enumerate() {
                 lines.push(BlockLine::separator(Line::default()));
                 lines.push(BlockLine::styled(Line::from(Span::styled(
-                    format!("Untrusted model-generated observation {}", index + 1),
+                    xai_grok_i18n::t_fmt(
+                        "scrollback.memory_capture.observation",
+                        &[("index", &(index + 1).to_string())],
+                    ),
                     theme.muted().add_modifier(Modifier::BOLD),
                 ))));
                 lines.extend(
@@ -272,7 +275,10 @@ impl BlockContent for MemoryCaptureBlock {
                     .and_then(|name| name.to_str())
                     .unwrap_or(entry.path.as_str());
                 let mut path_line = BlockLine::styled(Line::from(vec![
-                    Span::styled("Open file \u{2192} ", theme.muted()),
+                    Span::styled(
+                        xai_grok_i18n::t("scrollback.memory_capture.open_file"),
+                        theme.muted(),
+                    ),
                     Span::styled(
                         label.to_owned(),
                         theme.primary().add_modifier(Modifier::UNDERLINED),
@@ -395,13 +401,11 @@ impl SessionEvent {
                 let after = format_tokens(*tokens_after);
                 // Older shells don't send tokens_before; keep the legacy format
                 let body = match tokens_before {
-                    Some(before) if *before > 0 => {
-                        format!(
-                            "Context compacted: {} → {after} tokens",
-                            format_tokens(*before)
-                        )
-                    }
-                    _ => format!("Context compacted → {after} tokens"),
+                    Some(before) if *before > 0 => xai_grok_i18n::t_fmt(
+                        "session.compaction_completed_range",
+                        &[("before", &format_tokens(*before)), ("after", &after)],
+                    ),
+                    _ => xai_grok_i18n::t_fmt("session.compaction_completed", &[("after", &after)]),
                 };
                 if let Some(ms) = elapsed_ms {
                     let secs = *ms as f64 / 1000.0;
@@ -672,8 +676,12 @@ impl SessionEventBlock {
         };
         let header_style = header_text_style.add_modifier(Modifier::BOLD);
         // Non-selectable chrome (same as Thinking / tool label prefixes).
-        let header_line =
-            || BlockLine::separator(Line::from(Span::styled("Recap".to_string(), header_style)));
+        let header_line = || {
+            BlockLine::separator(Line::from(Span::styled(
+                xai_grok_i18n::t("session.recap").to_string(),
+                header_style,
+            )))
+        };
 
         // Loading: header only; the animated gray sidebar is the feedback.
         if ctx.is_running {
@@ -684,7 +692,10 @@ impl SessionEventBlock {
 
         match ctx.mode {
             DisplayMode::Collapsed => {
-                let mut spans = vec![Span::styled("Recap".to_string(), header_style)];
+                let mut spans = vec![Span::styled(
+                    xai_grok_i18n::t("session.recap").to_string(),
+                    header_style,
+                )];
                 let preview = summary.lines().next().unwrap_or(summary).trim();
                 if !preview.is_empty() {
                     spans.push(Span::styled(format!("  {preview}"), theme.muted()));
@@ -1781,5 +1792,64 @@ mod tests {
             auto: false,
         });
         assert!(!recap.event.is_turn_terminal());
+    }
+
+    /// Memory-capture chrome, the compaction range line and the recap header are catalog-backed.
+    #[test]
+    fn session_event_chrome_copy_comes_from_the_catalog() {
+        let capture = MemoryCaptureBlock::new(
+            2,
+            4,
+            vec![MemoryCaptureDebugEntry {
+                statement: "Use the focused test target.".into(),
+                body: None,
+                path: "/tmp/memory/observation.md".into(),
+            }],
+        );
+        let compaction = SessionEventBlock::new(SessionEvent::CompactionCompleted {
+            tokens_before: Some(48_800),
+            tokens_after: 27_100,
+            elapsed_ms: None,
+        });
+        let recap = SessionEventBlock::new(SessionEvent::Recap {
+            summary: "did stuff".into(),
+            auto: false,
+        });
+
+        let wide = BlockContext {
+            width: 200,
+            ..ctx()
+        };
+        let (capture_text, compaction_text, recap_text) = xai_grok_i18n::with_pseudo_locale(|| {
+            let joined = |out: BlockOutput| {
+                out.lines
+                    .iter()
+                    .map(|line| crate::scrollback::types::line_plain_text(&line.content))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            (
+                joined(capture.output(&wide)),
+                joined(compaction.output(&wide)),
+                joined(recap.output(&wide)),
+            )
+        });
+
+        assert!(
+            capture_text.contains("⟦scrollback.memory_capture.observation⟧"),
+            "observation label: {capture_text}"
+        );
+        assert!(
+            capture_text.contains("⟦scrollback.memory_capture.open_file⟧"),
+            "file link label: {capture_text}"
+        );
+        assert!(
+            compaction_text.contains("⟦session.compaction_completed_range⟧"),
+            "compaction range line: {compaction_text}"
+        );
+        assert!(
+            recap_text.contains("⟦session.recap⟧"),
+            "recap header: {recap_text}"
+        );
     }
 }

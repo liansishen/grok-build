@@ -166,8 +166,17 @@ fn render_diff_hunks_core(
                 .and_then(|j| hunks.get(j))
                 .and_then(|prev| hunk_gap_lines(prev, hunk))
             {
-                Some(1) => format!("{} 1 unchanged line", config.hunk_separator),
-                Some(n) => format!("{} {n} unchanged lines", config.hunk_separator),
+                Some(1) => xai_grok_i18n::t_fmt(
+                    "tool.diff.hunk_gap_one",
+                    &[("separator", &config.hunk_separator)],
+                ),
+                Some(n) => xai_grok_i18n::t_fmt(
+                    "tool.diff.hunk_gap_many",
+                    &[
+                        ("separator", &config.hunk_separator),
+                        ("count", &n.to_string()),
+                    ],
+                ),
 
                 None => config.hunk_separator.clone(),
             };
@@ -3207,6 +3216,41 @@ class ProcessQueueItem(BaseModel):
             field_full,
             "expected cold-start mismatch (hunk-only string spill vs full-file); \
              if equal, the bug may already be fixed or the fixture no longer triggers"
+        );
+    }
+
+    /// The hunk-gap separator chrome ("N unchanged lines") is catalog-backed.
+    #[test]
+    fn hunk_gap_copy_comes_from_the_catalog() {
+        let mk = |ln: usize| {
+            vec![DiffLine {
+                text: format!("line{ln}\n"),
+                lo: ln,
+                ln,
+                tag: ChangeTag::Equal,
+            }]
+        };
+        let theme = Theme::current();
+        let config = DiffRenderConfig::default();
+        let path = Path::new("test.txt");
+
+        let many = xai_grok_i18n::with_pseudo_locale(|| {
+            let outputs =
+                render_diff_hunks_highlighted(&[mk(1), mk(10)], path, &theme, 80, &config);
+            line_to_string(&nth(&outputs, 1).line)
+        });
+        let one = xai_grok_i18n::with_pseudo_locale(|| {
+            let outputs = render_diff_hunks_highlighted(&[mk(1), mk(3)], path, &theme, 80, &config);
+            line_to_string(&nth(&outputs, 1).line)
+        });
+
+        assert!(
+            many.contains("⟦tool.diff.hunk_gap_many⟧"),
+            "multi-line gap: {many}"
+        );
+        assert!(
+            one.contains("⟦tool.diff.hunk_gap_one⟧"),
+            "single-line gap: {one}"
         );
     }
 }

@@ -323,10 +323,15 @@ pub fn render(buf: &mut Buffer, area: Rect, theme: &Theme, data: &DockData) {
                 let hidden = layout.hidden_rows(section);
                 let arrow = crate::glyphs::disclosure_open();
                 let indent_len = MORE_INDENT.len().min(area.width.saturating_sub(1) as usize);
+                let indent = MORE_INDENT.get(..indent_len).unwrap_or(MORE_INDENT);
                 let line = Line::from(Span::styled(
-                    format!(
-                        "{}{arrow} show {hidden} more",
-                        MORE_INDENT.get(..indent_len).unwrap_or(MORE_INDENT)
+                    xai_grok_i18n::t_fmt(
+                        "dock.show_more",
+                        &[
+                            ("indent", indent),
+                            ("arrow", arrow),
+                            ("hidden", &hidden.to_string()),
+                        ],
                     ),
                     Style::default().fg(theme.gray),
                 ));
@@ -1932,6 +1937,29 @@ mod tests {
             buf.cell((0, 1)).map(|c| c.bg),
             Some(theme.bg_highlight),
             "selection wins over hover"
+        );
+    }
+
+    /// The `show N more` row is catalog copy, not a hardcoded literal.
+    #[test]
+    fn show_more_row_comes_from_the_catalog() {
+        let theme = Theme::tokyonight();
+        let data = crowded();
+        let area = Rect::new(0, 0, 60, MAX_DOCK_ROWS);
+
+        let painted = xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render(&mut buf, area, &theme, &data);
+            (0..area.height)
+                .map(|y| row_text(&buf, y))
+                .collect::<Vec<_>>()
+        });
+
+        assert!(
+            painted
+                .iter()
+                .any(|row| row.contains("⟦dock.show_more⟧")),
+            "the reveal-remaining row must be painted from the catalog: {painted:#?}"
         );
     }
 }

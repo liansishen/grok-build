@@ -7893,3 +7893,48 @@ fn settings_render_uses_pseudo_locale_for_core_modes() {
         "string editor validation was not localized:\n{string}"
     );
 }
+
+/// The string editor's empty-buffer placeholder is catalog copy.
+#[test]
+fn editor_placeholder_comes_from_the_catalog() {
+    let area = Rect {
+        x: 0,
+        y: 0,
+        width: 60,
+        height: 6,
+    };
+    let row = xai_grok_i18n::with_pseudo_locale(|| {
+        let mut state = editor_render_fixture("", 0);
+        let mut buf = Buffer::empty(area);
+        render_editing_value(&mut buf, area, &mut state, &Theme::current());
+        buf_row_text(&buf, 3, 0, area.width)
+    });
+
+    // The editor paints its cursor glyph over the first cell, so the marker only survives from its
+    // second character on.
+    assert!(
+        row.contains("settings.modal.placeholder_empty_shell_default⟧"),
+        "the shell-default placeholder must come from the catalog: {row:?}"
+    );
+}
+
+/// The `max_thoughts_width` wrap-preview sample sentence is catalog copy.
+#[test]
+fn wrap_preview_sample_comes_from_the_catalog() {
+    let area = Rect {
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 24,
+    };
+    let (buf, _) = xai_grok_i18n::with_pseudo_locale(|| render_max_thoughts_width_at(85, area));
+    let text = (area.y..area.y + area.height)
+        .map(|y| buf_row_text(&buf, y, area.x, area.width))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        text.contains("⟦settings.modal.preview_sample⟧"),
+        "the wrap-preview sample must come from the catalog:\n{text}"
+    );
+}

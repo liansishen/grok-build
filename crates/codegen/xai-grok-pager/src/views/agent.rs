@@ -938,7 +938,14 @@ pub(crate) fn build_hints(
                 hints.push(focus_hint.clone());
             }
             if surface == ViewSurface::ChildTakeover {
-                hints.push(HintItem::paired(crate::key!('q'), crate::key!(Esc), "back").pinned());
+                hints.push(
+                    HintItem::paired(
+                        crate::key!('q'),
+                        crate::key!(Esc),
+                        xai_grok_i18n::t("hint.back"),
+                    )
+                    .pinned(),
+                );
             }
             let offer_focus_hint = |hints: &mut Vec<HintItem>| {
                 if focus_reachable && !focus_hint.pinned {
@@ -2317,5 +2324,22 @@ mod tests {
         let layout = layout_with_rows(area, 0, 0, 1);
         assert_eq!(layout.follow_ups, Rect::default());
         assert!(layout.scrollback.height >= 5);
+    }
+
+    /// The child surface's `back` chip is catalog copy, not a hardcoded English word.
+    #[test]
+    fn child_surface_back_hint_comes_from_the_catalog() {
+        let mut prompt = PromptWidget::default();
+        prompt.textarea.insert_str("draft");
+        let labels = xai_grok_i18n::with_pseudo_locale(|| {
+            surface_hints(ActivePane::Scrollback, ViewSurface::ChildTakeover, &prompt)
+                .iter()
+                .map(|hint| hint.label.to_string())
+                .collect::<Vec<_>>()
+        });
+        assert!(
+            labels.iter().any(|label| label == "⟦hint.back⟧"),
+            "child-surface back chip must come from the catalog: {labels:?}"
+        );
     }
 }

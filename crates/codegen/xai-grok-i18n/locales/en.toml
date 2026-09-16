@@ -4717,3 +4717,169 @@ version = "  v{version}"
 model = "Model · {model}"
 
 help_hint = "/help for commands"
+
+[block_viewer.web_search]
+sources = "Sources ({count})"
+
+[block_viewer.integration_search]
+result_count_one = "{count} result"
+
+result_count_many = "{count} results"
+
+[dock]
+show_more = "{indent}{arrow} show {hidden} more"
+
+[elicitation.url]
+punycode_warning = "Punycode host: check it is the site you expect"
+
+waiting_confirm = "Waiting for the server to confirm…"
+
+[elicitation.field]
+required = " (required)"
+
+unselected = "(select)"
+
+[feedback]
+trace_disclosure = "One archive of this session is sent with this report only. Nothing is turned on for future sessions."
+
+unsent_image_dropped = " (its image was dropped)"
+
+unsent_images_dropped = " (its {count} images were dropped)"
+
+unsent_saved_to_drafts = "{failure}. Saved to Drafts{attachments}; open `/feedback` to retry."
+
+unsent_draft_save_failed = "{failure}. Could not save it as a draft ({error}). Not sent{attachments}: {text}"
+
+unsent_not_sent = "{failure}. Not sent{attachments}: {text}"
+[hint]
+approve_with_comments = "approve w/ comments"
+
+paste = "paste"
+
+undo = "undo"
+
+redo = "redo"
+
+dropdown_controls = "↑/↓ navigate · enter confirm · esc cancel"
+[settings.modal]
+preview_sample = "Let me trace through the call sites. First, I'll need to look at how the dispatch flow handles the new variant. Then I'll verify the rollback path preserves the previous state correctly."
+
+placeholder_empty_shell_default = "<empty: uses shell default>"
+
+[announcements]
+hide_cta = "hide: /announcements hide"
+
+hide_button = "[hide]"
+
+[picker]
+loading = "{frame} Loading…"
+
+[picker.empty]
+no_matches = "  No matches"
+
+[question]
+expand_hint = " to expand"
+
+[memory.empty]
+title = "**Nothing remembered yet.**\n\n"
+
+[memory.scope]
+session_logs = "session logs"
+
+source_memory = "{source} memory"
+
+[shortcuts]
+dimmed_note = "(not active in current context)"
+
+[turn.queue]
+queued_send_now = " · {count} queued, Enter to send now"
+
+[plan.notice]
+revise_turn_active = "Wait for the current turn to end before revising the plan."
+
+abandon_turn_active = "Wait for the current turn to end before abandoning the plan."
+
+revise_mode_switching = "Wait for plan mode to finish switching before revising the plan."
+
+changed_on_disk = "The plan changed on disk. Review the updated plan before approving."
+
+build_mode_switching = "Wait for plan mode to finish switching before building the plan."
+
+build_turn_active = "Wait for the current turn to end before building the plan."
+
+approve_slash_command_comment = "The comment in progress is a slash command: finish or discard it before approving."
+
+approve_slash_command_notes = "Run the slash command in the notes with Enter, or clear it, before approving."
+
+[question.footer]
+navigate = " navigate"
+
+switch_question = " question"
+
+copy = " copy"
+
+[history]
+panel_label = " history "
+
+[debug]
+scroll_log_recording_to = "scroll log: recording to {path}"
+
+scroll_log_off = "scroll log: off"
+
+toggles_status = "debug toggles: scroll {scroll} · fps {fps} · log {log}. Toggle with /debug <scroll|fps|log>"
+
+[toast]
+workspace_layout_not_found = "Session is no longer in the workspace"
+
+workspace_layout_read_only = "Dashboard workspace is read-only"
+
+workspace_layout_not_saved = "Session isn't saved to the workspace yet"
+
+prompt_not_accepted_restored = "Prompt not accepted, text restored"
+
+prompt_not_accepted_stopped = "Prompt not accepted, turn stopped"
+
+[task_result]
+workspace_archive_invalid_id = "Could not archive session: invalid session id"
+
+[scrollback.memory_capture]
+observation = "Untrusted model-generated observation {index}"
+
+open_file = "Open file → "
+
+[scrollback.subagent]
+label = "Subagent "
+
+completed_in = "completed in {time}: "
+
+failed_in = "failed in {time}{detail}: "
+
+cancelled_in = "cancelled in {time}: "
+
+[scrollback.verb_group.subagent]
+mixed = "{sep}{verb} {running} {noun}, {done} completed"
+
+[tool.diff]
+hunk_gap_one = "{separator} 1 unchanged line"
+
+hunk_gap_many = "{separator} {count} unchanged lines"
+
+[tool.execute]
+user_label = "(user) "
+
+[tool.question]
+no_answer = "     (no answer)"
+
+[tool.sent_message]
+header_label = "Message "
+
+subagent_id_label = "Subagent ID: "
+
+unavailable = "unavailable"
+
+[gboom]
+hud = " HP {hp} · KILLS {kills}/{total} "
+
+controls = " WASD/←→ move · SPACE fire · ESC quit "
+
+controls_idle = " ESC quit "

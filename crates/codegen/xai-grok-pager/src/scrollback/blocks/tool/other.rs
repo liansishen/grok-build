@@ -259,7 +259,7 @@ impl BlockContent for OtherToolCallBlock {
                             // "     → answer" or "     (no answer)"
                             let a_line = if answer.is_empty() {
                                 Line::from(Span::styled(
-                                    "     (no answer)".to_string(),
+                                    xai_grok_i18n::t("tool.question.no_answer").to_string(),
                                     theme.dim(),
                                 ))
                             } else {

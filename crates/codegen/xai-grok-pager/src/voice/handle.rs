@@ -193,7 +193,10 @@ pub fn handle_voice_event(app: &mut AppView, event: VoiceEvent) -> bool {
         VoiceEvent::Error { message, hint } => {
             let target = app.voice_recording_target();
             app.voice_reset();
-            app.show_toast(&format!("Voice: {message}"));
+            app.show_toast(&xai_grok_i18n::t_fmt(
+                "toast.voice_error",
+                &[("message", message.as_str())],
+            ));
             // The hint holds long fix steps, so it goes to the agent or peek scrollback; a toast is one line, and dashboard dispatch has no scrollback
             if let Some(hint) = hint
                 && let Some(VoiceTarget::Agent(id) | VoiceTarget::DashboardPeekReply(id)) = target

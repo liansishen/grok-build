@@ -581,16 +581,22 @@ impl AgentView {
             left_spans.push(Span::styled(counter, hint_style));
         }
         left_spans.push(Span::styled("\u{2191}/\u{2193}", hint_key));
-        left_spans.push(Span::styled(" navigate", hint_style));
+        left_spans.push(Span::styled(
+            xai_grok_i18n::t("question.footer.navigate"),
+            hint_style,
+        ));
         if qv.questions.len() > 1 {
             left_spans.push(Span::styled(" \u{b7} ", hint_style));
             left_spans.push(Span::styled("\u{2190}/\u{2192}", hint_key));
-            left_spans.push(Span::styled(" question", hint_style));
+            left_spans.push(Span::styled(
+                xai_grok_i18n::t("question.footer.switch_question"),
+                hint_style,
+            ));
         }
         if !qv.is_prompt_blocked() {
             left_spans.push(Span::styled(" \u{b7} ", hint_style));
             left_spans.push(Span::styled("y", hint_key));
-            left_spans.push(Span::styled(" copy", hint_style));
+            left_spans.push(Span::styled(xai_grok_i18n::t("question.footer.copy"), hint_style));
         }
         left_spans
     }
@@ -1405,7 +1411,7 @@ impl AgentView {
             status.push(
                 "dashboard",
                 Line::from(Span::styled(
-                    "[Dashboard]",
+                    xai_grok_i18n::t("dashboard.overlay_close"),
                     hover_or(self.hit_dashboard.hovered, bg.fg(theme.gray)),
                 )),
             );
@@ -3137,7 +3143,7 @@ impl AgentView {
                             hint_w,
                         );
                     }
-                    let label = " history ";
+                    let label = xai_grok_i18n::t("history.panel_label");
                     let label_w = label.len() as u16;
                     if label_w + 2 <= panel_width {
                         buf.set_line_safe(
@@ -5318,6 +5324,34 @@ mod status_line_draw_tests {
         assert!(
             find(&buf, ":shortcuts").is_none(),
             "the hidden shortcuts bar must not paint its hint row\n{screen}"
+        );
+    }
+}
+#[cfg(test)]
+mod answer_footer_i18n_tests {
+    use super::*;
+    /// The answer-card footer's word fragments are catalog lookups, so a minimal-mode card paints
+    /// translated hints instead of the raw keys.
+    #[test]
+    fn answer_footer_hints_are_drawn_from_the_catalog() {
+        let mut qv =
+            crate::app::agent_view::paste::paste_key_tests::make_question_view_state_in_input_mode();
+        qv.questions.push(qv.questions[0].clone());
+        let spans = xai_grok_i18n::with_pseudo_locale(|| {
+            AgentView::answer_footer_hints(&qv, Style::default(), Style::default())
+        });
+        let text: String = spans.iter().map(|span| span.content.as_ref()).collect();
+        assert!(
+            text.contains("\u{27e6}question.footer.navigate\u{27e7}"),
+            "got: {text}"
+        );
+        assert!(
+            text.contains("\u{27e6}question.footer.switch_question\u{27e7}"),
+            "got: {text}"
+        );
+        assert!(
+            text.contains("\u{27e6}question.footer.copy\u{27e7}"),
+            "got: {text}"
         );
     }
 }

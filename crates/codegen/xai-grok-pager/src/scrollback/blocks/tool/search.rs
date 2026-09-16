@@ -229,7 +229,10 @@ impl SearchToolCallBlock {
             theme.fg(theme.path)
         };
 
-        let mut spans = vec![Span::styled("Search ".to_string(), bold_style)];
+        let mut spans = vec![Span::styled(
+            xai_grok_i18n::t("tool.prefix.search").to_string(),
+            bold_style,
+        )];
 
         // The search term: the glob when it replaces a trivial pattern, otherwise the quoted pattern
         if self.is_trivial_pattern()
@@ -243,7 +246,10 @@ impl SearchToolCallBlock {
 
             // Case 2: glob shown as the first "in" scope (string-styled, not path-styled)
             if let Some(ref glob) = self.meta.glob {
-                spans.push(Span::styled(" in ".to_string(), text_style));
+                spans.push(Span::styled(
+                    xai_grok_i18n::t("tool.search.in_scope").to_string(),
+                    text_style,
+                ));
                 spans.push(Span::styled(glob.to_string(), pattern_style));
             }
         }
@@ -251,7 +257,10 @@ impl SearchToolCallBlock {
         // Path scope (always after glob if both present).
         // When width is constrained, shorten the path the way the fish shell does
         if let Some(ref path) = self.meta.path {
-            spans.push(Span::styled(" in ".to_string(), text_style));
+            spans.push(Span::styled(
+                xai_grok_i18n::t("tool.search.in_scope").to_string(),
+                text_style,
+            ));
             if let Some(w) = width {
                 let used: usize = spans
                     .iter()
@@ -403,8 +412,11 @@ impl BlockContent for SearchToolCallBlock {
                     // No results: show a hint
                     lines.push(Line::from("").into());
                     lines.push(
-                        Line::from(Span::styled("  (no results)".to_string(), theme.muted()))
-                            .into(),
+                        Line::from(Span::styled(
+                            xai_grok_i18n::t("tool.search.no_results").to_string(),
+                            theme.muted(),
+                        ))
+                        .into(),
                     );
                 }
 
@@ -522,5 +534,63 @@ impl BlockContent for SearchToolCallBlock {
             DisplayMode::Collapsed => DisplayMode::Expanded,
             _ => DisplayMode::Collapsed,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scrollback::types::{BlockContext, DisplayMode, line_plain_text};
+
+    fn ctx(mode: DisplayMode) -> BlockContext {
+        BlockContext {
+            mode,
+            is_running: false,
+            width: 120,
+            raw: false,
+            max_lines: None,
+            appearance: crate::appearance::AppearanceConfig::default(),
+            is_selected: false,
+            cwd: None,
+        }
+    }
+
+    fn rendered(block: &SearchToolCallBlock, mode: DisplayMode) -> String {
+        block
+            .output(&ctx(mode))
+            .lines
+            .iter()
+            .map(|line| line_plain_text(&line.content))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Search chrome (label, scope joiner, empty-result hint) is catalog-backed.
+    #[test]
+    fn search_chrome_copy_comes_from_the_catalog() {
+        let mut scoped = SearchToolCallBlock::new("needle");
+        scoped.meta.glob = Some("**/*.rs".into());
+        scoped.meta.path = Some("crates".into());
+        let empty = SearchToolCallBlock::new("needle");
+
+        let (scoped_text, empty_text) = xai_grok_i18n::with_pseudo_locale(|| {
+            (
+                rendered(&scoped, DisplayMode::Collapsed),
+                rendered(&empty, DisplayMode::Expanded),
+            )
+        });
+
+        assert!(
+            scoped_text.contains("⟦tool.prefix.search⟧"),
+            "search label: {scoped_text}"
+        );
+        assert!(
+            scoped_text.contains("⟦tool.search.in_scope⟧"),
+            "scope joiner: {scoped_text}"
+        );
+        assert!(
+            empty_text.contains("⟦tool.search.no_results⟧"),
+            "empty-result hint: {empty_text}"
+        );
     }
 }

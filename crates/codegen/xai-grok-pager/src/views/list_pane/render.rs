@@ -531,14 +531,15 @@ fn render_bottom_bar(
         let label = match mode {
             super::state::InputBarMode::Search => "search: ",
             super::state::InputBarMode::Filter => "filter: ",
-            super::state::InputBarMode::GotoLine => "go to: ",
+            super::state::InputBarMode::GotoLine => xai_grok_i18n::t("list_pane.input.goto_line"),
             super::state::InputBarMode::Comment => "comment: ",
         };
         let label_style = Style::default()
             .fg(style.input_bar_prompt_fg)
             .bg(style.input_bar_bg);
         let label_line = Line::from(Span::styled(label, label_style));
-        let label_w = label.len() as u16;
+        use unicode_width::UnicodeWidthStr;
+        let label_w = label.width() as u16;
         buf.set_line_safe(area.x, area.y, &label_line, label_w);
 
         // Textarea fills the rest. Multi-line for comment mode.
@@ -554,8 +555,8 @@ fn render_bottom_bar(
     } else if let Some(matcher) = state.matcher() {
         // Accepted matcher: right-aligned, dim
         let mode_word = match matcher.mode {
-            super::state::MatchMode::Filter => "filter",
-            super::state::MatchMode::Search => "search",
+            super::state::MatchMode::Filter => xai_grok_i18n::t("list_pane.mode.filter"),
+            super::state::MatchMode::Search => xai_grok_i18n::t("list_pane.mode.search"),
         };
         let status = format!("[{}: {}]  ", mode_word, matcher.query());
         let status_w = status.len() as u16;
@@ -577,7 +578,7 @@ mod tests {
     use crate::tracing::TracingEntry;
     use crate::views::list_pane::layout::WrapMode;
     use crate::views::list_pane::{
-        FilterMatcher, ListMatcher, ListPaneStyle, MatchMode, QueryKind,
+        FilterMatcher, ListMatcher, ListPaneConfig, ListPaneStyle, MatchMode, QueryKind,
     };
     use ratatui::style::Style;
     use ratatui::text::Line;
@@ -1719,5 +1720,50 @@ mod tests {
         assert_eq!(state.visible_count(), 2);
         assert_eq!(row_text(&buf, 0, 0, 20), ">row-0");
         assert_eq!(row_text(&buf, 1, 0, 20), " row-1");
+    }
+
+    /// The bottom bar labels are catalog copy, not hardcoded literals.
+    #[test]
+    fn bottom_bar_labels_come_from_the_catalog() {
+        use crate::key;
+
+        let items = vec![
+            RenderTestItem::new(0, "alpha"),
+            RenderTestItem::new(1, "beta"),
+        ];
+        let area = Rect::new(0, 0, 40, 1);
+        let config = ListPaneConfig {
+            search_enabled: true,
+            filter_enabled: true,
+            goto_line_enabled: true,
+            ..ListPaneConfig::default()
+        };
+        let mut state = ListPaneState::new_with_config(WrapMode::NoWrap, false, config);
+        state.prepare_layout(&items, area.width, area.height);
+
+        let (bar, status) = xai_grok_i18n::with_pseudo_locale(|| {
+            state.handle_key_event(&key!(':').to_key_event(), &items);
+            let mut bar_buf = Buffer::empty(area);
+            render_bottom_bar(area, &mut bar_buf, &mut state, &ListPaneStyle::default());
+            let bar = row_text(&bar_buf, 0, 0, area.width);
+
+            state.clear_input_and_matcher();
+            state.handle_key_event(&key!('f').to_key_event(), &items);
+            state.handle_paste("alp", &items);
+            state.handle_key_event(&key!(Enter).to_key_event(), &items);
+            let mut status_buf = Buffer::empty(area);
+            render_bottom_bar(area, &mut status_buf, &mut state, &ListPaneStyle::default());
+            let status = row_text(&status_buf, 0, 0, area.width);
+            (bar, status)
+        });
+
+        assert!(
+            bar.contains("⟦list_pane.input.goto_line⟧"),
+            "the goto-line bar label must be catalog copy: {bar:?}"
+        );
+        assert!(
+            status.contains("⟦list_pane.mode.filter⟧"),
+            "the accepted-matcher status must be catalog copy: {status:?}"
+        );
     }
 }

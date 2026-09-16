@@ -2321,3 +2321,55 @@ fn inline_expand_with_no_help_renders_no_description_line() {
         "empty help must render no description line even when expanded"
     );
 }
+
+/// The pseudo-entry labels and the dimmed note are catalog copy, not hardcoded English.
+#[test]
+fn pseudo_entry_labels_and_dimmed_note_come_from_the_catalog() {
+    let labels = xai_grok_i18n::with_pseudo_locale(|| {
+        build_entries(&[When::PromptFocused], &ActionRegistry::defaults(), true)
+            .into_iter()
+            .filter_map(|entry| match entry {
+                ShortcutsHelpEntry::Hint { item, .. } => Some(item.label.to_string()),
+                ShortcutsHelpEntry::SectionHeader { .. } => None,
+            })
+            .collect::<Vec<_>>()
+    });
+    for marker in [
+        "⟦hint.search⟧",
+        "⟦hint.paste⟧",
+        "⟦hint.undo⟧",
+        "⟦hint.redo⟧",
+    ] {
+        assert!(
+            labels.iter().any(|label| label == marker),
+            "missing {marker} in {labels:?}"
+        );
+    }
+
+    let area = ratatui::layout::Rect::new(0, 0, 60, 20);
+    let text = xai_grok_i18n::with_pseudo_locale(|| {
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        render_detail_body(
+            &mut buf,
+            area,
+            "title",
+            "",
+            "body",
+            true,
+            0,
+            &crate::theme::Theme::current(),
+        );
+        (area.y..area.y + area.height)
+            .map(|y| {
+                (area.x..area.x + area.width)
+                    .filter_map(|x| buf.cell((x, y)).map(|cell| cell.symbol().to_owned()))
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    });
+    assert!(
+        text.contains("⟦shortcuts.dimmed_note⟧"),
+        "dimmed note must come from the catalog: {text:?}"
+    );
+}

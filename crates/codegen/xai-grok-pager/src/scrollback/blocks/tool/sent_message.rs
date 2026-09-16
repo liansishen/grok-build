@@ -26,7 +26,10 @@ use crate::util::format_duration;
 
 const SENT_MESSAGE_ID_RANGE: u16 = 0;
 const SENT_MESSAGE_TEXT_RANGE: u16 = 1;
-const HEADER_LABEL: &str = "Message ";
+/// Header label, read through the catalog at render time (catalog values are not const-addressable).
+fn header_label() -> &'static str {
+    xai_grok_i18n::t("tool.sent_message.header_label")
+}
 const FALLBACK_NOUN: &str = "subagent";
 const PARENT_NOUN: &str = "parent";
 /// Trailing chars of a raw id: UUIDv7 prefixes are identical for ids minted within ~65 s, so the head would not tell two children apart.
@@ -166,7 +169,7 @@ impl SentMessageToolCallBlock {
 
     /// One line for export and search: label, verb, target. Never the text, the reason, or a raw id behind a label.
     pub(crate) fn header_text(&self) -> String {
-        format!("{HEADER_LABEL}{}", self.verb_and_target())
+        format!("{}{}", header_label(), self.verb_and_target())
     }
 
     /// The collapsed verb names the outcome: a steer stays unmarked and an unrecognized delivery reads like one; a
@@ -212,7 +215,7 @@ impl SentMessageToolCallBlock {
         }
         .add_modifier(Modifier::BOLD);
         Line::from(vec![
-            Span::styled(HEADER_LABEL, label_style),
+            Span::styled(header_label(), label_style),
             Span::styled(self.verb_and_target(), theme.muted()),
         ])
     }
@@ -220,7 +223,7 @@ impl SentMessageToolCallBlock {
     /// Never muted. Suffixes name the requested delivery and, for a finished send that stalled, its admission time.
     fn expanded_header(&self, theme: &Theme) -> Line<'static> {
         let mut spans = vec![
-            Span::styled(HEADER_LABEL, theme.primary().add_modifier(Modifier::BOLD)),
+            Span::styled(header_label(), theme.primary().add_modifier(Modifier::BOLD)),
             Span::styled(self.verb_and_target(), theme.primary()),
         ];
         if let Some(delivery) = self.input.as_ref().and_then(|input| input.delivery) {
@@ -369,8 +372,10 @@ impl BlockContent for SentMessageToolCallBlock {
 
         if let Some(raw_id) = self.input.as_ref().and_then(|input| input.target.raw_id()) {
             lines.push(Line::from("").into());
-            let id_wrap = RtOptions::new(width)
-                .initial_indent(Line::from(Span::styled("Subagent ID: ", theme.muted())));
+            let id_wrap = RtOptions::new(width).initial_indent(Line::from(Span::styled(
+                xai_grok_i18n::t("tool.sent_message.subagent_id_label"),
+                theme.muted(),
+            )));
             let id_value = Line::from(Span::styled(raw_id.to_owned(), theme.primary()));
             let (wrapped_id, id_joiners) =
                 word_wrap_lines_with_joiners(std::iter::once(id_value), id_wrap);
@@ -416,8 +421,10 @@ impl BlockContent for SentMessageToolCallBlock {
                 }
             }
             None => {
-                let mut line =
-                    BlockLine::styled(Line::from(Span::styled("unavailable", theme.muted())));
+                let mut line = BlockLine::styled(Line::from(Span::styled(
+                    xai_grok_i18n::t("tool.sent_message.unavailable"),
+                    theme.muted(),
+                )));
                 line.selectable = Selectable::None;
                 lines.push(line);
             }

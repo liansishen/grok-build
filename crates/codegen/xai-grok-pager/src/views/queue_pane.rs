@@ -197,9 +197,9 @@ impl QueuedPromptEntry {
         // Build the suffix for multiline prompts: " (+N lines)" or " (+1 line)"
         let mut suffix = if extra_lines > 0 {
             if extra_lines == 1 {
-                " (+1 line)".to_string()
+                xai_grok_i18n::t("queue.lines_one").to_string()
             } else {
-                format!(" (+{extra_lines} lines)")
+                xai_grok_i18n::t_fmt("queue.lines_many", &[("count", &extra_lines.to_string())])
             }
         } else {
             String::new()
@@ -2234,6 +2234,42 @@ mod tests {
             pane.hovered_row_id,
             Some(*at(&ids, 1)),
             "scroll must refresh the hovered row to the entry now under the cursor"
+        );
+    }
+
+    /// The `(+N lines)` multiline suffix is catalog copy.
+    #[test]
+    fn multiline_suffix_copy_comes_from_the_catalog() {
+        let line_text = |line: &Line<'static>| {
+            line.spans
+                .iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        };
+        let (one, many) = xai_grok_i18n::with_pseudo_locale(|| {
+            let one = QueuedPromptEntry::build_styled(
+                "first line",
+                2,
+                QueueEntryKind::Prompt,
+                None,
+                editable(),
+            );
+            let many = QueuedPromptEntry::build_styled(
+                "first line",
+                3,
+                QueueEntryKind::Prompt,
+                None,
+                editable(),
+            );
+            (line_text(&one), line_text(&many))
+        });
+        assert!(
+            one.contains("⟦queue.lines_one⟧"),
+            "single extra line must come from the catalog: {one:?}"
+        );
+        assert!(
+            many.contains("⟦queue.lines_many⟧"),
+            "multiple extra lines must come from the catalog: {many:?}"
         );
     }
 }

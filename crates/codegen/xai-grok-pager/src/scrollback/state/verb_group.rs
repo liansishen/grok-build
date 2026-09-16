@@ -431,10 +431,15 @@ impl<'e> BucketAccumulator<'e> {
                     let running_n = bucket.running_sources.len();
                     let done_n = count.saturating_sub(running_n);
                     if running_n > 0 && done_n > 0 {
-                        format!(
-                            "{sep}{} {running_n} {}, {done_n} completed",
-                            bucket.kind.verb(true),
-                            bucket.kind.noun(running_n),
+                        xai_grok_i18n::t_fmt(
+                            "scrollback.verb_group.subagent.mixed",
+                            &[
+                                ("sep", sep),
+                                ("verb", bucket.kind.verb(true)),
+                                ("running", &running_n.to_string()),
+                                ("noun", bucket.kind.noun(running_n)),
+                                ("done", &done_n.to_string()),
+                            ],
                         )
                     } else {
                         format!(
@@ -862,5 +867,17 @@ mod tests {
         let l = label(&entries);
         assert_eq!(l.text, "Reading 1 file, Ran 1 subagent");
         assert!(l.running);
+    }
+
+    /// The mixed running/completed subagent segment is catalog-backed.
+    #[test]
+    fn mixed_subagent_segment_copy_comes_from_the_catalog() {
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            label(&[running_sub("a"), sub_completed("b")]).text
+        });
+        assert!(
+            text.contains("⟦scrollback.verb_group.subagent.mixed⟧"),
+            "mixed subagent segment: {text}"
+        );
     }
 }

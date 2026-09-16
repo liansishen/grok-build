@@ -2623,3 +2623,34 @@ fn btw_submit_sends_composer_images() {
         "composer images are consumed by the side question"
     );
 }
+/// The unsent-report notice is catalog copy: the draft notice paints the translation, not the key.
+#[test]
+fn unsent_feedback_notice_is_localized() {
+    let id = AgentId(0);
+    let mut app = test_app_with_agent();
+    let session_id = format!("feedback-failed-{}", uuid::Uuid::new_v4());
+    let session_dir = plant_local_build_session(&test_agent(&app, id).session.cwd, &session_id);
+    {
+        let agent = app.agents.get_mut(&id).unwrap();
+        agent.session.session_id = Some(session_id.into());
+    }
+
+    xai_grok_i18n::with_pseudo_locale(|| {
+        let _ = dispatch(
+            Action::TaskComplete(crate::app::actions::TaskResult::FeedbackFailed {
+                agent_id: id,
+                origin: crate::app::actions::FeedbackSendOrigin::Immediate,
+                feedback_text: "todo is chopped".into(),
+                image_count: 2,
+                error: "disabled".into(),
+            }),
+            &mut app,
+        );
+    });
+    let _ = std::fs::remove_dir_all(&session_dir);
+
+    assert_eq!(
+        "\u{27e6}feedback.unsent_saved_to_drafts\u{27e7}",
+        last_system_text(&app, id)
+    );
+}

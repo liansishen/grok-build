@@ -83,7 +83,7 @@ impl AgentView {
             crate::prompt_images::SessionPathPolicy::Preserve,
             pasted,
         );
-        self.show_toast("Images can't be attached when editing a shared queued prompt");
+        self.show_toast(xai_grok_i18n::t("toast.images_shared_queue"));
         true
     }
     /// Enqueue attachment probing off-thread so a paste followed by a send still lands in that order.
@@ -2734,5 +2734,24 @@ pub(super) mod paste_key_tests {
             None,
         );
         assert_eq!(agent.prompt.images.len(), 1);
+    }
+    /// The shared-queue paste refusal is catalog copy: the toast paints the translation, not the key.
+    #[test]
+    fn shared_queue_image_paste_toast_is_localized() {
+        let mut agent = make_agent();
+        agent.prompt_mode = crate::app::queue_edit::PromptMode::EditingQueued {
+            id: 0,
+            original: String::new(),
+            server_id: Some("server-row-1".to_owned()),
+            kind: crate::app::agent::QueueEntryKind::Prompt,
+        };
+        let pasted = test_image_paste();
+        xai_grok_i18n::with_pseudo_locale(|| {
+            assert!(agent.reject_shared_queue_image_edit(&pasted));
+        });
+        assert_eq!(
+            agent.toast.as_ref().map(|(msg, _)| msg.as_str()),
+            Some("\u{27e6}toast.images_shared_queue\u{27e7}")
+        );
     }
 }

@@ -5947,3 +5947,33 @@ mod prompt_stash_dispatch_tests {
         assert!(agent.prompt_stash.is_some());
     }
 }
+/// The mid-turn execute-plan refusal and the leave-plan guard are catalog copy, not raw keys.
+#[test]
+fn execute_plan_notices_are_localized() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    install_post_turn_review(&mut app, id);
+    app.agents.get_mut(&id).expect("agent").session.state =
+        crate::app::agent::AgentState::TurnRunning;
+
+    xai_grok_i18n::with_pseudo_locale(|| {
+        let effects = dispatch(
+            Action::ExecutePlan {
+                plan_file_content: "# Build it\n".into(),
+                plan_file_uri: None,
+            },
+            &mut app,
+        );
+        assert!(effects.is_empty(), "a busy pane must not fire ExecutePlan");
+    });
+    assert_eq!(
+        agent_ref(&app, id).toast.as_ref().map(|(msg, _)| msg.as_str()),
+        Some("\u{27e6}plan.notice.build_turn_active\u{27e7}")
+    );
+    xai_grok_i18n::with_pseudo_locale(|| {
+        assert_eq!(
+            crate::app::dispatch::prompt::leave_plan_build_notice(),
+            "\u{27e6}plan.notice.build_mode_switching\u{27e7}"
+        );
+    });
+}

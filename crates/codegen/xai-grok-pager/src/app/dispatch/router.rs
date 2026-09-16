@@ -658,8 +658,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         }
         Action::ToggleScrollLog => {
             let msg = match app.scroll_state.toggle_scroll_log() {
-                Some(path) => format!("scroll log: recording to {}", path.display()),
-                None => "scroll log: off".to_string(),
+                Some(path) => xai_grok_i18n::t_fmt(
+                    "debug.scroll_log_recording_to",
+                    &[("path", &path.display().to_string())],
+                ),
+                None => xai_grok_i18n::t("debug.scroll_log_off").to_string(),
             };
             if let Some(agent) = get_active_agent_mut(app) {
                 agent
@@ -669,12 +672,20 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             vec![]
         }
         Action::ShowDebugStatus => {
-            let on = |b: bool| if b { "on" } else { "off" };
-            let msg = format!(
-                "debug toggles: scroll {} \u{00b7} fps {} \u{00b7} log {}. Toggle with /debug <scroll|fps|log>",
-                on(app.scroll_debug_hud.enabled()),
-                on(app.fps_hud.enabled()),
-                on(app.scroll_state.scroll_log_active()),
+            let on = |b: bool| {
+                if b {
+                    xai_grok_i18n::t("settings.modal.value_on")
+                } else {
+                    xai_grok_i18n::t("settings.modal.value_off")
+                }
+            };
+            let msg = xai_grok_i18n::t_fmt(
+                "debug.toggles_status",
+                &[
+                    ("scroll", on(app.scroll_debug_hud.enabled())),
+                    ("fps", on(app.fps_hud.enabled())),
+                    ("log", on(app.scroll_state.scroll_log_active())),
+                ],
             );
             if let Some(agent) = get_active_agent_mut(app) {
                 agent

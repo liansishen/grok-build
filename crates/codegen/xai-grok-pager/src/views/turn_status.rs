@@ -250,9 +250,12 @@ pub fn render_turn_status(
     if state.is_idle() || parked {
         // Parked with held queued rows: the queued hint says what Enter does (act on the queue now), so it replaces the generic interrupt copy
         let parked_suffix = if held_queue > 0 && held_queue_top_sendable {
-            format!(" \u{00b7} {held_queue} queued, Enter to send now")
+            xai_grok_i18n::t_fmt(
+                "turn.queue.queued_send_now",
+                &[("count", &held_queue.to_string())],
+            )
         } else if held_queue > 0 {
-            format!(" \u{00b7} {held_queue} queued")
+            xai_grok_i18n::t_fmt("turn.queue.queued", &[("count", &held_queue.to_string())])
         } else {
             xai_grok_i18n::t("turn.status.interrupt_send").to_string()
         };
@@ -338,7 +341,7 @@ pub fn render_turn_status(
         );
     let bg_str = if show_bg {
         if bg_hovered {
-            " [send to bg]"
+            xai_grok_i18n::t("turn.button.send_to_bg")
         } else {
             " [\u{2193}]"
         }
@@ -352,8 +355,8 @@ pub fn render_turn_status(
     // Hover state is conveyed by color (red on hover, see `cancel_style`), not by swapping the label
     let cancel_str: &str = match (show_cancel, show_bg) {
         (false, _) => "",
-        (true, true) => "[stop]",
-        (true, false) => " [stop]",
+        (true, true) => xai_grok_i18n::t("turn.button.stop"),
+        (true, false) => xai_grok_i18n::t("turn.button.stop_spaced"),
     };
     let cancel_width = cancel_str.width();
 
@@ -487,9 +490,12 @@ pub fn render_turn_status(
         // "Enter to send now" is advertised only when Enter would actually send the top row.
         let suffix = if held_queue > 0 && is_sendable_wait(activity) {
             if held_queue_top_sendable {
-                format!(" · {held_queue} queued, Enter to send now")
+                xai_grok_i18n::t_fmt(
+                    "turn.queue.queued_send_now",
+                    &[("count", &held_queue.to_string())],
+                )
             } else {
-                format!(" · {held_queue} queued")
+                xai_grok_i18n::t_fmt("turn.queue.queued", &[("count", &held_queue.to_string())])
             }
         } else {
             String::new()
@@ -1542,5 +1548,84 @@ mod tests {
         // The drain-blocked, pending-user-input, and plan-approval cues all read this one constant via `pending_diamond_color`
         // The assertion guards against an accidental tweak that would silently change the cadence of every "your turn" cue
         assert_eq!(USER_WAITING_PULSE_SPEED, 0.08);
+    }
+
+    /// The queue and cancel chrome is catalog copy: the pseudo-locale markers prove each arm reaches it.
+    #[test]
+    fn turn_status_chrome_comes_from_the_catalog() {
+        let area = Rect::new(0, 0, 80, 1);
+        let render = |state: &AgentState,
+                      has_running_execute: bool,
+                      held_queue: usize,
+                      held_queue_top_sendable: bool,
+                      parked: bool,
+                      bg_hovered: bool| {
+            let mut buf = Buffer::empty(area);
+            render_turn_status(
+                &mut buf,
+                area,
+                TurnStatusArgs {
+                    state,
+                    activity: &None,
+                    turn_elapsed: Some(Duration::from_secs(3)),
+                    activity_started_at: None,
+                    tick: 0,
+                    drain_blocked: false,
+                    buttons: Some(MouseButtons {
+                        bg_hovered,
+                        ..Default::default()
+                    }),
+                    has_running_execute,
+                    total_tokens: None,
+                    session_starting_since: None,
+                    is_bash_turn: false,
+                    is_pending_user_input: false,
+                    goal_verifying: false,
+                    watchers: Watchers::default(),
+                    parked,
+                    flat_background: false,
+                    held_queue,
+                    held_queue_top_sendable,
+                },
+            );
+            buffer_text(&buf, area)
+        };
+
+        let queued_send_now =
+            xai_grok_i18n::with_pseudo_locale(|| render(&AgentState::Idle, false, 2, true, true, false));
+        assert!(
+            queued_send_now.contains("⟦turn.queue.queued_send_now⟧"),
+            "parked send-now hint must come from the catalog: {queued_send_now:?}"
+        );
+
+        let queued =
+            xai_grok_i18n::with_pseudo_locale(|| render(&AgentState::Idle, false, 2, false, true, false));
+        assert!(
+            queued.contains("⟦turn.queue.queued⟧"),
+            "parked queue count must come from the catalog: {queued:?}"
+        );
+
+        let (lone_stop, adjacent_stop) = xai_grok_i18n::with_pseudo_locale(|| {
+            (
+                render(&AgentState::TurnCancelling, false, 0, false, false, false),
+                render(&AgentState::TurnRunning, true, 0, false, false, true),
+            )
+        });
+        assert!(
+            lone_stop.contains("⟦turn.button.stop_spaced⟧"),
+            "the lone cancel button must come from the catalog: {lone_stop:?}"
+        );
+        assert!(
+            adjacent_stop.contains("⟦turn.button.stop⟧"),
+            "the adjacent cancel button must come from the catalog: {adjacent_stop:?}"
+        );
+
+        let send_to_bg = xai_grok_i18n::with_pseudo_locale(|| {
+            render(&AgentState::TurnRunning, true, 0, false, false, true)
+        });
+        assert!(
+            send_to_bg.contains("⟦turn.button.send_to_bg⟧"),
+            "the hovered demotion button must come from the catalog: {send_to_bg:?}"
+        );
     }
 }

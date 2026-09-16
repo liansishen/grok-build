@@ -679,3 +679,32 @@ fn rejected_and_unconfirmed_have_distinct_failure_semantics() {
             .starts_with("Message unconfirmed \u{b7} subagent sub-123")
     );
 }
+
+/// Sent-message chrome (header label, subagent-id label, missing body) is catalog-backed.
+#[test]
+fn sent_message_chrome_copy_comes_from_the_catalog() {
+    let named_block = sent(named(SentMessageDelivery::Steer, "ping"));
+    let unresolved_block = sent(unresolved("sub-123", "ping"));
+    let no_input_block = sent(None);
+
+    let (header, id_label, missing) = xai_grok_i18n::with_pseudo_locale(|| {
+        (
+            rendered(&named_block, 120, DisplayMode::Collapsed),
+            rendered(&unresolved_block, 120, DisplayMode::Expanded),
+            rendered(&no_input_block, 120, DisplayMode::Expanded),
+        )
+    });
+
+    assert!(
+        header.contains("⟦tool.sent_message.header_label⟧"),
+        "header label: {header}"
+    );
+    assert!(
+        id_label.contains("⟦tool.sent_message.subagent_id_label⟧"),
+        "subagent id label: {id_label}"
+    );
+    assert!(
+        missing.contains("⟦tool.sent_message.unavailable⟧"),
+        "missing body: {missing}"
+    );
+}

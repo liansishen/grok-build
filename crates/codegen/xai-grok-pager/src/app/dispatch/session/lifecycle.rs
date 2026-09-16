@@ -597,13 +597,13 @@ pub(in crate::app::dispatch) fn dispatch_delete_current_session_answered(
             Some((session_id, cwd, running_bg_tasks, !agent.conversation_entry))
         })
     else {
-        app.show_toast("No active session to delete");
+        app.show_toast(xai_grok_i18n::t("toast.no_session_to_delete"));
         return vec![];
     };
     if build_session
         && crate::app::workspace_sync::permanent_delete_blocked(app, session_id.0.as_ref())
     {
-        app.show_toast("Cannot delete session: dashboard workspace is read-only");
+        app.show_toast(xai_grok_i18n::t("toast.delete_session_workspace_readonly"));
         return vec![];
     }
     let after = after_delete_current_session(app, id);

@@ -12,6 +12,10 @@ struct AuditConfig {
     docs_roots: Vec<String>,
     translated_docs_roots: Vec<String>,
     sinks: Vec<String>,
+    /// Sinks whose output the user reads inside the terminal UI. The whole-repository
+    /// full-prose pass uses these; CLI `print*` output is left to the diff pass because the
+    /// fork's non-goals keep CLI help, errors and logs out of the translation surface.
+    prose_sinks: Vec<String>,
     translation_functions: Vec<String>,
     excluded_path_fragments: Vec<String>,
     settings_files: Vec<String>,
@@ -49,6 +53,7 @@ impl AuditConfig {
             docs_roots: string_array(scan, "docs_roots"),
             translated_docs_roots: string_array(scan, "translated_docs_roots"),
             sinks: string_array(scan, "sinks"),
+            prose_sinks: string_array(scan, "prose_sinks"),
             translation_functions: string_array(scan, "translation_functions"),
             excluded_path_fragments: string_array(scan, "excluded_path_fragments"),
             settings_files: string_array(scan, "settings_files"),
@@ -288,6 +293,16 @@ fn literal_intersects_lines(node: Node<'_>, lines: &BTreeSet<usize>) -> bool {
 }
 
 fn visible_sink<'a>(node: Node<'a>, source: &'a [u8], config: &AuditConfig) -> Option<String> {
+    visible_sink_in(node, source, config, &config.sinks)
+}
+
+/// Like [`visible_sink`], restricted to one configured sink list.
+fn visible_sink_in<'a>(
+    node: Node<'a>,
+    source: &'a [u8],
+    config: &AuditConfig,
+    sinks: &[String],
+) -> Option<String> {
     let mut current = node.parent();
     while let Some(ancestor) = current {
         if ancestor.kind() == "call_expression"
@@ -296,7 +311,7 @@ fn visible_sink<'a>(node: Node<'a>, source: &'a [u8], config: &AuditConfig) -> O
             if matches_any_name(&name, &config.translation_functions) {
                 return None;
             }
-            if let Some(sink) = config.sinks.iter().find(|sink| name_matches(&name, sink)) {
+            if let Some(sink) = sinks.iter().find(|sink| name_matches(&name, sink)) {
                 return Some(sink.clone());
             }
         }
@@ -306,7 +321,18 @@ fn visible_sink<'a>(node: Node<'a>, source: &'a [u8], config: &AuditConfig) -> O
             if matches_any_name(&name, &config.translation_functions) {
                 return None;
             }
-            if let Some(sink) = config.sinks.iter().find(|sink| name_matches(&name, sink)) {
+            // A translation call written inside the macro is not a parsed call expression, so ask
+            // the textual check before treating the macro as a sink for this literal.
+            if let Ok(text) = ancestor.utf8_text(source)
+                && offset_inside_translation_call(
+                    text,
+                    node.start_byte() - ancestor.start_byte(),
+                    config,
+                )
+            {
+                return None;
+            }
+            if let Some(sink) = sinks.iter().find(|sink| name_matches(&name, sink)) {
                 return Some(sink.clone());
             }
         }
@@ -325,6 +351,7 @@ fn scan_node(
 ) {
     if matches!(node.kind(), "string_literal" | "raw_string_literal")
         && !in_test_code(node, source)
+        && !inside_developer_diagnostic(node, source)
         && changed_lines.is_none_or(|lines| literal_intersects_lines(node, lines))
         && let Ok(raw) = node.utf8_text(source)
         && let Some(value) = string_value(raw)
@@ -420,12 +447,12 @@ fn workspace_source_trees(repo_root: &Path) -> Vec<String> {
         .collect()
 }
 
-fn call_is_visible_sink(node: Node<'_>, source: &[u8], config: &AuditConfig) -> bool {
+fn call_is_visible_sink(node: Node<'_>, source: &[u8], config: &AuditConfig, sinks: &[String]) -> bool {
     let Some(name) = call_name(node, source) else {
         return false;
     };
     !matches_any_name(&name, &config.translation_functions)
-        && config.sinks.iter().any(|sink| name_matches(&name, sink))
+        && sinks.iter().any(|sink| name_matches(&name, sink))
 }
 
 fn literal_binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
@@ -443,142 +470,220 @@ fn literal_binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
     None
 }
 
-fn binding_flows_to_visible_sink(
-    root: Node<'_>,
-    source: &[u8],
-    name: &str,
-    config: &AuditConfig,
-) -> bool {
-    fn contains_binding(node: Node<'_>, source: &[u8], name: &str) -> bool {
-        (node.kind() == "identifier" && node.utf8_text(source).is_ok_and(|text| text == name))
-            || node
-                .named_children(&mut node.walk())
-                .any(|child| contains_binding(child, source, name))
+/// Name of the binding a `let` / `const` declares, when it is a plain identifier.
+fn binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
+    if !matches!(node.kind(), "let_declaration" | "const_item") {
+        return None;
     }
+    node.child_by_field_name("pattern")
+        .or_else(|| node.child_by_field_name("name"))
+        .and_then(|pattern| pattern.utf8_text(source).ok())
+        .map(normalized)
+        .filter(|name| !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+}
 
-    fn binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
-        if !matches!(node.kind(), "let_declaration" | "const_item") {
-            return None;
-        }
-        node.child_by_field_name("pattern")
-            .or_else(|| node.child_by_field_name("name"))
-            .and_then(|pattern| pattern.utf8_text(source).ok())
-            .map(normalized)
-            .filter(|name| {
-                !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-            })
+/// Identifiers and named-format-arguments mentioned anywhere inside `node`.
+fn collect_identifiers(node: Node<'_>, source: &[u8], identifiers: &mut BTreeSet<String>) {
+    if node.kind() == "identifier"
+        && let Ok(identifier) = node.utf8_text(source)
+    {
+        identifiers.insert(identifier.to_owned());
     }
-
-    fn collect_consumers<'a>(
-        node: Node<'a>,
-        source: &[u8],
-        wanted: &str,
-        consumers: &mut BTreeSet<String>,
-    ) {
-        if let Some(candidate) = binding_name(node, source)
-            && candidate != wanted
-            && let Some(value) = node.child_by_field_name("value")
-        {
-            let mut dependencies = BTreeSet::new();
-            collect_identifiers(value, source, &mut dependencies);
-            if dependencies.contains(wanted) {
-                consumers.insert(candidate);
+    if matches!(node.kind(), "string_literal" | "raw_string_literal")
+        && let Ok(raw) = node.utf8_text(source)
+        && let Some(value) = string_value(raw)
+    {
+        let mut rest = value.as_str();
+        while let Some(open) = rest.find('{') {
+            rest = &rest[open + 1..];
+            if rest.starts_with('{') {
+                rest = &rest[1..];
+                continue;
             }
-        }
-        for child in node.named_children(&mut node.walk()) {
-            collect_consumers(child, source, wanted, consumers);
-        }
-    }
-
-    fn collect_identifiers(node: Node<'_>, source: &[u8], identifiers: &mut BTreeSet<String>) {
-        if node.kind() == "identifier"
-            && let Ok(identifier) = node.utf8_text(source)
-        {
-            identifiers.insert(identifier.to_owned());
-        }
-        if matches!(node.kind(), "string_literal" | "raw_string_literal")
-            && let Ok(raw) = node.utf8_text(source)
-            && let Some(value) = string_value(raw)
-        {
-            let mut rest = value.as_str();
-            while let Some(open) = rest.find('{') {
-                rest = &rest[open + 1..];
-                if rest.starts_with('{') {
-                    rest = &rest[1..];
-                    continue;
-                }
-                let Some(close) = rest.find('}') else { break };
-                let name = rest[..close]
-                    .split(':')
-                    .next()
-                    .map(str::trim)
-                    .unwrap_or_default();
-                if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                    identifiers.insert(name.to_owned());
-                }
-                rest = &rest[close + 1..];
+            let Some(close) = rest.find('}') else { break };
+            let name = rest[..close]
+                .split(':')
+                .next()
+                .map(str::trim)
+                .unwrap_or_default();
+            if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                identifiers.insert(name.to_owned());
             }
-        }
-        for child in node.named_children(&mut node.walk()) {
-            collect_identifiers(child, source, identifiers);
+            rest = &rest[close + 1..];
         }
     }
+    for child in node.named_children(&mut node.walk()) {
+        collect_identifiers(child, source, identifiers);
+    }
+}
 
-    fn flows(
-        root: Node<'_>,
-        source: &[u8],
-        name: &str,
-        config: &AuditConfig,
-        visiting: &mut BTreeSet<String>,
-    ) -> bool {
-        if !visiting.insert(name.to_owned()) {
-            return false;
-        }
-        fn visit_sink(node: Node<'_>, source: &[u8], name: &str, config: &AuditConfig) -> bool {
+/// Identifier nodes mentioned anywhere inside `node`, without the named-format-argument reading.
+/// This is the check the sink side uses: a rendered argument mentions the value it interpolates.
+fn collect_identifier_nodes(node: Node<'_>, source: &[u8], identifiers: &mut BTreeSet<String>) {
+    if node.kind() == "identifier"
+        && let Ok(identifier) = node.utf8_text(source)
+    {
+        identifiers.insert(identifier.to_owned());
+    }
+    for child in node.named_children(&mut node.walk()) {
+        collect_identifier_nodes(child, source, identifiers);
+    }
+}
+
+/// Index of the call argument a visible sink renders, for the sinks that take it past position 0.
+fn sink_argument_index(function_name: &str) -> usize {
+    if name_matches(function_name, "set_string") || name_matches(function_name, "set_span") {
+        2
+    } else if name_matches(function_name, "HintItem::new") {
+        1
+    } else if name_matches(function_name, "HintItem::paired") {
+        2
+    } else {
+        0
+    }
+}
+
+/// One walk of a file, resolved into the data flow that can carry a literal into a visible sink.
+///
+/// A per-literal version of this query rescanned the whole file (and every binding initializer) for
+/// each candidate literal, which made a repository-wide prose scan quadratic: a single 3k-line file
+/// took minutes. The flow relation is a property of the file, so it is computed once here.
+struct FlowIndex {
+    /// Identifiers appearing in the argument a visible sink renders.
+    sink_identifiers: BTreeSet<String>,
+    /// Binding name → names of the bindings whose value mentions it.
+    used_by: BTreeMap<String, BTreeSet<String>>,
+}
+
+impl FlowIndex {
+    fn build(root: Node<'_>, source: &[u8], config: &AuditConfig) -> Self {
+        fn walk(
+            node: Node<'_>,
+            source: &[u8],
+            config: &AuditConfig,
+            sink_identifiers: &mut BTreeSet<String>,
+            used_by: &mut BTreeMap<String, BTreeSet<String>>,
+        ) {
             if node.kind() == "call_expression"
-                && call_is_visible_sink(node, source, config)
+                && call_is_visible_sink(node, source, config, &config.prose_sinks)
                 && let Some(function_name) = call_name(node, source)
                 && let Some(arguments) = node.child_by_field_name("arguments")
             {
+                let index = sink_argument_index(&function_name);
                 let mut cursor = arguments.walk();
                 let args = arguments.named_children(&mut cursor).collect::<Vec<_>>();
-                let index = if name_matches(&function_name, "set_string")
-                    || name_matches(&function_name, "set_span")
-                {
-                    2
-                } else if name_matches(&function_name, "HintItem::new") {
-                    1
-                } else if name_matches(&function_name, "HintItem::paired") {
-                    2
-                } else {
-                    0
-                };
-                if args
-                    .get(index)
-                    .is_some_and(|argument| contains_binding(*argument, source, name))
-                {
-                    return true;
+                if let Some(argument) = args.get(index) {
+                    collect_identifier_nodes(*argument, source, sink_identifiers);
                 }
             }
-            node.named_children(&mut node.walk())
-                .any(|child| visit_sink(child, source, name, config))
-        }
-        if visit_sink(root, source, name, config) {
-            return true;
-        }
-
-        let mut consumers = BTreeSet::new();
-        collect_consumers(root, source, name, &mut consumers);
-        for consumer in consumers {
-            if flows(root, source, &consumer, config, visiting) {
-                return true;
+            if let Some(name) = binding_name(node, source)
+                && let Some(value) = node.child_by_field_name("value")
+            {
+                let mut dependencies = BTreeSet::new();
+                collect_identifiers(value, source, &mut dependencies);
+                for dependency in dependencies {
+                    used_by.entry(dependency).or_default().insert(name.clone());
+                }
+            }
+            for child in node.named_children(&mut node.walk()) {
+                walk(child, source, config, sink_identifiers, used_by);
             }
         }
-        visiting.remove(name);
-        false
+
+        let mut sink_identifiers = BTreeSet::new();
+        let mut used_by = BTreeMap::new();
+        walk(
+            root,
+            source,
+            config,
+            &mut sink_identifiers,
+            &mut used_by,
+        );
+        Self {
+            sink_identifiers,
+            used_by,
+        }
     }
 
-    flows(root, source, name, config, &mut BTreeSet::new())
+    /// Whether `name` is rendered by a visible sink, directly or through other bindings.
+    fn reaches_visible_sink(&self, name: &str) -> bool {
+        let mut queue = vec![name.to_owned()];
+        let mut seen = BTreeSet::new();
+        while let Some(current) = queue.pop() {
+            if !seen.insert(current.clone()) {
+                continue;
+            }
+            if self.sink_identifiers.contains(&current) {
+                return true;
+            }
+            if let Some(consumers) = self.used_by.get(&current) {
+                queue.extend(consumers.iter().cloned());
+            }
+        }
+        false
+    }
+}
+
+/// Whether `offset` (relative to `text`) sits inside a call to a translation function.
+///
+/// The Rust grammar leaves a macro invocation's interior as token trees, so a `t` / `t_fmt` call
+/// written inside `println!(...)` is not a `call_expression` and its argument names would otherwise
+/// read as untranslated copy. The names are scanned textually, with balanced parentheses and
+/// string literals skipped.
+fn offset_inside_translation_call(text: &str, offset: usize, config: &AuditConfig) -> bool {
+    let bytes = text.as_bytes();
+    let identifier_char = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    for name in &config.translation_functions {
+        let mut search = 0;
+        while let Some(found) = text[search..].find(name.as_str()) {
+            let start = search + found;
+            let open = start + name.len();
+            let standalone = start == 0 || !identifier_char(bytes[start - 1]);
+            if standalone && bytes.get(open) == Some(&b'(') {
+                if let Some(close) = matching_delimiter(text, open, b'(', b')') {
+                    if offset > open && offset < close {
+                        return true;
+                    }
+                }
+            }
+            search = open.max(start + 1);
+            if search >= text.len() {
+                break;
+            }
+        }
+    }
+    false
+}
+
+/// Byte offset of the delimiter closing the one at `open`, skipping string literals and nested pairs.
+fn matching_delimiter(text: &str, open: usize, opener: u8, closer: u8) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut index = open;
+    let mut in_string = false;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if in_string {
+            if byte == b'\\' {
+                index += 2;
+                continue;
+            }
+            if byte == b'"' {
+                in_string = false;
+            }
+        } else if byte == b'"' {
+            in_string = true;
+        } else if byte == opener {
+            depth += 1;
+        } else if byte == closer {
+            depth -= 1;
+            if depth == 0 {
+                return Some(index);
+            }
+        }
+        index += 1;
+    }
+    None
 }
 
 fn inside_translation_call(node: Node<'_>, source: &[u8], config: &AuditConfig) -> bool {
@@ -587,6 +692,122 @@ fn inside_translation_call(node: Node<'_>, source: &[u8], config: &AuditConfig) 
         if ancestor.kind() == "call_expression"
             && let Some(name) = call_name(ancestor, source)
             && matches_any_name(&name, &config.translation_functions)
+        {
+            return true;
+        }
+        if ancestor.kind() == "macro_invocation"
+            && let Ok(text) = ancestor.utf8_text(source)
+            && offset_inside_translation_call(text, node.start_byte() - ancestor.start_byte(), config)
+        {
+            return true;
+        }
+        current = ancestor.parent();
+    }
+    false
+}
+
+/// Whether the literal is developer log text (`tracing::warn!`, `info!`, …): never painted.
+fn inside_developer_log(node: Node<'_>, source: &[u8]) -> bool {
+    const LOG_MACROS: &[&str] = &[
+        "debug",
+        "error",
+        "event",
+        "info",
+        "instrument",
+        "span",
+        "trace",
+        "warn",
+    ];
+    let mut current = node.parent();
+    while let Some(ancestor) = current {
+        if ancestor.kind() == "macro_invocation"
+            && let Some(name) = macro_name(ancestor, source)
+            && LOG_MACROS
+                .iter()
+                .any(|mac| name_matches(&name, mac) || name.ends_with(&format!("::{mac}")))
+        {
+            return true;
+        }
+        current = ancestor.parent();
+    }
+    false
+}
+
+/// Whether the literal is a token being matched rather than copy being shown: a `match` arm pattern,
+/// or an argument to a string-inspection method (`starts_with`, `strip_prefix`, `get`, ...), which
+/// compares text but never renders it.
+fn inside_token_position(node: Node<'_>, source: &[u8]) -> bool {
+    const INSPECTION_METHODS: &[&str] = &[
+        "contains",
+        "ends_with",
+        "eq_ignore_ascii_case",
+        "find",
+        "get",
+        "match_indices",
+        "parse",
+        "replace",
+        "rfind",
+        "rsplit",
+        "rsplit_once",
+        "split",
+        "split_once",
+        "splitn",
+        "starts_with",
+        "strip_prefix",
+        "strip_suffix",
+        "trim_end",
+        "trim_end_matches",
+        "trim_matches",
+        "trim_start",
+        "trim_start_matches",
+    ];
+    let mut current = node.parent();
+    while let Some(ancestor) = current {
+        if ancestor.kind() == "match_arm"
+            && let Some(pattern) = ancestor.child_by_field_name("pattern")
+            && node.start_byte() >= pattern.start_byte()
+            && node.end_byte() <= pattern.end_byte()
+        {
+            return true;
+        }
+        if ancestor.kind() == "call_expression"
+            && let Some(name) = call_name(ancestor, source)
+            && INSPECTION_METHODS
+                .iter()
+                .any(|method| name_matches(&name, method))
+        {
+            return true;
+        }
+        current = ancestor.parent();
+    }
+    false
+}
+
+/// Whether the literal is a panic / assert / `expect` message: developer diagnostics, not copy.
+fn inside_developer_diagnostic(node: Node<'_>, source: &[u8]) -> bool {
+    const PANIC_MACROS: &[&str] = &[
+        "panic",
+        "unreachable",
+        "todo",
+        "unimplemented",
+        "assert",
+        "assert_eq",
+        "assert_ne",
+        "debug_assert",
+        "debug_assert_eq",
+        "debug_assert_ne",
+    ];
+    let mut current = node.parent();
+    while let Some(ancestor) = current {
+        if ancestor.kind() == "macro_invocation"
+            && let Some(name) = macro_name(ancestor, source)
+            && PANIC_MACROS.iter().any(|mac| name_matches(&name, mac))
+        {
+            return true;
+        }
+        if ancestor.kind() == "call_expression"
+            && let Some(name) = call_name(ancestor, source)
+            && (name_matches(&name, "expect") || name_matches(&name, "expect_err"))
         {
             return true;
         }
@@ -617,25 +838,30 @@ fn scan_full_prose_source(
         .ok_or_else(|| format!("tree-sitter returned no tree for {path}"))?;
     // The Rust grammar can mark valid cfg-pattern attributes as ERROR nodes; keep walking the
     // recovered tree so the audit does not skip otherwise scannable source.
+    let flow = FlowIndex::build(tree.root_node(), source, config);
     fn visit(
         node: Node<'_>,
         root: Node<'_>,
         source: &[u8],
         path: &str,
         config: &AuditConfig,
+        flow: &FlowIndex,
         findings: &mut Vec<Finding>,
     ) {
         if matches!(node.kind(), "string_literal" | "raw_string_literal")
             && !inside_translation_call(node, source, config)
             && !inside_comparison(node)
             && !in_test_code(node, source)
+            && !inside_developer_diagnostic(node, source)
+            && !inside_developer_log(node, source)
+            && !inside_token_position(node, source)
             && let Ok(raw) = node.utf8_text(source)
             && let Some(value) = string_value(raw)
             && is_candidate(&value, config)
         {
-            let direct = visible_sink(node, source, config).is_some();
+            let direct = visible_sink_in(node, source, config, &config.prose_sinks).is_some();
             let flowed = literal_binding_name(node, source)
-                .is_some_and(|name| binding_flows_to_visible_sink(root, source, &name, config));
+                .is_some_and(|name| flow.reaches_visible_sink(&name));
             if direct || flowed {
                 findings.push(Finding {
                     path: path.to_owned(),
@@ -646,12 +872,12 @@ fn scan_full_prose_source(
             }
         }
         for child in node.named_children(&mut node.walk()) {
-            visit(child, root, source, path, config, findings);
+            visit(child, root, source, path, config, flow, findings);
         }
     }
     let mut findings = Vec::new();
     let root = tree.root_node();
-    visit(root, root, source, path, config, &mut findings);
+    visit(root, root, source, path, config, &flow, &mut findings);
     Ok(findings)
 }
 
@@ -1213,6 +1439,125 @@ fn markdown_fixture_detects_missing_translation_without_scanning_code() {
     fs::remove_dir_all(root).unwrap();
 }
 
+/// The two passes split the sink list: a hardcoded CLI literal is gated on changed lines by the diff
+/// pass, while the whole-repository full-prose pass gates copy painted into the terminal UI. A
+/// translation call written inside a macro is a translation call in both (its argument names are
+/// not copy).
+#[test]
+fn fixture_splits_cli_and_ui_sinks() {
+    let config = AuditConfig::load(&repo_root());
+    let translated = br#"
+        fn render(name: &str) {
+            eprintln!("{}", t_fmt("cli.example.added", &[("name", name)]));
+            Line::from(t("ui.example.saved"));
+        }
+    "#;
+    let prose =
+        scan_full_prose_source("macro_fixture.rs", translated, &config).expect("fixture parses");
+    assert!(prose.is_empty(), "{prose:?}");
+    let direct = scan_source("macro_fixture.rs", translated, &config, None).expect("fixture parses");
+    assert!(direct.is_empty(), "{direct:?}");
+
+    // CLI output: the diff pass reports it, the full-prose pass leaves it to that gate.
+    let cli = br#"
+        fn render() {
+            eprintln!("Hardcoded CLI copy");
+        }
+    "#;
+    let cli_prose = scan_full_prose_source("macro_fixture.rs", cli, &config).expect("fixture parses");
+    assert!(cli_prose.is_empty(), "{cli_prose:?}");
+    let cli_diff = scan_source("macro_fixture.rs", cli, &config, None).expect("fixture parses");
+    assert!(
+        cli_diff
+            .iter()
+            .any(|finding| finding.literal == "Hardcoded CLI copy"),
+        "the diff pass must report hardcoded CLI copy: {cli_diff:?}"
+    );
+
+    // Painted copy: the full-prose pass reports it wherever it lives.
+    let ui = br#"
+        fn render() {
+            Line::from("Hardcoded UI copy");
+        }
+    "#;
+    let ui_prose = scan_full_prose_source("macro_fixture.rs", ui, &config).expect("fixture parses");
+    assert!(
+        ui_prose
+            .iter()
+            .any(|finding| finding.literal == "Hardcoded UI copy"),
+        "the full-prose pass must report painted copy: {ui_prose:?}"
+    );
+
+    // Panic / assert / `expect` text is developer diagnostics, not copy the user is meant to read.
+    let diagnostic = br#"
+        fn render(agent: Option<u8>) {
+            let agent = agent.expect("agent present (re-borrow)");
+            assert!(agent > 0, "agent must be present");
+            Line::from(agent.to_string());
+        }
+    "#;
+    let ignored = scan_full_prose_source("macro_fixture.rs", diagnostic, &config)
+        .expect("fixture parses");
+    assert!(ignored.is_empty(), "{ignored:?}");
+}
+
+/// Token positions are not copy: a `match` arm pattern and a string-inspection argument are matched
+/// against, never rendered, while copy that flows into a painted sink is still reported.
+#[test]
+fn fixture_ignores_token_positions() {
+    let config = AuditConfig::load(&repo_root());
+    let tokens = br#"
+        fn render(token: &str, terminal: &str) {
+            let direction = match token { "LR" => 1, "RL" => 2, _ => 0 };
+            let is_tmux = terminal.strip_prefix("tmux").is_some();
+            Line::from(direction.to_string());
+            Line::from(is_tmux.to_string());
+        }
+    "#;
+    let findings =
+        scan_full_prose_source("token_fixture.rs", tokens, &config).expect("fixture parses");
+    assert!(findings.is_empty(), "{findings:?}");
+
+    let copy = br#"
+        fn render() {
+            let label = "Painted label copy";
+            Line::from(label);
+        }
+    "#;
+    let reported = scan_full_prose_source("token_fixture.rs", copy, &config)
+        .expect("fixture parses");
+    assert!(
+        reported
+            .iter()
+            .any(|finding| finding.literal == "Painted label copy"),
+        "copy laundered through a local must still be reported: {reported:?}"
+    );
+}
+
+/// The full-prose pass may only check sinks the diff pass already knows about, and it deliberately
+/// leaves the CLI `print*` sinks to that pass (the fork's non-goals exclude CLI help/error/log text).
+#[test]
+fn prose_sinks_stay_within_the_diff_sink_list() {
+    let config = AuditConfig::load(&repo_root());
+    assert!(!config.prose_sinks.is_empty(), "prose_sinks must not be empty");
+    for prose in &config.prose_sinks {
+        assert!(
+            config.sinks.iter().any(|sink| sink == prose),
+            "prose sink `{prose}` is missing from `sinks`"
+        );
+    }
+    for cli in ["println", "eprintln", "print"] {
+        assert!(
+            config.sinks.iter().any(|sink| sink == cli),
+            "the diff pass must keep the CLI sink `{cli}`"
+        );
+        assert!(
+            !config.prose_sinks.iter().any(|sink| sink == cli),
+            "the prose pass must leave the CLI sink `{cli}` to the diff pass"
+        );
+    }
+}
+
 /// The scan scope must stay at workspace granularity: every first-party crate's sources are inside
 /// a configured root, so a new crate or a new render mode cannot silently fall outside the audit.
 #[test]
@@ -1240,14 +1585,19 @@ fn configured_scan_roots_cover_every_first_party_crate() {
         "crates outside the configured i18n scan roots: {uncovered:?}"
     );
 
-    // The minimal render mode paints its own UI, so its prose must stay in the full-prose scan.
+    // The full-prose pass must cover the same first-party trees, so no crate can be scanned for
+    // translation keys while the copy it renders goes unchecked.
+    let unchecked = trees
+        .iter()
+        .filter(|tree| {
+            !config.current_full_scan_roots.iter().any(|configured| {
+                tree.starts_with(configured.as_str()) && tree[configured.len()..].starts_with('/')
+            })
+        })
+        .collect::<Vec<_>>();
     assert!(
-        config
-            .current_full_scan_roots
-            .iter()
-            .any(|configured| configured == "crates/codegen/xai-grok-pager-minimal/src"),
-        "the minimal render mode must stay in the full-prose scan: {:?}",
-        config.current_full_scan_roots
+        unchecked.is_empty(),
+        "crates outside the configured full-prose scan: {unchecked:?}"
     );
 }
 
@@ -1281,6 +1631,7 @@ fn full_scan_reports_untranslated_copy_in_a_crate_outside_the_old_whitelist() {
         }
     }
     let fixture = root.join("crates/codegen/xai-grok-pager-minimal/src/scope_fixture.rs");
+    fs::create_dir_all(fixture.parent().unwrap()).unwrap();
     fs::write(
         &fixture,
         "fn render() {\n    Line::from(\"Untranslated scope fixture copy\");\n}\n",

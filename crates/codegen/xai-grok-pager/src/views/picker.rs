@@ -24,7 +24,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
-use xai_grok_i18n::t;
+use xai_grok_i18n::{t, t_fmt};
 
 use crate::input::line_editor::{LineEditOutcome, LineEditor};
 use crate::render::line_utils::truncate_str;
@@ -1926,7 +1926,7 @@ fn render_picker_content_inner(
             .get((loading_tick / 4) as usize % spinner_frames.len())
             .copied()
             .unwrap_or("");
-        let msg = format!("{frame} Loading\u{2026}");
+        let msg = t_fmt("picker.loading", &[("frame", frame)]);
         let msg_style = Style::default().fg(theme.gray);
         let cx = content_area.x + content_area.width.saturating_sub(msg.width() as u16) / 2;
         let cy = content_area.y + content_area.height / 2;
@@ -1939,7 +1939,12 @@ fn render_picker_content_inner(
         let msg_style = Style::default()
             .fg(theme.gray_dim)
             .bg(picker_base_bg(bg, theme));
-        buf.set_string(content_area.x, content_area.y, "  No matches", msg_style);
+        buf.set_string(
+            content_area.x,
+            content_area.y,
+            t("picker.empty.no_matches"),
+            msg_style,
+        );
         return empty_hit;
     }
 
@@ -3967,5 +3972,51 @@ mod tests {
             handle_picker_input(&Event::Paste("x\r\ny".to_owned()), &mut state, 3, &config);
         assert!(matches!(outcome, PickerOutcome::QueryChanged));
         assert_eq!(state.query(), "axyb");
+    }
+
+    /// Collect every rendered glyph in `area` into a single string.
+    fn buffer_text(buf: &Buffer, area: Rect) -> String {
+        (area.y..area.y + area.height)
+            .map(|y| {
+                (area.x..area.x + area.width)
+                    .filter_map(|x| buf.cell((x, y)).map(|cell| cell.symbol().to_owned()))
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// The loading and no-match states are catalog copy, not hardcoded English.
+    #[test]
+    fn picker_status_copy_comes_from_the_catalog() {
+        let area = Rect::new(0, 0, 40, 6);
+        let theme = Theme::current();
+        let render = |loading: bool| {
+            let mut state = PickerState::default();
+            let mut buf = Buffer::empty(area);
+            render_picker_content_inner(
+                &mut buf,
+                area,
+                &theme,
+                &mut state,
+                &[],
+                &[],
+                &[],
+                None,
+                loading,
+                0,
+                None,
+            );
+            buffer_text(&buf, area)
+        };
+        let (loading, empty) = xai_grok_i18n::with_pseudo_locale(|| (render(true), render(false)));
+        assert!(
+            loading.contains("⟦picker.loading⟧"),
+            "loading state must come from the catalog: {loading:?}"
+        );
+        assert!(
+            empty.contains("⟦picker.empty.no_matches⟧"),
+            "no-match state must come from the catalog: {empty:?}"
+        );
     }
 }
