@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.upstream_merge import (
     ConflictHunk,
     classify_conflicts,
     marker_audit,
+    worktree_preflight,
     parse_conflict_hunks,
     replace_safe_hunks,
 )
@@ -133,6 +137,33 @@ class MarkerAuditTests(unittest.TestCase):
 
             self.assertFalse(audit.ok)
             self.assertIn("unknown", " ".join(audit.errors))
+
+    def test_worktree_preflight_checks_clean_state_and_target_isolation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.name", "test"], check=True)
+            subprocess.run(["git", "-C", str(repo), "config", "user.email", "test@example.test"], check=True)
+            (repo / "LOCAL_PATCHES.md").write_text("## `example`\n", encoding="utf-8")
+            (repo / "src.rs").write_text("fn main() {}\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "--quiet", "-m", "initial"], check=True)
+
+            clean = worktree_preflight(repo)
+            self.assertTrue(clean["ok"], clean)
+            self.assertEqual(clean["errors"], [])
+            self.assertEqual(clean["tracked_target_files"], [])
+
+            (repo / "dirty.txt").write_text("uncommitted\n", encoding="utf-8")
+            dirty = worktree_preflight(repo)
+            self.assertFalse(dirty["ok"])
+            self.assertIn("worktree is dirty", dirty["errors"])
+
+            (repo / "dirty.txt").unlink()
+            with patch.dict(os.environ, {"CARGO_TARGET_DIR": str(repo.parent / "shared-target")}):
+                outside = worktree_preflight(repo)
+            self.assertFalse(outside["ok"])
+            self.assertTrue(any("CARGO_TARGET_DIR is outside" in error for error in outside["errors"]))
 
 
 if __name__ == "__main__":

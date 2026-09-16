@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import os
 import shutil
 import subprocess
 import sys
@@ -335,6 +336,79 @@ def marker_audit(repo: Path) -> MarkerAudit:
     )
 
 
+def worktree_preflight(repo: Path) -> dict[str, object]:
+    """Return a fail-closed cleanliness and worktree-isolation report."""
+
+    repo = resolve_repo(repo)
+    status = run_git(repo, "status", "--porcelain", check=True).stdout.splitlines()
+    merge_head = run_git(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD", check=False).stdout.strip()
+    unresolved = run_git(
+        repo, "diff", "--name-only", "--diff-filter=U", check=True
+    ).stdout.splitlines()
+    diff_check = run_git(repo, "diff", "--check", check=False)
+    worktree_lines = run_git(repo, "worktree", "list", "--porcelain", check=True).stdout.splitlines()
+    worktrees: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    for line in worktree_lines + [""]:
+        if line.startswith("worktree "):
+            if current:
+                worktrees.append(current)
+            current = {"path": line.removeprefix("worktree ")}
+        elif line.startswith("HEAD "):
+            current["head"] = line.removeprefix("HEAD ")
+        elif line.startswith("branch "):
+            current["branch"] = line.removeprefix("branch ")
+        elif not line and current:
+            worktrees.append(current)
+            current = {}
+
+    branch_paths: dict[str, list[str]] = {}
+    for worktree in worktrees:
+        branch = worktree.get("branch")
+        if branch:
+            branch_paths.setdefault(branch, []).append(worktree["path"])
+
+    errors: list[str] = []
+    if status:
+        errors.append("worktree is dirty")
+    if merge_head:
+        errors.append(f"merge is in progress ({merge_head})")
+    if unresolved:
+        errors.append(f"unmerged files: {unresolved}")
+    if diff_check.returncode:
+        errors.append("git diff --check failed")
+    for branch, paths in branch_paths.items():
+        if len(paths) > 1:
+            errors.append(f"branch {branch} is checked out in multiple worktrees: {paths}")
+
+    target_dir_value = os.environ.get("CARGO_TARGET_DIR")
+    target_dir = Path(target_dir_value).expanduser() if target_dir_value else repo / "target"
+    if not target_dir.is_absolute():
+        target_dir = repo / target_dir
+    try:
+        target_dir.resolve().relative_to(repo)
+    except ValueError:
+        errors.append(f"CARGO_TARGET_DIR is outside this worktree: {target_dir}")
+
+    tracked_target = run_git(repo, "ls-files", "--", "target", check=True).stdout.splitlines()
+    if tracked_target:
+        errors.append(f"build artifacts are tracked under target/: {tracked_target[:5]}")
+
+    return {
+        "repo": str(repo),
+        "branch": run_git(repo, "branch", "--show-current", check=True).stdout.strip(),
+        "head": run_git(repo, "rev-parse", "HEAD", check=True).stdout.strip(),
+        "status": status,
+        "merge_head": merge_head or None,
+        "unresolved_files": unresolved,
+        "worktrees": worktrees,
+        "cargo_target_dir": str(target_dir.resolve()),
+        "tracked_target_files": tracked_target,
+        "errors": errors,
+        "ok": not errors,
+    }
+
+
 def _worktree_path(parent: Path | None) -> Path:
     if parent is not None:
         parent.mkdir(parents=True, exist_ok=True)
@@ -459,6 +533,19 @@ def print_marker_audit(repo: Path, as_json: bool) -> int:
     return 0 if audit.ok else 1
 
 
+def print_preflight(repo: Path, as_json: bool) -> int:
+    report = worktree_preflight(repo)
+    if as_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(f"worktree: {report['repo']}")
+        print(f"branch: {report['branch']}")
+        print(f"target: {report['cargo_target_dir']}")
+        for error in report["errors"]:
+            print(f"ERROR: {error}", file=sys.stderr)
+    return 0 if report["ok"] else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -479,6 +566,11 @@ def build_parser() -> argparse.ArgumentParser:
     audit = subparsers.add_parser("audit-markers", help="check LOCAL-PATCH registry consistency")
     audit.add_argument("--repo", type=Path, default=Path.cwd())
     audit.add_argument("--json", action="store_true")
+
+
+    preflight = subparsers.add_parser("preflight", help="check worktree and build isolation")
+    preflight.add_argument("--repo", type=Path, default=Path.cwd())
+    preflight.add_argument("--json", action="store_true")
     return parser
 
 
@@ -487,6 +579,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "audit-markers":
             return print_marker_audit(args.repo, args.json)
+        if args.command == "preflight":
+            return print_preflight(args.repo, args.json)
         return rehearse(
             repo=args.repo,
             target=args.target,

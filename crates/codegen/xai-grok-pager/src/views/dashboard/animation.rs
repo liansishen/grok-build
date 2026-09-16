@@ -47,7 +47,7 @@ impl PaintedAnimations {
 }
 
 impl RowState {
-    /// Wide-layout icon cadence. Narrow NeedsInput is a static diamond.
+    /// NeedsInput uses a blink cadence when the theme can render a dim state.
     pub(crate) fn animation(self) -> Option<Animation> {
         match self {
             Self::Working => Some(Animation::Spinner),

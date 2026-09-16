@@ -1017,14 +1017,15 @@ async fn started_wake_with_failed_metadata_write_preserves_prior_durable_artifac
             ));
             while gateway_rx.try_recv().is_ok() {}
 
-            assert!(matches!(
-                backend
-                    .send_active_message(
-                        ActiveAgentMessageRequest::try_new(&id, "continue").expect("wake request")
-                    )
-                    .await,
-                ActiveAgentMessageOutcome::Accepted { .. }
-            ));
+            let admission = backend
+                .send_active_message(
+                    ActiveAgentMessageRequest::try_new(&id, "continue").expect("wake request"),
+                )
+                .await;
+            assert!(
+                matches!(admission, ActiveAgentMessageOutcome::Accepted { .. }),
+                "wake admission: {admission:?}"
+            );
             let wake = backend
                 .query(&id, true, Some(5_000))
                 .await

@@ -2097,18 +2097,12 @@ fn render_row(
     } else {
         state_color(row.state, theme)
     };
-    let roster_static = matches!(
-        row.id,
-        super::DashboardRowId::Roster { .. } | super::DashboardRowId::Workspace { .. }
-    ) && row.state == RowState::NeedsInput;
-    if !roster_static {
-        match row.state.animation() {
-            Some(Animation::Spinner) => state.painted_animations.mark(Animation::Spinner),
-            Some(Animation::Blink) if needs_input_blink_visible(theme) => {
-                state.painted_animations.mark(Animation::Blink);
-            }
-            Some(Animation::Blink) | None => {}
+    match row.state.animation() {
+        Some(Animation::Spinner) => state.painted_animations.mark(Animation::Spinner),
+        Some(Animation::Blink) if needs_input_blink_visible(theme) => {
+            state.painted_animations.mark(Animation::Blink);
         }
+        Some(Animation::Blink) | None => {}
     }
     let icon_w = UnicodeWidthStr::width(icon) as u16;
     // Title-row paint cursor. Title-only rows sit padded above and below, while 2-line rows stay
