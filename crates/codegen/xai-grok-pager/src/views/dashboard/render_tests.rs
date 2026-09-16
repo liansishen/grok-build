@@ -41,6 +41,7 @@ fn painted_row_cells(row_state: RowState, tick: u64) -> Vec<(String, Color)> {
     paint_rows(&[row_state], tick).0
 }
 
+#[serial_test::serial(GROK_THEME)]
 #[test]
 fn row_paint_changes_across_ticks_iff_state_is_animated() {
     use strum::IntoEnumIterator as _;
@@ -59,6 +60,7 @@ fn row_paint_changes_across_ticks_iff_state_is_animated() {
     }
 }
 
+#[serial_test::serial(GROK_THEME)]
 #[test]
 fn dashboard_tick_reports_exactly_the_ticks_where_the_painted_rows_repaint() {
     use strum::IntoEnumIterator as _;
