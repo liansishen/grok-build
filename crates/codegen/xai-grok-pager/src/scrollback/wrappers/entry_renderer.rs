@@ -779,7 +779,12 @@ impl Renderable for EntryRenderer<'_> {
 
             if own_gutter {
                 let gutter = Rect::new(content_area.x + text_width, row, ts_reserved, 1);
-                fill_bg_spaces(buf, gutter, line_bg.unwrap_or(self.fallback_bg()));
+                let gutter_bg = line_bg.unwrap_or_else(|| {
+                    buf.cell((content_area.x, row))
+                        .map(|cell| cell.bg)
+                        .unwrap_or_else(|| self.fallback_bg())
+                });
+                fill_bg_spaces(buf, gutter, gutter_bg);
             }
 
             row += 1;

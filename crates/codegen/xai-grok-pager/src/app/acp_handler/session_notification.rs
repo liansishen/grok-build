@@ -213,6 +213,7 @@ fn synthesize_replay_turn_marker(
             elapsed_ms,
             agent_result,
             send_now_cancel: cancel_trigger == Some("send_now"),
+            cancel_trigger,
             cancellation_category,
             error_banner_present: banner,
             error_kind,
@@ -244,6 +245,13 @@ pub(super) fn handle_session_notification_with_origin(
         tracing::warn!("Failed to parse {}", notif.method.as_ref());
         return false;
     };
+    let envelope = SessionUpdateEnvelope::from_method_and_meta(
+        notif.method.as_ref(),
+        session_notif.meta.as_ref().and_then(|value| value.as_object()),
+    )
+    .expect("xAI session update has a known carrier");
+    let carrier = envelope.carrier;
+    let mut meta = envelope.meta;
     match &session_notif.update {
         XaiSessionUpdate::TaskBackgrounded { .. } => {
             return handle_task_backgrounded(notif, app);
@@ -273,12 +281,25 @@ pub(super) fn handle_session_notification_with_origin(
     };
     let parent_id = matched.agent_id();
     let is_active = is_matched_agent_active(app, parent_id);
+    let session_update_prompt_id = meta.prompt_id.as_deref();
     let agent = app
         .agents
         .get_mut(&parent_id)
         .expect("find_session_match returned an existing AgentId");
     if matches!(matched, SessionMatch::Child(_)) {
         let child_sid: &str = session_notif.session_id.0.as_ref();
+        if let Some(prompt_id) = session_update_prompt_id
+            && let Some(child) = agent.subagent_views.get_mut(child_sid)
+            && child
+                .prompt_ack
+                .as_ref()
+                .is_some_and(|watch| watch.prompt_id() == prompt_id)
+        {
+            child.note_prompt_ack(
+                crate::app::prompt_ack::AckSignal::SessionUpdate,
+                std::time::Instant::now(),
+            );
+        }
         let changed = handle_child_session_notification(
             session_notif.update,
             child_sid,
@@ -287,12 +308,11 @@ pub(super) fn handle_session_notification_with_origin(
         );
         return changed && is_active;
     }
-    let meta = NotificationMeta::from_json(session_notif.meta.as_ref().and_then(|v| v.as_object()));
     if drop_unexpected_replay(
         agent,
         &meta,
         session_notif.session_id.0.as_ref(),
-        "x.ai/session/update",
+        carrier.method(),
     ) {
         return false;
     }
@@ -352,6 +372,7 @@ pub(super) fn handle_session_notification_with_origin(
         | XaiSessionUpdate::RetryState(_)
         | XaiSessionUpdate::ImageDropped { .. }
         | XaiSessionUpdate::MemoryFlushCompleted { .. }
+        | XaiSessionUpdate::MemoryCaptureActivity { .. }
         | XaiSessionUpdate::MemoryDreamCompleted { .. }
         | XaiSessionUpdate::MemorySessionSaved { .. }) => {
             let changed = apply_session_event(
@@ -533,6 +554,7 @@ pub(super) fn handle_session_notification_with_origin(
             capability_mode,
             context_normalized,
             parent_prompt_id,
+            parent_session_id,
             workflow_run_id,
             ..
         } => {
@@ -649,6 +671,11 @@ pub(super) fn handle_session_notification_with_origin(
                 attempt,
                 is_new_attempt,
             );
+            agent.session.tracker.subagent_labels.borrow_mut().record(
+                &info.subagent_id,
+                crate::app::subagent::subagent_display_label(&info),
+                info.child_session_id.clone(),
+            );
             if meta.is_replay && agent.session.loading_replay {
                 info.transcript.begin_parent_replay();
             }
@@ -665,10 +692,11 @@ pub(super) fn handle_session_notification_with_origin(
                 &agent.session.cwd,
                 agent.subagent_sessions.get(&child_session_id),
             );
+            let labels = &agent.session.tracker.subagent_labels;
             if let Some(child_view) = agent.subagent_views.get_mut(&child_session_id) {
                 child_view.session.state = AgentState::TurnRunning;
                 if is_new_attempt {
-                    child_view.session.tracker = AcpUpdateTracker::new();
+                    child_view.session.tracker = AcpUpdateTracker::sharing_labels(labels);
                 }
             } else {
                 let child_session = AgentSession {
@@ -677,7 +705,7 @@ pub(super) fn handle_session_notification_with_origin(
                     session_id: Some(acp::SessionId::new(child_session_id.clone())),
                     models: agent.session.models.clone(),
                     state: AgentState::TurnRunning,
-                    tracker: AcpUpdateTracker::new(),
+                    tracker: AcpUpdateTracker::sharing_labels(labels),
                     cwd: effective_child_cwd,
                     is_worktree: effective_is_worktree,
                     forked_from: None,
@@ -713,7 +741,6 @@ pub(super) fn handle_session_notification_with_origin(
                 child_scrollback.set_appearance(agent.scrollback.appearance().clone());
                 let mut child_view = AgentView::new(child_session, child_scrollback);
                 child_view.set_input_mode(InputMode::Vim);
-                child_view.active_pane = crate::views::agent::ActivePane::Scrollback;
                 child_view.set_sharing_enabled(agent.sharing_enabled);
                 child_view.set_billing_surface_visible(agent.billing_surface_visible);
                 child_view.set_usage_command_visible(agent.usage_command_visible);
@@ -751,7 +778,10 @@ pub(super) fn handle_session_notification_with_origin(
                     .registry()
                     .restricted_commands();
                 child_view.set_restricted_commands(&restricted);
-                agent.insert_subagent_view(child_session_id.clone(), Box::new(child_view));
+                let link = crate::app::agent_view::ChildLink::unaddressable(acp::SessionId::new(
+                    parent_session_id,
+                ));
+                agent.insert_subagent_view(child_session_id.clone(), Box::new(child_view), link);
             }
             if workflow_run_id.is_none() {
                 let block = crate::scrollback::blocks::SubagentBlock::started(
@@ -1324,9 +1354,17 @@ pub(super) fn handle_session_notification_with_origin(
             }
             actually_changed
         }
-        XaiSessionUpdate::MemoryFiles { files } => {
+        XaiSessionUpdate::MemoryFiles {
+            files,
+            enabled,
+            disabled_reason,
+            capture_enabled,
+            dream_enabled,
+        } => {
             let entries = crate::views::memory_modal::build_entries(files);
-            let modal_state = crate::views::memory_modal::MemoryModalState::new(entries);
+            let modal_state = crate::views::memory_modal::MemoryModalState::new(entries)
+                .with_enabled(enabled, disabled_reason)
+                .with_capabilities(capture_enabled, dream_enabled);
             agent.active_modal = Some(crate::views::modal::ActiveModal::MemoryBrowser {
                 state: Box::new(modal_state),
             });
@@ -1441,6 +1479,43 @@ pub(super) fn handle_session_notification_with_origin(
         }
         XaiSessionUpdate::InteractionResolved { tool_call_id } => {
             agent.dismiss_resolved_interaction(&tool_call_id)
+        }
+        XaiSessionUpdate::PlanKept { plan_uri, content } => {
+            if meta.is_replay || agent.session.loading_replay {
+                false
+            } else {
+                let next = crate::app::agent_view::KeptPlan::from_signal(&plan_uri, content);
+                if next.is_kept() {
+                    agent.kept_plan = next;
+                    if agent.session.state.is_turn_running() {
+                        agent.refresh_post_turn_plan_review();
+                    } else {
+                        agent.open_post_turn_plan_review();
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        XaiSessionUpdate::PlanCleared => {
+            if meta.is_replay
+                || agent.session.loading_replay
+                || agent.plan_mode_pending == Some(true)
+            {
+                false
+            } else {
+                agent.forget_waiting_plan();
+                true
+            }
+        }
+        XaiSessionUpdate::PlanExecuting => {
+            if meta.is_replay || agent.session.loading_replay {
+                false
+            } else {
+                agent.commit_post_turn_plan_approved();
+                true
+            }
         }
         XaiSessionUpdate::SessionStatus(status) => {
             agent.status_context = Some(*status);
@@ -1599,7 +1674,9 @@ pub(crate) fn apply_child_view_session_event(
         &mut child_view.scrollback,
         is_api_key_auth,
     );
-    if let Some(used) = compaction_context_refresh(update) {
+    if matches!(update, XaiSessionUpdate::AutoCompactCompleted { .. })
+        && let Some(used) = compaction_context_refresh(update)
+    {
         refresh_context_used(child_view, used);
     }
     changed
@@ -1619,6 +1696,28 @@ pub(crate) fn apply_session_event_for_test(
 ) -> bool {
     apply_session_event(update, session, scrollback, false)
 }
+fn memory_capture_system_message(
+    activity: &str,
+    from_turn: u32,
+    through_turn: u32,
+    attempt: u32,
+) -> String {
+    let activity = match activity {
+        "queued" => "queued",
+        "running" => "running",
+        "completed" => "completed",
+        "no_op" => "completed with no changes",
+        "retry" => "scheduled for retry",
+        "failed" => "failed",
+        _ => "updated",
+    };
+    let attempt_suffix = if attempt > 1 {
+        format!(" (attempt {attempt})")
+    } else {
+        String::new()
+    };
+    format!("Memory capture {activity} for turns {from_turn}-{through_turn}{attempt_suffix}")
+}
 pub(super) fn apply_session_event(
     update: &XaiSessionUpdate,
     session: &mut AgentSession,
@@ -1626,7 +1725,9 @@ pub(super) fn apply_session_event(
     is_api_key_auth: bool,
 ) -> bool {
     match update {
-        XaiSessionUpdate::AutoCompactStarted { percentage, .. } => {
+        XaiSessionUpdate::AutoCompactStarted {
+            percentage, reason, ..
+        } => {
             tracing::info!("Auto-compact started: {percentage}% context used");
             if session.compact_held_prompt.is_none() {
                 session.compact_held_prompt = session.in_flight_prompt.clone();
@@ -1636,6 +1737,7 @@ pub(super) fn apply_session_event(
             scrollback.push_block(RenderBlock::session_event(
                 SessionEvent::CompactionStarted {
                     percentage: *percentage,
+                    reason: reason.clone(),
                 },
             ));
             true
@@ -1688,6 +1790,30 @@ pub(super) fn apply_session_event(
             let message = notes.join("\n");
             tracing::info!("Image dropped: {message}");
             scrollback.push_block(RenderBlock::system(message));
+            true
+        }
+        XaiSessionUpdate::MemoryCaptureActivity {
+            activity,
+            from_turn,
+            through_turn,
+            attempt,
+            detail: _,
+            memories,
+        } => {
+            if activity == "completed" && !memories.is_empty() {
+                scrollback.push_block(RenderBlock::memory_capture(
+                    *from_turn,
+                    *through_turn,
+                    memories.clone(),
+                ));
+                return true;
+            }
+            scrollback.push_block(RenderBlock::system(memory_capture_system_message(
+                activity,
+                *from_turn,
+                *through_turn,
+                *attempt,
+            )));
             true
         }
         _ => false,
@@ -1859,7 +1985,7 @@ pub(super) fn apply_retry_state(
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum PlanModeTransition {
+pub(crate) enum PlanModeTransition {
     Unchanged,
     /// Also claims another attached client's `session/set_mode`: the wire has no trigger field, and that misattribution is accepted.
     EnteredByAgent,
@@ -1870,9 +1996,12 @@ pub(super) enum PlanModeTransition {
 /// Do not be tempted to infer mode from tool-call titles.
 /// A substring match would silently brick sessions whenever any tool happens to mention `enter_plan_mode`.
 /// Entries are attributed locally: every pager-side path stages `plan_mode_pending` before its `session/set_mode`, and the agent's tool call never does.
-pub(super) fn detect_plan_mode_change(
+/// Mode bits still apply on replay; keep/review side effects do not. PlanKept
+/// and post-turn open already skip historical updates.
+pub(crate) fn detect_plan_mode_change_replayed(
     update: &acp::SessionUpdate,
     agent: &mut AgentView,
+    is_replay: bool,
 ) -> Option<PlanModeTransition> {
     use xai_grok_tools::types::SessionMode;
     let acp::SessionUpdate::CurrentModeUpdate(cmu) = update else {
@@ -1881,9 +2010,29 @@ pub(super) fn detect_plan_mode_change(
     let mode = SessionMode::from_id(cmu.current_mode_id.0.as_ref());
     let was_active = agent.plan_mode_active;
     let now_active = mode.is_plan();
-    let user_requested = agent.plan_mode_pending.is_some();
+    let staged = agent.plan_mode_pending;
+    let user_requested = staged.is_some();
+    let user_left = staged == Some(false);
     agent.plan_mode_active = now_active;
     agent.plan_mode_pending = None;
+    agent.session_mode = mode;
+    agent.session_mode_pending = None;
+    let historical = is_replay || agent.session.loading_replay;
+    if !historical && (!now_active && (was_active || agent.session_mode == SessionMode::Default)) {
+        if staged == Some(true) {
+            agent.plan_mode_pending = Some(true);
+        } else {
+            if let Some(commit) = agent.pending_post_turn_commit.take() {
+                agent.commit_post_turn_plan_review(commit);
+            } else if agent.session_mode == SessionMode::Default && user_left {
+                agent.commit_post_turn_plan_abandoned();
+            }
+            agent.forget_waiting_plan();
+        }
+    }
+    if !historical && !was_active && now_active {
+        agent.open_post_turn_plan_review();
+    }
     if was_active != now_active {
         tracing::info!(
             mode_id = %cmu.current_mode_id.0,
@@ -1897,4 +2046,15 @@ pub(super) fn detect_plan_mode_change(
         (true, false) => PlanModeTransition::Exited,
         (false, false) | (true, true) => PlanModeTransition::Unchanged,
     })
+}
+#[cfg(test)]
+mod memory_capture_privacy_tests {
+    use super::memory_capture_system_message;
+    #[test]
+    fn trusted_capture_copy_only_accepts_typed_status_values() {
+        let untrusted = "failed: /Users/alice/private\nhttps://untrusted.example";
+        let message = memory_capture_system_message(untrusted, 2, 4, 3);
+        assert_eq!(message, "Memory capture updated for turns 2-4 (attempt 3)");
+        assert!(!message.contains(untrusted));
+    }
 }

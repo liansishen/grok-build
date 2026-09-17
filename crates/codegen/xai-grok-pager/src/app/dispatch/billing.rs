@@ -396,6 +396,7 @@ pub(super) fn handle_billing_fetched(
         }
     }
     app.sync_billing_cache_to_agents();
+    app.sync_billing_surface_to_agents();
     app.refresh_status_line_for(agent_id);
     // Settle usage-modal loading for the generation that requested this fetch.
     if let Some(agent) = app.agents.get_mut(&agent_id) {

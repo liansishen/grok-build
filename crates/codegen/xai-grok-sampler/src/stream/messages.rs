@@ -539,7 +539,7 @@ pub fn stream_messages<'a>(
         items.push(assistant_item);
 
         let stream_end = Instant::now();
-        let metrics = InferenceLatencyStats::from_timestamps(
+        let metrics = InferenceLatencyStats::from_observations(
             stream_start,
             first_output_at,
             &chunk_timestamps,

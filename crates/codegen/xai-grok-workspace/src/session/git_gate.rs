@@ -248,7 +248,13 @@ impl GitGate {
                 );
                 ROOT_CACHE.lock().clear();
                 let mut state = self.inner.state.lock();
-                for epoch in state.epochs.values_mut() {
+                let roots = state
+                    .slots
+                    .keys()
+                    .map(|key| key.root.clone())
+                    .collect::<Vec<_>>();
+                for root in roots {
+                    let epoch = state.epochs.entry(root).or_insert(0);
                     *epoch = epoch.saturating_add(1);
                 }
                 for slot in state.slots.values_mut() {

@@ -14,6 +14,7 @@ use super::{BenchResults, ContentController, PtyHarness};
 pub mod empty_enter_send_now;
 pub mod idle_cost;
 pub mod large_codeblock;
+pub mod minimal_zh_localization;
 pub mod mixed_interaction;
 pub mod plan_approval_resume;
 pub mod resize_storm;

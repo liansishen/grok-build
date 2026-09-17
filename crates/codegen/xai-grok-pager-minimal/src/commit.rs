@@ -8,6 +8,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 
+use xai_grok_i18n::t_fmt;
 use xai_grok_pager::app::PagerTerminal;
 use xai_grok_pager::app::app_view::{ActiveView, AppView};
 use xai_grok_pager::appearance::AppearanceConfig;
@@ -284,7 +285,10 @@ fn paint_committed(
         let style = footer_style.bg(Color::Reset);
         // Clear any clipped content that landed on the footer row first.
         buf.set_style(row, style);
-        let text = format!("\u{2026} {hidden} more lines \u{00b7} /transcript to view");
+        let text = t_fmt(
+            "minimal.commit.more_lines_footer",
+            &[("count", &hidden.to_string())],
+        );
         buf.set_span(buf.area.x, y, &Span::styled(text, style), width);
     }
 }
@@ -301,10 +305,10 @@ pub fn commit_active(app: &mut AppView, terminal: &mut PagerTerminal) {
     let Some(agent) = app.agents.get_mut(&id) else {
         return;
     };
-    // Hold commits while a centered fullscreen app-modal (settings) is open
+    // Hold commits while a band-owning modal (settings, palette, feedback form) is open
     // It takes the whole live region, so an `insert_before` underneath it would scroll the popup
     // Deferred commits flush on the next frame after it closes
-    if super::overlay::app_modal_active(agent) {
+    if super::overlay::is_live_region_modal_active(agent) {
         return;
     }
     // The sizing pass and this commit pass must judge committability against the same marks. Syncing here would let a
@@ -384,15 +388,15 @@ pub fn expand_pending(app: &mut AppView, terminal: &mut PagerTerminal) {
     let appearance = committed_appearance(&app.appearance);
     // Guards: a missing active agent must leave the IDs queued, so confirm it exists before consuming the queue below.
     // The queue take needs `&mut app`, which can't overlap the agent borrow, hence the check-then-reborrow. An
-    // `insert_before` would scroll the popup and the user wouldn't see the re-print.
+    // `insert_before` would scroll the popup or the feedback form and the user wouldn't see the re-print.
     match app.agents.get(&id) {
-        Some(agent) if !super::overlay::app_modal_active(agent) => {}
+        Some(agent) if !super::overlay::is_live_region_modal_active(agent) => {}
         _ => return,
     }
     let theme = Theme::current();
     let footer_style = theme.dim();
     // Consume the expand queue only after every guard above has passed
-    // A non-agent active view, a 0-width (probe) frame, or an open app-modal must leave the IDs queued for a later frame
+    // A non-agent active view, a 0-width (probe) frame, or an open band-owning modal must leave the IDs queued for a later frame
     let ids = minimal_api::take_minimal_pending_expand(app);
     let mut requeue: Vec<EntryId> = Vec::new();
     {

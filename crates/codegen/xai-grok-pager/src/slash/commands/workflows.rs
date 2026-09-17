@@ -21,6 +21,7 @@ impl SlashCommand for WorkflowsCommand {
         "/workflows"
     }
 
+
     fn run(&self, _ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
         CommandResult::Action(Action::OpenExtensionsModal {
             tab: ExtensionsTab::Workflows,

@@ -83,9 +83,14 @@ fn render_hud_bar(buf: &mut Buffer, popup_rect: Rect, hud: &GboomHud, dim_fg: Co
         let [r, g, b] = xai_grok_gboom::GBOOM_RED;
         Color::Rgb(r, g, b)
     };
-    let stats = format!(
-        " HP {:<3} \u{00b7} KILLS {}/{} ",
-        hud.hp, hud.kills, hud.total
+    // The `{hp}` parameter carries its own padding so the catalog value stays plain text.
+    let stats = xai_grok_i18n::t_fmt(
+        "gboom.hud",
+        &[
+            ("hp", &format!("{:<3}", hud.hp)),
+            ("kills", &hud.kills.to_string()),
+            ("total", &hud.total.to_string()),
+        ],
     );
     // `chars().count()` not `len()`: the separator is multi-byte UTF-8 but every char here is a single display cell
     let stats_w = (stats.chars().count() as u16).min(inner_width as u16);
@@ -99,9 +104,9 @@ fn render_hud_bar(buf: &mut Buffer, popup_rect: Rect, hud: &GboomHud, dim_fg: Co
     buf.set_line_safe(popup_rect.x + 1, bar_y, &line, stats_w);
 
     let hint = if hud.playing {
-        " WASD/\u{2190}\u{2192} move \u{00b7} SPACE fire \u{00b7} ESC quit "
+        xai_grok_i18n::t("gboom.controls")
     } else {
-        " ESC quit "
+        xai_grok_i18n::t("gboom.controls_idle")
     };
     let hint_w = hint.chars().count() as u16;
     if (stats_w + hint_w) as usize <= inner_width {

@@ -46,10 +46,16 @@ xai-grok-shell = { workspace = true }
 xai-grok-version = { workspace = true }
 xai-token-estimation = { workspace = true }
 
+# User-visible copy in the live region, scrollback cards, and panels.
+xai-grok-i18n = { workspace = true }
+
 [dev-dependencies]
 # The unit tests reuse the pager's test-only view-model constructors
 # (`test_agent_view`, yolo/auto setters), gated behind its test-only
 # helpers.
 xai-grok-pager = { path = "../xai-grok-pager", features = ["test-support"] }
+# The feedback-form render tests flip the pager's process-global embedded
+# modal flag and must not interleave.
+serial_test = { workspace = true }
 
 [features]

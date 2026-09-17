@@ -301,6 +301,69 @@ fn activity_label_rendered_for_each_turn_activity() {
     }
 }
 
+/// Type, context and activity labels are user-visible, so each resolves through the catalog rather
+/// than a literal: the pseudo-locale pins the exact key, zh-CN pins the translation that ships.
+#[test]
+#[serial_test::serial(GROK_UI_LOCALE)]
+fn subagent_labels_resolve_through_the_catalog() {
+    use crate::acp::tracker::TurnActivity;
+
+    struct RestoreLocale(xai_grok_i18n::Locale);
+    impl Drop for RestoreLocale {
+        fn drop(&mut self) {
+            xai_grok_i18n::set_locale(self.0);
+        }
+    }
+    let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+    let mut info = make_info();
+    info.attempt.context_source = Some("resumed".into());
+    let no_tool = TurnActivity::ToolRunning {
+        title: String::new(),
+        description: None,
+    };
+    let named_tool = TurnActivity::ToolRunning {
+        title: "cargo build".into(),
+        description: None,
+    };
+
+    // The pseudo-locale wraps every catalog lookup, so a hardcoded literal cannot masquerade as one.
+    let pseudo = xai_grok_i18n::with_pseudo_locale(|| {
+        (
+            format_type_label("general-purpose").to_string(),
+            format_subagent_label(&info).0,
+            format_context_badge(&info).to_string(),
+            format_activity_label(&TurnActivity::Thinking),
+            format_activity_label(&TurnActivity::AutoCompacting),
+            format_activity_label(&no_tool),
+            format_activity_label(&named_tool),
+        )
+    });
+    assert!(pseudo.0.contains("⟦subagent.type.general⟧"), "{:?}", pseudo.0);
+    assert!(pseudo.1.contains("⟦subagent.type.explore⟧"), "{:?}", pseudo.1);
+    assert!(pseudo.2.contains("⟦subagent.context.resumed⟧"), "{:?}", pseudo.2);
+    assert!(pseudo.3.contains("⟦subagent.activity.thinking⟧"), "{:?}", pseudo.3);
+    assert!(pseudo.4.contains("⟦subagent.activity.compacting⟧"), "{:?}", pseudo.4);
+    assert!(pseudo.5.contains("⟦subagent.activity.running_tool⟧"), "{:?}", pseudo.5);
+    assert!(pseudo.6.contains("⟦subagent.activity.running⟧"), "{:?}", pseudo.6);
+
+    // zh-CN: the shipped translation is what the dashboard row, tasks pane and peek actually paint.
+    xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+    assert_eq!(format_type_label("general-purpose"), "通用");
+    assert_eq!(format_type_label("custom-agent"), "custom-agent");
+    assert_eq!(format_subagent_label(&info).0, "探索");
+    assert_eq!(format_context_badge(&info), "已恢复");
+    assert_eq!(format_activity_label(&TurnActivity::Thinking), "思考中");
+    assert_eq!(format_activity_label(&TurnActivity::Responding), "回复中");
+    assert_eq!(format_activity_label(&TurnActivity::AutoCompacting), "压缩中");
+    assert_eq!(format_activity_label(&no_tool), "运行工具");
+    assert_eq!(format_activity_label(&named_tool), "运行中：cargo build");
+
+    info.subagent_type = "general-purpose".into();
+    info.description = "plain task".into();
+    assert_eq!(format_subagent_label(&info).0, "通用");
+}
+
 #[test]
 fn enrichment_reads_prompt_and_paths_from_meta_json() {
     struct Case {

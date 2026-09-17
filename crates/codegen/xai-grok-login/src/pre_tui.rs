@@ -162,8 +162,9 @@ mod tests {
             .await
             .expect_err("non-zero provider must fail closed");
         let msg = format!("{err:#}");
+        // The fallthrough copy lives in the catalog, so assert the same lookup the flow prints.
         assert!(
-            !msg.contains("Signing in with browser"),
+            !msg.contains(xai_grok_i18n::t("auth.flow.browser_fallback")),
             "must not fall through to OIDC/device: {msg}"
         );
         assert!(mgr.current().is_none(), "failed mint must not persist");

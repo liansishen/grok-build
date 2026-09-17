@@ -24,7 +24,7 @@ grok models
 ### CLI 标志
 
 ```bash
-grok -p "你好" -m grok-build
+grok -p "Hello" -m grok-4.6
 ```
 
 <a id="slash-command"></a>
@@ -33,23 +33,23 @@ grok -p "你好" -m grok-build
 在 TUI 中，可以在会话期间切换模型：
 
 ```
-/model grok-build
+/model grok-4.6
 ```
 
 也可以使用别名：
 
 ```
-/m grok-build
+/m grok-4.6
 ```
 
 <a id="model-picker-ctrlm"></a>
-### 模型选择器（Ctrl+M）
+### 模型选择器（Alt+M）
 
-在回滚区按 `Ctrl+M` 打开模型选择器。它会列出所有可用模型，包括内置模型和自定义模型，并允许你用一次按键完成切换。当提示输入框获得焦点时，`Ctrl+M` 会改为切换多行输入；此时使用 `/model` 即可在不离开提示输入框的情况下切换。
+从提示框或回滚区按 `Alt+M` 打开模型选择器。它会列出所有可用模型，包括内置模型和自定义模型，并允许你用一次按键完成切换。`/model` 和命令面板也会打开同一个选择器。Agent 屏幕上的 `Ctrl+M` 未绑定；大多数终端会将其作为 Enter 发送。
 
 ### 机群允许列表（`requirements.toml`）
 
-企业主机可以在签名的 `requirements.toml` 中固定**可选择的**模型集合，而不只是默认模型。该列表会**替换**用户的 `allowed_models`（不是取并集），因此 `/model`、`Ctrl+M` 和 `-m` 都不会提供列表外的模型。
+企业主机可以在签名的 `requirements.toml` 中固定**可选择的**模型集合，而不只是默认模型。该列表会**替换**用户的 `allowed_models`（不是取并集），因此 `/model`、`Alt+M` 和 `-m` 都不会提供列表外的模型。
 
 ```toml
 [models]
@@ -95,23 +95,45 @@ Grok 支持三种 API 后端。在 `[model.*]` 配置中设置 `api_backend`，�
 
 ```toml
 [model.my-model]
-model = "model-id"                        # 发送给 API 的模型标识符
-base_url = "https://api.example.com/v1"   # 兼容 OpenAI 的端点
-name = "显示名称"                          # 显示在模型选择器中
-description = "模型描述"                   # 可选描述
-api_key = "sk-..."                        # 此提供商的 API 密钥（可选）
-env_key = "XAI_API_KEY"                   # 保存 API 密钥的环境变量（可选；字符串或数组）
-api_backend = "chat_completions"          # "chat_completions"、"responses" 或 "messages"
-temperature = 0.7                          # 采样温度
-top_p = 0.95                               # 核采样参数
-max_completion_tokens = 8192               # 每次响应的最大 token 数
-context_window = 128000                   # token 总上下文窗口
-extra_headers = { "x-api-key" = "sk-..." } # 额外请求标头，原样发送（可选）
-query_params = { api-version = "2026-07-22" } # 附加到每个请求 URL 的查询参数（可选）
-env_http_headers = { "X-Tenant" = "TENANT_TOKEN" }    # 从环境变量读取的标头，在客户端构建时解析（可选）
+model = "model-id"                        # Model identifier sent to the API
+base_url = "https://api.example.com/v1"   # OpenAI-compatible endpoint
+name = "Display Name"                     # Shown in the model picker
+description = "Model description"          # Optional description
+api_key = "sk-..."                        # API key for this provider (optional)
+env_key = "XAI_API_KEY"                   # Env var holding the API key (optional; string or array)
+api_backend = "chat_completions"          # "chat_completions", "responses", or "messages"
+reasoning_summary = "concise"             # Responses API only: "none", "auto", "concise", or "detailed"
+temperature = 0.7                         # Sampling temperature
+top_p = 0.95                              # Nucleus sampling parameter
+max_completion_tokens = 8192              # Maximum tokens per response
+context_window = 128000                   # Total context window in tokens
+# compaction_model = "cheaper-id"        # optional same-provider id for /compact
+extra_headers = { "x-api-key" = "sk-..." } # Extra request headers, sent verbatim (optional)
+query_params = { api-version = "2026-07-22" } # Query params appended to every request URL (optional)
+env_http_headers = { "X-Tenant" = "TENANT_TOKEN" }    # Headers from env vars, resolved at client build (optional)
+
+# Optional local price sheet (USD per 1M tokens). Used to estimate session
+# cost in /usage and the live prompt usage bar when the API does not return
+# cost_in_usd_ticks (e.g. Cli Proxy API / BYOK gateways).
+input_price_per_mtok = 5.0
+cached_input_price_per_mtok = 0.5
+output_price_per_mtok = 30.0
+# cost_source = "auto"   # auto | server | local (default auto)
 ```
 
 <a id="credential-resolution"></a>
+### 本地成本估算
+
+当提供商不返回线路成本时，Grok 可以根据上述费率估算每次调用的成本，并将其计入会话用量账本：
+
+| `cost_source` | 行为 |
+|---------------|----------|
+| `auto`（默认） | 有服务器计费刻度时使用，否则进行估算 |
+| `server` | 仅使用服务器报告的成本（旧行为） |
+| `local` | 始终根据价格表估算 |
+
+费率单位是**每 100 万 token 的美元**。未缓存的输入使用 `input_price_per_mtok`；缓存命中使用 `cached_input_price_per_mtok`（未设置时使用输入费率）；完成/输出使用 `output_price_per_mtok`。在设置中启用**提示框中的实时会话用量**，即可在模型名称左侧显示总量（`tokens` 始终显示；只有完整估算可用时才显示 `$cost`）。
+
 ### 凭据解析
 
 Grok 按以下顺序解析 API 密钥：
@@ -149,6 +171,7 @@ temperature                 = 0.7
 top_p                       = 0.95
 max_completion_tokens       = 8192
 max_retries                 = 8
+rate_limit_retry_threshold  = 4
 inference_idle_timeout_secs = 600
 subagent_rate_limit_max_attempts = 8
 stream_tool_calls           = true
@@ -198,12 +221,12 @@ Grok 会在为会话构建客户端时读取每个变量，并只将值放入请
 你可以覆盖内置模型的特定字段，而无需重新定义全部设置。只指定要更改的字段：
 
 ```toml
-# 只覆盖默认模型的 API 密钥
-[model.grok-build]
+# Override only the API key for a default model
+[model.grok-4.6]
 api_key = "my-api-key"
 
-# 覆盖温度并添加自定义 API 密钥
-[model.grok-build]
+# Override temperature and add a custom API key
+[model.grok-4.6]
 temperature = 0.5
 api_key = "sk-custom"
 ```
@@ -267,6 +290,27 @@ env_key = "OPENAI_API_KEY"
 ```
 
 <a id="ollama-local-models"></a>
+Responses API 默认要求 Grok 提供 `concise` 推理摘要；UI 中显示的推理文本就来自此摘要。`reasoning_summary` 会改变请求：使用 `detailed` 或 `auto` 获取更完整的摘要，使用 `none` 可为拒绝该字段的网关省略它。
+
+### AWS Bedrock（Mantle）
+
+Bedrock 的 OpenAI 兼容网关会拒绝 `reasoning.summary`，因此请设置 `reasoning_summary = "none"`。它使用 Bedrock API 密钥作为 bearer token 进行身份验证；下面的示例通过命名身份验证提供商生成短期密钥：
+
+```toml
+[auth_provider.bedrock]
+command = "aws-bedrock-token"   # prints a Bedrock API key on stdout (e.g. via aws-bedrock-token-generator)
+token_ttl_secs = 3600
+
+[model."bedrock-grok-4.6"]
+model = "xai.grok-4.6"
+base_url = "https://bedrock-mantle.us-west-2.api.aws/openai/v1"
+name = "Grok 4.6 (Bedrock)"
+api_backend = "responses"
+reasoning_summary = "none"
+auth_provider = "bedrock"
+context_window = 500000
+```
+
 ### Ollama（本地模型）
 
 使用 [Ollama](https://ollama.ai) 在本地运行模型：
@@ -300,7 +344,7 @@ env_key = "TOGETHER_API_KEY"
 [model.local-llama]
 model = "llama-3.1-70b"
 base_url = "http://localhost:8080/v1"
-name = "本地 Llama"
+name = "Local Llama"
 temperature = 0.8
 ```
 
@@ -336,8 +380,8 @@ grok
 [endpoints]
 models_base_url = "https://api.acme.com/v1"
 
-# 只覆盖特定模型的 API 密钥
-[model.grok-build]
+# Override only the API key for a specific model
+[model.grok-4.6]
 api_key = "my-api-key"
 ```
 
@@ -383,16 +427,16 @@ supports_backend_search = true
 ## 使用自定义模型
 
 ```bash
-# 列出可用模型（包括自定义模型）
+# List available models (including custom)
 grok models
 
-# 通过斜杠命令在 TUI 中使用
+# Use in the TUI via slash command
 /model my-model
 
-# 在无头模式中使用
-grok -p "你好" -m my-model
+# Use in headless mode
+grok -p "Hello" -m my-model
 
-# 在 config.toml 中设为默认值：
+# Set as default in config.toml:
 [models]
 default = "my-model"
 ```
@@ -417,9 +461,9 @@ auth_token_ttl = 3600
 default = "company-grok"
 
 [model.company-grok]
-model = "grok-build"
+model = "grok-4.6"
 base_url = "https://grok-proxy.acme.com/"
-name = "Grok Build 最新版（代理）"
+name = "Grok 4.6 (Proxy)"
 context_window = 128000
 
 [features]
@@ -435,10 +479,10 @@ telemetry = false
 ### 找不到模型
 
 ```bash
-# 列出可用模型
+# List available models
 grok models
 
-# 检查 config.toml 中的 [model.*] 区段是否有拼写错误
+# Check config.toml for typos in [model.*] sections
 ```
 
 <a id="connection-errors"></a>

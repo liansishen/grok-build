@@ -17,8 +17,17 @@ use xai_grok_telemetry::events::{
     PromptAckDisposition, PromptAckPromptKind, PromptAckSurface, PromptAckTimeoutFired,
 };
 
-const PROMPT_ACK_TIMEOUT_TOAST_RESTORED: &str = "Prompt not accepted, text restored";
-const PROMPT_ACK_TIMEOUT_TOAST_STOPPED: &str = "Prompt not accepted, turn stopped";
+/// Toast for a fired fail-safe: the scrollback notice carries the detail.
+pub(super) fn prompt_ack_timeout_toast(disposition: PromptAckDisposition) -> &'static str {
+    match disposition {
+        PromptAckDisposition::RestoredToComposer | PromptAckDisposition::MergedIntoDraft => {
+            xai_grok_i18n::t("toast.prompt_not_accepted_restored")
+        }
+        PromptAckDisposition::NotRestorable => {
+            xai_grok_i18n::t("toast.prompt_not_accepted_stopped")
+        }
+    }
+}
 
 /// Scrollback notice for a fired fail-safe; the wording names where the user's text went.
 fn prompt_ack_timeout_notice(limit: Duration, disposition: PromptAckDisposition) -> String {
@@ -172,12 +181,7 @@ fn fire_fail_safe(
             deadlines.hard,
             disposition,
         )));
-    agent.show_toast(match disposition {
-        PromptAckDisposition::RestoredToComposer | PromptAckDisposition::MergedIntoDraft => {
-            PROMPT_ACK_TIMEOUT_TOAST_RESTORED
-        }
-        PromptAckDisposition::NotRestorable => PROMPT_ACK_TIMEOUT_TOAST_STOPPED,
-    });
+    agent.show_toast(prompt_ack_timeout_toast(disposition));
 
     crate::unified_log::write_direct_warn(
         "prompt.ack_timeout",

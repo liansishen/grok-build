@@ -17,8 +17,14 @@ use crate::scrollback::blocks::SessionEvent;
 
 /// `/logout` -- ask the shell to clear auth, then return to the login screen.
 pub(super) fn dispatch_logout(app: &mut AppView) -> Vec<Effect> {
-    app.invalidate_billing_account();
     app.usage_visible = false;
+    // The single visible→hidden transition below owns the billing-generation bump and also sets the
+    // controller's surface flag, so logout clears the account state without a second bump.
+    app.billing_account_key = None;
+    app.billing_poll_wanted = false;
+    app.credit_balance = None;
+    app.auto_topup = None;
+    app.sync_billing_cache_to_agents();
     app.sync_billing_surface_to_agents();
     vec![Effect::Logout]
 }

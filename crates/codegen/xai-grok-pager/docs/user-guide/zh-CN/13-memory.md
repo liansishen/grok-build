@@ -25,12 +25,21 @@
 <a id="per-session-flag"></a>
 ### 每会话标志
 
-```bash
-grok --experimental-memory
+```toml
+[memory_v2]
+enabled = true
 ```
 
 <a id="environment-variable"></a>
-### 环境变量
+### Memory v2（推荐）
+
+```toml
+# ~/.grok/config.toml
+[memory_v2]
+enabled = true
+```
+
+### 旧版环境变量
 
 ```bash
 export GROK_MEMORY=1
@@ -38,7 +47,7 @@ grok
 ```
 
 <a id="config-file-persistent"></a>
-### 配置文件（持久化）
+### 旧版配置（持久化）
 
 ```toml
 # ~/.grok/config.toml
@@ -52,13 +61,14 @@ enabled = true
 即使其他设置启用了记忆，也可以将其禁用：
 
 ```bash
-grok --no-memory
+export GROK_MEMORY=0
 ```
 
 或者：
 
-```bash
-export GROK_MEMORY=0
+```
+/memory on
+/memory off
 ```
 
 `--no-memory` 标志的优先级绝对最高，始终会禁用记忆。
@@ -69,8 +79,7 @@ export GROK_MEMORY=0
 无需重启，即可在会话期间打开或关闭记忆：
 
 ```
-/memory on
-/memory off
+/flush
 ```
 
 该切换仅作用于当前会话，不会持久化到 `config.toml`。关闭后会移除对记忆工具的访问，但会保留磁盘上的现有文件。打开后会重新初始化记忆存储并注册记忆工具。
@@ -80,11 +89,13 @@ export GROK_MEMORY=0
 <a id="priority-order"></a>
 ### 优先级顺序
 
-1. `--no-memory` CLI 标志（始终禁用）
-2. `--experimental-memory` CLI 标志（启用）
-3. `GROK_MEMORY` 环境变量：`1`/`true` 启用，`0`/`false` 禁用
-4. config.toml 中的 `[memory]` 节
-5. 默认值：禁用
+1. 进程级强制禁用（兼容标志 `--no-memory` 或 `GROK_MEMORY=0`）会关闭两个实现。
+2. 生效 TOML 中显式的 `[memory] enabled = false` 会关闭两个实现，除非同一 TOML 还设置 `[memory_v2] enabled = true`；单独的远程 v2 开关不能覆盖本地选择退出。
+3. `memory_v2.enabled` 先从生效 TOML、再从专用受管设置 `grok_build_memory_v2_enabled` 解析；为 true 时无论旧版 `memory_enabled` 如何都会选择 v2。
+4. 否则，旧版启用状态通过现有兼容 CLI、`GROK_MEMORY`、生效 TOML 和受管远程层级解析。
+5. 两个开关都未启用时，记忆处于禁用状态。
+
+所有受管 v2 行为都来自专用的 `grok_build_memory_v2_settings` 对象。Memory v2 不使用旧版 `grok_build_settings` 对象中的字段。
 
 ---
 
@@ -128,7 +139,7 @@ Grok 从会话元数据生成摘要，不调用 LLM，也不会增加延迟。�
 如需更丰富地捕获决策、模式、调试工作流和 API 发现，请在 TUI 中使用 `/flush`：
 
 ```
-/flush
+> remember to always open PR links after pushing
 ```
 
 该命令会触发由 LLM 生成的摘要，提炼当前会话中最重要的内容，并将其写入带日期的会话日志。摘要会建立索引，以便未来会话搜索。
@@ -149,7 +160,7 @@ Grok 从会话元数据生成摘要，不调用 LLM，也不会增加延迟。�
 让 Grok 记住某件事，它会将笔记追加到 `MEMORY.md` 文件中——项目专用内容写入工作区文件，跨项目偏好写入全局 `~/.grok/memory/MEMORY.md`：
 
 ```
-> remember to always open PR links after pushing
+/remember always open PR links after pushing
 ```
 
 Grok 会将条目以持久化陈述记录在有组织的标题下，例如 `## Preferences`、`## Project Context` 或 `## Debugging`。文件监视器会在下次记忆搜索时重新建立索引，因此新条目在当前会话中即可搜索。
@@ -157,7 +168,7 @@ Grok 会将条目以持久化陈述记录在有组织的标题下，例如 `## P
 也可以直接使用 `/remember` 命令保存笔记：
 
 ```
-/remember always open PR links after pushing
+> forget the snake_case convention
 ```
 
 不带文本运行 `/remember` 会进入记住模式，你输入的下一行将成为笔记。无论哪种方式，Grok 都会打开审阅面板显示笔记（可选的改写版本可用 `Tab` 切换）；只有确认后才会写入。保存后，Grok 会显示 `Memory saved to ~/.grok/memory/MEMORY.md`。
@@ -168,7 +179,7 @@ Grok 会将条目以持久化陈述记录在有组织的标题下，例如 `## P
 让 Grok 忘记某件事，它会查找并删除匹配的条目：
 
 ```
-> forget the snake_case convention
+> what do you remember?
 ```
 
 Forget 采用尽力而为的方式：模型搜索记忆并移除匹配项。要保证删除，请直接编辑 `~/.grok/memory/` 下的文件并自行删除条目。要定位文件，请打开 `/memory` 浏览器并按 `y` 复制路径。
@@ -179,7 +190,7 @@ Forget 采用尽力而为的方式：模型搜索记忆并移除匹配项。要�
 询问 Grok 记得什么：
 
 ```
-> what do you remember?
+/memory
 ```
 
 Grok 会搜索全部记忆文件，并按来源汇总已知内容：全局偏好、项目专用知识和会话历史。使用 `/memory` 浏览原始文件。
@@ -197,7 +208,7 @@ Grok 会搜索全部记忆文件，并按来源汇总已知内容：全局偏好
 `/memory` 命令会打开一个模态窗口，显示全部记忆文件：
 
 ```
-/memory
+Memory saved to ~/.grok/memory/MEMORY.md
 ```
 
 文件按范围分组：
@@ -235,7 +246,7 @@ Grok 会搜索全部记忆文件，并按来源汇总已知内容：全局偏好
 使用 `/remember` 保存笔记时，Grok 会在回滚区确认：
 
 ```
-Memory saved to ~/.grok/memory/MEMORY.md
+/dream
 ```
 
 后台保存——flush、dream 和会话结束保存——会静默运行，不会发布回滚区消息。随时使用 `/memory` 浏览 Grok 已存储的内容。
@@ -247,8 +258,12 @@ Memory saved to ~/.grok/memory/MEMORY.md
 
 `/dream` 命令会将零散的记忆片段整理为有组织的主题：
 
-```
-/dream
+```toml
+[memory.dream]
+enabled = true     # Run automatic consolidation (default: true)
+min_hours = 24     # Minimum hours between consolidations
+min_sessions = 5   # Minimum sessions since the last consolidation
+check_interval_secs = 3600 # Also check the gates hourly
 ```
 
 Dream 会把各个会话日志和记忆条目重组为连贯、去重的知识库，随时间推移减少噪声并提升搜索质量。`/dream` 要求已启用记忆。
@@ -259,11 +274,9 @@ Dream 会把各个会话日志和记忆条目重组为连贯、去重的知识�
 Dream 也会自动运行。默认情况下，Grok 会在启动时以及会话期间定期检查整理条件，并在经过足够时间且积累足够会话后运行一次 Dream：
 
 ```toml
-[memory.dream]
-enabled = true     # 运行自动整理（默认：true）
-min_hours = 24     # 整理之间的最少小时数
-min_sessions = 5   # 上次整理以来的最少会话数
-# check_interval_secs 默认为 3600，因此每小时检查一次。
+[memory.initial_injection]
+enabled = true     # Enable or disable first-turn injection
+min_score = 0.9    # Score threshold for first-turn injection
 ```
 
 ---
@@ -278,10 +291,9 @@ min_sessions = 5   # 上次整理以来的最少会话数
 
 可以配置首轮注入：
 
-```toml
-[memory.initial_injection]
-enabled = true     # 启用或禁用首轮注入
-min_score = 0.0    # 可选的分数阈值；默认未设置，即不进行过滤
+```
+Search memory for "auth middleware patterns"
+Read my workspace MEMORY.md
 ```
 
 <a id="after-compaction"></a>
@@ -296,9 +308,10 @@ min_score = 0.0    # 可选的分数阈值；默认未设置，即不进行过�
 
 Grok 会自动搜索记忆，但你也可以在聊天中手动触发搜索：
 
-```
-Search memory for "auth middleware patterns"
-Read my workspace MEMORY.md
+```toml
+[memory.search.temporal_decay]
+enabled = true           # Enable time-based decay
+half_life_days = 30.0    # Score halves after this many days
 ```
 
 模型可以使用两个记忆工具：
@@ -331,9 +344,9 @@ Read my workspace MEMORY.md
 会话记忆会随时间衰减，以便优先显示最近会话：
 
 ```toml
-[memory.search.temporal_decay]
-enabled = true           # 启用基于时间的衰减
-half_life_days = 7.0     # 经过这么多天后分数减半
+[memory.search.mmr]
+enabled = true           # Enable diversity re-ranking
+lambda = 0.7             # 0.0 = max diversity, 1.0 = pure relevance
 ```
 
 只有会话分块会衰减。全局和工作区记忆包含经过整理的长期知识，不受影响。
@@ -343,10 +356,21 @@ half_life_days = 7.0     # 经过这么多天后分数减半
 
 MMR 重排会惩罚重复结果，以提高多样性：
 
-```toml
-[memory.search.mmr]
-enabled = false          # 选择启用多样性重排
-lambda = 0.7             # 0.0 = 最大多样性，1.0 = 纯相关性
+```bash
+# Clear workspace memory (MEMORY.md, sessions/, and index.sqlite). This is the default scope.
+grok memory clear
+
+# The same scope, stated explicitly
+grok memory clear --workspace
+
+# Clear the global MEMORY.md
+grok memory clear --global
+
+# Clear both workspace and global memory
+grok memory clear --all
+
+# Skip the confirmation prompt (-y is the short form)
+grok memory clear --yes
 ```
 
 ---
@@ -356,21 +380,9 @@ lambda = 0.7             # 0.0 = 最大多样性，1.0 = 纯相关性
 
 `grok memory` 命令从 Shell 管理记忆。它有一个子命令 `clear`：
 
-```bash
-# 清除工作区记忆（MEMORY.md、sessions/ 和 index.sqlite）。这是默认范围。
-grok memory clear
-
-# 显式指定同一范围
-grok memory clear --workspace
-
-# 清除全局 MEMORY.md
-grok memory clear --global
-
-# 同时清除工作区和全局记忆
-grok memory clear --all
-
-# 跳过确认提示（-y 是短形式）
-grok memory clear --yes
+```toml
+[memory.watcher]
+enabled = true    # default
 ```
 
 要从 Shell 编辑记忆，请直接在编辑器中打开文件，例如 `$EDITOR ~/.grok/memory/MEMORY.md`。
@@ -480,11 +492,6 @@ grok memory clear --yes
 - 新建或修改的文件会重新建立索引。
 - 删除的文件会从索引中移除其陈旧分块。
 
-```toml
-[memory.watcher]
-enabled = true    # 默认值
-```
-
 ---
 
 <a id="troubleshooting"></a>
@@ -494,8 +501,8 @@ enabled = true    # 默认值
 ### 记忆不起作用
 
 1. 确认记忆已启用：检查 `grok inspect` 输出。
-2. 检查标志：`grok --experimental-memory` 或 `GROK_MEMORY=1`。
-3. 检查是否有 `--no-memory` 或 `GROK_MEMORY=0` 覆盖你的配置。
+2. 检查生效 TOML 中的 `[memory_v2] enabled`、`[memory] enabled` 或 `GROK_MEMORY`。
+3. 检查是否有 `GROK_MEMORY=0` 或兼容性强制禁用设置覆盖配置。
 
 <a id="memory-not-appearing-in-sessions"></a>
 ### 记忆未出现在会话中

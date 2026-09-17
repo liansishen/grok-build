@@ -195,11 +195,13 @@ impl ExecuteToolCallBlock {
                 } else {
                     theme.primary().add_modifier(Modifier::BOLD)
                 };
-                let mut spans = vec![Span::styled("Run ".to_string(), label_style)];
-                let mut hang = UnicodeWidthStr::width("Run ");
+                let run_label = xai_grok_i18n::t("tool.prefix.run");
+                let user_label = xai_grok_i18n::t("tool.execute.user_label");
+                let mut spans = vec![Span::styled(run_label.to_string(), label_style)];
+                let mut hang = UnicodeWidthStr::width(run_label);
                 if self.bash_mode {
-                    spans.push(Span::styled("(user) ".to_string(), theme.muted()));
-                    hang += UnicodeWidthStr::width("(user) ");
+                    spans.push(Span::styled(user_label.to_string(), theme.muted()));
+                    hang += UnicodeWidthStr::width(user_label);
                 }
                 (spans, hang)
             }
@@ -288,10 +290,16 @@ impl ExecuteToolCallBlock {
         } else {
             theme.primary().add_modifier(Modifier::BOLD)
         };
-        let mut spans = vec![Span::styled("Run ", label_style)];
+        let mut spans = vec![Span::styled(
+            xai_grok_i18n::t("tool.prefix.run"),
+            label_style,
+        )];
         if self.bash_mode {
             // Same style as session event messages (e.g. "Worked for 2.3s")
-            spans.push(Span::styled("(user) ", theme.muted()));
+            spans.push(Span::styled(
+                xai_grok_i18n::t("tool.execute.user_label"),
+                theme.muted(),
+            ));
         }
         // Single ratatui Line: never pass raw newlines (callers that need multi-line command display use `push_command_soft_wrap`)
         let title_owned;
@@ -549,7 +557,10 @@ impl ExecuteToolCallBlock {
                     let hidden = total - threshold;
                     lines.push(apply_pad(
                         BlockLine::separator(Line::from(Span::styled(
-                            format!("\u{2026} +{hidden} lines"),
+                            xai_grok_i18n::t_fmt(
+                                "tool.execute.hidden_lines",
+                                &[("hidden", &hidden.to_string())],
+                            ),
                             theme.muted(),
                         )))
                         .with_panel_background(theme.bg_dark),
@@ -612,7 +623,9 @@ fn strip_leading_run_word(s: &str) -> String {
     }
     // Map back to original casing via byte length of the prefix consumed (`to_ascii_lowercase` preserves length for ASCII prefixes)
     let prefix_len = s.len() - rest.len();
-    s[prefix_len..].trim_start().to_string()
+    s.get(prefix_len..)
+        .map(|rest| rest.trim_start().to_string())
+        .unwrap_or_else(|| s.to_string())
 }
 
 impl BlockContent for ExecuteToolCallBlock {
@@ -778,6 +791,13 @@ mod tests {
         line.spans.iter().map(|s| s.content.as_ref()).collect()
     }
 
+    fn nth<'a, T>(xs: &'a [T], i: usize) -> &'a T {
+        let Some(x) = xs.get(i) else {
+            panic!("expected item {i}, got {} items", xs.len());
+        };
+        x
+    }
+
     #[test]
     fn header_line_uses_header_display_when_set_command_stays_full() {
         let mut block = ExecuteToolCallBlock::new("cd /proj && echo hi");
@@ -786,7 +806,7 @@ mod tests {
         let theme = Theme::current();
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, false, true);
         assert_eq!(headers.len(), 1);
-        let text = line_text(&headers[0].0);
+        let text = line_text(&nth(&headers, 0).0);
         assert!(text.contains("echo hi"), "header={text:?}");
         assert!(
             !text.contains("cd /proj"),
@@ -801,15 +821,15 @@ mod tests {
         let theme = Theme::current();
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, false, true);
         assert_eq!(headers.len(), 2);
-        let title = line_text(&headers[0].0);
-        let cmd = line_text(&headers[1].0);
+        let title = line_text(&nth(&headers, 0).0);
+        let cmd = line_text(&nth(&headers, 1).0);
         // Leading "Run " on the description is stripped (Label already has it).
         assert_eq!(title, "Run the unit test suite");
         assert!(cmd.starts_with("$ "), "cmd={cmd:?}");
         assert!(cmd.contains("cargo test --lib"), "cmd={cmd:?}");
         // Prefix span counts: "Run " only on title; "$ " on command.
-        assert_eq!(headers[0].1, 1);
-        assert_eq!(headers[1].1, 1);
+        assert_eq!(nth(&headers, 0).1, 1);
+        assert_eq!(nth(&headers, 1).1, 1);
     }
 
     #[test]
@@ -819,7 +839,7 @@ mod tests {
         let theme = Theme::current();
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, true, false);
         assert_eq!(headers.len(), 1);
-        assert_eq!(line_text(&headers[0].0), "Run the unit test suite");
+        assert_eq!(line_text(&nth(&headers, 0).0), "Run the unit test suite");
     }
 
     #[test]
@@ -837,9 +857,9 @@ mod tests {
         let theme = Theme::current();
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Shell, false, true);
         assert_eq!(headers.len(), 2);
-        assert_eq!(line_text(&headers[0].0), "Check git status");
-        assert_eq!(headers[0].1, 0);
-        let cmd = line_text(&headers[1].0);
+        assert_eq!(line_text(&nth(&headers, 0).0), "Check git status");
+        assert_eq!(nth(&headers, 0).1, 0);
+        let cmd = line_text(&nth(&headers, 1).0);
         assert!(cmd.starts_with("$ "), "cmd={cmd:?}");
         assert!(cmd.contains("git status -sb"), "cmd={cmd:?}");
     }
@@ -850,7 +870,7 @@ mod tests {
         let theme = Theme::current();
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, false, false);
         assert_eq!(headers.len(), 1);
-        let text = line_text(&headers[0].0);
+        let text = line_text(&nth(&headers, 0).0);
         assert!(text.starts_with("Run "), "header={text:?}");
         assert!(text.contains("echo hi"), "header={text:?}");
     }
@@ -862,7 +882,7 @@ mod tests {
         let theme = Theme::current();
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, false, true);
         assert_eq!(headers.len(), 1);
-        let text = line_text(&headers[0].0);
+        let text = line_text(&nth(&headers, 0).0);
         assert!(
             !text.contains('\n'),
             "label single-line header must flatten newlines: {text:?}"
@@ -893,7 +913,7 @@ mod tests {
             "expected operator soft-wrap rows, got {}",
             lines.len()
         );
-        let first = line_text(&lines[0].content);
+        let first = line_text(&nth(&lines, 0).content);
         assert!(
             first.starts_with("Run "),
             "Label soft-wrap first row needs Run prefix: {first:?}"
@@ -906,13 +926,13 @@ mod tests {
             !first.contains('\n'),
             "each BlockLine is one visual row: {first:?}"
         );
-        let second = line_text(&lines[1].content);
+        let second = line_text(&nth(&lines, 1).content);
         assert!(
             second.trim_start().starts_with("cargo"),
             "continuation under hang: {second:?}"
         );
         assert_eq!(
-            lines[1].joiner.as_deref(),
+            nth(&lines, 1).joiner.as_deref(),
             Some("\n"),
             "copy must preserve line breaks between soft-wrap rows"
         );
@@ -924,7 +944,7 @@ mod tests {
         let theme = Theme::current();
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, false, false);
         assert_eq!(headers.len(), 1);
-        assert!(line_text(&headers[0].0).contains("echo hi"));
+        assert!(line_text(&nth(&headers, 0).0).contains("echo hi"));
     }
 
     #[test]
@@ -934,9 +954,9 @@ mod tests {
         let theme = Theme::current();
         let headers = block.header_lines(&theme, ExecuteHeaderStyle::Label, false, true);
         assert_eq!(headers.len(), 2);
-        let title = line_text(&headers[0].0);
+        let title = line_text(&nth(&headers, 0).0);
         assert_eq!(title, "Run (user) List files");
-        assert_eq!(headers[0].1, 2); // "Run " and "(user) "
+        assert_eq!(nth(&headers, 0).1, 2); // "Run " and "(user) "
     }
 
     #[test]
@@ -1045,6 +1065,51 @@ mod tests {
         assert_eq!(
             plain,
             vec!["$ export XAI_ROOT=/tmp", "  cd /tmp", "  echo start"]
+        );
+    }
+
+    /// The "Run" / "(user)" header chrome and the hidden-lines marker come from the catalog.
+    #[test]
+    fn execute_chrome_copy_comes_from_the_catalog() {
+        let mut block = ExecuteToolCallBlock::new("ls").with_output(
+            (1..=40)
+                .map(|i| format!("line{i}"))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+        block.bash_mode = true;
+        let mut appearance = AppearanceConfig::default();
+        appearance.scrollback.blocks.execute.header_style = ExecuteHeaderStyle::Label;
+        let ctx = BlockContext {
+            mode: DisplayMode::Truncated,
+            is_running: false,
+            width: 120,
+            raw: false,
+            max_lines: None,
+            appearance,
+            is_selected: false,
+            cwd: None,
+        };
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            block
+                .output(&ctx)
+                .lines
+                .iter()
+                .map(|line| crate::scrollback::types::line_plain_text(&line.content))
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
+        assert!(
+            text.contains("⟦tool.prefix.run⟧"),
+            "header label must come from the catalog: {text}"
+        );
+        assert!(
+            text.contains("⟦tool.execute.user_label⟧"),
+            "user-bash marker must come from the catalog: {text}"
+        );
+        assert!(
+            text.contains("⟦tool.execute.hidden_lines⟧"),
+            "hidden-line marker must come from the catalog: {text}"
         );
     }
 }

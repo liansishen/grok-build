@@ -45,6 +45,56 @@ pub struct NotificationMeta {
         Option<BTreeMap<String, xai_grok_status_line::StatusLineModelUsage>>,
 }
 
+/// The wire carrier used for a session-scoped update.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionUpdateCarrier {
+    Standard,
+    XaiSessionNotification,
+    XaiSessionUpdate,
+}
+
+impl SessionUpdateCarrier {
+    pub fn from_method(method: &str) -> Option<Self> {
+        match method {
+            "session/update" => Some(Self::Standard),
+            "x.ai/session_notification" => Some(Self::XaiSessionNotification),
+            "x.ai/session/update" => Some(Self::XaiSessionUpdate),
+            _ => None,
+        }
+    }
+
+    pub const fn method(self) -> &'static str {
+        match self {
+            Self::Standard => "session/update",
+            Self::XaiSessionNotification => "x.ai/session_notification",
+            Self::XaiSessionUpdate => "x.ai/session/update",
+        }
+    }
+
+    pub const fn is_xai(self) -> bool {
+        !matches!(self, Self::Standard)
+    }
+}
+
+/// Normalized metadata envelope shared by standard and xAI session updates.
+#[derive(Debug, Clone)]
+pub struct SessionUpdateEnvelope {
+    pub carrier: SessionUpdateCarrier,
+    pub meta: NotificationMeta,
+}
+
+impl SessionUpdateEnvelope {
+    pub fn from_method_and_meta(
+        method: &str,
+        meta: Option<&serde_json::Map<String, serde_json::Value>>,
+    ) -> Option<Self> {
+        Some(Self {
+            carrier: SessionUpdateCarrier::from_method(method)?,
+            meta: NotificationMeta::from_json(meta),
+        })
+    }
+}
+
 /// Serializable counterpart of the replay stamp the agent injects on replayed notifications.
 /// [`NotificationMeta::from_json`] is the parse side. this is the build side. That spares those sites from
 /// hand-writing `json!` literals.
@@ -88,6 +138,8 @@ pub mod user_message_chunk_meta {
     pub const HIDE_FROM_SCROLLBACK: &str = "hideFromScrollback";
     /// When true, the chunk is a persisted mid-turn interjection; replay renders its `displayText` as an interjection block.
     pub const INTERJECTION: &str = xai_grok_shell::session::storage::INTERJECTION_META_KEY;
+    /// Daemon `UserMessage.message_id`. An interjection stamps this with its injection id.
+    pub const MESSAGE_ID: &str = "messageId";
 }
 
 /// Extract the numeric counter from an `eventId` (`"{sessionId}-{counter}"`).
@@ -250,4 +302,41 @@ mod tests {
         assert_eq!(meta.event_id, None);
         assert_eq!(meta.event_seq, None);
     }
+
+    #[test]
+    fn session_update_carriers_share_one_classification_boundary() {
+        assert_eq!(
+            SessionUpdateCarrier::from_method("session/update"),
+            Some(SessionUpdateCarrier::Standard)
+        );
+        assert_eq!(
+            SessionUpdateCarrier::from_method("x.ai/session_notification"),
+            Some(SessionUpdateCarrier::XaiSessionNotification)
+        );
+        assert_eq!(
+            SessionUpdateCarrier::from_method("x.ai/session/update"),
+            Some(SessionUpdateCarrier::XaiSessionUpdate)
+        );
+        assert!(SessionUpdateCarrier::XaiSessionUpdate.is_xai());
+        assert!(!SessionUpdateCarrier::Standard.is_xai());
+    }
+
+    #[test]
+    fn session_update_envelope_preserves_carrier_and_typed_meta() {
+        let meta_json = json!({
+            "isReplay": true,
+            "eventId": "session-12",
+        });
+        let envelope = SessionUpdateEnvelope::from_method_and_meta(
+            "x.ai/session/update",
+            meta_json.as_object(),
+        )
+        .expect("known session update carrier");
+
+        assert_eq!(envelope.carrier.method(), "x.ai/session/update");
+        assert!(envelope.meta.is_replay);
+        assert_eq!(envelope.meta.event_seq, Some(12));
+        assert!(SessionUpdateEnvelope::from_method_and_meta("x.ai/other", None).is_none());
+    }
+
 }

@@ -116,12 +116,18 @@ pub(super) fn todo_panel_lines(
         .collect();
 
     if overflow {
-        let remaining = todos.len() - shown;
+        let remaining = (todos.len() - shown).to_string();
         // When collapsed, advertise the chord that expands the full list; when already forced open (still overflowing a tiny screen) drop the hint
         let label = if force {
-            format!("\u{2026} +{remaining} more")
+            xai_grok_i18n::t_fmt(
+                "minimal.todo.overflow_more",
+                &[("remaining", remaining.as_str())],
+            )
         } else {
-            format!("\u{2026} +{remaining} more \u{00b7} ctrl+t to expand")
+            xai_grok_i18n::t_fmt(
+                "minimal.todo.overflow_expand",
+                &[("remaining", remaining.as_str())],
+            )
         };
         lines.push(Line::from(Span::styled(label, theme.dim())));
     }
@@ -217,14 +223,17 @@ mod tests {
         ]);
         let lines = todo_panel_lines(&agent, 8, false);
         assert_eq!(lines.len(), 3);
-        assert!(line_text(&lines[0]).contains("done one"));
+        let [done, active, pending] = lines.as_slice() else {
+            panic!("expected 3 todo lines: {lines:?}");
+        };
+        assert!(line_text(done).contains("done one"));
         assert!(
-            line_text(&lines[1]).contains("\u{25b6}"),
+            line_text(active).contains("\u{25b6}"),
             "in-progress row uses the ▶ glyph"
         );
-        assert!(line_text(&lines[1]).contains("active item"));
+        assert!(line_text(active).contains("active item"));
         assert!(
-            line_text(&lines[2]).contains("\u{25a1}"),
+            line_text(pending).contains("\u{25a1}"),
             "pending row uses the □ glyph"
         );
     }
@@ -237,17 +246,47 @@ mod tests {
                 .map(|i| todo(&format!("item {i}"), TodoStatus::Pending))
                 .collect(),
         );
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let lines = todo_panel_lines(&agent, 4, false);
+            assert_eq!(lines.len(), 4, "capped to max_rows");
+            let Some(overflow) = lines.get(3) else {
+                panic!("expected overflow row: {lines:?}");
+            };
+            let text = line_text(overflow);
+            assert!(text.contains("⟦minimal.todo.overflow_expand⟧"), "{text:?}");
+            assert!(
+                !text.contains("ctrl+t"),
+                "the expand-chord hint must come from the catalog: {text:?}"
+            );
+            assert!(
+                !text.contains("+7 more"),
+                "the overflow label must come from the catalog template: {text:?}"
+            );
+
+            // Forced open by Ctrl+T but still overflowing a tiny screen: same row without the expand chord.
+            let forced = todo_panel_lines(&agent, 4, true);
+            let Some(forced_overflow) = forced.get(3) else {
+                panic!("expected overflow row: {forced:?}");
+            };
+            let forced_text = line_text(forced_overflow);
+            assert!(
+                forced_text.contains("⟦minimal.todo.overflow_more⟧"),
+                "{forced_text:?}"
+            );
+            assert!(
+                !forced_text.contains("ctrl+t"),
+                "the forced row drops the expand chord: {forced_text:?}"
+            );
+        });
+
+        // The dropped-row count is substituted into the catalog template.
         let lines = todo_panel_lines(&agent, 4, false);
-        assert_eq!(lines.len(), 4, "capped to max_rows");
-        assert!(
-            line_text(&lines[3]).contains("+7 more"),
-            "got: {:?}",
-            line_text(&lines[3])
-        );
-        assert!(
-            line_text(&lines[3]).contains("ctrl+t"),
-            "overflow row advertises the expand chord: {:?}",
-            line_text(&lines[3])
+        let Some(overflow) = lines.get(3) else {
+            panic!("expected overflow row: {lines:?}");
+        };
+        assert_eq!(
+            line_text(overflow),
+            xai_grok_i18n::t_fmt("minimal.todo.overflow_expand", &[("remaining", "7")])
         );
     }
 }

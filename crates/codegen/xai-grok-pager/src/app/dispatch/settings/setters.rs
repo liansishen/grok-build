@@ -1626,14 +1626,20 @@ pub(super) fn set_theme_inner(app: &mut AppView, value: &str) {
         );
         return;
     };
-    if crate::theme::Theme::apply_name(&canonical).is_none() {
-        tracing::warn!(
-            target: "settings",
-            key = "theme",
-            value = value,
-            "theme could not be applied — set_theme_inner no-op",
-        );
-        return;
+    if canonical == "auto" {
+        crate::theme::cache::set_auto_mode(true);
+        apply_theme_kind_for_display(crate::theme::ThemeKind::Auto);
+    } else {
+        crate::theme::cache::set_auto_mode(false);
+        if crate::theme::Theme::apply_name(&canonical).is_none() {
+            tracing::warn!(
+                target: "settings",
+                key = "theme",
+                value = value,
+                "theme could not be applied — set_theme_inner no-op",
+            );
+            return;
+        }
     }
     app.current_ui.theme = Some(canonical);
 }
@@ -1732,7 +1738,9 @@ pub(super) fn set_auto_dark_theme_inner(app: &mut AppView, value: &str) {
     app.current_ui.auto_dark_theme = Some(canonical.clone());
     crate::theme::cache::invalidate_auto_theme_config();
     if auto_theme_setting_is_live("auto_dark_theme") {
-        let _ = crate::theme::Theme::preview_name(&canonical);
+        if let Some(kind) = crate::theme::ThemeKind::from_name(&canonical) {
+            crate::theme::Theme::apply_kind(kind);
+        }
     }
 }
 
@@ -1833,7 +1841,9 @@ pub(super) fn set_auto_light_theme_inner(app: &mut AppView, value: &str) {
     app.current_ui.auto_light_theme = Some(canonical.clone());
     crate::theme::cache::invalidate_auto_theme_config();
     if auto_theme_setting_is_live("auto_light_theme") {
-        let _ = crate::theme::Theme::preview_name(&canonical);
+        if let Some(kind) = crate::theme::ThemeKind::from_name(&canonical) {
+            crate::theme::Theme::apply_kind(kind);
+        }
     }
 }
 

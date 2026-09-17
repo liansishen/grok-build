@@ -19,9 +19,11 @@ pub struct LoopCommand;
 /// leaving the model to derive the real interval. There is no host-side default.
 fn parse_loop_args(args: &str) -> (Option<&str>, &str) {
     let trimmed = args.trim();
-    if let Some(space) = trimmed.find(char::is_whitespace) {
-        let first = &trimmed[..space];
-        let rest = trimmed[space..].trim_start();
+    if let Some((first, rest)) = trimmed
+        .find(char::is_whitespace)
+        .and_then(|space| trimmed.split_at_checked(space))
+    {
+        let rest = rest.trim_start();
         if is_interval_token(first) && !rest.is_empty() {
             return (Some(first), rest);
         }
@@ -316,8 +318,8 @@ mod tests {
     fn run_instruction_drops_host_default_and_explains_parsing() {
         match run_loop("every 30 minutes do x") {
             CommandResult::InjectSkill { prompt_blocks, .. } => {
-                let acp::ContentBlock::Text(text) = &prompt_blocks[0] else {
-                    panic!("expected a text prompt block");
+                let Some(acp::ContentBlock::Text(text)) = prompt_blocks.first() else {
+                    panic!("expected a text prompt block, got {prompt_blocks:?}");
                 };
                 let instruction = &text.text;
                 assert!(
@@ -353,8 +355,8 @@ mod tests {
         let args = "2h run tests";
         match run_loop(args) {
             CommandResult::InjectSkill { prompt_blocks, .. } => {
-                let acp::ContentBlock::Text(text) = &prompt_blocks[0] else {
-                    panic!("expected a text prompt block");
+                let Some(acp::ContentBlock::Text(text)) = prompt_blocks.first() else {
+                    panic!("expected a text prompt block, got {prompt_blocks:?}");
                 };
                 assert_eq!(text.text, loop_schedule_instruction(args));
             }

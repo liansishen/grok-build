@@ -18,10 +18,9 @@ pub(super) fn dispatch_share_session(app: &mut AppView) -> Vec<Effect> {
     vec![]
 }
 
-/// Monotonic generation for usage-modal fetches. Each open stamps the modal
-/// and its effects with a fresh value so a reply from a previous open (same
-/// session, modal closed and reopened) can't overwrite newer results. `0` is
-/// reserved for the minimal-mode paths, which never touch the modal.
+/// Monotonic generation for usage-modal fetches, shared by every surface that opens the modal.
+/// A reply from a previous open (modal closed and reopened) then can't overwrite newer results.
+/// `0` is reserved for background refreshes (minimal-mode paths, startup/login `FetchAppBilling`), which never settle a modal.
 static USAGE_FETCH_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 fn next_usage_fetch_nonce() -> u64 {
@@ -145,9 +144,16 @@ fn open_dashboard_usage_modal(
     let mut state = UsageInfoModalState::new(tab, ctx);
     let mut effects = Vec::new();
     if billing_reachable {
+        app.billing_request_seq = app.billing_request_seq.wrapping_add(1);
+        let request = crate::app::actions::BillingRequestId {
+            generation: app.billing_generation,
+            sequence: app.billing_request_seq,
+        };
         state.fetch_nonce = next_usage_fetch_nonce();
         state.billing_loading = true;
-        effects.push(Effect::FetchAppBilling { request: None });
+        effects.push(Effect::FetchAppBilling {
+            request: Some(request),
+        });
     }
     dashboard.usage_modal = Some(Box::new(state));
     effects

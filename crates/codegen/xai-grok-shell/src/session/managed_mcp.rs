@@ -691,6 +691,13 @@ pub(crate) fn merge_plugin_oauth_into(
 mod tests {
     use super::*;
 
+    fn at<T>(xs: &[T], i: usize) -> &T {
+        let Some(x) = xs.get(i) else {
+            panic!("expected index {i}, len {}", xs.len());
+        };
+        x
+    }
+
     fn empty_cwd() -> tempfile::TempDir {
         tempfile::tempdir().unwrap()
     }
@@ -775,6 +782,7 @@ mod tests {
     fn client_cursor_server_kept_when_cursor_mcps_enabled() {
         let cwd = empty_cwd();
         write_cursor_project_mcp(cwd.path(), "killswitch-cache");
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
         let merged = merge_managed_mcp_servers(
             vec![client_stdio("killswitch-cache")],
@@ -834,6 +842,7 @@ args = ["ok"]
         )
         .unwrap();
         git2::Repository::init(cwd.path()).unwrap();
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
 
         let mut compat = xai_grok_tools::types::compat::CompatConfig::default();
         compat.cursor.mcps = false;
@@ -994,6 +1003,7 @@ url = "https://denied.corp.com/mcp"
 "#,
         )
         .unwrap();
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
 
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
         let inputs = McpDiscoveryInputs {
@@ -1366,7 +1376,7 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
             &settings_with_policy(deny(PolicySourceAuthority::Advisory)),
         );
         assert!(
-            tagged[0].disabled_reason.is_none(),
+            at(&tagged, 0).disabled_reason.is_none(),
             "advisory deny must not bind a grok-native server"
         );
 
@@ -1377,7 +1387,7 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
             &settings_with_policy(deny(PolicySourceAuthority::Advisory)),
         );
         assert!(
-            tagged[0].disabled_reason.is_some(),
+            at(&tagged, 0).disabled_reason.is_some(),
             "advisory deny must bind a foreign server"
         );
 
@@ -1388,7 +1398,7 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
             &settings_with_policy(deny(PolicySourceAuthority::Native)),
         );
         assert!(
-            tagged[0].disabled_reason.is_some(),
+            at(&tagged, 0).disabled_reason.is_some(),
             "a native policy source binds every origin"
         );
     }
@@ -1600,7 +1610,7 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
         // A project-scoped name strips the native classification.
         let project: std::collections::HashSet<String> = ["srv".to_string()].into();
         assert_eq!(
-            mcp_subject(&server, &native[0], &project).origin,
+            mcp_subject(&server, at(&native, 0), &project).origin,
             PolicySubjectOrigin::Foreign
         );
     }
@@ -1623,6 +1633,7 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
             }}"#,
         )
         .unwrap();
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
         let merge = |ms: &ManagedSettings| {
             let merged =
@@ -1766,7 +1777,10 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
             &std::collections::HashSet::new(),
             &settings_with_policy(allowlist),
         );
-        assert!(tagged[0].disabled_reason.is_some(), "server must be tagged");
+        assert!(
+            at(&tagged, 0).disabled_reason.is_some(),
+            "server must be tagged"
+        );
 
         let log = xai_grok_telemetry::unified_log::snapshot_log().unwrap_or_default();
         let log = String::from_utf8_lossy(&log);
@@ -1980,8 +1994,9 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
         assert_eq!(names, ["projallowed", "usersrv"]);
 
         // The verdict API's pin leg classifies the drop as a ProjectPin hit naming the pinning layer.
+        let listed = servers();
         let reason = ms
-            .mcp_project_pin_block(&servers()[0], subject("projsrv"))
+            .mcp_project_pin_block(at(&listed, 0), subject("projsrv"))
             .expect("project server without a grant is dropped");
         assert!(
             matches!(&reason, McpBlockReason::ProjectPin { source }
@@ -1989,7 +2004,7 @@ headers = { "X-A" = "1", "X-B" = "2", "X-C" = "3" }
             "got {reason:?}"
         );
         assert!(
-            ms.mcp_project_pin_block(&servers()[1], subject("projallowed"))
+            ms.mcp_project_pin_block(at(&listed, 1), subject("projallowed"))
                 .is_none(),
             "allowlisted project server is not dropped"
         );
@@ -2164,6 +2179,7 @@ Authorization = "Bearer org2-token"
 
         let cwd = empty_cwd();
         write_cursor_project_mcp(cwd.path(), "projsrv");
+        crate::agent::folder_trust::record_for_test(cwd.path(), true);
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
         let inputs = McpDiscoveryInputs {
             cwd: cwd.path(),
@@ -2212,7 +2228,7 @@ Authorization = "Bearer org2-token"
         );
 
         assert_eq!(servers.len(), 1, "should create one server");
-        match &servers[0] {
+        match &at(&servers, 0) {
             acp::McpServer::Stdio(acp::McpServerStdio {
                 name,
                 command,
@@ -2270,7 +2286,7 @@ Authorization = "Bearer org2-token"
         let (servers, _) =
             load_plugin_mcp_servers_from_value(&value, "sentry", "/tmp/p", "/tmp/pd");
         assert_eq!(servers.len(), 1);
-        match &servers[0] {
+        match &at(&servers, 0) {
             acp::McpServer::Http(acp::McpServerHttp { name, url, .. }) => {
                 assert_eq!(name, "sentry");
                 assert_eq!(url, "https://mcp.sentry.dev/mcp");
@@ -2415,7 +2431,7 @@ Authorization = "Bearer org2-token"
             1,
             "same plugin declaring one server name twice must register exactly once"
         );
-        match sentry[0] {
+        match at(&sentry, 0) {
             acp::McpServer::Http(acp::McpServerHttp { url, .. }) => {
                 assert_eq!(url, "https://file.example/mcp", "file source must win");
             }

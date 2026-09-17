@@ -2,6 +2,8 @@
 //! Each event variant carries structured data (e.g., elapsed time, error messages, token counts).
 //! This enables variant-specific rendering and future styling differentiation.
 
+use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use ratatui::style::Modifier;
@@ -18,6 +20,9 @@ use crate::scrollback::types::{
 use crate::theme::Theme;
 use crate::util::format_duration;
 use crate::views::plan_approval_view::PlanReviewOutcome;
+use xai_grok_shell::extensions::notification::{
+    MODEL_FAMILY_SWITCH_COMPACT_BANNER, MemoryCaptureDebugEntry,
+};
 
 /// Shared text-selection range id for recap body lines (header is excluded).
 const RECAP_BODY_RANGE: u16 = 0;
@@ -33,10 +38,12 @@ pub enum SessionEvent {
         /// `None` when unknown: a wake turn whose deltas carried no `turnStartMs` (old shells) renders without a duration instead of a fake "0.0s".
         elapsed: Option<Duration>,
     },
-    /// Agent turn was cancelled by the user.
+    /// Agent turn was cancelled.
     TurnCancelled {
         /// Wall-clock elapsed time before cancellation.
         elapsed: Duration,
+        /// Named from `_meta.cancelTrigger` / `_meta.cancellationCategory`.
+        cause: crate::scrollback::blocks::CancelledBy,
     },
     /// Agent turn ended because a hook denied it, today only a `UserPromptSubmit` block (a `PreToolUse` deny feeds back and the turn continues).
     /// Distinct from [`SessionEvent::TurnCancelled`] so the marker never claims the USER cancelled a policy block.
@@ -61,6 +68,7 @@ pub enum SessionEvent {
     CompactionStarted {
         /// Percentage of context window used (e.g., 85).
         percentage: u8,
+        reason: String,
     },
     /// Auto-compaction completed successfully.
     CompactionCompleted {
@@ -158,6 +166,196 @@ pub enum SessionEvent {
     },
 }
 
+/// Debug-only, foldable view of observations created by a memory-v2 capture.
+#[derive(Debug, Clone)]
+pub struct MemoryCaptureBlock {
+    from_turn: u32,
+    through_turn: u32,
+    entries: Vec<MemoryCaptureDebugEntry>,
+}
+
+impl MemoryCaptureBlock {
+    pub fn new(from_turn: u32, through_turn: u32, entries: Vec<MemoryCaptureDebugEntry>) -> Self {
+        Self {
+            from_turn,
+            through_turn,
+            entries: entries
+                .into_iter()
+                .map(|entry| MemoryCaptureDebugEntry {
+                    statement: sanitize_model_debug_text(&entry.statement),
+                    body: entry.body.map(|body| sanitize_model_debug_text(&body)),
+                    // The path is produced only after create-only persistence
+                    // succeeds and remains the block's sole trusted link target.
+                    path: entry.path,
+                })
+                .collect(),
+        }
+    }
+
+    fn title(&self) -> String {
+        let args = [
+            ("count", self.entries.len().to_string()),
+            ("from", self.from_turn.to_string()),
+            ("through", self.through_turn.to_string()),
+        ];
+        let args = args
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect::<Vec<_>>();
+        xai_grok_i18n::t_fmt(
+            if self.entries.len() == 1 {
+                "scrollback.memory_capture.debug_output_one"
+            } else {
+                "scrollback.memory_capture.debug_output_many"
+            },
+            &args,
+        )
+    }
+
+    pub(crate) fn searchable_text(&self) -> String {
+        let mut parts = vec![self.title()];
+        for entry in &self.entries {
+            parts.push(entry.statement.clone());
+            if let Some(body) = &entry.body {
+                parts.push(body.clone());
+            }
+            parts.push(entry.path.clone());
+        }
+        parts.join("\n")
+    }
+}
+
+impl BlockContent for MemoryCaptureBlock {
+    fn output(&self, ctx: &BlockContext) -> BlockOutput {
+        let theme = Theme::current();
+        let title_style = if ctx.mode == DisplayMode::Collapsed {
+            theme.muted().add_modifier(Modifier::BOLD)
+        } else {
+            theme.primary().add_modifier(Modifier::BOLD)
+        };
+        let mut lines = vec![BlockLine::styled(Line::from(Span::styled(
+            self.title(),
+            title_style,
+        )))];
+
+        if ctx.mode != DisplayMode::Collapsed {
+            let width = ctx.content_width().max(1);
+            for (index, entry) in self.entries.iter().enumerate() {
+                lines.push(BlockLine::separator(Line::default()));
+                lines.push(BlockLine::styled(Line::from(Span::styled(
+                    xai_grok_i18n::t_fmt(
+                        "scrollback.memory_capture.observation",
+                        &[("index", &(index + 1).to_string())],
+                    ),
+                    theme.muted().add_modifier(Modifier::BOLD),
+                ))));
+                lines.extend(
+                    word_wrap_lines(
+                        entry
+                            .statement
+                            .lines()
+                            .map(|line| Line::from(Span::styled(line.to_owned(), theme.primary())))
+                            .collect::<Vec<_>>(),
+                        width,
+                    )
+                    .into_iter()
+                    .map(BlockLine::styled),
+                );
+                if let Some(body) = entry.body.as_deref() {
+                    lines.extend(
+                        word_wrap_lines(
+                            body.lines()
+                                .map(|line| {
+                                    Line::from(Span::styled(line.to_owned(), theme.muted()))
+                                })
+                                .collect::<Vec<_>>(),
+                            width,
+                        )
+                        .into_iter()
+                        .map(BlockLine::styled),
+                    );
+                }
+
+                let label = Path::new(&entry.path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or(entry.path.as_str());
+                let mut path_line = BlockLine::styled(Line::from(vec![
+                    Span::styled(
+                        xai_grok_i18n::t("scrollback.memory_capture.open_file"),
+                        theme.muted(),
+                    ),
+                    Span::styled(
+                        label.to_owned(),
+                        theme.primary().add_modifier(Modifier::UNDERLINED),
+                    ),
+                ]));
+                path_line.link_target = Some(crate::render::osc8::LinkTarget::File(Arc::from(
+                    Path::new(&entry.path),
+                )));
+                lines.push(path_line);
+            }
+        }
+
+        if let Some(max_lines) = ctx.max_lines {
+            lines.truncate(max_lines as usize);
+        }
+        BlockOutput { lines }
+    }
+
+    fn accent(&self, _ctx: &BlockContext) -> Option<AccentStyle> {
+        None
+    }
+
+    fn has_vpad_for(&self, _appearance: &AppearanceConfig) -> bool {
+        false
+    }
+
+    fn default_display_mode(&self) -> DisplayMode {
+        DisplayMode::Collapsed
+    }
+
+    fn has_bullet(&self, _ctx: &BlockContext) -> bool {
+        true
+    }
+
+    fn is_groupable(&self) -> bool {
+        true
+    }
+}
+
+fn sanitize_model_debug_text(text: &str) -> String {
+    let stripped = strip_ansi_escapes::strip_str(text);
+    let mut sanitized = String::with_capacity(stripped.len());
+    let mut characters = stripped.chars().peekable();
+    let mut previous = None;
+    while let Some(character) = characters.next() {
+        if character.is_control() && !matches!(character, '\n' | '\t') {
+            sanitized.push('\u{fffd}');
+            continue;
+        }
+        if matches!(
+            character,
+            '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}'
+        ) {
+            sanitized.push('\u{fffd}');
+            continue;
+        }
+        sanitized.push(character);
+        // Keep debug prose from becoming terminal-native links. Word joiners break
+        // URL/email recognition without changing visible text; the committed local
+        // path below is linked explicitly through `LinkTarget::File`.
+        let domain_dot = character == '.'
+            && previous.is_some_and(char::is_alphanumeric)
+            && characters.peek().is_some_and(|next| next.is_alphanumeric());
+        if matches!(character, ':' | '/' | '@') || domain_dot {
+            sanitized.push('\u{2060}');
+        }
+        previous = Some(character);
+    }
+    sanitized
+}
+
 impl SessionEvent {
     /// Format the event as a human-readable string.
     pub fn message(&self) -> String {
@@ -169,33 +367,54 @@ impl SessionEvent {
                 let duration = format_duration(*elapsed);
                 xai_grok_i18n::t_fmt("session.worked_for", &[("duration", &duration)])
             }
-            SessionEvent::TurnCompleted { elapsed: None } => "Turn completed.".to_string(),
-            SessionEvent::TurnCancelled { elapsed } => {
-                format!("Turn cancelled by user in {}.", format_duration(*elapsed))
+            SessionEvent::TurnCompleted { elapsed: None } => {
+                xai_grok_i18n::t("session.turn_completed").to_string()
+            }
+            SessionEvent::TurnCancelled { elapsed, cause } => {
+                xai_grok_i18n::t_fmt(
+                    "session.turn_cancelled_in",
+                    &[
+                        ("reason", cause.phrase()),
+                        ("duration", &format_duration(*elapsed)),
+                    ],
+                )
             }
             SessionEvent::TurnBlockedByHook { elapsed } => {
-                format!("Turn blocked by a hook in {}.", format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.turn_blocked_by_hook",
+                    &[("duration", &format_duration(*elapsed))],
+                )
             }
             SessionEvent::TurnHalted { elapsed } => {
-                format!(
-                    "Agent was unable to make progress. Turn ended in {}.",
-                    format_duration(*elapsed)
+                xai_grok_i18n::t_fmt(
+                    "session.turn_halted",
+                    &[("duration", &format_duration(*elapsed))],
                 )
             }
             SessionEvent::TurnFailed {
                 error,
                 elapsed: Some(elapsed),
             } => {
-                format!("Turn failed in {}: {error}", format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.turn_failed_in",
+                    &[("duration", &format_duration(*elapsed)), ("error", error)],
+                )
             }
             SessionEvent::TurnFailed {
                 error,
                 elapsed: None,
             } => {
-                format!("Turn failed: {error}")
+                xai_grok_i18n::t_fmt("session.turn_failed", &[("error", error)])
             }
-            SessionEvent::CompactionStarted { percentage } => {
-                format!("Context {percentage}% full. Compacting…")
+            SessionEvent::CompactionStarted { percentage, reason } => {
+                if reason == MODEL_FAMILY_SWITCH_COMPACT_BANNER {
+                    xai_grok_i18n::t("session.model_family_switch_compacting").to_string()
+                } else {
+                    xai_grok_i18n::t_fmt(
+                        "session.compaction_started",
+                        &[("percentage", &percentage.to_string())],
+                    )
+                }
             }
             SessionEvent::CompactionCompleted {
                 tokens_before,
@@ -205,13 +424,11 @@ impl SessionEvent {
                 let after = format_tokens(*tokens_after);
                 // Older shells don't send tokens_before; keep the legacy format
                 let body = match tokens_before {
-                    Some(before) if *before > 0 => {
-                        format!(
-                            "Context compacted: {} → {after} tokens",
-                            format_tokens(*before)
-                        )
-                    }
-                    _ => format!("Context compacted → {after} tokens"),
+                    Some(before) if *before > 0 => xai_grok_i18n::t_fmt(
+                        "session.compaction_completed_range",
+                        &[("before", &format_tokens(*before)), ("after", &after)],
+                    ),
+                    _ => xai_grok_i18n::t_fmt("session.compaction_completed", &[("after", &after)]),
                 };
                 if let Some(ms) = elapsed_ms {
                     let secs = *ms as f64 / 1000.0;
@@ -222,46 +439,46 @@ impl SessionEvent {
             }
             SessionEvent::CompactionFailed { error } => {
                 if error.trim().is_empty() {
-                    "Compaction failed.".to_string()
+                    xai_grok_i18n::t("session.compaction_failed").to_string()
                 } else {
                     // Multi-line errors (guidance and detail) split in `output`; old one-line replays render unchanged
-                    format!("Compaction failed - {error}")
+                    xai_grok_i18n::t_fmt("session.compaction_failed_error", &[("error", error)])
                 }
             }
-            SessionEvent::CompactionCancelled => "Compaction cancelled.".to_string(),
+            SessionEvent::CompactionCancelled => {
+                xai_grok_i18n::t("session.compaction_cancelled").to_string()
+            }
             SessionEvent::RetryFailed { error, error_type } => {
                 use crate::app::error_display::WireErrorType;
                 if WireErrorType::parse(error_type.as_deref())
                     == WireErrorType::EncryptedContentMismatch
                 {
-                    "This session's conversation history is incompatible with the \
-                     current model. Please start a new session."
-                        .to_string()
+                    xai_grok_i18n::t("session.retry_encrypted_mismatch").to_string()
                 } else {
-                    format!("Retry failed: {error}")
+                    xai_grok_i18n::t_fmt("session.retry_failed", &[("error", error)])
                 }
             }
             SessionEvent::RequestFailed {
                 headline, detail, ..
             } => crate::app::error_display::banner_message(headline, detail),
             SessionEvent::ReAuthRequired => {
-                "Authentication required: your session has expired or your \
-                 credentials were rejected. Run /login to re-authenticate, then resend \
-                 your message."
-                    .to_string()
+                xai_grok_i18n::t("session.reauth_required").to_string()
             }
             SessionEvent::ContextTooLarge => {
-                "This conversation is too large for the model's context window. \
-                 Use /new to start a new session."
-                    .to_string()
+                xai_grok_i18n::t("session.context_too_large").to_string()
             }
             SessionEvent::DiskFull => {
                 xai_grok_shell::extensions::notification::DISK_FULL_USER_MESSAGE.to_string()
             }
             // No "Context N% full." prefix; that phrasing is the auto marker's
-            SessionEvent::CompactStarted => "Compacting conversation…".to_string(),
+            SessionEvent::CompactStarted => {
+                xai_grok_i18n::t("session.compacting_conversation").to_string()
+            }
             SessionEvent::CompactCompleted { elapsed } => {
-                format!("Compaction completed in {}.", format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.compaction_completed_in",
+                    &[("duration", &format_duration(*elapsed))],
+                )
             }
             SessionEvent::HookAnnotation { message } | SessionEvent::HookOutcome { message } => {
                 message.clone()
@@ -274,23 +491,33 @@ impl SessionEvent {
                 if new_model_id.is_empty() {
                     reason.clone()
                 } else {
-                    format!("{reason} Switched to \"{new_model_id}\".")
+                    xai_grok_i18n::t_fmt(
+                        "session.model_switched",
+                        &[("reason", reason), ("model", new_model_id)],
+                    )
                 }
             }
             SessionEvent::MemorySaved { path, trigger } => {
                 let short_path = crate::util::abbreviate_path(path);
-                format!("Memory saved ({trigger}) \u{2192} {short_path}  \u{00b7}  /memory to view")
+                xai_grok_i18n::t_fmt(
+                    "session.memory_saved",
+                    &[("trigger", trigger), ("path", &short_path)],
+                )
             }
             SessionEvent::GoalCompleted { elapsed } => {
-                format!("Goal complete in {} end-to-end.", format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.goal_complete",
+                    &[("duration", &format_duration(*elapsed))],
+                )
             }
             SessionEvent::Recap { summary, auto: _ } => {
                 // Always "Recap:" (manual `/recap` and auto return-from-away).
-                format!("Recap: {summary}")
+                xai_grok_i18n::t_fmt("session.recap_summary", &[("summary", summary)])
             }
             SessionEvent::PlanModeEnteredByAgent { permission } => {
-                format!(
-                    "Agent entered plan mode · active permission mode: {permission} · file edits outside session plan.md blocked until plan mode exits"
+                xai_grok_i18n::t_fmt(
+                    "session.plan_mode_entered_by_agent",
+                    &[("permission", permission.as_canonical())],
                 )
             }
             SessionEvent::PlanReviewClosed {
@@ -298,10 +525,13 @@ impl SessionEvent {
                 permission,
             } => {
                 let verdict = match outcome {
-                    PlanReviewOutcome::Approved => "approved",
-                    PlanReviewOutcome::Abandoned => "abandoned",
+                    PlanReviewOutcome::Approved => xai_grok_i18n::t("session.plan_review_approved"),
+                    PlanReviewOutcome::Abandoned => xai_grok_i18n::t("session.plan_review_abandoned"),
                 };
-                format!("Plan {verdict} · plan mode off · active permission mode: {permission}")
+                xai_grok_i18n::t_fmt(
+                    "session.plan_review_closed",
+                    &[("verdict", verdict), ("permission", permission.as_canonical())],
+                )
             }
         }
     }
@@ -482,8 +712,12 @@ impl SessionEventBlock {
         };
         let header_style = header_text_style.add_modifier(Modifier::BOLD);
         // Non-selectable chrome (same as Thinking / tool label prefixes).
-        let header_line =
-            || BlockLine::separator(Line::from(Span::styled("Recap".to_string(), header_style)));
+        let header_line = || {
+            BlockLine::separator(Line::from(Span::styled(
+                xai_grok_i18n::t("session.recap").to_string(),
+                header_style,
+            )))
+        };
 
         // Loading: header only; the animated gray sidebar is the feedback.
         if ctx.is_running {
@@ -494,7 +728,10 @@ impl SessionEventBlock {
 
         match ctx.mode {
             DisplayMode::Collapsed => {
-                let mut spans = vec![Span::styled("Recap".to_string(), header_style)];
+                let mut spans = vec![Span::styled(
+                    xai_grok_i18n::t("session.recap").to_string(),
+                    header_style,
+                )];
                 let preview = summary.lines().next().unwrap_or(summary).trim();
                 if !preview.is_empty() {
                     spans.push(Span::styled(format!("  {preview}"), theme.muted()));
@@ -679,8 +916,26 @@ mod tests {
     fn turn_cancelled_message() {
         let event = SessionEvent::TurnCancelled {
             elapsed: Duration::from_secs(10),
+            cause: crate::scrollback::blocks::CancelledBy::User,
         };
         assert_eq!(event.message(), "Turn cancelled by user in 10s.");
+    }
+
+    #[test]
+    fn turn_cancelled_message_names_passive_cause() {
+        let event = SessionEvent::TurnCancelled {
+            elapsed: Duration::from_secs(10),
+            cause: crate::scrollback::blocks::CancelledBy::SessionClosed,
+        };
+        assert_eq!(
+            event.message(),
+            "Turn cancelled because the session closed in 10s."
+        );
+        let event = SessionEvent::TurnCancelled {
+            elapsed: Duration::from_secs(4),
+            cause: crate::scrollback::blocks::CancelledBy::Unspecified,
+        };
+        assert_eq!(event.message(), "Turn cancelled in 4.0s.");
     }
 
     #[test]
@@ -844,6 +1099,26 @@ mod tests {
     }
 
     #[test]
+    fn compaction_started_switch_reason_renders_reason() {
+        let event = SessionEvent::CompactionStarted {
+            percentage: 9,
+            reason: MODEL_FAMILY_SWITCH_COMPACT_BANNER.into(),
+        };
+        assert_eq!(event.message(), MODEL_FAMILY_SWITCH_COMPACT_BANNER);
+    }
+
+    #[test]
+    fn compaction_started_threshold_reason_renders_fullness() {
+        for reason in ["Context window 9% full", ""] {
+            let event = SessionEvent::CompactionStarted {
+                percentage: 9,
+                reason: reason.into(),
+            };
+            assert_eq!(event.message(), "Context 9% full. Compacting…");
+        }
+    }
+
+    #[test]
     fn compaction_completed_renders_before_after_delta() {
         let event = SessionEvent::CompactionCompleted {
             tokens_before: Some(48_800),
@@ -900,11 +1175,11 @@ mod tests {
         });
         assert_eq!(out.lines.len(), 2, "one block line per message line");
         assert_eq!(
-            plain(&out.lines[0]),
+            plain(nth(&out, 0)),
             "Compaction failed - it'll retry on the next turn, or start a new session using /new."
         );
         assert_eq!(
-            plain(&out.lines[1]),
+            plain(nth(&out, 1)),
             "API error (status 400 Bad Request): invalid_image: too big"
         );
     }
@@ -962,6 +1237,97 @@ mod tests {
             "`web_fetch` blocked by global/qa: no",
             "the message itself carries no glyph"
         );
+    }
+
+    #[test]
+    fn memory_capture_debug_block_is_collapsed_by_default() {
+        let block = MemoryCaptureBlock::new(
+            2,
+            4,
+            vec![MemoryCaptureDebugEntry {
+                statement: "Use the focused test target.".into(),
+                body: Some("The full suite is expensive.".into()),
+                path: "/tmp/memory/observation.md".into(),
+            }],
+        );
+        assert_eq!(block.default_display_mode(), DisplayMode::Collapsed);
+
+        let mut collapsed = ctx();
+        collapsed.mode = DisplayMode::Collapsed;
+        let output = block.output(&collapsed);
+        let [line] = output.lines.as_slice() else {
+            panic!("expected one collapsed line, got {}", output.lines.len());
+        };
+        let text = crate::scrollback::types::line_plain_text(&line.content);
+        assert_eq!(
+            text,
+            "Model-generated memory debug output: 1 memory for turns 2-4"
+        );
+        assert!(line.link_target.is_none());
+    }
+
+    #[test]
+    fn expanded_memory_capture_debug_block_shows_content_and_file_link() {
+        let path = "/tmp/memory/observation.md";
+        let block = MemoryCaptureBlock::new(
+            2,
+            4,
+            vec![MemoryCaptureDebugEntry {
+                statement: "Use the focused test target.".into(),
+                body: Some("The full suite is expensive.".into()),
+                path: path.into(),
+            }],
+        );
+        let output = block.output(&ctx());
+        let text = output
+            .lines
+            .iter()
+            .map(|line| crate::scrollback::types::line_plain_text(&line.content))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("Use the focused test target."));
+        assert!(text.contains("The full suite is expensive."));
+        assert!(text.contains("Open file \u{2192} observation.md"));
+        assert!(output.lines.iter().any(|line| {
+            line.link_target.as_ref()
+                == Some(&crate::render::osc8::LinkTarget::File(Arc::from(
+                    Path::new(path),
+                )))
+        }));
+    }
+
+    #[test]
+    fn memory_capture_debug_sanitizes_controls_and_disarms_remote_links() {
+        let local_path = "/tmp/memory/observation.md";
+        let block = MemoryCaptureBlock::new(
+            2,
+            4,
+            vec![MemoryCaptureDebugEntry {
+                statement: "\u{1b}]8;;https://evil.example\u{7}trusted\u{1b}]8;;\u{7}".into(),
+                body: Some("Visit https://evil.example or attacker@example.com\u{202e}".into()),
+                path: local_path.into(),
+            }],
+        );
+        let output = block.output(&ctx());
+        let text = output
+            .lines
+            .iter()
+            .map(|line| crate::scrollback::types::line_plain_text(&line.content))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(text.contains("Untrusted model-generated observation 1"));
+        assert!(!text.contains('\u{1b}'));
+        assert!(!text.contains('\u{7}'));
+        assert!(!text.contains("https://"));
+        assert!(!text.contains("attacker@example.com"));
+        assert!(output.lines.iter().all(|line| {
+            line.link_target.is_none()
+                || line.link_target.as_ref()
+                    == Some(&crate::render::osc8::LinkTarget::File(Arc::from(
+                        Path::new(local_path),
+                    )))
+        }));
     }
 
     #[test]
@@ -1040,6 +1406,13 @@ mod tests {
         crate::scrollback::types::line_plain_text(&line.content)
     }
 
+    fn nth<'a>(out: &'a BlockOutput, i: usize) -> &'a BlockLine {
+        let Some(line) = out.lines.get(i) else {
+            panic!("expected line {i}, got {} lines", out.lines.len());
+        };
+        line
+    }
+
     #[test]
     fn recap_renders_tool_style_header_and_body() {
         let block = SessionEventBlock::new(SessionEvent::Recap {
@@ -1048,7 +1421,7 @@ mod tests {
         });
         let out = block.output(&recap_ctx(DisplayMode::Expanded, false));
         assert_eq!(
-            plain(&out.lines[0]),
+            plain(nth(&out, 0)),
             "Recap",
             "header line is the 'Recap' label"
         );
@@ -1058,6 +1431,8 @@ mod tests {
             "summary is shown as body text: {body}"
         );
     }
+
+
 
     #[test]
     fn recap_is_foldable_selectable_and_bulleted_open_by_default() {
@@ -1119,7 +1494,7 @@ mod tests {
         // Header only: no blank line or body while still generating
         let out = block.output(&rc);
         assert_eq!(out.lines.len(), 1, "loading recap is just the header");
-        assert_eq!(plain(&out.lines[0]), "Recap");
+        assert_eq!(plain(nth(&out, 0)), "Recap");
 
         // The sidebar and bullet animate in gray (the feedback), not the magenta running color used for active tool turns
         let accent = block.accent(&rc).expect("loading recap has an accent bar");
@@ -1140,7 +1515,7 @@ mod tests {
         });
         let out = block.output(&recap_ctx(DisplayMode::Collapsed, false));
         assert_eq!(out.lines.len(), 1, "collapsed recap is a single line");
-        let text = plain(&out.lines[0]);
+        let text = plain(nth(&out, 0));
         assert!(text.starts_with("Recap"), "starts with the header: {text}");
         assert!(
             text.contains("First line of recap."),
@@ -1180,12 +1555,12 @@ mod tests {
         });
         let out = block.output(&recap_ctx(DisplayMode::Expanded, false));
         assert!(
-            matches!(out.lines[0].selectable, Selectable::None),
+            matches!(nth(&out, 0).selectable, Selectable::None),
             "header must be decoration, not copyable"
         );
-        assert_eq!(out.lines[0].selection_range, None);
+        assert_eq!(nth(&out, 0).selection_range, None);
         assert!(
-            matches!(out.lines[1].selectable, Selectable::None),
+            matches!(nth(&out, 1).selectable, Selectable::None),
             "blank gap under header must not be selectable"
         );
         let body: Vec<_> = out.lines.iter().skip(2).collect();
@@ -1211,7 +1586,7 @@ mod tests {
         });
         let out = block.output(&recap_ctx(DisplayMode::Collapsed, false));
         assert_eq!(out.lines.len(), 1);
-        let line = &out.lines[0];
+        let line = nth(&out, 0);
         assert!(
             matches!(&line.selectable, Selectable::Spans(r) if *r == (1..2)),
             "only the preview span is selectable, not the Recap label: {:?}",
@@ -1453,5 +1828,169 @@ mod tests {
             auto: false,
         });
         assert!(!recap.event.is_turn_terminal());
+    }
+
+    /// Memory-capture chrome, the compaction range line and the recap header are catalog-backed.
+    #[test]
+    fn session_event_chrome_copy_comes_from_the_catalog() {
+        let capture = MemoryCaptureBlock::new(
+            2,
+            4,
+            vec![MemoryCaptureDebugEntry {
+                statement: "Use the focused test target.".into(),
+                body: None,
+                path: "/tmp/memory/observation.md".into(),
+            }],
+        );
+        let compaction = SessionEventBlock::new(SessionEvent::CompactionCompleted {
+            tokens_before: Some(48_800),
+            tokens_after: 27_100,
+            elapsed_ms: None,
+        });
+        let recap = SessionEventBlock::new(SessionEvent::Recap {
+            summary: "did stuff".into(),
+            auto: false,
+        });
+
+        let wide = BlockContext {
+            width: 200,
+            ..ctx()
+        };
+        let (capture_text, compaction_text, recap_text) = xai_grok_i18n::with_pseudo_locale(|| {
+            let joined = |out: BlockOutput| {
+                out.lines
+                    .iter()
+                    .map(|line| crate::scrollback::types::line_plain_text(&line.content))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            (
+                joined(capture.output(&wide)),
+                joined(compaction.output(&wide)),
+                joined(recap.output(&wide)),
+            )
+        });
+
+        assert!(
+            capture_text.contains("⟦scrollback.memory_capture.observation⟧"),
+            "observation label: {capture_text}"
+        );
+        assert!(
+            capture_text.contains("⟦scrollback.memory_capture.open_file⟧"),
+            "file link label: {capture_text}"
+        );
+        assert!(
+            compaction_text.contains("⟦session.compaction_completed_range⟧"),
+            "compaction range line: {compaction_text}"
+        );
+        assert!(
+            recap_text.contains("⟦session.recap⟧"),
+            "recap header: {recap_text}"
+        );
+    }
+
+    /// `SessionEvent::message()` is the human-readable line the scrollback paints, so each variant
+    /// resolves through the catalog: the pseudo-locale pins the key, zh-CN pins the translation.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn session_event_messages_come_from_the_catalog() {
+        use crate::scrollback::blocks::CancelledBy;
+
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+        let cases: Vec<(SessionEvent, &str)> = vec![
+            (
+                SessionEvent::TurnCompleted { elapsed: None },
+                "session.turn_completed",
+            ),
+            (
+                SessionEvent::TurnFailed {
+                    error: "boom".into(),
+                    elapsed: None,
+                },
+                "session.turn_failed",
+            ),
+            (
+                SessionEvent::CompactionFailed {
+                    error: String::new(),
+                },
+                "session.compaction_failed",
+            ),
+            (
+                SessionEvent::CompactionCancelled,
+                "session.compaction_cancelled",
+            ),
+            (SessionEvent::ContextTooLarge, "session.context_too_large"),
+            (SessionEvent::CompactStarted, "session.compacting_conversation"),
+            (
+                SessionEvent::GoalCompleted {
+                    elapsed: Duration::from_secs(3),
+                },
+                "session.goal_complete",
+            ),
+            (
+                SessionEvent::Recap {
+                    summary: "did stuff".into(),
+                    auto: false,
+                },
+                "session.recap_summary",
+            ),
+        ];
+        for (event, key) in cases {
+            let text = xai_grok_i18n::with_pseudo_locale(|| event.message());
+            assert!(
+                text.contains(&format!("\u{27e6}{key}\u{27e7}")),
+                "{key} not resolved for {event:?}: {text:?}"
+            );
+        }
+
+        // Cancel causes have their own entries, and the duration template wraps them.
+        let cancelled = SessionEvent::TurnCancelled {
+            elapsed: Duration::from_secs(10),
+            cause: CancelledBy::User,
+        };
+        let pseudo = xai_grok_i18n::with_pseudo_locale(|| cancelled.message());
+        // The template resolves through the catalog; its placeholders are only substituted once the
+        // locale yields real copy, so the cause is pinned by the zh-CN assertion below.
+        assert!(
+            pseudo.contains("\u{27e6}session.turn_cancelled_in\u{27e7}"),
+            "cancel message: {pseudo:?}"
+        );
+        for cause in [
+            CancelledBy::User,
+            CancelledBy::MaxTurns,
+            CancelledBy::Unspecified,
+        ] {
+            let phrase = xai_grok_i18n::with_pseudo_locale(|| cause.phrase().to_string());
+            assert!(phrase.starts_with('\u{27e6}'), "{cause:?}: {phrase:?}");
+        }
+
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        assert_eq!(
+            SessionEvent::TurnCompleted { elapsed: None }.message(),
+            "回合已完成。"
+        );
+        assert_eq!(
+            cancelled.message(),
+            "用户取消了回合，用时 10s。"
+        );
+        assert_eq!(
+            SessionEvent::ContextTooLarge.message(),
+            "此对话过大，超出模型上下文窗口。请使用 /new 开始新会话。"
+        );
+        assert_eq!(
+            SessionEvent::Recap {
+                summary: "did stuff".into(),
+                auto: false,
+            }
+            .message(),
+            "回顾：did stuff"
+        );
     }
 }

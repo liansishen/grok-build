@@ -92,7 +92,9 @@ pub(super) fn dispatch_copy_assistant_message(
             return;
         }
 
-        let text = &agent_messages[n - 1];
+        let Some(text) = n.checked_sub(1).and_then(|i| agent_messages.get(i)) else {
+            return;
+        };
         if text.is_empty() {
             agent.scrollback.push_block(RenderBlock::system(
                 xai_grok_i18n::t("transcript.assistant_message_empty").to_string(),
@@ -507,9 +509,12 @@ fn config_agents_slash_name(tab: Option<crate::views::agents_modal::AgentsTab>) 
     }
 }
 
-/// Toast when a session-hosted modal is opened off the agent view.
-fn toast_session_only_slash(app: &mut AppView, name: &str) {
-    let msg = format!("/{name} only works in a session. Open an agent first.");
+/// Toast shown when a modal that needs a session is opened off the agent view.
+pub(super) fn toast_session_only_slash(app: &mut AppView, name: &str) {
+    let msg = xai_grok_i18n::t_fmt(
+        "slash.session_only_command",
+        &[("command", name)],
+    );
     match app.active_view {
         ActiveView::AgentDashboard => {
             if let Some(d) = app.dashboard.as_mut() {
@@ -820,11 +825,12 @@ pub(super) fn handle_marketplace_updates_available(
         let summary = if names.len() <= 2 {
             names.join(", ")
         } else {
-            let count = (names.len() - 2).to_string();
-            let names = names[..2].join(", ");
             xai_grok_i18n::t_fmt(
                 "plugins.update_summary_more",
-                &[("names", &names), ("count", &count)],
+                &[
+                    ("names", &names.iter().take(2).cloned().collect::<Vec<_>>().join(", ")),
+                    ("count", &(names.len() - 2).to_string()),
+                ],
             )
         };
         agent

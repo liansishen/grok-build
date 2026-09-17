@@ -329,7 +329,7 @@ impl FeedbackModalState {
             ratatui::style::Style::default().fg(theme.text_primary),
         );
         let disclosure = ratatui::text::Line::styled(
-            "One archive of this session is sent with this report only. Nothing is turned on for future sessions.",
+            xai_grok_i18n::t("feedback.trace_disclosure"),
             ratatui::style::Style::default().fg(theme.gray),
         );
         for wrapped in crate::render::wrapping::word_wrap_line(&disclosure, width) {

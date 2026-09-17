@@ -232,10 +232,8 @@ fn spawn_stdin_reader(tx: tokio::sync::mpsc::Sender<CallbackResult>) {
                 }
                 Err(OidcError::InvalidPastedInput(msg)) => {
                     tracing::debug!(input = %msg, "OIDC: invalid stdin paste, retrying");
-                    eprintln!(
-                        "  {}",
-                        t_fmt("auth.oidc.invalid_input_retry", &[("message", &msg)])
-                    );
+                    let retry = t_fmt("auth.oidc.invalid_input_retry", &[("message", &msg)]);
+                    eprintln!("  {retry}");
                 }
                 Err(e) => {
                     tracing::warn!(error = %e, "OIDC: stdin paste returned auth error");
@@ -425,13 +423,11 @@ pub async fn run_login_flow_with_config(
         } else {
             oidc.issuer.clone()
         };
-        eprintln!(
-            "{}",
-            t_fmt(
-                "auth.oidc.signing_in_with_provider",
-                &[("provider", &provider_label)],
-            )
+        let signing_in = t_fmt(
+            "auth.oidc.signing_in_with_provider",
+            &[("provider", &provider_label)],
         );
+        eprintln!("{signing_in}");
         eprintln!();
         if let Err(e) = webbrowser::open(&auth_url) {
             tracing::debug!(error = %e, "OIDC: failed to open browser");

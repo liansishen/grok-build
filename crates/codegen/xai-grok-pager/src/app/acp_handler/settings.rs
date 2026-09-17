@@ -132,7 +132,7 @@ pub(super) fn handle_settings_update(notif: &acp::ExtNotification, app: &mut App
         let was_api_key = app.is_api_key_auth;
         let is_key = super::super::app_view::is_api_key_label(&v);
         app.is_api_key_auth = is_key;
-        app.usage_visible = !is_key && !app.is_team_principal && !app.has_external_auth_provider;
+        app.usage_visible = app.team_name.is_none() && app.consumer_account();
         app.sync_billing_surface_to_agents();
         if was_api_key && !is_key && app.usage_visible {
             // This live transition does not pass through auth metadata, so it
@@ -656,7 +656,7 @@ mod presence_aware_dto_tests {
         assert!(update.consent_gate.is_none());
         assert_eq!(
             update.tips.as_deref(),
-            Some(&["still applied".to_string()][..]),
+            Some(["still applied".to_string()].as_slice()),
         );
     }
 
@@ -668,7 +668,10 @@ mod presence_aware_dto_tests {
         }))
         .expect("absent slash_command_tags must not fail parse");
         assert_eq!(absent.slash_command_tags, None, "omit must be None");
-        assert_eq!(absent.tips.as_deref(), Some(&["hello".to_string()][..]));
+        assert_eq!(
+            absent.tips.as_deref(),
+            Some(["hello".to_string()].as_slice())
+        );
 
         // 2. Explicit null: Some(None) (remote cleared)
         let null_v: PagerSettingsUpdate = serde_json::from_value(serde_json::json!({
@@ -707,7 +710,7 @@ mod presence_aware_dto_tests {
         );
         assert_eq!(
             bad.tips.as_deref(),
-            Some(&["still-applied".to_string()][..]),
+            Some(["still-applied".to_string()].as_slice()),
             "sibling tips must still parse"
         );
         assert_eq!(

@@ -34,6 +34,9 @@ Grok 为每个会话使用单独的目录，并按工作目录分组。它会对
   summary.json            # 元数据：摘要/标题、时间戳、模型 ID、消息计数
   updates.jsonl           # ACP 会话更新流（对话 + 工具调用）
   chat_history.jsonl      # 发送给模型的原始聊天消息
+  system_prompt.txt       # 发送给模型的已渲染系统提示
+  prompt_context.json     # 渲染系统提示所用的输入
+  tool_definitions.json   # 最近一次模型调用发送的函数工具（不含 MCP server__tool 条目）
   plan.json               # TODO/任务列表状态
   rewind_points.jsonl     # 用于 /rewind 撤销的回退点
   signals.json            # 会话信号（Token 用量、工具/轮次计数器）
@@ -42,8 +45,7 @@ Grok 为每个会话使用单独的目录，并按工作目录分组。它会对
   subagents/              # 每个子智能体的元数据（meta.json）；子会话位于常规会话树中
 ```
 
-`summary.json` 是索引条目。它记录会话摘要和生成的标题、模型 ID、创建和更新时间
-戳、消息计数，以及分叉或恢复会话的父会话引用。它还会记录最近一轮摘要和会话回顾，供列表界面展示。`updates.jsonl` 是驱动 `/resume` 和会话恢复的权威对话日志。逐轮令牌与费用总计可通过 `grok usage` 查看。
+`summary.json` 是索引条目。它记录会话摘要和生成的标题、模型 ID、创建和更新时间戳、消息计数，以及分叉或恢复会话的父会话引用。它还会记录最近一轮摘要和会话回顾，供列表界面展示。`updates.jsonl` 是驱动 `/resume` 和会话恢复的权威对话日志。`tool_definitions.json` 不包含 MCP 的 `server__tool` 条目，因为模型通过 `search_tool` 和 `use_tool` 使用它们；这两个元工具会被列出。逐轮令牌与费用总计可通过 `grok usage` 查看。
 
 ### 会话标题
 

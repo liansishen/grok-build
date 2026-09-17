@@ -80,8 +80,18 @@
         let entry = scrollback.entries_mut().last().expect("entry pushed");
         match &entry.block {
             RenderBlock::System(b) => {
-                assert!(b.text.contains(&notes[0]));
-                assert!(b.text.contains(&notes[1]));
+                assert!(b.text.contains(
+                    notes
+                        .first()
+                        .unwrap_or_else(|| panic!("missing note"))
+                        .as_str()
+                ));
+                assert!(b.text.contains(
+                    notes
+                        .get(1)
+                        .unwrap_or_else(|| panic!("missing note"))
+                        .as_str()
+                ));
                 assert!(
                     b.text.contains('\n'),
                     "expected \\n separator between dropped notes, got: {:?}",
@@ -919,8 +929,7 @@
             .insert(child_sid.into(), make_subagent_info(child_sid));
         let child_view = make_agent(Some(child_sid));
         agent
-            .subagent_views
-            .insert(child_sid.into(), Box::new(child_view));
+            .insert_test_child(child_sid.into(), Box::new(child_view));
 
         let update = XaiSessionUpdate::AutoCompactCompleted {
             tokens_before: Some(90000),
@@ -959,8 +968,7 @@
             90_000, 131_072,
         ));
         agent
-            .subagent_views
-            .insert(child_sid.into(), Box::new(child_view));
+            .insert_test_child(child_sid.into(), Box::new(child_view));
 
         let update = XaiSessionUpdate::AutoCompactStarted {
             tokens_used: 95_000,
@@ -1311,7 +1319,7 @@
             &mut app,
         );
         assert!(changed);
-        let agent = &app.agents[&AgentId(0)];
+        let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert_eq!(
             agent.display_name.as_deref(),
             Some("a &amp; b"),
@@ -1334,7 +1342,7 @@
             &mut app,
         ));
         assert_eq!(
-            app.agents[&AgentId(0)]
+            app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"))
                 .generated_session_title
                 .as_deref(),
             Some("Keep Me"),
@@ -1350,7 +1358,7 @@
             &mut app,
         );
         assert!(changed);
-        let agent = &app.agents[&AgentId(0)];
+        let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert!(
             agent.display_name.is_none(),
             "auto titles must not promote to display_name"
@@ -1371,7 +1379,7 @@
             &mut app,
         );
         assert!(changed);
-        let agent = &app.agents[&AgentId(0)];
+        let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert_eq!(agent.display_name.as_deref(), Some("Pinned"));
         assert_eq!(agent.generated_session_title.as_deref(), Some("a & b"));
     }
@@ -1392,7 +1400,7 @@
         let raw = serde_json::value::to_raw_value(&n).unwrap();
         let notif = acp::ExtNotification::new("x.ai/session_notification", std::sync::Arc::from(raw));
         assert!(handle_session_notification(&notif, &mut app));
-        let agent = &app.agents[&AgentId(0)];
+        let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert!(
             agent.display_name.is_none(),
             "explicit unpin meta must clear display_name"
@@ -1419,7 +1427,7 @@
         let raw = serde_json::value::to_raw_value(&n).unwrap();
         let notif = acp::ExtNotification::new("x.ai/session_notification", std::sync::Arc::from(raw));
         assert!(handle_session_notification(&notif, &mut app));
-        let agent = &app.agents[&AgentId(0)];
+        let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert!(
             agent.display_name.is_none(),
             "explicit unpin meta must still clear display_name"
@@ -1448,7 +1456,7 @@
             "{PREFIX}{}",
             "é".repeat(MAX_TITLE_SCALARS - PREFIX.chars().count())
         );
-        let agent = &app.agents[&AgentId(0)];
+        let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert!(
             agent.display_name.is_none(),
             "auto titles must not promote to display_name"
@@ -1473,7 +1481,7 @@
             "{PREFIX}{}",
             "é".repeat(MAX_TITLE_SCALARS - PREFIX.chars().count())
         );
-        let agent = &app.agents[&AgentId(0)];
+        let agent = &app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry"));
         assert_eq!(agent.display_name.as_deref(), Some(expected.as_str()));
         assert_eq!(
             agent.generated_session_title.as_deref(),
@@ -1532,7 +1540,7 @@
             &mut app,
         ));
         {
-            let modal = app.agents[&AgentId(0)].extensions_modal.as_ref().unwrap();
+            let modal = app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry")).extensions_modal.as_ref().unwrap();
             assert!(matches!(modal.hooks_data, TabDataState::Loaded(_)));
             assert!(
                 modal.hooks_collapsed_groups.is_empty(),
@@ -1547,7 +1555,7 @@
             &mut app,
         ));
         {
-            let modal = app.agents[&AgentId(0)].extensions_modal.as_ref().unwrap();
+            let modal = app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry")).extensions_modal.as_ref().unwrap();
             assert!(modal.hooks_collapsed_groups.contains("/src1"));
             assert!(modal.hooks_collapsed_groups.contains("/src2"));
         }
@@ -1565,7 +1573,7 @@
             &hooks_changed_ext("sess-1", hooks),
             &mut app,
         ));
-        let modal = app.agents[&AgentId(0)].extensions_modal.as_ref().unwrap();
+        let modal = app.agents.get(&AgentId(0)).unwrap_or_else(|| panic!("missing map entry")).extensions_modal.as_ref().unwrap();
         assert!(!modal.hooks_collapsed_groups.contains("/src1"));
         assert!(modal.hooks_collapsed_groups.contains("/src2"));
     }

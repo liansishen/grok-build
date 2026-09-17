@@ -4,16 +4,20 @@
 # namespaces; do not add a whole module or file as an exception.
 
 [scan]
+# Every first-party workspace source tree is scanned, so a new crate or a new
+# render mode cannot silently fall outside the audit. `third_party/` holds
+# vendored upstream sources and is covered by its own upstream project, not by
+# this fork's localization.
 roots = [
-  "crates/codegen/xai-grok-pager/src",
-  "crates/codegen/xai-grok-shell/src",
-  "crates/codegen/xai-grok-workspace/src",
+  "crates",
+  "prod",
 ]
 
-# Full-prose UI modules are scanned even when strings flow through locals or format!.
+# The full-prose pass runs over the same trees as `roots`: every first-party file is checked for
+# copy reaching a terminal-UI sink, whether it is written inline, through a local, or into a buffer.
 current_full_scan_roots = [
-  "crates/codegen/xai-grok-pager/src/views/tasks_pane.rs",
-  "crates/codegen/xai-grok-pager/src/views/dashboard",
+  "crates",
+  "prod",
 ]
 # Markdown trees are checked by relative path against their translation trees.
 docs_roots = [
@@ -47,11 +51,41 @@ sinks = [
   "HintItem::new",
   "HintItem::paired",
 ]
+# Sinks whose output the user reads inside the terminal UI. Every first-party Rust file is scanned
+# for copy reaching one of these, however it is laundered through locals or `format!`. The CLI
+# `print*` sinks stay in `sinks` only: the fork's non-goals keep CLI help, error and log lines out
+# of the translation surface (new or changed ones are still gated by the diff audit).
+prose_sinks = [
+  "show_toast",
+  "show_toast_ticks",
+  "Span::raw",
+  "Span::styled",
+  "Span::from",
+  "Line::from",
+  "Line::raw",
+  "Line::styled",
+  "Line::from_iter",
+  "Text::from",
+  "Paragraph::new",
+  "Block::title",
+  "Block::title_bottom",
+  "ListItem::new",
+  "Cell::from",
+  "Table::new",
+  "set_string",
+  "set_span",
+  "HintItem::new",
+  "HintItem::paired",
+]
 translation_functions = [
   "t",
   "t_for",
   "t_fmt",
   "t_or",
+  "tr",
+  "tr_for",
+  "tr_fmt",
+  "tr_fmt_for",
   "intern_key",
   "label_t",
   "description_t",
@@ -61,6 +95,7 @@ excluded_path_fragments = [
   "/tests/",
   "/tests.rs",
   "/examples/",
+  "/benches/",
   "/bin/",
   "/testkit/",
   "_tests.rs",
@@ -94,9 +129,57 @@ exact = [
   "h",
   "q",
   "y",
+  "z",
+  # ANSI dim/reset wrapper around catalog copy (the sentence itself is a
+  # `t(...)` lookup); terminal control sequences are never translated.
+  "\u001b[90m{}\u001b[0m",
+  # Keyboard chords, the Mermaid diagram-language tokens and label, and the GBOOM overlay's title:
+  # opaque values rather than prose to translate.
+  "Ctrl+Y",
+  "TB",
+  "GBOOM",
+  # Fixed-width numeric marker (`{pct:.2}%`-style column): 5 cells by contract, never translated.
+  "MAX %",
+  "mermaid: {header}",
+  # Key/chord tokens, layout-only fragments, and compared identifiers (grammars, path
+  # components, protocol states) are matched or measured, never read as prose.
+  "L{}",
+  "SIGKILL",
+  "SIGTERM",
+  "[Esc]",
+  "[x]",
+  "active",
+  "bash",
+  "bundled",
+  "ctrl+d",
+  "ctrl+q",
+  "ctrl+u",
+  "done",
+  "e",
+  "enter",
+  "esc",
+  "f",
+  "json",
+  "killed",
+  "logs",
+  "oom",
+  "personas",
+  "powershell",
+  "{prefix}P {}",
+  "{pos}-{end}/{total}  ↑↓  [Esc]",
+  "{pos}-{end}/{total}  [Esc]",
+  "{}x{} {}",
+  # Stderr diagnostics rather than UI copy: telemetry log-setup failures and the test harness
+  # timer. The fork's non-goals keep logs out of the translation surface, so they stay verbatim.
+  "Failed to create instrumentation log directory {:?}: {}",
+  "Failed to open instrumentation log file {:?}: {}",
+  "Failed to create chrome trace directory {:?}: {}",
+  "Failed to open chrome trace file {:?}: {}",
+  "[harness-timing] {what}: {:?}",
+  # Slash-command name echoed as a block header (`/btw <question>`); the command token is opaque.
+  "/btw {}",
 ]
 prefix = [
-  "/",
   "./",
   "../",
   "http://",

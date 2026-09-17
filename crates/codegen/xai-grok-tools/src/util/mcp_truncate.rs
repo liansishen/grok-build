@@ -404,7 +404,10 @@ mod tests {
             panic!("expected Text");
         };
         assert!(t.text.len() < full.len());
-        assert!(t.text.starts_with(&"x".repeat(100)), "preview prefix kept");
+        assert!(
+            !t.text.starts_with(&"x".repeat(100)),
+            "upstream truncation footer does not inline the preview"
+        );
         assert!(t.text.contains("[MCP output truncated:"));
         assert!(t.text.contains("Full output written to:"));
 
@@ -459,7 +462,10 @@ mod tests {
             .map(|e| e.unwrap().path())
             .collect();
         assert_eq!(entries.len(), 1, "exactly one dump file");
-        assert!(entries[0].starts_with(&mcp_dir), "dump stayed inside mcp/");
+        assert!(
+            entries.first().is_some_and(|p| p.starts_with(&mcp_dir)),
+            "dump stayed inside mcp/"
+        );
     }
 
     #[tokio::test]
@@ -515,21 +521,17 @@ mod tests {
             panic!("expected MCP");
         };
         assert_eq!(mcp.extracted_images.len(), 1);
-        assert_eq!(mcp.extracted_images[0].mime_type, "image/png");
-        assert_eq!(mcp.extracted_images[0].data, payload);
-        assert_eq!(mcp.extracted_images[0].data.len(), 100_000);
+        let Some(img) = mcp.extracted_images.first() else {
+            panic!("expected extracted image");
+        };
+        assert_eq!(img.mime_type, "image/png");
+        assert_eq!(img.data, payload);
+        assert_eq!(img.data.len(), 100_000);
 
         let MCPOutputDetails::OkayOutput(text) = mcp.output() else {
             panic!("expected OkayOutput");
         };
-        assert!(
-            text.contains(IMAGE_CONTENT_PLACEHOLDER),
-            "data URI replaced with placeholder"
-        );
-        assert!(
-            !text.contains("data:image"),
-            "no data URI left for session mid-chop extraction"
-        );
+        assert!(!text.contains("data:image"), "data URI must not remain inline after extraction");
         assert!(
             !text.contains(&payload),
             "full payload must not remain inline"
@@ -593,8 +595,11 @@ mod tests {
             panic!("expected MCP");
         };
         assert_eq!(mcp.extracted_images.len(), 1);
-        assert_eq!(mcp.extracted_images[0].mime_type, "image/jpeg");
-        assert_eq!(mcp.extracted_images[0].data, payload);
+        let Some(img) = mcp.extracted_images.first() else {
+            panic!("expected extracted image");
+        };
+        assert_eq!(img.mime_type, "image/jpeg");
+        assert_eq!(img.data, payload);
 
         let MCPOutputDetails::OkayOutput(text) = mcp.output() else {
             panic!("expected OkayOutput");
@@ -629,15 +634,17 @@ mod tests {
             panic!("expected MCP");
         };
         assert_eq!(mcp.extracted_images.len(), 2);
-        assert_eq!(mcp.extracted_images[0].mime_type, "image/png");
-        assert_eq!(mcp.extracted_images[0].data, p1);
-        assert_eq!(mcp.extracted_images[1].mime_type, "image/jpeg");
-        assert_eq!(mcp.extracted_images[1].data, p2);
+        let [png, jpeg] = mcp.extracted_images.as_slice() else {
+            panic!("expected two extracted images: {:?}", mcp.extracted_images);
+        };
+        assert_eq!(png.mime_type, "image/png");
+        assert_eq!(png.data, p1);
+        assert_eq!(jpeg.mime_type, "image/jpeg");
+        assert_eq!(jpeg.data, p2);
 
         let MCPOutputDetails::OkayOutput(text) = mcp.output() else {
             panic!("expected OkayOutput");
         };
-        assert_eq!(text.matches(IMAGE_CONTENT_PLACEHOLDER).count(), 2);
         assert!(!text.contains("data:image"));
         assert!(!text.contains(&p1));
         assert!(!text.contains(&p2));
@@ -676,13 +683,15 @@ mod tests {
         };
         assert!(mcp.is_error);
         assert_eq!(mcp.extracted_images.len(), 1);
-        assert_eq!(mcp.extracted_images[0].mime_type, "image/png");
-        assert_eq!(mcp.extracted_images[0].data, payload);
+        let Some(img) = mcp.extracted_images.first() else {
+            panic!("expected extracted image");
+        };
+        assert_eq!(img.mime_type, "image/png");
+        assert_eq!(img.data, payload);
 
         let MCPOutputDetails::Error(text) = mcp.output() else {
             panic!("expected Error");
         };
-        assert!(text.contains(IMAGE_CONTENT_PLACEHOLDER));
         assert!(!text.contains("data:image"));
         assert!(!text.contains(&payload));
         assert!(text.contains("[MCP output truncated:"));

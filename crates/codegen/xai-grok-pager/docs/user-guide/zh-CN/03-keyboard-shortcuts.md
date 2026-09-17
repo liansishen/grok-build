@@ -13,11 +13,6 @@ Grok 有两种输入模式，用于控制你在回滚区中的导航方式：
 
 默认启用简单模式。要切换到 Vim 模式，请在 `~/.grok/config.toml` 的 `[ui]` 下设置 `vim_mode = true`，或在运行时使用 `/vim-mode` 切换。详情参见[配置](05-configuration.md)。
 
-> **更新提示上下文：** 仅当欢迎页已经显示“有新版本”提示时，`Ctrl+U` 会优先执行
-> `QuitForUpdate`：退出当前旧版本并授权本次 ZIP 下载与安装；如果已显式开启自动更新，
-> 则等待可能已经开始的后台下载。重新运行 `grok` 即进入新版本。
-> 在回滚区、提示框和 Dashboard 等其他上下文中，`Ctrl+U` 仍保留各自原有含义。
-
 下表记录两种模式的绑定。“按键”列显示 Vim 模式绑定，“替代按键”列显示简单模式中的等效按键（方向键等）。
 
 > **需要 Vim 模式**：**回滚区**上下文中的单字母和 `Shift+letter` 绑定（`j/k`、`h/l`、`g/G`、`L/H`、`y/Y`、`o/O`、`r`、
@@ -134,9 +129,35 @@ MCP 服务器请求用户输入（表单字段或 URL 同意）时会显示此�
 | `Shift+X` | 关闭问题（智能体在没有答案的情况下继续） |
 | `Ctrl+F` | 将卡片全屏显示 |
 
-`/feedback` 面板是此表唯一的例外：报告框没有可浏览的答案，`Enter` 发送报告，`Esc` 关闭面板。如果可以上传跟踪数据，报告框中的 `Enter` 会先显示上传问题（`↑`/`↓` 选择，`Enter` 按所选项发送，`Esc` 跳过上传但仍会发送报告）。
+`/feedback` 表单是此表的唯一例外：报告框没有可浏览的答案，因此有自己的按键（如下）。
 
 输入自由文本答案时，`Enter` 提交，`Esc` 返回答案行；其他所有按键都输入到文本字段。
+
+### `/feedback` 表单
+
+| 按键 | 操作 |
+|-----|--------|
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | 在 Write 和 Drafts 标签页之间切换 |
+| `Esc` | 关闭表单（先关闭聚焦的标签行或打开的确认） |
+
+Write 标签页：
+
+| 按键 | 操作 |
+|-----|--------|
+| `Enter` | 发送报告 |
+| `Tab` | 聚焦类型/任务/失败标签行（草稿提供时显示）；再次按 `Tab` 返回报告框 |
+| `←` / `→` | 在聚焦的标签行中选择值 |
+
+Drafts 标签页：
+
+| 按键 | 操作 |
+|-----|--------|
+| `↑` / `↓`、`j` / `k` | 选择已保存的草稿 |
+| `Enter` | 将选中的草稿载入 Write |
+| `d` | 删除选中的草稿（按 `y` 确认） |
+| `/` | 搜索草稿 |
+
+如果可以上传跟踪数据，报告框中的 `Enter` 会先显示上传问题（`↑`/`↓` 选择，`Enter` 按所选项发送，`Esc` 跳过上传但仍会发送报告）。
 
 ### 权限提示
 
@@ -191,8 +212,8 @@ MCP 服务器请求用户输入（表单字段或 URL 同意）时会显示此�
 |-----|---------|--------|
 | `Ctrl+P` | 智能体界面 | 打开命令面板 |
 | `?`（Shift+/） | 智能体界面 | 打开命令面板（替代绑定） |
-| `Ctrl+M` | 智能体界面 | 打开模型选择器 / 切换模型 |
-| `Ctrl+M` | 提示框聚焦 | 切换多行输入模式 |
+| `Alt+M` | 智能体界面（提示框或回滚区） | 打开模型选择器 / 切换模型 |
+| `/multiline` | 提示框 | 切换多行输入模式 |
 | `Ctrl+C` | 智能体界面 | 取消当前轮次（或先清除非空草稿；参见 Esc 表） |
 | `Ctrl+O` | 智能体界面 | 切换始终批准（YOLO）模式 |
 | `F3` | 智能体界面 | 打开会话选择器（恢复之前的会话，等同于 `/resume`） |
@@ -209,7 +230,7 @@ MCP 服务器请求用户输入（表单字段或 URL 同意）时会显示此�
 | `Ctrl+.`（替代：`Ctrl+X`） | 智能体界面 | 打开键盘快捷键帮助 |
 | `F2`（替代：`Ctrl+,` / `Cmd+,`） | 智能体界面 | 打开设置模态框 |
 
-**注意：** `Ctrl+M` 取决于上下文。提示框聚焦时，它切换多行输入模式；否则打开模型选择器。
+**注意：** `Alt+M` 可从提示框或回滚区打开模型选择器。`Ctrl+M` 未绑定——大多数终端会将其作为 Enter 发送。多行模式通过 `/multiline` 或 `/settings` 切换。在智能体 Dashboard 中，`Ctrl+M` 仍会切换 dispatch / peek 编写器的多行模式。
 
 **注意：** 暂存草稿时，提示框顶部边框会显示 `Stashed`（若已用 `/rename` 设置标题，则显示在标题旁）。精简模式没有边框，因此每次暂存或恢复都会在回滚区打印一行。暂存只存在于内存中：退出后消失，也不会随恢复的会话迁移。新的暂存会替换旧草稿，并且只有旧草稿的**文本**会进入 `↑` 历史，因此旧草稿中的图像会丢失。
 
@@ -370,40 +391,40 @@ TUI 支持鼠标交互：
 ### 聚焦回滚区时（简单模式——默认）
 
 ```
-导航：             Up/Down（上一条/下一条）  Shift+Left/Right（上一轮/下一轮）
-滚动：             Ctrl+J/K（行）  PgUp/PgDn（页）  Ctrl+U/D（半页）
-聚焦提示框：       Space 或任意字母键（自动聚焦并输入）
+Navigation:       Up/Down (prev/next entry)  Shift+Left/Right (prev/next turn)
+Scrolling:        Ctrl+J/K (line)  PgUp/PgDn (page)  Ctrl+U/D (half page)
+Focus prompt:     Space or any letter key (auto-focuses and types)
 ```
 
 ### 聚焦回滚区时（Vim 模式）
 
 ```
-导航：             j/k（上/下）  H/L（上一轮/下一轮）  K/J（上一条/下一条回复）  g/G（顶部/底部）
-滚动：             Ctrl+J/K（行）  Ctrl+U/D（半页；VSCode 中 D=Shift+D）  PgUp/PgDn（页）
-折叠：             h/l（折叠/展开）  e（切换）  E（全部）
-内容：             y（复制）  Y（复制命令）  Enter（全屏）
-查看：             r（原始 markdown）  Ctrl+E（思考）
-聚焦提示框：       i、Tab 或 Space
+Navigation:       j/k (up/down)  H/L (prev/next turn)  K/J (viewport-top turn)  g/G (top/bottom)
+Scrolling:        Ctrl+J/K (line)  Ctrl+U/D (half page; D=Shift+D in VSCode)  PgUp/PgDn (page)
+Folding:          h/l (collapse/expand)  e (toggle)  E (all)
+Content:          y (copy)  Y (copy cmd)  Enter (fullscreen)
+View:             r (raw markdown)  Ctrl+E (thinking)
+Focus prompt:     i, Tab, or Space
 ```
 
 ### 聚焦提示框时
 
 ```
-发送：             Enter
-换行：             Shift+Enter 或 Alt+Enter
-多行：             Ctrl+M（切换）
-粘贴：             Ctrl+V（文本、文件、macOS/Linux 截图）
-选中文本：         中键或 Shift+Insert（Linux X11/XWayland PRIMARY）
-粘贴图像：         Alt+V（仅 Windows——截图/“复制图像”）
-全选：             Cmd+A（macOS，仅 Ghostty——参见下方说明）
-选择文本：         Shift+←/→（字符） · Alt+Shift+←/→（单词） ·
-                   Cmd+Shift+←/→（可视行） · Shift+Home/End（逻辑行） ·
-                   Shift+↑/↓（行）
-复制 / 剪切：      Cmd+C / Cmd+X（存在选区时；支持 Kitty 键盘协议的终端）
-离开：             Tab（返回回滚区）
-取消（运行中）：   Ctrl+C（空提示；非空草稿先清除）
-清除（空闲）：     800ms 内按 Esc Esc（非空提示）
-回退（空闲）：     800ms 内按 Esc Esc（空提示 + 有消息）
+Send:             Enter
+Newline:          Shift+Enter or Alt+Enter
+Multiline:        /multiline or /settings
+Paste:            Ctrl+V (text, files, screenshots on macOS/Linux)
+Selected text:    Middle click or Shift+Insert (Linux X11/XWayland PRIMARY)
+Paste image:      Alt+V (Windows only — for screenshots / "Copy Image")
+Select all:       Cmd+A (macOS, Ghostty only — see note below)
+Select text:      Shift+←/→ (char) · Alt+Shift+←/→ (word) ·
+                  Cmd+Shift+←/→ (visual row) · Shift+Home/End (logical line) ·
+                  Shift+↑/↓ (row)
+Copy / Cut:       Cmd+C / Cmd+X (with a selection; Kitty-protocol terminals)
+Leave:            Tab (back to scrollback)
+Cancel (running): Ctrl+C (empty prompt; non-empty draft clears first)
+Clear (idle):     Esc Esc within 800ms (non-empty prompt)
+Rewind (idle):    Esc Esc within 800ms (empty prompt + messages)
 ```
 
 存在选区时，输入字符、按 `Enter` 或粘贴会替换选区；删除和按词删除快捷键只删除选区；方向键会把选区收拢到对应边缘（按词/按行移动会从该边缘继续）；`Esc` 或 `Tab` 会取消高亮，同时仍执行各自的常规操作。请注意，`Shift+←/→` 只有在**提示框**获得焦点时才选择文本；回滚区获得焦点时，相同快捷键会在各轮之间跳转（参见上方“导航”）。
@@ -416,13 +437,17 @@ TUI 支持鼠标交互：
 > keybind = cmd+a=unbind
 > ```
 >
-> Ghostty 重新加载后（它会监视配置文件），在提示框中按 `Cmd+A` 会选中提示缓冲区中的每个字符，包括粘贴的图像芯片。图像芯片始终不含路径（`[Image #N]`）；已知时的文件路径只会在悬停或光标位于芯片上/紧邻芯片后方时的图像预览覆盖层中显示。
+> After Ghostty reloads (it watches the config file), `Cmd+A` in the
+> prompt selects every character in the prompt buffer, including pasted
+> image chips. Image chips are always path-free (`[Image #N]`); the
+> filepath (when known) appears only in the image preview overlay on
+> hover or when the cursor is on/right after the chip.
 
-### 始终可用
+### Always available
 
 ```
 命令面板：         Ctrl+P 或 ?
-模型选择器：       Ctrl+M（从回滚区）
+模型选择器：       Alt+M
 取消：             Ctrl+C（参见 Esc 表）
 始终批准：         Ctrl+O（切换 YOLO）
 新会话：           Ctrl+N（再次按下，然后选择普通/工作树）

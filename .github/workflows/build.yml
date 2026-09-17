@@ -91,16 +91,71 @@ jobs:
           if [[ "$old_source_rev" =~ ^[0-9a-f]{40}$ \
                 && "$new_source_rev" =~ ^[0-9a-f]{40}$ \
                 && "$old_source_rev" != "$new_source_rev" ]]; then
-            git fetch --no-tags https://github.com/xai-org/grok-build.git \
-              "$old_source_rev" "$new_source_rev"
-            export GROK_I18N_UPSTREAM_OLD="$old_source_rev"
-            export GROK_I18N_UPSTREAM_NEW="$new_source_rev"
+            # The SOURCE_REV values are monorepo revisions, while the public mirror only carries
+            # its own snapshot commits, so these objects can legitimately be unreachable. That must
+            # not abort the job: the current full scan and the repository diff audit below run
+            # either way. Degrade to "upstream comparison unavailable" with a visible warning.
+            if git fetch --no-tags https://github.com/xai-org/grok-build.git \
+                 "$old_source_rev" "$new_source_rev"; then
+              export GROK_I18N_UPSTREAM_OLD="$old_source_rev"
+              export GROK_I18N_UPSTREAM_NEW="$new_source_rev"
+            else
+              echo "::warning title=Upstream diff audit skipped::SOURCE_REV $old_source_rev -> $new_source_rev is not reachable from the public mirror; the current full scan and repository diff audit still run."
+            fi
           fi
 
           cargo +1.92.0 test --locked -p xai-grok-i18n --lib
           cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit current_full_scan_and_markdown_coverage_are_unconditional
           cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit
 
+
+  fork_integrity:
+    name: Fork integrity audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Audit local patch markers and catalog structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/upstream_merge.py audit-markers --repo . --json > "$RUNNER_TEMP/local-patches.json"
+          python3 scripts/upstream_merge.py preflight --repo . --json > "$RUNNER_TEMP/worktree-preflight.json"
+          python3 scripts/i18n_catalog.py \
+            --english crates/codegen/xai-grok-i18n/locales/en.toml \
+            --translated crates/codegen/xai-grok-i18n/locales/zh-CN.toml \
+            > "$RUNNER_TEMP/catalog-report.json"
+          python3 - "$RUNNER_TEMP/catalog-report.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              report = json.load(stream)
+          for field in ("missing_keys", "extra_keys", "placeholder_mismatches"):
+              if report[field]:
+                  raise SystemExit(f"catalog {field}: {report[field]}")
+          print(
+              "catalog source report: "
+              f"duplicates={len(report['duplicate_sources'])}, "
+              f"ambiguous={len(report['ambiguous_sources'])}"
+          )
+          PY
+          git diff --check
+          test -z "$(git diff --name-only --diff-filter=U)"
+
+      - name: Upload integrity reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: fork-integrity-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/local-patches.json
+            ${{ runner.temp }}/worktree-preflight.json
+            ${{ runner.temp }}/catalog-report.json
+          if-no-files-found: error
   build:
     name: ${{ matrix.name }}
     needs: version
@@ -183,20 +238,45 @@ jobs:
 
       - name: Check release binary
         shell: bash
-        run: cargo check --locked -p xai-grok-pager-bin
+        run: cargo +1.92.0 check --locked -p xai-grok-pager-bin
 
       - name: Test settings localization
         if: runner.os == 'Linux'
         shell: bash
-        run: cargo test --locked -p xai-grok-pager --lib settings_render_uses_pseudo_locale_for_core_modes
+        run: cargo +1.92.0 test --locked -p xai-grok-pager --lib settings_render_uses_pseudo_locale_for_core_modes
       - name: Test sampler library
         if: runner.os == 'Linux'
         shell: bash
-        run: cargo test --locked -p xai-grok-sampler --lib
+        run: cargo +1.92.0 test --locked -p xai-grok-sampler --lib
 
+      - name: Install ripgrep for the workspace tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # xai-grok-workspace resolves `rg` from PATH (see build_ripgrep_command), and the
+          # runner image does not ship it; the child-kill test spawns rg directly, so its
+          # absence fails the suite with `spawn rg: NotFound`.
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+          rg --version
+
+      - name: Test workspace permission manager
+        if: runner.os == 'Linux'
+        shell: bash
+        run: cargo +1.92.0 test --locked -p xai-grok-workspace --lib
+
+      - name: Test pager library
+        if: runner.os == 'Linux'
+        shell: bash
+        run: cargo +1.92.0 test --locked -p xai-grok-pager --lib -- --test-threads=1
+
+      - name: Test shell library
+        if: runner.os == 'Linux'
+        shell: bash
+        run: cargo +1.92.0 test --locked -p xai-grok-shell --lib -- --test-threads=1
       - name: Build release binary
         shell: bash
-        run: cargo build --locked -p xai-grok-pager-bin --release
+        run: cargo +1.92.0 build --locked -p xai-grok-pager-bin --release
 
       - name: Verify binary version
         shell: bash

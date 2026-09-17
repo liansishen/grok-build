@@ -17,7 +17,6 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::subagent::format_subagent_meta;
 use crate::appearance::AppearanceConfig;
-use crate::render::color::blend_color;
 use crate::render::line_utils::truncate_str;
 use crate::scrollback::block::BlockContent;
 use crate::scrollback::types::{AccentStyle, BlockContext, BlockOutput, DisplayMode};
@@ -178,7 +177,11 @@ impl BlockContent for SubagentBlock {
 
         let line = match (&self.kind, self.is_background) {
             (SubagentBlockKind::Started, bg) => {
-                let verb = if bg { "started: " } else { "running: " };
+                let verb = if bg {
+                    xai_grok_i18n::t("scrollback.subagent.verb_started")
+                } else {
+                    xai_grok_i18n::t("scrollback.subagent.verb_running")
+                };
                 let activity_suffix: String = self
                     .activity_label
                     .as_deref()
@@ -190,11 +193,15 @@ impl BlockContent for SubagentBlock {
                     self.role.as_deref(),
                     self.model.as_deref(),
                 );
-                // "Subagent running: " / "Subagent started: " = 18 chars
-                let overhead = 18 + meta.width() + activity_suffix.width();
+                // The label and the verb are catalog copy, so their width decides the budget
+                // ("Subagent " + "running: " is 18 cells in English).
+                let overhead = xai_grok_i18n::t("scrollback.subagent.label").width()
+                    + verb.width()
+                    + meta.width()
+                    + activity_suffix.width();
                 let desc = quoted_desc(&self.description, w.saturating_sub(overhead));
                 let mut spans = vec![
-                    Span::styled("Subagent ", bold),
+                    Span::styled(xai_grok_i18n::t("scrollback.subagent.label"), bold),
                     Span::styled(verb, muted),
                     Span::styled(desc, muted),
                 ];
@@ -211,8 +218,14 @@ impl BlockContent for SubagentBlock {
                 let prefix_len = 26 + time_str.len();
                 let desc = quoted_desc(&self.description, w.saturating_sub(prefix_len));
                 Line::from(vec![
-                    Span::styled("Subagent ", bold),
-                    Span::styled(format!("completed in {time_str}: "), muted),
+                    Span::styled(xai_grok_i18n::t("scrollback.subagent.label"), bold),
+                    Span::styled(
+                        xai_grok_i18n::t_fmt(
+                            "scrollback.subagent.completed_in",
+                            &[("time", &time_str)],
+                        ),
+                        muted,
+                    ),
                     Span::styled(desc, muted),
                 ])
             }
@@ -226,8 +239,14 @@ impl BlockContent for SubagentBlock {
                 let prefix_len = 21 + time_str.len() + detail.len();
                 let desc = quoted_desc(&self.description, w.saturating_sub(prefix_len));
                 Line::from(vec![
-                    Span::styled("Subagent ", bold),
-                    Span::styled(format!("failed in {time_str}{detail}: "), muted),
+                    Span::styled(xai_grok_i18n::t("scrollback.subagent.label"), bold),
+                    Span::styled(
+                        xai_grok_i18n::t_fmt(
+                            "scrollback.subagent.failed_in",
+                            &[("time", &time_str), ("detail", &detail)],
+                        ),
+                        muted,
+                    ),
                     Span::styled(desc, muted),
                 ])
             }
@@ -238,8 +257,14 @@ impl BlockContent for SubagentBlock {
                 let prefix_len = 26 + time_str.len();
                 let desc = quoted_desc(&self.description, w.saturating_sub(prefix_len));
                 Line::from(vec![
-                    Span::styled("Subagent ", bold),
-                    Span::styled(format!("cancelled in {time_str}: "), muted),
+                    Span::styled(xai_grok_i18n::t("scrollback.subagent.label"), bold),
+                    Span::styled(
+                        xai_grok_i18n::t_fmt(
+                            "scrollback.subagent.cancelled_in",
+                            &[("time", &time_str)],
+                        ),
+                        muted,
+                    ),
                     Span::styled(desc, muted),
                 ])
             }
@@ -265,10 +290,7 @@ impl BlockContent for SubagentBlock {
         match &self.kind {
             SubagentBlockKind::Started => {
                 if ctx.is_running {
-                    let dim = ctx.appearance.scrollback.display.dim_accent;
-                    let dimmed = blend_color(theme.bg_base, theme.accent_running, dim)
-                        .unwrap_or(theme.accent_running);
-                    Some(AccentStyle::animated(dimmed))
+                    Some(AccentStyle::animated_running(ctx, &theme))
                 } else {
                     // Finished: gray bullet (same as bg task "started" after completion)
                     None
@@ -309,5 +331,91 @@ impl BlockContent for SubagentBlock {
 
     fn is_groupable(&self) -> bool {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::appearance::AppearanceConfig;
+    use crate::scrollback::types::{BlockContext, DisplayMode};
+    use std::time::Duration;
+
+    fn ctx() -> BlockContext {
+        BlockContext {
+            mode: DisplayMode::Collapsed,
+            is_running: false,
+            width: 100,
+            raw: false,
+            max_lines: None,
+            appearance: AppearanceConfig::default(),
+            is_selected: false,
+            cwd: None,
+        }
+    }
+
+    fn plain(block: &SubagentBlock) -> String {
+        block
+            .output(&ctx())
+            .lines
+            .iter()
+            .map(|line| crate::scrollback::types::line_plain_text(&line.content))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Every subagent row's label and tense phrase is catalog-backed.
+    #[test]
+    fn subagent_row_copy_comes_from_the_catalog() {
+        let started = SubagentBlock::started(
+            "scan the tree",
+            "child-1",
+            "explore",
+            None,
+            None,
+            None,
+            false,
+        );
+        let completed =
+            SubagentBlock::completed("scan the tree", "child-1", Duration::from_secs(3));
+        let failed = SubagentBlock::failed(
+            "scan the tree",
+            "child-1",
+            Duration::from_secs(3),
+            Some("boom".into()),
+        );
+        let cancelled =
+            SubagentBlock::cancelled("scan the tree", "child-1", Duration::from_secs(3));
+
+        let (started_text, completed_text, failed_text, cancelled_text) =
+            xai_grok_i18n::with_pseudo_locale(|| {
+                (
+                    plain(&started),
+                    plain(&completed),
+                    plain(&failed),
+                    plain(&cancelled),
+                )
+            });
+
+        assert!(
+            started_text.contains("⟦scrollback.subagent.label⟧"),
+            "started row label: {started_text}"
+        );
+        assert!(
+            completed_text.contains("⟦scrollback.subagent.completed_in⟧"),
+            "completed row phrase: {completed_text}"
+        );
+        assert!(
+            failed_text.contains("⟦scrollback.subagent.failed_in⟧"),
+            "failed row phrase: {failed_text}"
+        );
+        assert!(
+            cancelled_text.contains("⟦scrollback.subagent.cancelled_in⟧"),
+            "cancelled row phrase: {cancelled_text}"
+        );
+        assert!(
+            completed_text.contains("⟦scrollback.subagent.label⟧"),
+            "every row shares the label: {completed_text}"
+        );
     }
 }

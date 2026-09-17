@@ -193,6 +193,7 @@ fn bound_retry_after_floors_zero_to_retry_base() {
             seq: std::sync::atomic::AtomicU64::new(0),
             lock: parking_lot::Mutex::new(()),
         }),
+        terminal: tokio::sync::watch::Sender::new(None),
     };
     assert_eq!(bound_retry_after(Duration::ZERO, &inner), RETRY_BASE);
     assert_eq!(
@@ -220,8 +221,10 @@ fn provider_params(issuer: String, expires_at: Option<DateTime<Utc>>) -> Proacti
     }
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn current_never_blocks_or_touches_network() {
+    let _metrics = lock_metrics();
     let provider = ProactiveOidcAuthProvider::new(provider_params(
         "http://127.0.0.1:1".into(),
         Some(Utc::now() - chrono::TimeDelta::hours(1)),
@@ -239,8 +242,10 @@ async fn current_never_blocks_or_touches_network() {
     }
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn principal_key_is_stable_across_rotation() {
+    let _metrics = lock_metrics();
     let provider = ProactiveOidcAuthProvider::new(provider_params(
         "https://auth.example.com".into(),
         Some(Utc::now() + chrono::TimeDelta::hours(1)),
@@ -257,8 +262,10 @@ async fn principal_key_is_stable_across_rotation() {
     }
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn principal_key_includes_empty_user_id() {
+    let _metrics = lock_metrics();
     let mut params = provider_params("https://auth.example.com".into(), None);
     params.identity.user_id.clear();
     let empty = ProactiveOidcAuthProvider::new(params).principal_key();
@@ -307,8 +314,10 @@ async fn disabled_flag_does_not_refresh_or_spawn() {
     }
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "current_thread")]
 async fn debug_does_not_leak_tokens() {
+    let _metrics = lock_metrics();
     let provider =
         ProactiveOidcAuthProvider::new(provider_params("https://auth.example.com".into(), None));
     let debug = format!("{provider:?}");
@@ -390,7 +399,11 @@ async fn wait_auth_json_field(
     loop {
         if let Ok(raw) = std::fs::read_to_string(path)
             && let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw)
-            && value["oidc"][field].as_str() == Some(expected)
+            && value
+                .get("oidc")
+                .and_then(|v| v.get(field))
+                .and_then(|v| v.as_str())
+                == Some(expected)
         {
             return value;
         }
@@ -410,7 +423,11 @@ async fn wait_auth_json_changed(
     loop {
         if let Ok(raw) = std::fs::read_to_string(path)
             && let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw)
-            && value["oidc"][field].as_str() != Some(not_eq)
+            && value
+                .get("oidc")
+                .and_then(|v| v.get(field))
+                .and_then(|v| v.as_str())
+                != Some(not_eq)
         {
             return value;
         }
@@ -469,8 +486,20 @@ async fn background_refresh_updates_snapshot_against_mock_idp() {
     }
 
     let updated = wait_auth_json_field(&auth_path, "refresh_token", "fresh-refresh").await;
-    assert_eq!(updated["oidc"]["key"], "fresh-access");
-    assert_eq!(updated["oidc"]["refresh_token"], "fresh-refresh");
+    assert_eq!(
+        updated
+            .get("oidc")
+            .and_then(|v| v.get("key"))
+            .unwrap_or(&serde_json::Value::Null),
+        "fresh-access"
+    );
+    assert_eq!(
+        updated
+            .get("oidc")
+            .and_then(|v| v.get("refresh_token"))
+            .unwrap_or(&serde_json::Value::Null),
+        "fresh-refresh"
+    );
     assert!(hits.load(Ordering::SeqCst) >= 1);
     assert!(refresh_count(OUTCOME_OK) > ok_before);
     let new_leads = lead_sample_count() - lead_before;
@@ -588,7 +617,13 @@ async fn failed_refresh_retries_faster_than_min_interval_then_exhausts() {
         "expected at least two retries, got {}",
         recorded.len()
     );
-    let gap = recorded[1].saturating_duration_since(recorded[0]);
+    let Some(first) = recorded.first() else {
+        panic!("expected retry timestamps: {recorded:?}");
+    };
+    let Some(second) = recorded.get(1) else {
+        panic!("expected two retry timestamps: {recorded:?}");
+    };
+    let gap = second.saturating_duration_since(*first);
     assert!(
         gap < Duration::from_secs(60),
         "failure retry was floored to success-path interval: {gap:?}"
@@ -776,11 +811,19 @@ async fn invalid_expires_in_keeps_rotated_refresh_token() {
         "rotated refresh token was never presented: {seen:?}"
     );
     let updated = wait_auth_json_changed(&auth_path, "refresh_token", "refresh-tok").await;
-    assert_ne!(updated["oidc"]["refresh_token"], "refresh-tok");
+    assert_ne!(
+        updated
+            .get("oidc")
+            .and_then(|v| v.get("refresh_token"))
+            .unwrap_or(&serde_json::Value::Null),
+        "refresh-tok"
+    );
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn drop_aborts_background_task() {
+    let _metrics = lock_metrics();
     let hits = Arc::new(AtomicU32::new(0));
     let base = spawn_mock_idp(
         serde_json::json!({"error": "no"}),
@@ -851,14 +894,31 @@ async fn expired_seed_refreshes_without_min_interval_delay() {
     assert!(hits.load(Ordering::SeqCst) >= 1);
 }
 
+/// The body becomes the daemon's `cause` and the last line of its log: one line, bounded.
+#[test]
+fn the_idp_body_in_the_error_is_one_bounded_line() {
+    assert_eq!(
+        body_excerpt("{\n  \"error\": \"invalid_grant\"\n}\r\n"),
+        r#"{ "error": "invalid_grant" }"#
+    );
+    let page = "<html>\n".repeat(200);
+    let excerpt = body_excerpt(&page);
+    assert_eq!(excerpt.chars().count(), BODY_EXCERPT_CHARS + 1);
+    assert!(
+        excerpt.ends_with('…') && !excerpt.contains('\n'),
+        "{excerpt}"
+    );
+}
+
 #[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn invalid_grant_stops_the_loop() {
     let _metrics = lock_metrics();
     let terminal_before = refresh_count(OUTCOME_FAILED_TERMINAL);
     let hits = Arc::new(AtomicU32::new(0));
+    // A page of a body: the cause keeps one bounded line of it.
     let base = spawn_mock_idp(
-        serde_json::json!({"error": "invalid_grant"}),
+        serde_json::json!({"error": "invalid_grant", "error_description": "x".repeat(2_000)}),
         axum::http::StatusCode::BAD_REQUEST,
         hits.clone(),
     )
@@ -869,7 +929,8 @@ async fn invalid_grant_stops_the_loop() {
         enabled: true,
         ..ProactiveRefreshConfig::default()
     };
-    let _provider = ProactiveOidcAuthProvider::new(params);
+    let provider = ProactiveOidcAuthProvider::new(params);
+    let subscribed_before = provider.refresh_ended();
 
     let deadline = Instant::now() + Duration::from_secs(3);
     while hits.load(Ordering::SeqCst) == 0 && Instant::now() < deadline {
@@ -887,6 +948,125 @@ async fn invalid_grant_stops_the_loop() {
         "invalid_grant must stop the loop, not retry at RETRY_CAP"
     );
     assert!(refresh_count(OUTCOME_FAILED_TERMINAL) > terminal_before);
+
+    // A host that stopped retrying learns why, whether it subscribed before or after the rejection.
+    let cause = tokio::time::timeout(Duration::from_secs(1), subscribed_before)
+        .await
+        .expect("refresh_ended resolves once the loop has stopped");
+    assert!(
+        cause.contains("invalid_grant") && cause.contains("400"),
+        "the cause names the IdP's answer: {cause}"
+    );
+    assert!(
+        cause.ends_with('…') && cause.chars().count() < BODY_EXCERPT_CHARS + 100,
+        "the body is excerpted, not copied: {} chars",
+        cause.chars().count()
+    );
+    let late = tokio::time::timeout(Duration::from_secs(1), provider.refresh_ended())
+        .await
+        .expect("a late subscriber sees the cause too");
+    assert_eq!(cause, late);
+    match provider.current() {
+        AuthCredential::Bearer { token } => assert_eq!(token, "stale-access"),
+        other => panic!("expected stale Bearer, got {other:?}"),
+    }
+}
+
+/// Only the token endpoint judges the refresh token. The same `401` from the unauthenticated
+/// discovery document is a proxy or an outage: the loop keeps retrying, nothing is terminal, and a
+/// host does not exit over it.
+#[allow(clippy::await_holding_lock)]
+#[tokio::test]
+async fn a_rejected_discovery_document_keeps_retrying() {
+    let _metrics = lock_metrics();
+    let terminal_before = refresh_count(OUTCOME_FAILED_TERMINAL);
+    let discovery_hits = Arc::new(AtomicU32::new(0));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let app = axum::Router::new().route(
+        "/.well-known/openid-configuration",
+        axum::routing::get({
+            let discovery_hits = discovery_hits.clone();
+            move || {
+                let discovery_hits = discovery_hits.clone();
+                async move {
+                    discovery_hits.fetch_add(1, Ordering::SeqCst);
+                    (
+                        axum::http::StatusCode::UNAUTHORIZED,
+                        axum::Json(serde_json::json!({"error": "unauthorized"})),
+                    )
+                }
+            }
+        }),
+    );
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    tokio::task::yield_now().await;
+
+    let provider = ProactiveOidcAuthProvider::new(provider_params(
+        base,
+        Some(Utc::now() + chrono::TimeDelta::seconds(3)),
+    ));
+    let ended = provider.refresh_ended();
+    let deadline = Instant::now() + Duration::from_secs(8);
+    while discovery_hits.load(Ordering::SeqCst) < 2 && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(
+        discovery_hits.load(Ordering::SeqCst) >= 2,
+        "a 401 on discovery must be retried, not treated as the token endpoint's verdict"
+    );
+    assert_eq!(refresh_count(OUTCOME_FAILED_TERMINAL), terminal_before);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(200), ended)
+            .await
+            .is_err(),
+        "discovery failures never end the refresh"
+    );
+}
+
+/// Only a rejection for good ends the refresh: a retrying failure and a disabled refresher leave
+/// `refresh_ended` pending, so a host does not exit over a 5xx or a config flag.
+#[tokio::test]
+async fn refresh_ended_stays_pending_unless_the_rejection_is_terminal() {
+    let _metrics = lock_metrics();
+    let hits = Arc::new(AtomicU32::new(0));
+    let retrying = spawn_mock_idp(
+        serde_json::json!({"error": "temporarily_unavailable"}),
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+        hits.clone(),
+    )
+    .await;
+    // Not yet expired: past expiry the retry backs off to RETRY_CAP, and the point here is the
+    // retries themselves, not their pace.
+    let provider = ProactiveOidcAuthProvider::new(provider_params(
+        retrying,
+        Some(Utc::now() + chrono::TimeDelta::seconds(3)),
+    ));
+    let deadline = Instant::now() + Duration::from_secs(8);
+    while hits.load(Ordering::SeqCst) < 2 && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(hits.load(Ordering::SeqCst) >= 2, "5xx must keep retrying");
+    assert!(
+        tokio::time::timeout(Duration::from_millis(200), provider.refresh_ended())
+            .await
+            .is_err(),
+        "a retrying failure is not the end of the refresh"
+    );
+
+    let mut disabled = provider_params("http://127.0.0.1:1".into(), None);
+    disabled.refresh.enabled = false;
+    let disabled = ProactiveOidcAuthProvider::new(disabled);
+    let ended = disabled.refresh_ended();
+    drop(disabled);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(200), ended)
+            .await
+            .is_err(),
+        "a provider that never refreshed, even once dropped, never reports a rejection"
+    );
 }
 
 #[allow(clippy::await_holding_lock)]
@@ -947,8 +1127,10 @@ async fn rate_limit_429_zero_retry_after_uses_backoff() {
     );
 }
 
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn stale_persist_does_not_clobber_newer_token() {
+    let _metrics = lock_metrics();
     let dir = tempfile::tempdir().unwrap();
     let auth_path = write_auth_json(dir.path());
     let mut params = provider_params("https://auth.example.com".into(), None);
@@ -973,9 +1155,27 @@ async fn stale_persist_does_not_clobber_newer_token() {
     tokio::time::sleep(Duration::from_millis(250)).await;
     let after: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&auth_path).unwrap()).unwrap();
-    assert_eq!(after["oidc"]["key"], "new-access");
-    assert_eq!(after["oidc"]["refresh_token"], "new-rt");
-    assert_eq!(updated["oidc"]["key"], "new-access");
+    assert_eq!(
+        after
+            .get("oidc")
+            .and_then(|v| v.get("key"))
+            .unwrap_or(&serde_json::Value::Null),
+        "new-access"
+    );
+    assert_eq!(
+        after
+            .get("oidc")
+            .and_then(|v| v.get("refresh_token"))
+            .unwrap_or(&serde_json::Value::Null),
+        "new-rt"
+    );
+    assert_eq!(
+        updated
+            .get("oidc")
+            .and_then(|v| v.get("key"))
+            .unwrap_or(&serde_json::Value::Null),
+        "new-access"
+    );
 }
 
 async fn spawn_rate_limited_idp(hits: Arc<AtomicU32>, retry_after: &'static str) -> String {

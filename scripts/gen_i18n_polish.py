@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import tomllib
+
+from i18n_catalog import load_catalog, merge_catalog_file
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -364,15 +366,17 @@ def flatten(node: object, prefix: str = "") -> dict[str, str]:
 
 
 def merge(path: Path, extra: dict[str, str]) -> None:
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
-    all_keys = flatten(data)
-    before = len(all_keys)
-    all_keys.update(extra)
-    path.write_text(
-        "# Locale catalog (merged)\n" + flat_section(all_keys), encoding="utf-8"
+    before = len(load_catalog(path))
+    result = merge_catalog_file(
+        path,
+        extra,
+        banner="Polish-pass additions",
+        overwrite=True,
     )
-    tomllib.loads(path.read_text(encoding="utf-8"))
-    print(f"{path.name}: {len(all_keys)} keys (+{len(all_keys) - before})")
+    after = len(load_catalog(path))
+    print(f"{path.name}: {after} keys (+{result.added}, ~{result.updated}, ={result.unchanged})")
+    if after < before:
+        raise RuntimeError(f"catalog key count decreased for {path}")
 
 
 def main() -> None:

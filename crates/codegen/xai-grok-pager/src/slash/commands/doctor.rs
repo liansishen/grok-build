@@ -177,6 +177,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn rejects_unknown_and_extra_arguments() {
         let usage = xai_grok_i18n::t("slash.doctor.usage");
         for value in ["unknown", "fix unknown", "fix ssh-wrap extra", "report now"] {
@@ -203,13 +204,21 @@ mod tests {
         assert!(command.suggest_args(&context, "").is_none());
         assert!(command.suggest_args(&context, "   ").is_none());
         assert_eq!(
-            command.suggest_args(&context, "f").unwrap()[0].insert_text,
-            "fix"
+            command
+                .suggest_args(&context, "f")
+                .as_ref()
+                .and_then(|items| items.first())
+                .map(|item| item.insert_text.as_str()),
+            Some("fix")
         );
         for query in ["fix", "fix ", "fix s", "fix ssh", "fix terminal."] {
             assert_eq!(
-                command.suggest_args(&context, query).unwrap()[0].insert_text,
-                "fix ssh-wrap"
+                command
+                    .suggest_args(&context, query)
+                    .as_ref()
+                    .and_then(|items| items.first())
+                    .map(|item| item.insert_text.as_str()),
+                Some("fix ssh-wrap")
             );
         }
         for query in [

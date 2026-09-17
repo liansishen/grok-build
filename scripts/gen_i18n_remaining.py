@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import tomllib
+
+from i18n_catalog import load_catalog, merge_catalog_file
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -231,19 +233,17 @@ ZH = {
 
 
 def append_missing(path: Path, new_map: dict[str, str], banner: str) -> int:
-    have = existing_keys(path)
-    missing = {k: v for k, v in new_map.items() if k not in have}
-    if not missing:
-        print(f"{path.name}: no new keys")
-        return 0
-    text = path.read_text(encoding="utf-8")
-    if not text.endswith("\n"):
-        text += "\n"
-    text += f"\n# {banner}\n"
-    text += flat_section(missing)
-    path.write_text(text, encoding="utf-8")
-    print(f"{path.name}: +{len(missing)} keys")
-    return len(missing)
+    result = merge_catalog_file(
+        path,
+        new_map,
+        banner=banner,
+        overwrite=False,
+    )
+    print(
+        f"{path.name}: +{result.added} keys (~{result.updated}, "
+        f"={result.unchanged})"
+    )
+    return result.added
 
 
 def main() -> None:

@@ -704,6 +704,7 @@ mod tests {
         std::fs::create_dir_all(&wf_dir).unwrap();
         std::fs::write(wf_dir.join("alpha.rhai"), script("alpha")).unwrap();
         std::fs::write(wf_dir.join("wrong.rhai"), script("other")).unwrap();
+        crate::agent::folder_trust::record_for_test(dir.path(), true);
 
         let registry = WorkflowRegistry::scan(Some(&cwd));
         let project_names: Vec<_> = registry
@@ -868,8 +869,11 @@ mod tests {
             entries,
             duplicate_names: BTreeMap::new(),
         };
-        assert_eq!(registry.list().len(), 1);
-        assert_eq!(registry.list()[0].source, "builtin");
+        let listed = registry.list();
+        let [first] = listed.as_slice() else {
+            panic!("expected one listing: {listed:?}");
+        };
+        assert_eq!(first.source, "builtin");
         assert_eq!(
             registry.resolve_by_name("same").unwrap().source,
             WorkflowSource::Builtin
@@ -951,6 +955,7 @@ mod tests {
     #[test]
     fn save_is_validated_atomic_and_no_clobber() {
         let dir = tempfile::tempdir().unwrap();
+        crate::agent::folder_trust::record_for_test(dir.path(), true);
         let path = save_project_workflow(dir.path(), "saved", &script("saved")).unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), script("saved"));
 

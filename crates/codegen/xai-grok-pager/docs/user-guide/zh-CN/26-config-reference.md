@@ -98,6 +98,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | --- | --- | --- | --- | --- |
 | `cli.auto_update` | `boolean` | `pin` | `user` | 启动时检查 CLI 更新；`GROK_DISABLE_AUTOUPDATER` 可禁用。 |
 | `cli.channel` | `stable / alpha` | `pin` | `user` | 首选发布通道。 |
+| `cli.grove` | `boolean` 或 `grove` / `grove-fuse` / `grove-nfs` / `nfs` / `all` / `copy` / `true` / `false` / `1` / `0` / `on` / `off` | `yes` | `user` | 便捷开关：当具体配置未设置时，同时启用 `grok clone` 和会话 / `-w` Grove。也对应 `GROK_GROVE`。`false` / `copy` / `off` 表示关闭便捷开关（继续回退），不会强制关闭两个界面。`[cli] grove_worktree` 和 `GROK_WORKTREE_TYPE` 对工作树仍优先；`GROK_CLONE` 对克隆仍优先。`remote grove_worktree = false` 仍只会关闭工作树。`
 | `cli.installer` | `string` | `—` | `user` | 最近安装此 CLI 的安装器，用于选择更新路径。 |
 | `cli.maximum_version` | `string` | `pin` | `user` | 不触发硬阻止时可运行的最高 CLI 版本。也对应 `GROK_MAXIMUM_VERSION`。 |
 | `cli.minimum_version` | `string` | `pin` | `user` | 不触发硬阻止时可运行的最低 CLI 版本。也对应 `GROK_MINIMUM_VERSION`。 |
@@ -204,7 +205,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `features.compaction_tool_choice` | `string` | `yes` | `user` | 压缩期间使用的 tool-choice 提示。 |
 | `features.compaction_verbatim_input` | `boolean` | `pin` | `user` | 启用或禁用 `compaction_verbatim_input`；默认 true。也对应 `GROK_COMPACTION_VERBATIM_INPUT`。 |
 | `features.dock` | `boolean` | `pin` | `user` | 启用或禁用 `dock`；默认 false。也对应 `GROK_DOCK`。 |
-| `features.feedback` | `boolean` | `pin` | `user` | 启用或禁用反馈；默认 true。也对应 `GROK_FEEDBACK_ENABLED`。 |
+| `features.feedback` | `boolean` | `pin` | `user` | 启用或禁用反馈弹窗、`/feedback` 命令和 `send_feedback` 工具；默认 true。也对应 `GROK_FEEDBACK_ENABLED`。 |
 | `features.feedback_trace_card` | `boolean` | `pin` | `user` | `/feedback` 后显示跟踪上传同意问题；默认 false。也对应 `GROK_FEEDBACK_TRACE_CARD`。 |
 | `features.image_edit_model_override` | `string` | `yes` | `user` | `image_edit` 使用的 Imagine 模型 ID。 |
 | `features.image_gen` | `boolean` | `pin` | `user` | 启用 `image_gen` / `/imagine`。 |
@@ -345,6 +346,15 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | 键 | 类型／取值 | Requirements | 托管 | 说明 |
 | --- | --- | --- | --- | --- |
 | `memory.enabled` | `boolean` | `pin` | `user` | 跨会话记忆总开关。也对应 `GROK_MEMORY`。 |
+| `memory_v2.enabled` | `boolean` | `pin` | `user` | memory-v2 主开关。启用后优先于旧版 `memory.enabled`；未启用或缺失时正常解析旧版开关。默认：`false`。 |
+| `memory_v2.rollout` | `"off"`、`"record_only"`、`"shadow"`、`"active"` | — | `user` | 新 v2 会话的分阶段发布控制。启用 v2 后默认：`"active"`；大多数用户应留空。 |
+| `memory_v2.capture_status_enabled` | `boolean` | — | `user` | 在 UI 中显示 memory-v2 捕获生命周期消息以便调试。成功捕获可展开，并包含生成内容和已提交观测文件的链接。遥测和调试日志始终记录。默认：`false`。 |
+| `memory_v2.capture_enabled` | `boolean` | — | `user` | 启用 memory-v2 提取和观测捕获。默认：`true`。 |
+| `memory_v2.automatic_dream_enabled` | `boolean` | — | `user` | 启用事件驱动的 memory-v2 Dream。默认：`true`。 |
+| `memory_v2.manual_dream_enabled` | `boolean` | — | `user` | 启用显式请求的 memory-v2 Dream。默认：`true`。 |
+| `memory_v2.file_writes_enabled` | `boolean` | — | `user` | 启用所有 memory-v2 文件变更；`false` 会在创建骨架前安全拒绝。默认：`true`。 |
+| `memory_v2.archived_retention_days` | `number` | — | `user` | 归档 memory-v2 观测文件的保留天数。默认：`30`。 |
+| `memory_v2.job_retention_days` | `number` | — | `user` | 终态 memory-v2 捕获作业元数据的保留天数。默认：`14`。 |
 
 ### `model`
 
@@ -376,6 +386,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `model.<id>.query_params` | `map<string,string>` | `yes` | `user` | 该模型请求的额外查询参数。 |
 | `model.<id>.reasoning_effort` | `string` | `yes` | `user` | 已弃用的单模型推理强度；优先使用 `reasoning_efforts`。 |
 | `model.<id>.reasoning_efforts` | `array of tables` | `yes` | `user` | 该模型允许的推理强度取值。 |
+| `model.<id>.reasoning_summary` | `none / auto / concise / detailed` | `yes` | `user` | 此模型的 Responses API `reasoning.summary`；默认 `concise`。对于拒绝该字段的端点（例如 AWS Bedrock Mantle），`none` 会省略该字段。 |
 | `model.<id>.show_model_fingerprint` | `boolean` | `yes` | `user` | 提供方返回模型 fingerprint 时在 UI 中显示。 |
 | `model.<id>.stream_tool_calls` | `boolean` | `yes` | `user` | 该模型工具调用流式请求的形状。 |
 | `model.<id>.supported_in_api` | `boolean` | `yes` | `user` | 此目录条目是否作为公共 API 模型提供。 |
@@ -424,8 +435,8 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 
 | 键 | 类型／取值 | Requirements | 托管 | 说明 |
 | --- | --- | --- | --- | --- |
-| `paths.extra_rule_dirs` | `string[]` | `yes` | `user` | 额外规则目录（每个目录含 `*.md`）。 |
-| `paths.extra_skill_dirs` | `string[]` | `yes` | `user` | 额外技能目录（每个目录含 `<skill>/SKILL.md`）。 |
+| `paths.extra_rule_dirs` | `string[]` | `yes` | `user` | 额外规则目录（绝对路径或 `~/…`；每个目录含 `*.md`），在主目录规则之后加载。 |
+| `paths.extra_skill_dirs` | `string[]` | `yes` | `user` | 额外技能目录（每个目录含 `<skill>/SKILL.md`）。由 `/import-claude` 写入；技能发现目前尚未读取此项。 |
 
 ### `permission`
 
@@ -491,7 +502,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 
 | 键 | 类型／取值 | Requirements | 托管 | 说明 |
 | --- | --- | --- | --- | --- |
-| `storage` | `table` | `yes` | `user` | 本地会话存储清理策略。 |
+| `storage.cleanup_ttl_days` | `integer` | `yes` | `user` | 会话文件夹可保持空闲的天数，超过后删除；实时会话中早于此期限的媒体和终端日志会被清理。默认 30。 |
 
 ### `subagents`
 

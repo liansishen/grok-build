@@ -172,6 +172,8 @@ struct Bucket<'e> {
     /// Holds WebSearch citation URLs (distinct result websites) and subagent child session ids.
     /// The started and terminal rows of one subagent count once; a burst of terminal rows counts each distinct subagent.
     sources: std::collections::HashSet<&'e str>,
+    /// Distinct child ids whose Subagent row is still `is_running`. Empty for other kinds.
+    running_sources: std::collections::HashSet<&'e str>,
 }
 
 /// The label counts members only: folded thoughts contribute nothing here and appear as their own member rows only
@@ -187,7 +189,10 @@ pub fn verb_group_header_label(
     let mut acc = BucketAccumulator::default();
 
     let end = end.min(entries.len());
-    for &entry in &entries[header_idx.min(end)..end] {
+    let Some(run) = entries.get(header_idx.min(end)..end) else {
+        return acc.into_label(theme);
+    };
+    for &entry in run {
         let kind = match run_step(entry, show_thinking) {
             RunStep::Member(kind) => kind,
             RunStep::Break => break,
@@ -213,7 +218,8 @@ pub fn truncation_header_label(
     let end = range.end.min(entries.len());
     let mut participants = 0usize;
 
-    for &entry in &entries[range.start.min(end)..end] {
+    let run = entries.get(range.start.min(end)..end)?;
+    for &entry in run {
         if limit.is_some_and(|n| participants >= n) {
             break;
         }
@@ -365,11 +371,14 @@ impl<'e> BucketAccumulator<'e> {
                     kind,
                     calls: 0,
                     sources: std::collections::HashSet::new(),
+                    running_sources: std::collections::HashSet::new(),
                 });
                 self.buckets.len() - 1
             }
         };
-        let bucket = &mut self.buckets[pos];
+        let Some(bucket) = self.buckets.get_mut(pos) else {
+            return;
+        };
         bucket.calls += 1;
         // Both walks only bucket tool-call or subagent rows
         // The block feeds the distinct-count override and failure detection
@@ -388,6 +397,9 @@ impl<'e> BucketAccumulator<'e> {
             }
             RenderBlock::Subagent(sb) => {
                 bucket.sources.insert(sb.child_session_id.as_str());
+                if entry.is_running {
+                    bucket.running_sources.insert(sb.child_session_id.as_str());
+                }
                 // Cancelled is deliberate, not an error; only Failed feeds the red suffix
                 if matches!(sb.kind, SubagentBlockKind::Failed { .. }) {
                     self.failed_count += 1;
@@ -412,12 +424,53 @@ impl<'e> BucketAccumulator<'e> {
             } else {
                 bucket.sources.len()
             };
-            let segment_key = bucket.kind.i18n_key(self.running, count);
-            let formatted = xai_grok_i18n::t_fmt(segment_key, &[("count", &count.to_string())]);
+            // Subagent tense is per-bucket: a finished-only set must not inherit group-wide Running.
+            let segment = match bucket.kind {
+                VerbGroupKind::Subagent => {
+                    let running_n = bucket.running_sources.len();
+                    let done_n = count.saturating_sub(running_n);
+                    if running_n > 0 && done_n > 0 {
+                        xai_grok_i18n::t_fmt(
+                            "scrollback.verb_group.subagent.mixed",
+                            &[
+                                (
+                                    "verb",
+                                    xai_grok_i18n::t(
+                                        "scrollback.verb_group.subagent.verb_running",
+                                    ),
+                                ),
+                                ("running", &running_n.to_string()),
+                                (
+                                    "noun",
+                                    xai_grok_i18n::t(if running_n == 1 {
+                                        "scrollback.verb_group.subagent.noun_one"
+                                    } else {
+                                        "scrollback.verb_group.subagent.noun_many"
+                                    }),
+                                ),
+                                ("done", &done_n.to_string()),
+                            ],
+                        )
+                    } else {
+                        xai_grok_i18n::t_fmt(
+                            bucket.kind.i18n_key(running_n > 0, count),
+                            &[("count", &count.to_string())],
+                        )
+                    }
+                }
+                _ => xai_grok_i18n::t_fmt(
+                    bucket.kind.i18n_key(self.running, count),
+                    &[("count", &count.to_string())],
+                ),
+            };
+            // Segments are joined by a catalog separator, so zh-CN can use its own enumeration mark.
             let segment = if i == 0 {
-                formatted
+                segment
             } else {
-                xai_grok_i18n::t_fmt("scrollback.verb_group.next_segment", &[("segment", &formatted)])
+                xai_grok_i18n::t_fmt(
+                    "scrollback.verb_group.next_segment",
+                    &[("segment", &segment)],
+                )
             };
             text.push_str(&segment);
             spans.push(Span::styled(segment, text_style));
@@ -482,6 +535,12 @@ mod tests {
         subagent(SubagentBlock::started(
             "task", child_sid, "explore", None, None, None, /*is_background=*/ true,
         ))
+    }
+
+    fn running_sub(child_sid: &str) -> ScrollbackEntry {
+        let mut entry = sub_started(child_sid);
+        entry.is_running = true;
+        entry
     }
 
     fn sub_completed(child_sid: &str) -> ScrollbackEntry {
@@ -550,12 +609,18 @@ mod tests {
             read("a.rs"),
             entry(ToolCallBlock::Search(SearchToolCallBlock::new("todo"))),
         ];
-        entries[1].is_running = true;
+        let Some(search) = entries.get_mut(1) else {
+            panic!("expected two entries: {entries:?}");
+        };
+        search.is_running = true;
         let l = label(&entries);
         assert_eq!(l.text, "Reading 1 file, Searching 1 pattern");
         assert!(l.running);
 
-        entries[1].is_running = false;
+        let Some(search) = entries.get_mut(1) else {
+            panic!("expected two entries: {entries:?}");
+        };
+        search.is_running = false;
         let l = label(&entries);
         assert_eq!(l.text, "Read 1 file, Searched 1 pattern");
         assert!(!l.running);
@@ -785,10 +850,111 @@ mod tests {
 
     #[test]
     fn running_subagent_flips_group_tense() {
-        let mut entries = vec![read("a.rs"), sub_started("child-A")];
-        entries[1].is_running = true;
+        let entries = vec![read("a.rs"), running_sub("child-A")];
         let l = label(&entries);
         assert_eq!(l.text, "Reading 1 file, Running 1 subagent");
         assert!(l.running);
+    }
+
+    #[test]
+    fn mixed_subagents_show_running_and_completed_counts() {
+        let l = label(&[
+            running_sub("a"),
+            running_sub("b"),
+            sub_completed("c"),
+            sub_completed("d"),
+            sub_completed("e"),
+        ]);
+        assert_eq!(l.text, "Running 2 subagents, 3 completed");
+        assert!(l.running);
+
+        let l = label(&[running_sub("a"), sub_completed("b")]);
+        assert_eq!(l.text, "Running 1 subagent, 1 completed");
+        assert!(l.running);
+    }
+
+    #[test]
+    fn finished_subagents_do_not_claim_running_when_another_kind_is() {
+        let mut entries = vec![read("a.rs"), sub_completed("child-A")];
+        let Some(file) = entries.get_mut(0) else {
+            panic!("expected two entries: {entries:?}");
+        };
+        file.is_running = true;
+        let l = label(&entries);
+        assert_eq!(l.text, "Reading 1 file, Ran 1 subagent");
+        assert!(l.running);
+    }
+
+    /// The mixed running/completed subagent segment is catalog-backed.
+    #[test]
+    fn mixed_subagent_segment_copy_comes_from_the_catalog() {
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            label(&[running_sub("a"), sub_completed("b")]).text
+        });
+        assert!(
+            text.contains("⟦scrollback.verb_group.subagent.mixed⟧"),
+            "mixed subagent segment: {text}"
+        );
+    }
+
+    /// Every bucket kind resolves its header segment from the catalog. The label used to be assembled
+    /// inline from a hardcoded English verb/noun pair, which left the whole segment English under zh-CN.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn verb_group_segments_come_from_the_catalog() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+        const KINDS: [VerbGroupKind; 14] = [
+            VerbGroupKind::File,
+            VerbGroupKind::Skill,
+            VerbGroupKind::Search,
+            VerbGroupKind::Dir,
+            VerbGroupKind::WebFetch,
+            VerbGroupKind::WebSearch,
+            VerbGroupKind::MemorySearch,
+            VerbGroupKind::IntegrationSearch,
+            VerbGroupKind::Subagent,
+            VerbGroupKind::Command,
+            VerbGroupKind::EditFile,
+            VerbGroupKind::McpCall,
+            VerbGroupKind::Message,
+            VerbGroupKind::OtherTool,
+        ];
+        for kind in KINDS {
+            for running in [false, true] {
+                for count in [1usize, 3] {
+                    let key = kind.i18n_key(running, count);
+                    assert!(xai_grok_i18n::has_en(key), "no en entry for {key}");
+                    let zh = xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, key);
+                    assert_ne!(zh, key, "no zh entry for {key}");
+                    assert!(
+                        zh.chars()
+                            .any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
+                        "zh value for {key} is not Chinese: {zh:?}"
+                    );
+                }
+            }
+        }
+
+        // The shipped label path paints the catalog copy, not the old English verb/noun pair.
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        assert_eq!(label(&[read("a.rs"), read("b.rs")]).text, "已读取 2 个文件");
+        assert_eq!(
+            label(&[
+                running_sub("a"),
+                running_sub("b"),
+                sub_completed("c"),
+                sub_completed("d"),
+                sub_completed("e"),
+            ])
+            .text,
+            "正在运行 2 个子智能体，3 个已完成"
+        );
     }
 }

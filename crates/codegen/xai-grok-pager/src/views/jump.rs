@@ -118,11 +118,13 @@ pub fn render_jump_overlay(buf: &mut Buffer, area: Rect, state: &JumpState, focu
     state
         .list()
         .render(buf, area, "Jump to which turn?", focused, |i, ctx| {
-            let entry = &state.entries[i];
+            let Some(entry) = state.entries.get(i) else {
+                return Line::from("");
+            };
             let ordinal = format!("{:>ord_width$} ", entry.turn_idx + 1);
             let ord_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
             let preview: String = if entry.preview.is_empty() {
-                "(no preview)".to_string()
+                xai_grok_i18n::t("rewind.no_preview").to_string()
             } else {
                 truncate_str(
                     &entry.preview,
@@ -246,5 +248,29 @@ mod tests {
         assert_eq!(jump_row_at(&s, area(), 5, 2), Some(0));
         assert_eq!(jump_row_at(&s, area(), 5, 4), Some(2));
         assert_eq!(jump_row_at(&s, area(), 5, 5), None);
+    }
+
+    /// A row with no preview text paints the catalog's `(no preview)` placeholder.
+    #[test]
+    fn empty_preview_placeholder_comes_from_the_catalog() {
+        let mut s = state(1);
+        s.entries[0].preview.clear();
+        let area = area();
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_jump_overlay(&mut buf, area, &s, false);
+            (area.y..area.y + area.height)
+                .map(|y| {
+                    (area.x..area.x + area.width)
+                        .filter_map(|x| buf.cell((x, y)).map(|cell| cell.symbol().to_owned()))
+                        .collect::<String>()
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
+        assert!(
+            text.contains("⟦rewind.no_preview⟧"),
+            "empty preview must come from the catalog: {text:?}"
+        );
     }
 }

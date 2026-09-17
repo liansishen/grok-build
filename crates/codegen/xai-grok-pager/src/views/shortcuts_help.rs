@@ -23,10 +23,6 @@ use crate::input::key::KeyShortcut;
 use crate::views::picker::{PickerConfig, PickerOutcome, PickerState, handle_picker_input};
 use crate::views::shortcuts_bar::HintItem;
 
-// ---------------------------------------------------------------------------
-// Data
-// ---------------------------------------------------------------------------
-
 /// Key for pattern-A inline expand state (`expanded_ids`).
 ///
 /// Registry rows use [`ExpandKey::Action`]; display-only rows that ship `long_help` (e.g. paste) use [`ExpandKey::Pseudo`] with a stable label.
@@ -64,10 +60,6 @@ impl ShortcutsHelpEntry {
         matches!(self, Self::SectionHeader { .. })
     }
 }
-
-// ---------------------------------------------------------------------------
-// Modal state construction
-// ---------------------------------------------------------------------------
 
 /// Category display order and labels for the cheatsheet.
 fn category_order() -> [(Category, &'static str); 7] {
@@ -201,7 +193,9 @@ pub fn build_entries(
                 item,
                 dimmed,
                 action_id: Some(def.id),
-                long_help: def.long_help,
+                // Localized man-style help (`actions.<Id>.help`); stays `None` for actions that
+                // ship no long help, whose detail falls back to the localized description.
+                long_help: def.long_help.map(|_| def.help_t()),
             };
             match seen_in_cat.entry(def.default_key) {
                 std::collections::hash_map::Entry::Vacant(slot) => {
@@ -211,7 +205,9 @@ pub fn build_entries(
                 std::collections::hash_map::Entry::Occupied(slot) => {
                     // Same key already rendered in this category
                     // Replace it only when the earlier row is dimmed and this one is lit (active context wins)
-                    let prior = &mut entries[*slot.get()];
+                    let Some(prior) = entries.get_mut(*slot.get()) else {
+                        continue;
+                    };
                     if !dimmed && matches!(prior, ShortcutsHelpEntry::Hint { dimmed: true, .. }) {
                         *prior = hint;
                     }
@@ -220,7 +216,7 @@ pub fn build_entries(
         }
         // Scrollback search (`/`) has no registered ActionDef yet (vim-only, handled inline); list it here for discoverability
         if vim_mode && cat == Category::ConversationNav {
-            let mut item = HintItem::new(crate::key!('/'), "search");
+            let mut item = HintItem::new(crate::key!('/'), t("hint.search"));
             item.description = Some(t("shortcuts.pseudo.search_scrollback").into());
             let dimmed = !active_contexts.contains(&When::ScrollbackFocused);
             entries.push(ShortcutsHelpEntry::Hint {
@@ -233,7 +229,7 @@ pub fn build_entries(
         // Simple mode reaches scrollback search via the `/find` slash command, not a keystroke
         // Use a null key and a custom display so the raw key list stays empty of `/`
         if !vim_mode && cat == Category::ConversationNav {
-            let mut item = HintItem::new(crate::key!(Null), "search");
+            let mut item = HintItem::new(crate::key!(Null), t("hint.search"));
             item.custom_display = Some("/find");
             item.description = Some(t("shortcuts.pseudo.search_scrollback").into());
             // `/find` is a slash command typed at the prompt (not a scrollback keystroke like the vim `/` above)
@@ -262,18 +258,18 @@ pub fn build_entries(
                 });
             };
 
-            let mut paste = HintItem::new(crate::key!('v', CONTROL), "paste");
+            let mut paste = HintItem::new(crate::key!('v', CONTROL), t("hint.paste"));
             paste.description = Some(t("shortcuts.pseudo.paste_clipboard").into());
             #[cfg(target_os = "windows")]
             paste.keys.push(crate::key!('v', ALT));
             push_pseudo(&mut entries, paste, Some(paste_long_help()));
 
-            let mut undo = HintItem::new(crate::key!('z', CONTROL), "undo");
+            let mut undo = HintItem::new(crate::key!('z', CONTROL), t("hint.undo"));
             undo.description = Some(t("shortcuts.pseudo.undo").into());
             push_pseudo(&mut entries, undo, Some(undo_long_help()));
 
             // Alt+Z is the fallback on terminals that send Ctrl+Shift+Z as plain Ctrl+Z
-            let mut redo = HintItem::new(crate::key!('z', CONTROL | SHIFT), "redo");
+            let mut redo = HintItem::new(crate::key!('z', CONTROL | SHIFT), t("hint.redo"));
             redo.description = Some(t("shortcuts.pseudo.redo").into());
             redo.keys.push(crate::key!('z', ALT));
             push_pseudo(&mut entries, redo, Some(redo_long_help()));
@@ -318,10 +314,6 @@ pub fn build_initial_picker_state(entries: &[ShortcutsHelpEntry]) -> PickerState
     state.selected = entries.iter().position(|e| e.is_hint()).unwrap_or(0);
     state
 }
-
-// ---------------------------------------------------------------------------
-// Search filtering
-// ---------------------------------------------------------------------------
 
 /// Filter ShortcutsHelp entries by search query. Returns the original-index list of entries that
 /// pass the filter. Section headers are kept only when at least one hint in their section matches;
@@ -440,10 +432,6 @@ fn hint_description(h: &HintItem) -> String {
         })
 }
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
 fn selected_original_entry<'a>(
     filtered: &[usize],
     entries: &'a [ShortcutsHelpEntry],
@@ -480,10 +468,6 @@ fn picker_config(non_sel: &[bool]) -> PickerConfig<'_> {
         vim_normal_first: crate::appearance::cache::load_vim_mode(),
     }
 }
-
-// ---------------------------------------------------------------------------
-// Input dispatch
-// ---------------------------------------------------------------------------
 
 /// Outcome of an input event delivered to the cheatsheet modal.
 ///
@@ -656,7 +640,7 @@ pub fn render_detail_body<'a>(
     if dimmed_note {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "(not active in current context)",
+            t("shortcuts.dimmed_note"),
             Style::default().fg(theme.gray_dim),
         )));
     }
@@ -993,10 +977,6 @@ pub fn handle_mouse(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Modal rendering + chrome integration
-// ---------------------------------------------------------------------------
-
 /// Footer hints painted along the bottom border of the cheatsheet modal.
 /// The agent view and the dashboard show the same hints so muscle memory carries over.
 pub fn modal_footer(filter_active: bool) -> Vec<crate::views::modal_window::Shortcut<'static>> {
@@ -1166,9 +1146,14 @@ impl CheatsheetRows {
             .map(|(idx, kind)| {
                 let selected = state.hovered == Some(idx)
                     || (state.hovered.is_none() && idx == state.selected);
+                let (label, right_label) = self
+                    .row_strs
+                    .get(idx)
+                    .map(|(l, r)| (l.as_str(), r.as_str()))
+                    .unwrap_or(("", ""));
                 match kind {
                     CheatsheetRowKind::Header { is_collapsed } => PickerEntry::Row(PickerRow {
-                        label: self.row_strs[idx].0.as_str(),
+                        label,
                         right_label: "",
                         selected,
                         expanded: !is_collapsed,
@@ -1185,14 +1170,17 @@ impl CheatsheetRows {
                     CheatsheetRowKind::Hint { dimmed, expand } => {
                         let is_expanded =
                             expand.map(|id| expanded_ids.contains(&id)).unwrap_or(false);
-                        let description_lines: &[&str] = if is_expanded && !help[idx].is_empty() {
-                            std::slice::from_ref(&help[idx])
+                        let description_lines: &[&str] = if is_expanded {
+                            match help.get(idx) {
+                                Some(line) if !line.is_empty() => std::slice::from_ref(line),
+                                _ => &[],
+                            }
                         } else {
                             &[]
                         };
                         PickerEntry::Row(PickerRow {
-                            label: self.row_strs[idx].0.as_str(),
-                            right_label: self.row_strs[idx].1.as_str(),
+                            label,
+                            right_label,
                             selected,
                             expanded: is_expanded,
                             fields: &[],
@@ -1207,8 +1195,8 @@ impl CheatsheetRows {
                         })
                     }
                     CheatsheetRowKind::Other => PickerEntry::Row(PickerRow {
-                        label: self.row_strs[idx].0.as_str(),
-                        right_label: self.row_strs[idx].1.as_str(),
+                        label,
+                        right_label,
                         selected: false,
                         expanded: false,
                         fields: &[],

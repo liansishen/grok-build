@@ -462,7 +462,7 @@ fn headless_version_mismatch_logs_warn_with_both_versions() {
         "log names the method: {logs}"
     );
     let banner = crate::glyphs::sanitize_toast_message(
-        "⚠ Version mismatch: client 0.1.157, leader 0.1.150. Restart grok to match",
+        "⚠ Version mismatch: client 0.1.157, leader 0.1.150 — restart grok to match",
     );
     assert!(
         logs.contains(banner.as_ref()),
@@ -486,7 +486,7 @@ fn headless_version_mismatch_without_message_still_warns() {
     assert!(is_none);
     assert!(logs.contains("WARN"), "logged at warn level: {logs}");
     let banner = crate::glyphs::sanitize_toast_message(
-        "⚠ Version mismatch: client 0.1.157, leader 0.1.150. Restart grok to match",
+        "⚠ Version mismatch: client 0.1.157, leader 0.1.150 — restart grok to match",
     );
     assert!(
         logs.contains(banner.as_ref()),
@@ -681,5 +681,35 @@ fn headless_memory_flush_notifications_decode() {
             assert_eq!(path.as_deref(), Some("/tmp/memory/sessions/log.md"));
         }
         _ => panic!("expected MemoryFlushCompleted"),
+    }
+}
+
+#[test]
+fn headless_memory_capture_activity_decodes_without_content() {
+    use crate::headless::reducer::Lifecycle;
+
+    let notification = make_ext_notif(
+        "x.ai/session/update",
+        serde_json::json!({
+            "sessionUpdate": "memory_capture_activity",
+            "activity": "running",
+            "from_turn": 2,
+            "through_turn": 5,
+            "attempt": 1
+        }),
+    );
+    match handle_ext_notification(&notification) {
+        ExtEvent::Lifecycle(Lifecycle::MemoryCaptureActivity {
+            activity,
+            from_turn,
+            through_turn,
+            attempt,
+            detail,
+        }) => {
+            assert_eq!(activity, "running");
+            assert_eq!((from_turn, through_turn, attempt), (2, 5, 1));
+            assert!(detail.is_none());
+        }
+        _ => panic!("expected MemoryCaptureActivity"),
     }
 }

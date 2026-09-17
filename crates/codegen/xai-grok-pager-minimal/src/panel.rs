@@ -21,6 +21,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Span;
 
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_pager::app::agent_view::AgentView;
 use xai_grok_pager::minimal_api;
 use xai_grok_pager::theme::Theme;
@@ -130,10 +131,14 @@ fn render_dim_line(buf: &mut Buffer, row: Rect, theme: &Theme, text: &str) {
 }
 
 /// `/resume` session picker: Enter picks a session.
-const RESUME_FOOTER: &str = "\u{2191}/\u{2193} navigate \u{00b7} enter confirm \u{00b7} esc cancel";
+fn resume_footer() -> &'static str {
+    t("minimal.panel.resume_footer")
+}
 
 /// `/mcps` list: Enter expands tools; reconnect is space (off then on); `r` re-lists status.
-const MCPS_FOOTER: &str = "\u{2191}/\u{2193} navigate \u{00b7} space enable/disable \u{00b7} r refresh \u{00b7} enter expand \u{00b7} esc cancel";
+fn mcps_footer() -> &'static str {
+    t("minimal.panel.mcps_footer")
+}
 
 fn render_footer(buf: &mut Buffer, row: Rect, theme: &Theme, text: &str) {
     render_dim_line(buf, row, theme, text);
@@ -235,7 +240,7 @@ fn render_resume(
         .then(|| minimal_api::hidden_external_hint(entries.as_deref(), *source_filter))
         .flatten();
 
-    render_title(buf, title_row, theme, "Resume session");
+    render_title(buf, title_row, theme, t("modal.resume_session"));
     // Focus-aware search bar (cursor only when search is focused).
     minimal_api::render_picker_search_bar(
         buf,
@@ -288,7 +293,7 @@ fn render_resume(
         filter_rect: None,
     });
 
-    render_footer(buf, footer_row, theme, RESUME_FOOTER);
+    render_footer(buf, footer_row, theme, resume_footer());
     None
 }
 
@@ -320,7 +325,7 @@ fn render_mcps(
     theme: &Theme,
 ) -> Option<(u16, u16)> {
     let (title_row, subtitle_row, divider_row, list_area, footer_row) = chrome_layout(area);
-    render_title(buf, title_row, theme, "Manage MCP servers");
+    render_title(buf, title_row, theme, t("minimal.panel.mcps_title"));
 
     // Phase 1 (immutable): build the row mapping and owned per-row render data
     let labels: Vec<String>;
@@ -356,53 +361,76 @@ fn render_mcps(
                 let mut col = vec![false; n];
                 let mut exp = vec![false; n];
                 for i in 0..n {
-                    let gk = row_group_keys[i].as_deref();
-                    if gk.is_some_and(|k| k.starts_with("mcp-section:")) {
-                        col[i] = true;
-                        exp[i] = !minimal_api::mcp_section_children_hidden(
-                            &s.mcps_collapsed_sections,
-                            gk.unwrap(),
-                            searching,
-                        );
+                    let gk = row_group_keys.get(i).and_then(|k| k.as_deref());
+                    if let Some(k) = gk.filter(|k| k.starts_with("mcp-section:")) {
+                        if let Some(c) = col.get_mut(i) {
+                            *c = true;
+                        }
+                        if let Some(e) = exp.get_mut(i) {
+                            *e = !minimal_api::mcp_section_children_hidden(
+                                &s.mcps_collapsed_sections,
+                                k,
+                                searching,
+                            );
+                        }
                     } else if gk.is_some_and(|k| k.starts_with("mcp-tools:")) {
-                        ind[i] = 1;
-                        col[i] = true;
-                        if let Some(si) = row_data_indices[i] {
-                            exp[i] = s.mcps_tools_expanded.contains(&si);
+                        if let Some(d) = ind.get_mut(i) {
+                            *d = 1;
+                        }
+                        if let Some(c) = col.get_mut(i) {
+                            *c = true;
+                        }
+                        if let Some(si) = row_data_indices.get(i).copied().flatten() {
+                            if let Some(e) = exp.get_mut(i) {
+                                *e = s.mcps_tools_expanded.contains(&si);
+                            }
                             if let Some(srv) = servers.get(si) {
                                 if !srv.enabled {
                                     // Policy-blocked rows also carry `enabled = false`; the verdict outranks
                                     // the personal-disable badge, as in the full modal
-                                    b[i] = if srv.blocked_reason.is_some() {
-                                        "blocked by policy"
-                                    } else {
-                                        "disabled"
+                                    if let Some(badge) = b.get_mut(i) {
+                                        *badge = if srv.blocked_reason.is_some() {
+                                            t("minimal.panel.mcp_badge_blocked")
+                                        } else {
+                                            t("minimal.panel.mcp_badge_disabled")
+                                        }
+                                        .to_string();
                                     }
-                                    .to_string();
-                                    bc[i] = Some(theme.accent_error);
+                                    if let Some(color) = bc.get_mut(i) {
+                                        *color = Some(theme.accent_error);
+                                    }
                                 } else {
-                                    b[i] = minimal_api::mcp_status_label(&srv.status).to_string();
-                                    bc[i] = Some(minimal_api::mcp_status_theme_color(
-                                        &srv.status,
-                                        theme,
-                                    ));
+                                    if let Some(badge) = b.get_mut(i) {
+                                        *badge =
+                                            minimal_api::mcp_status_label(&srv.status).to_string();
+                                    }
+                                    if let Some(color) = bc.get_mut(i) {
+                                        *color = Some(minimal_api::mcp_status_theme_color(
+                                            &srv.status,
+                                            theme,
+                                        ));
+                                    }
                                 }
-                                rl[i] = if srv.tool_count == 1 {
-                                    "1 tool".to_string()
-                                } else {
-                                    format!("{} tools", srv.tool_count)
-                                };
+                                if let Some(right) = rl.get_mut(i) {
+                                    let count = srv.tool_count.to_string();
+                                    *right = if srv.tool_count == 1 {
+                                        t_fmt("scrollback.context.tool_one", &[("count", &count)])
+                                    } else {
+                                        t_fmt("scrollback.context.tool_many", &[("count", &count)])
+                                    };
+                                }
                             }
                         }
-                    } else {
-                        ind[i] = 2; // tool child
+                    } else if let Some(d) = ind.get_mut(i) {
+                        *d = 2; // tool child
                     }
                 }
-                subtitle = format!(
-                    "{} server{}",
-                    servers.len(),
-                    if servers.len() == 1 { "" } else { "s" }
-                );
+                let count = servers.len().to_string();
+                subtitle = if servers.len() == 1 {
+                    t_fmt("scrollback.context.server_one", &[("count", &count)])
+                } else {
+                    t_fmt("scrollback.context.server_many", &[("count", &count)])
+                };
                 labels = row_labels;
                 group_keys = row_group_keys;
                 data_indices = row_data_indices;
@@ -414,7 +442,7 @@ fn render_mcps(
                 expandeds = exp;
             }
             TabDataState::Loading => {
-                subtitle = "loading\u{2026}".to_string();
+                subtitle = t("minimal.panel.mcps_loading").to_string();
                 labels = vec![];
                 group_keys = vec![];
                 data_indices = vec![];
@@ -426,7 +454,7 @@ fn render_mcps(
                 expandeds = vec![];
             }
             TabDataState::Error(msg) => {
-                subtitle = format!("error: {msg}");
+                subtitle = t_fmt("value_error_detail", &[("message", msg.as_str())]);
                 labels = vec![];
                 group_keys = vec![];
                 data_indices = vec![];
@@ -468,18 +496,18 @@ fn render_mcps(
     let entries: Vec<PickerEntry> = (0..n)
         .map(|i| {
             PickerEntry::Row(PickerRow {
-                label: labels[i].as_str(),
-                right_label: right_labels[i].as_str(),
+                label: labels.get(i).map(String::as_str).unwrap_or(""),
+                right_label: right_labels.get(i).map(String::as_str).unwrap_or(""),
                 selected: !search_active && i == selected,
-                expanded: expandeds[i],
+                expanded: expandeds.get(i).copied().unwrap_or(false),
                 fields: &empty_fields,
                 description_lines: &no_lines,
                 summary_lines: &no_lines,
                 dimmed: false,
-                indent: indents[i],
-                badge: badges[i].as_str(),
-                badge_color: badge_colors[i],
-                collapsible: collapsibles[i],
+                indent: indents.get(i).copied().unwrap_or(0),
+                badge: badges.get(i).map(String::as_str).unwrap_or(""),
+                badge_color: badge_colors.get(i).copied().flatten(),
+                collapsible: collapsibles.get(i).copied().unwrap_or(false),
                 underline_last_desc: false,
             })
         })
@@ -505,7 +533,7 @@ fn render_mcps(
         filter_rect: None,
     });
 
-    render_footer(buf, footer_row, theme, MCPS_FOOTER);
+    render_footer(buf, footer_row, theme, mcps_footer());
     None
 }
 
@@ -625,18 +653,6 @@ mod tests {
         a
     }
 
-    fn buffer_text(buf: &Buffer) -> String {
-        let area = buf.area;
-        let mut out = String::new();
-        for y in area.y..area.y + area.height {
-            for x in area.x..area.x + area.width {
-                out.push_str(buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "));
-            }
-            out.push('\n');
-        }
-        out
-    }
-
     #[test]
     fn active_detects_resume_mcps_and_none() {
         assert_eq!(active(&agent()), None);
@@ -663,18 +679,35 @@ mod tests {
         let theme = Theme::current();
         let area = Rect::new(0, 0, 80, 24);
         let mut buf = Buffer::empty(area);
-        render(&mut buf, area, &mut a, ListPanel::Mcps, &theme);
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            render(&mut buf, area, &mut a, ListPanel::Mcps, &theme);
+            crate::buffer_text(&buf)
+        });
 
-        let text = buffer_text(&buf);
-        assert!(text.contains("Manage MCP servers"), "title:\n{text}");
-        assert!(text.contains("2 servers"), "subtitle:\n{text}");
+        assert!(
+            text.contains("⟦minimal.panel.mcps_title⟧"),
+            "title:\n{text}"
+        );
+        assert!(
+            text.contains("⟦scrollback.context.server_many⟧"),
+            "subtitle:\n{text}"
+        );
         assert!(text.contains("alpha"), "server row:\n{text}");
         assert!(text.contains("bravo"), "server row:\n{text}");
-        assert!(text.contains("space enable/disable"), "footer:\n{text}");
-        assert!(text.contains("r refresh"), "footer:\n{text}");
-        assert!(text.contains("enter expand"), "footer:\n{text}");
         assert!(
-            !text.contains("enter confirm"),
+            text.contains("⟦minimal.panel.mcps_footer⟧"),
+            "footer:\n{text}"
+        );
+        assert!(
+            !text.contains("Manage MCP servers"),
+            "title must come from the catalog:\n{text}"
+        );
+        assert!(
+            !text.contains("space enable/disable"),
+            "footer must come from the catalog:\n{text}"
+        );
+        assert!(
+            !text.contains("⟦minimal.panel.resume_footer⟧"),
             "MCP footer must not reuse resume confirm copy:\n{text}"
         );
 
@@ -701,9 +734,11 @@ mod tests {
         let theme = Theme::current();
         let area = Rect::new(0, 0, 80, 24);
         let mut buf = Buffer::empty(area);
-        render(&mut buf, area, &mut a, ListPanel::Mcps, &theme);
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            render(&mut buf, area, &mut a, ListPanel::Mcps, &theme);
+            crate::buffer_text(&buf)
+        });
 
-        let text = buffer_text(&buf);
         let row = |name: &str| {
             text.lines()
                 .find(|l| l.contains(name))
@@ -712,15 +747,19 @@ mod tests {
         };
         let denied_row = row("denied-srv");
         assert!(
-            denied_row.contains("blocked by policy"),
+            denied_row.contains("⟦minimal.panel.mcp_badge_blocked⟧"),
             "policy verdict must win:\n{denied_row}"
         );
         assert!(
-            !denied_row.contains("disabled"),
+            !denied_row.contains("⟦minimal.panel.mcp_badge_disabled⟧"),
             "policy-blocked row must not read as a personal disable:\n{denied_row}"
         );
         assert!(
-            row("manual-srv").contains("disabled"),
+            !text.contains("blocked by policy"),
+            "badge copy must come from the catalog:\n{text}"
+        );
+        assert!(
+            row("manual-srv").contains("⟦minimal.panel.mcp_badge_disabled⟧"),
             "personal disable keeps its badge:\n{text}"
         );
     }
@@ -731,12 +770,25 @@ mod tests {
         let theme = Theme::current();
         let area = Rect::new(0, 0, 80, 24);
         let mut buf = Buffer::empty(area);
-        render(&mut buf, area, &mut a, ListPanel::Resume, &theme);
+        let text = xai_grok_i18n::with_pseudo_locale(|| {
+            render(&mut buf, area, &mut a, ListPanel::Resume, &theme);
+            crate::buffer_text(&buf)
+        });
 
-        let text = buffer_text(&buf);
-        assert!(text.contains("Resume session"), "title:\n{text}");
+        assert!(text.contains("⟦modal.resume_session⟧"), "title:\n{text}");
         assert!(text.contains("first task"), "session row:\n{text}");
-        assert!(text.contains("enter confirm"), "resume footer:\n{text}");
+        assert!(
+            text.contains("⟦minimal.panel.resume_footer⟧"),
+            "resume footer:\n{text}"
+        );
+        assert!(
+            !text.contains("Resume session"),
+            "title must come from the catalog:\n{text}"
+        );
+        assert!(
+            !text.contains("enter confirm"),
+            "resume footer must come from the catalog:\n{text}"
+        );
         assert!(
             !text.contains("r refresh"),
             "resume footer must stay session-picker copy:\n{text}"
@@ -777,7 +829,7 @@ mod tests {
             assert_eq!(actual_cell.symbol(), expected_cell.symbol(), "column {x}");
             assert_eq!(actual_cell.style(), expected_cell.style(), "column {x}");
         }
-        let text = buffer_text(&actual);
+        let text = crate::buffer_text(&actual);
         assert!(text.contains(grapheme), "ZWJ grapheme was split: {text:?}");
         assert!(
             text.contains(combining),

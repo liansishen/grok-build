@@ -53,13 +53,14 @@ fn global_target(storage: &MemoryStorage) -> ClearTarget {
     }
 }
 
-pub fn run(args: MemoryArgs) -> Result<()> {
+pub fn run(args: MemoryArgs, mode: xai_grok_shell::config::MemoryMode) -> Result<()> {
     match args.command {
         MemoryCommand::Clear {
             global, all, yes, ..
         } => {
             let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
-            let storage = MemoryStorage::new(&cwd, None);
+            let storage = MemoryStorage::new_for_mode(&cwd, None, mode);
+
 
             let targets = if all {
                 vec![workspace_target(&storage), global_target(&storage)]

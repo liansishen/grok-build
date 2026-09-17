@@ -743,9 +743,14 @@
 "dashboard.awaiting_count" = "{count} 个等待中"
 "dashboard.awaiting_input" = "等待你的输入"
 "dashboard.badge.background" = "后台"
+"dashboard.badge.background_count" = "{total} 后台"
 "dashboard.badge.failed" = "失败"
 "dashboard.badge.needs_input" = "需输入"
 "dashboard.badge.pinned" = "已固定"
+"dashboard.badge.subagents" = "子代理"
+"dashboard.badge.tasks" = "任务"
+"dashboard.badge.watchers" = "监视器"
+"dashboard.badge.workflows" = "工作流"
 "dashboard.badge.worktree" = "工作树"
 "dashboard.banner_empty" = " 暂无会话 — 按 Esc 调度一个。 "
 "dashboard.close_this_session" = "关闭此会话"
@@ -755,6 +760,9 @@
 "dashboard.empty" = "暂无智能体"
 "dashboard.empty_prompt" = "暂无智能体，输入提示以开始。"
 "dashboard.failed" = "失败"
+"dashboard.footer.disable_worktree" = "禁用工作树"
+"dashboard.footer.enable_worktree" = "启用工作树"
+"dashboard.footer.open_previous" = "打开上一会话"
 "dashboard.group.awaiting" = "等待中"
 "dashboard.group.blocked" = "已阻塞"
 "dashboard.group.done" = "已完成"
@@ -787,6 +795,7 @@
 "dashboard.more_count" = "还有 {count} 个"
 "dashboard.new_agent_button" = "[+ 新智能体]"
 "dashboard.new_session" = "新会话"
+"dashboard.subagent.usage_summary" = "{tools} 个工具 · {toks} 词元 · {turns} 轮"
 "dashboard.new_worktree_button" = "[+ 新工作树]"
 "dashboard.no_activity" = "暂无活动"
 "dashboard.no_agent_match" = "没有智能体匹配 `{query}` — 按 Esc 清除筛选。"
@@ -846,8 +855,10 @@
 "dashboard.toast.reply_canceled_changed" = "回复已取消 — 预览面板已更改"
 "dashboard.toast.reply_canceled_question" = "回复已取消 — 请先回答问题"
 "dashboard.toast.requires_supergrok" = "/{command} 需要 SuperGrok — 请前往 {url} 升级"
+"dashboard.toast.session_became_active_archive" = "会话已激活；请先停止后再归档"
 "dashboard.toast.session_closed" = "{check} 会话已关闭"
 "dashboard.toast.session_only_command" = "/{command} 仅可在会话中使用"
+"dashboard.toast.subagent_archive_readonly" = "无法从仪表板归档子代理行"
 "dashboard.toast.subagent_mode_readonly" = "无法更改子代理的模式"
 "dashboard.toast.subagent_reply_readonly" = "无法回复子代理"
 "dashboard.consent_first" = "请先阅读并确认条款通知以打开仪表盘"
@@ -1484,6 +1495,20 @@
 "modal.send_feedback" = "发送反馈"
 "modal.session_info" = "会话信息"
 "modal.usage" = "用量"
+"permission.description.tool" = "运行 {name}"
+"slash.session_only_command" = "/{command} 只能在会话中使用。请先打开一个代理。"
+"task_completion.background_prefix" = "后台任务"
+"task_completion.description_label" = "描述"
+"task_completion.duration_label" = "持续时间"
+"task_completion.monitor_prefix" = "监视任务"
+"task_result.workspace_archive_failed_many" = "无法归档 {count} 个仪表板会话"
+"task_result.workspace_archive_failed_one" = "无法归档 1 个仪表板会话"
+"task_result.workspace_archive_read_only" = "无法归档会话：仪表板工作区为只读"
+"task_result.workspace_layout_failed" = "无法保存仪表板布局"
+"tasks.status_starting" = "（启动中）"
+"tool.description.subagent_tools.access_prefix" = "可使用："
+"tool.description.subagent_tools.plan_tail" = "无法执行文件编辑和命令执行。"
+"tool.description.subagent_tools.read_only_prefix" = "只读代理，可使用："
 "usage.modal.tab.context" = "上下文用量"
 "usage.modal.tab.limit" = "用量限额"
 "usage.modal.tab.session" = "会话信息"
@@ -1934,8 +1959,11 @@
 "scrollback.verb_group.skill.running_one" = "正在读取 {count} 个技能"
 "scrollback.verb_group.subagent.done_many" = "已运行 {count} 个子智能体"
 "scrollback.verb_group.subagent.done_one" = "已运行 {count} 个子智能体"
+"scrollback.verb_group.subagent.noun_many" = "个子智能体"
+"scrollback.verb_group.subagent.noun_one" = "个子智能体"
 "scrollback.verb_group.subagent.running_many" = "正在运行 {count} 个子智能体"
 "scrollback.verb_group.subagent.running_one" = "正在运行 {count} 个子智能体"
+"scrollback.verb_group.subagent.verb_running" = "正在运行"
 "scrollback.verb_group.web_fetch.done_many" = "已获取 {count} 个网站"
 "scrollback.verb_group.web_fetch.done_one" = "已获取 {count} 个网站"
 "scrollback.verb_group.web_fetch.running_many" = "正在获取 {count} 个网站"
@@ -1967,12 +1995,12 @@
 "session.compaction_completed_range" = "上下文已压缩：{before} → {after} 词元"
 "session.compaction_completed_with_time" = "{body}（{secs}s）"
 "session.compaction_failed" = "压缩失败。"
-"session.compaction_failed_error" = "压缩失败：{error}"
+"session.compaction_failed_error" = "压缩失败 - {error}"
 "session.compaction_started" = "上下文已用 {percentage}%。正在压缩…"
 "session.context_too_large" = "此对话过大，超出模型上下文窗口。请使用 /new 开始新会话。"
 "session.create_failed" = "会话创建失败：{error}"
 "session.created" = "会话：{session_id}"
-"session.created_switch_hint" = "会话 {session_id} — 使用 {command} 在会话之间切换"
+"session.created_switch_hint" = "会话 {session_id}，使用 {command} 在会话之间切换"
 "session.disk_full" = "磁盘已满 — 请释放空间后重试。"
 "session.effort_error" = "--effort/--reasoning-effort：{error}"
 "session.error.couldnt_load" = "无法加载会话：{error}"
@@ -1993,9 +2021,9 @@
 "session.model_switched" = "{reason} 已切换到「{model}」。"
 "session.model_switched_plain" = "已切换到 {model}"
 "session.model_switched_with_effort" = "已切换到 {model}（推理强度：{effort}）"
-"session.reauth_required" = "需要重新认证 — 会话已过期或凭据被拒绝。请运行 /login 重新登录，然后重新发送消息。"
+"session.reauth_required" = "需要重新认证：会话已过期或凭据被拒绝。请运行 /login 重新登录，然后重新发送消息。"
 "session.recap" = "回顾"
-"session.recap_summary" = "回顾 — {summary}"
+"session.recap_summary" = "回顾：{summary}"
 "session.relative.days_ago" = "{n} 天前"
 "session.relative.hours_ago" = "{n} 小时前"
 "session.relative.minutes_ago" = "{n} 分钟前"
@@ -2010,12 +2038,26 @@
 "session.title_list_failed" = "解析 --resume {arg} 时列出本地会话失败：{error}"
 "session.title_miss_hint" = "此目录中没有匹配 {arg} 的会话 ID 或标题；请尝试 `grok sessions search {arg}`"
 "session.turn_blocked_by_hook" = "回合被钩子拦截，在 {duration} 后结束。"
-"session.turn_cancelled" = "用户在 {duration} 后取消了回合。"
 "session.turn_completed" = "回合已完成。"
 "session.turn_failed" = "回合失败：{error}"
 "session.turn_failed_in" = "回合在 {duration} 后失败：{error}"
-"session.turn_halted" = "智能体无法继续推进 — 回合在 {duration} 后结束。"
+"session.turn_halted" = "智能体无法继续推进。回合在 {duration} 后结束。"
 "session.worked_for" = "工作了 {duration}"
+"session.turn_cancelled_in" = "{reason}，用时 {duration}。"
+"session.compacting_conversation" = "正在压缩对话…"
+"session.model_family_switch_compacting" = "正在切换模型，压缩中…"
+"session.plan_mode_entered_by_agent" = "智能体进入了计划模式 · 当前权限模式：{permission} · 计划模式退出前禁止编辑会话 plan.md 之外的文件"
+"session.plan_review_approved" = "已批准"
+"session.plan_review_abandoned" = "已放弃"
+"session.plan_review_closed" = "计划{verdict} · 计划模式已关闭 · 当前权限模式：{permission}"
+"cancel.cause.user" = "用户取消了回合"
+"cancel.cause.session_closed" = "会话已关闭，回合被取消"
+"cancel.cause.shutdown" = "会话已退出，回合被取消"
+"cancel.cause.max_turns" = "达到回合上限，回合被取消"
+"cancel.cause.permission_denied" = "权限被拒绝，回合被取消"
+"cancel.cause.permission_dismissed" = "权限提示被关闭，回合被取消"
+"cancel.cause.host_interrupt" = "智能体宿主中断了回合"
+"cancel.cause.unspecified" = "回合已取消"
 "session.worktree_resume_failed" = "无法恢复工作树会话：{detail}"
 "session.worktree_resume_failed_with_hint" = "无法恢复工作树会话：{detail}；{hint}"
 "session_info.auth.api_key" = "  认证方式: API 密钥\n"
@@ -2023,7 +2065,7 @@
 "session_info.auth.api_key_env" = "  认证方式: API 密钥（XAI_API_KEY）\n"
 "session_info.auth.line_prefix" = "认证方式:"
 "session_info.auth.login_upsell_prefix" = "运行 `grok login`"
-"session_info.auth.oauth" = "  认证方式: OAuth\n  管理账户与额度: https://grok.com/?_s=billing\n"
+"session_info.auth.oauth" = "  认证方式: OAuth\n"
 "session_info.api_backend" = "\n  API 后端: {backend}"
 "session_info.conversation_id" = "\n  对话 ID: {id}"
 "session_info.label.api_backend" = "API 后端"
@@ -2469,6 +2511,7 @@
 "slash.doctor.usage" = "用法：/doctor [fix [ssh-wrap|tmux-clipboard|dcs-passthrough|tmux-extended-keys|tmux-truecolor]]"
 "slash.edit_prompt.description" = "为空提示打开外部编辑器；使用命令面板可保留草稿"
 "slash.edit_prompt.no_active_session" = "没有活动会话"
+"slash.remedy.edit_prompt_why" = "全屏界面没有外部编辑器路径 — Ctrl+G 在那里用于任务面板"
 "slash.effort.current_suffix" = "（当前：{effort}）"
 "slash.effort.description" = "设置当前模型的推理强度"
 "slash.effort.error_no_active_model" = "没有可应用推理强度的活动模型"
@@ -2543,7 +2586,7 @@
 "slash.mcps.description" = "显示 MCP 服务器状态"
 "slash.mode_support.already_in_mode" = "你已处于{current}模式。"
 "slash.mode_support.switch_mode" = "/{token} 在{current}模式下不可用（{why}）。请运行 {switch} 切换此会话。"
-"slash.mode_support.use_instead" = "/{token} 在{current}模式下不可用 — {instead}。"
+"slash.mode_support.use_instead" = "/{token} 在{current}模式下不可用：{instead}。"
 "slash.model.description" = "切换活动模型"
 "slash.model.unknown" = "未知模型：{model}"
 "slash.web-search-model.description" = "选择 Web Search 使用的模型"
@@ -2561,7 +2604,8 @@
 "slash.release-notes.description" = "查看当前版本的发行说明"
 "slash.remedy.dashboard_why" = "极简模式为单会话"
 "slash.remedy.expand_use_instead" = "按 Tab 聚焦回滚历史，然后在代码块上按 →"
-"slash.remedy.find_why" = "极简模式没有回滚窗格：请使用终端自带的搜索功能"
+"slash.remedy.find_why" = "极简模式没有滚动回看窗格：请使用终端自带的搜索功能"
+"slash.remedy.workflows_why" = "工作流运行面板需要全屏模式"
 "slash.remedy.jump_why" = "极简模式使用终端的原生回滚滚动"
 "slash.remedy.theme_why" = "极简模式使用终端自带的调色板渲染"
 "slash.remedy.timeline_why" = "时间线导航栏需要交互式回滚窗格"
@@ -2704,7 +2748,7 @@
 "status.server_error_see_logs" = "服务器错误（详情见日志）"
 "status.session_usage_unavailable" = "会话用量在会话开始之前不可用。"
 "status.unknown" = "未知"
-"status.update_available" = "有可用更新：v{latest_version} — 请重启以应用。"
+"status.update_available" = "有可用更新：v{latest_version}。请重启以应用。"
 "subagent_catalog.agents" = "智能体"
 "subagent_catalog.personas" = "角色"
 "subagent_catalog.roles" = "职责"
@@ -2776,7 +2820,6 @@
 "tasks.status_queued" = "（已排队）"
 "tasks.status_running" = "（运行中）"
 "tasks.status_scheduled" = "已调度"
-"tasks.status_starting" = "（启动中）"
 "tasks.status_stopping" = "停止中"
 "tasks.task_prefix" = "任务 "
 "tasks.total_tokens" = "  总词元：   {count}"
@@ -2811,7 +2854,7 @@
 "tips.send_now.prefix" = "已排队 · "
 "tips.send_now.suffix" = " 立即发送"
 "tips.small_screen" = "空间紧张？试试 /compact-mode"
-"tips.ssh_wrap.full" = "通过 SSH 连接？请在本地运行 grok wrap ssh <host>，以转发剪贴板并恢复终端"
+"tips.ssh_wrap.full" = "运行 /doctor 查看详情和修复方法。"
 "tips.undo.prefix" = "输入已清空 · "
 "tips.undo.suffix" = " 撤销"
 "tips.word_select.full" = "想双击选词？/settings → 文本选择 · Ctrl+Y：立即启用"
@@ -2820,7 +2863,7 @@
 "toast.already_default" = "{label}: 已是默认值"
 "toast.already_plan_mode" = "已在计划模式。使用 /view-plan 查看当前计划。"
 "toast.always_approve" = "始终批准"
-"toast.always_approve_on" = "⚠ 始终批准：开"
+"toast.always_approve_on" = "⚠ 始终批准：开启，所有工具操作将自动运行"
 "toast.always_approve_on_plan" = "⚠ 始终批准：开（计划模式仍拦编辑）"
 "toast.browser_unavailable" = "浏览器不可用 - URL 已显示在上方"
 "toast.cannot_close_only_session" = "无法关闭唯一会话 — 使用 /home 退出"
@@ -2901,6 +2944,7 @@
 "toast.send_now_failed_requeued" = "立即发送失败 — 已重新排队：{error}"
 "toast.session_delete_failed" = "无法删除会话：{error}"
 "toast.session_deleted" = "会话已删除"
+"toast.session_deleted_membership_failed" = "会话已删除，但无法移除仪表板成员关系"
 "toast.session_no_longer_in_list" = "会话已不在列表中"
 "toast.session_not_found_locally" = "本地未找到会话"
 "toast.session_restore_failed" = "会话恢复失败。已保留现有记录。"
@@ -2923,6 +2967,7 @@
 "toast.voice_stopped" = "语音已停止 — 管道已结束"
 "toast.working_directory_updated" = "工作目录已更新为 {path}"
 "toast.worktree_not_git_repository" = "无法创建工作树：当前不在 Git 仓库中"
+"toast.not_inside_git_repository" = "当前不在 Git 仓库中。请切换到 Git 仓库，或先运行 'git init'。"
 "toast.x11_primary_paste_hint" = "尝试按 Shift+Insert 粘贴所选文本"
 "toast.zdr_enabled" = "✗ 无法更改：已启用零数据保留"
 "toast.open_session_to_run" = "打开会话以运行此命令"
@@ -3099,6 +3144,7 @@
 "update.background_running" = "自动更新正在后台运行。"
 "update.channel_switched" = "已切换到 {channel} 渠道。"
 "update.downloading" = "  正在下载 grok v{version}（{platform}）..."
+"update.downloading_bundled_git" = "  正在下载内置 git {version}..."
 "update.downloading_github" = "  正在从 GitHub Releases 下载 grok v{version}（{platform}）..."
 "update.error.checksum_entry_missing" = "SHA256SUMS 中没有 '{asset}' 的有效条目"
 "update.error.checksum_mismatch" = "'{asset}' 的 SHA-256 不匹配：预期 {expected}，实际为 {actual}"
@@ -3147,6 +3193,7 @@
 "update.restart_required" = "  请重启 Grok。"
 "update.restarting" = "正在重启 Grok..."
 "update.run_manual" = "请运行 `grok update` 获取最新版本。"
+"update.skipped_not_allowed" = "最新版本（{latest}）不在允许更新的范围内；继续保留当前版本（{current_version}）。"
 "update.status.check_failed" = "更新检查失败：{error}"
 "update.status.current_channel" = "Grok Build - v{current} [{channel}]"
 "update.status.current_latest_channel" = "Grok Build - v{current}（最新：{latest}）[{channel}]"
@@ -3522,6 +3569,16 @@
 "subagent.error.dropped" = "子会话意外中断"
 "subagent.error.unknown_type" = "未知子代理类型：{name}"
 "subagent.error.cannot_validate" = "无法验证子代理“{name}”"
+"subagent.type.general" = "通用"
+"subagent.type.explore" = "探索"
+"subagent.type.plan" = "计划"
+"subagent.context.resumed" = "已恢复"
+"subagent.context.forked" = "已分叉"
+"subagent.activity.thinking" = "思考中"
+"subagent.activity.responding" = "回复中"
+"subagent.activity.compacting" = "压缩中"
+"subagent.activity.running_tool" = "运行工具"
+"subagent.activity.running" = "运行中：{title}"
 "cli.headless.no_structured_output" = "模型未产生结构化输出"
 "cli.headless.session_not_exists" = "会话不存在"
 "cli.headless.couldnt_set_model" = "无法设置模型“{model}”：{error}。运行 `grok models` 查看可用模型。"
@@ -3865,9 +3922,6 @@
 "tool.description.subagent.general_purpose" = "用于多步骤任务的通用代理。"
 "tool.description.subagent.explore" = "专用于探索代码库的快速只读代理。"
 "tool.description.subagent.plan" = "负责制定实现策略的软件架构师。"
-"tool.description.subagent_tools.general_purpose" = "可使用：${{ tools.by_kind.execute }}、${{ tools.by_kind.read }}、${{ tools.by_kind.edit }}、${{ tools.by_kind.list }}、${{ tools.by_kind.search }}、${{ tools.by_kind.web_search }} 和 ${{ tools.by_kind.plan }}。"
-"tool.description.subagent_tools.explore" = "只读代理，可使用：${{ tools.by_kind.read }}、${{ tools.by_kind.list }}、${{ tools.by_kind.search }}。"
-"tool.description.subagent_tools.plan" = "只读代理，可使用：${{ tools.by_kind.read }}、${{ tools.by_kind.list }}、${{ tools.by_kind.search }}、${{ tools.by_kind.web_search }} 和 ${{ tools.by_kind.plan }}。无法执行文件编辑和命令执行。"
 "tool.description.lifecycle.target_suffix.monitor_subagent" = "、监视器或子代理"
 "tool.description.lifecycle.target_suffix.monitor" = "或监视器"
 "tool.description.lifecycle.target_suffix.subagent" = "或子代理"
@@ -3990,7 +4044,7 @@
 "tool.schema.the_command_to_run" = "要运行的命令。"
 "tool.schema.optional_timeout_in_milliseconds_max_300000_default_120000_2_minutes_enforced_for_foreground_commands_only" = "可选超时时间，单位为毫秒（最大 300000）。默认为 120000（2 分钟），仅对前台命令强制执行。"
 "tool.schema.one_sentence_explanation_as_to_why_this_command_needs_to_be_run_and_how_it_contributes_to_the_goal" = "用一句话说明为何需要运行此命令，以及它如何有助于实现目标。"
-"tool.schema.set_to_true_for_long_running_commands_that_should_run_in_the_background_e_g_dev_servers_long_builds_returns_a_task_id_immediately_while_the_command_keeps_running_in_the_background_if_system_reminders_enabled_you_are_notified_on_completion_so_do_not_poll_or_sleep_wait_for_it_elif_tools_by_kind_background_task_action_check_on_it_later_with_the_tools_by_kind_background_task_action_tool_endif" = "对于应在后台运行的长时间命令（例如开发服务器、长时间构建），设置为 true。命令在后台继续运行时会立即返回任务 ID${%- if system_reminders_enabled %}；完成后会通知你，因此不要轮询或休眠等待${%- elif tools.by_kind.background_task_action %}；稍后使用 ${{ tools.by_kind.background_task_action }} 工具检查${%- endif }。"
+"tool.schema.set_to_true_for_long_running_commands_that_should_run_in_the_background_e_g_dev_servers_long_builds_returns_a_task_id_immediately_while_the_command_keeps_running_in_the_background_if_system_reminders_enabled_you_are_notified_on_completion_so_do_not_poll_or_sleep_wait_for_it_elif_tools_by_kind_background_task_action_check_on_it_later_with_the_tools_by_kind_background_task_action_tool_endif" = "对于应在后台运行的长时间命令（例如开发服务器、长时间构建），设置为 true。命令在后台继续运行时会立即返回任务 ID${%- if system_reminders_enabled %}；完成后会通知你，因此不要轮询或休眠等待${%- elif tools.by_kind.background_task_action %}；稍后使用 ${{ tools.by_kind.background_task_action }} 工具检查${%- endif %}。"
 
 "tool.schema.a_text_description_of_the_desired_edit_or_transformation_describe_what_the_output_image_should_look_like_referencing_the_input_image_s" = "所需编辑或转换的文本描述。请描述输出图像应呈现的样子，并引用输入图像。"
 "tool.schema.reference_image_s_to_condition_the_edit_on_each_is_one_reference_in_priority_order_1_a_user_attachment_its_placeholder_token_e_g_image_1_attachments_have_no_path_you_can_see_so_never_invent_one_2_an_absolute_filesystem_path_the_user_gave_you_3_a_data_image_base64_url" = "用于控制编辑效果的参考图像。每一项都是一个参考，按优先级排列：(1) 用户附件及其占位符令牌，例如 \"[Image #1]\"（附件没有可见路径，因此不要自行编造）；(2) 用户提供的绝对文件系统路径；(3) `data:image/...;base64,...` URL。"
@@ -4584,3 +4638,447 @@ print("Hello World")
 {prior}</system-reminder>
 
 {prompt}'''
+
+[goal.detail]
+resume_hint = "状态：{status}。输入 /goal resume 继续"
+
+clear_hint = "状态：{status}。输入 /goal clear，然后开始新目标"
+
+[goal]
+time_just_now = "刚刚"
+
+[prompt.stash]
+caption = "已暂存"
+
+saved = "草稿已暂存。再次按下暂存键即可恢复。"
+
+restored = "已恢复暂存的草稿。"
+
+[minimal.auth]
+sign_in_header = "登录 Grok"
+
+open_url_approve = "请在浏览器中打开此 URL 以完成批准："
+
+code_prefix = "代码："
+
+waiting_approval = "等待批准…"
+
+opening_browser = "正在打开浏览器以登录…"
+
+sign_in_failed = "登录失败"
+
+trust_hint = "按 Enter 或 y 信任 · 按 n 或 Esc 退出"
+
+starting_session = "正在登录… 即将启动会话。"
+
+[minimal.commit]
+more_lines_footer = "… 还有 {count} 行 · 用 /transcript 查看"
+
+[minimal.feedback]
+band_too_small_hint = "反馈表单需要更大的终端，按 Esc 关闭"
+
+[minimal.live]
+transcript_hint = "ctrl+o 查看对话记录"
+
+rendering_transcript = "正在生成对话记录… {done}/{total}"
+
+idle_hint = "极简模式 · /help"
+
+idle_hint_switch_back = "极简模式 · 输入 /fullscreen 返回 · /help"
+
+idle_hint_auto = "极简模式 · 因 JetBrains 鼠标上报问题已在 JetBrains/Windows 上自动切换 · /help"
+
+idle_hint_auto_switch_back = "极简模式 · 因 JetBrains 鼠标上报问题已在 JetBrains/Windows 上自动切换 · 输入 /fullscreen 返回 · /help"
+
+context_usage = "{used} / {total} 词元（{percent}%）"
+
+queued = "{count} 条已排队"
+
+press_again = "再次按下 {chord} 即可{label}"
+
+[minimal.panel]
+resume_footer = "↑/↓ 导航 · enter 确认 · esc 取消"
+
+mcps_footer = "↑/↓ 导航 · space 启用/停用 · r 刷新 · enter 展开 · esc 取消"
+
+mcps_title = "管理 MCP 服务器"
+
+mcp_badge_blocked = "被策略阻止"
+
+mcp_badge_disabled = "已禁用"
+
+mcps_loading = "加载中…"
+
+[minimal.plan]
+empty_notice = "尚未编写计划。\n\n批准即可退出规划模式并开始实现，请求修改会将智能体退回规划，退出则放弃。"
+
+header_ready = "计划已就绪，等待审阅"
+
+header_empty = "尚未编写计划"
+
+controls_request_changes = "enter 请求修改 · tab 计划 · esc 返回"
+
+controls_approve = "enter 批准 · tab 计划 · esc 返回"
+
+controls_save_comment = "enter 保存评论 · esc 取消"
+
+controls_preview = "a 批准 · s 修改 · q 继续规划"
+
+[minimal.todo]
+overflow_more = "… 另有 {remaining} 项"
+
+overflow_expand = "… 另有 {remaining} 项 · ctrl+t 展开"
+
+[minimal.welcome]
+version = "  版本 v{version}"
+
+model = "模型 · {model}"
+
+help_hint = "/help 查看可用命令"
+
+[block_viewer.web_search]
+sources = "来源（{count}）"
+
+[block_viewer.integration_search]
+result_count_one = "{count} 个结果"
+
+result_count_many = "{count} 个结果"
+
+[dock]
+show_more = "{indent}{arrow} 再显示 {hidden} 条"
+
+[elicitation.url]
+punycode_warning = "Punycode 主机：请确认这正是你预期的网站"
+
+waiting_confirm = "正在等待服务器确认…"
+
+[elicitation.field]
+required = " （必填）"
+
+unselected = "（请选择）"
+
+none_selected = "（未选择）"
+[feedback]
+trace_disclosure = "本次会话的一份存档会随这份报告一并发送，仅此一次。不会为后续会话开启任何内容。"
+
+unsent_image_dropped = " （其图片已被丢弃）"
+
+unsent_images_dropped = " （其 {count} 张图片已被丢弃）"
+
+unsent_saved_to_drafts = "{failure}。已保存到草稿{attachments}；打开 `/feedback` 重试。"
+
+unsent_draft_save_failed = "{failure}。无法将其保存为草稿（{error}）。未发送{attachments}：{text}"
+
+unsent_not_sent = "{failure}。未发送{attachments}：{text}"
+[hint]
+approve_with_comments = "带评论批准"
+
+paste = "粘贴"
+
+undo = "撤销"
+
+redo = "重做"
+
+dropdown_controls = "↑/↓ 导航 · enter 确认 · esc 取消"
+
+submit = "提交"
+
+accept_toggle = "接受 / 切换"
+
+decline = "拒绝"
+
+next_field = "下一个字段"
+
+quote = "引用"
+[settings.modal]
+preview_sample = "让我梳理一下这些调用点。首先，我需要看看分发流程如何处理这个新变体。然后我会确认回滚路径能正确保留先前的状态。"
+
+placeholder_empty_shell_default = "<空：使用 shell 默认值>"
+
+[announcements]
+hide_cta = "隐藏: /announcements hide"
+
+hide_button = "[隐藏]"
+
+[picker]
+loading = "{frame} 加载中…"
+
+[picker.empty]
+no_matches = "  无匹配项"
+
+[question]
+expand_hint = " 展开"
+
+[memory.empty]
+title = "**暂无记忆内容。**\n\n"
+
+bullet_capture = "- 继续工作即可。每完成一个回合后，笔记会自动保存。\n"
+
+bullet_remember = "- `/remember <note>` 可立即保存具体内容。\n"
+
+bullet_dream = "- `/dream` 会把保存的笔记整理成主题。\n"
+
+blurb = "\nGrok Build 会跨会话记住约定、决策和项目事实，你不必反复说明。笔记存放在**工作区**记忆（针对本仓库）与**全局**记忆（跨所有项目共享）中；两者各有一个自动生成的 `MEMORY.md` 索引，会随笔记保存而更新。\n"
+[memory.scope]
+session_logs = "会话日志"
+
+source_memory = "{source} 记忆"
+
+[shortcuts]
+dimmed_note = "（在当前上下文中未激活）"
+
+[turn.queue]
+queued_send_now = " · {count} 条已排队，按 Enter 立即发送"
+
+[plan.notice]
+revise_turn_active = "请等待当前回合结束后再修改计划。"
+
+abandon_turn_active = "请等待当前回合结束后再放弃计划。"
+
+revise_mode_switching = "请等待计划模式切换完成后再修改计划。"
+
+changed_on_disk = "计划文件已在磁盘上更改。请先查看更新后的计划再批准。"
+
+build_mode_switching = "请等待计划模式切换完成后再开始实施计划。"
+
+build_turn_active = "请等待当前回合结束后再开始实施计划。"
+
+approve_slash_command_comment = "正在编辑的评论是一个斜杠命令：请先完成或丢弃它，再批准。"
+
+approve_slash_command_notes = "请先用 Enter 运行备注中的斜杠命令，或清除它，再批准。"
+
+[question.footer]
+navigate = " 导航"
+
+switch_question = " 切换问题"
+
+copy = " 复制"
+
+[history]
+panel_label = " 历史 "
+
+[debug]
+scroll_log_recording_to = "滚动日志：正在记录到 {path}"
+
+scroll_log_off = "滚动日志：关闭"
+
+toggles_status = "调试开关：滚动 {scroll} · 帧率 {fps} · 日志 {log}。使用 /debug <scroll|fps|log> 切换"
+
+[toast]
+workspace_layout_not_found = "会话已不在工作区中"
+
+workspace_layout_read_only = "仪表盘工作区为只读"
+
+workspace_layout_not_saved = "会话尚未保存到工作区"
+
+prompt_not_accepted_restored = "提示未被接受，文本已恢复"
+
+prompt_not_accepted_stopped = "提示未被接受，回合已停止"
+
+[task_result]
+workspace_archive_invalid_id = "无法归档会话：会话 ID 无效"
+
+[scrollback.memory_capture]
+observation = "模型生成的不可信观察 {index}"
+
+open_file = "打开文件 → "
+
+debug_output_one = "模型生成的记忆调试输出：{count} 条记忆，覆盖回合 {from}-{through}"
+
+debug_output_many = "模型生成的记忆调试输出：{count} 条记忆，覆盖回合 {from}-{through}"
+[scrollback.subagent]
+label = "子代理 "
+
+completed_in = "已在 {time} 内完成："
+
+failed_in = "已在 {time}{detail} 内失败："
+
+cancelled_in = "已在 {time} 内取消："
+
+verb_started = "已启动："
+
+verb_running = "运行中："
+[scrollback.verb_group.subagent]
+mixed = "{verb} {running} {noun}，{done} 个已完成"
+
+[tool.diff]
+hunk_gap_one = "{separator} 1 行未更改"
+
+hunk_gap_many = "{separator} {count} 行未更改"
+
+[tool.execute]
+user_label = "（用户）"
+
+[tool.question]
+no_answer = "     （无回答）"
+
+[tool.sent_message]
+header_label = "消息 "
+
+subagent_id_label = "子代理 ID："
+
+unavailable = "不可用"
+
+[gboom]
+hud = " HP {hp} · 击杀 {kills}/{total} "
+
+controls = " WASD/←→ 移动 · SPACE 开火 · ESC 退出 "
+
+controls_idle = " ESC 退出 "
+
+[memory.disabled]
+session_toggle = "**本会话已关闭记忆。**\n\n- 按 **t** 可重新开启。\n- 在提示符下执行 `/memory on` 效果相同。\n\n关闭期间 Grok 不会读取或保存笔记；已记住的内容仍保留在磁盘上。记忆会在会话之间延续约定、决策和项目事实，你不必反复说明。"
+
+rollout_restricted = "**本会话无法使用记忆。** 请新建会话以应用当前设置。\n\n本会话的记忆设置在启动时已固定，而该设置关闭了记忆，因此这里无法开启。`/memory status` 可查看详情。"
+
+not_configured = "**尚未配置记忆。** `/memory status` 可查看详情。\n\n本会话没有设置记忆存储，因此没有内容可浏览或开启。"
+
+unknown = "**本会话已关闭记忆。** `/memory status` 可查看详情。\n\n本会话报告的原因在此版本的 Grok Build 中无法识别；可在提示符下执行 `/memory on` 尝试重新开启。"
+
+[memory]
+deleted = "已删除 {name}。"
+
+[modal]
+vim_search_hint = "i 搜索"
+
+[session.subject]
+subagent_prefix = "子代理（"
+
+subagent_suffix = "）："
+
+subagent = "子代理："
+
+subagents = "{count} 个子代理："
+
+[actions.EditPromptExternal]
+label = "编辑提示"
+
+description = "在外部编辑器中编辑提示"
+
+help = "用 $VISUAL 或 $EDITOR 打开当前提示草稿，两者都未设置时回退到 vi。\n保存并关闭编辑器后，更新后的文本会回到输入框；不会发送提示。\n在精简模式下对无附件的普通草稿可用。"
+
+[actions.ToggleTasks]
+help = "显示或隐藏任务窗格，其中列出后台任务及其状态。\n用它来查看或回到你用 Ctrl+B 送到后台的工作。\n这是侧边窗格；关掉可收回宽度。"
+
+[actions.ToggleFold]
+help = "折叠或展开选中的回滚区条目，以隐藏或显示其完整内容。\n适合快速浏览冗长的工具输出或推理过程。\n相关：E 折叠/展开所有条目，Ctrl+E 切换所有思考块。"
+
+[actions.ToggleExpandAll]
+help = "一次性折叠或展开所有回滚区条目，不同于 e 只切换选中的那一行。\n折叠冗长的对话记录以便浏览标题，然后再全部展开。\n思考块有自己的开关：Ctrl+E。"
+
+[actions.ExpandAllThinking]
+help = "一次按键即可显示或隐藏整份对话记录中 agent 的推理（思考）块。\n可以看清 agent 如何得出答案，也可以隐藏推理以专注于结果。\n与 E 不同，E 会折叠所有条目，不论类型。"
+
+[actions.ToggleRaw]
+help = "在渲染后的 markdown 与其原始源文本之间切换选中的条目。\n可用于复制精确的 markdown、查看链接目标，或看到渲染器隐藏的格式。\n再按一次回到渲染视图。"
+
+[actions.CopyBlockContent]
+help = "把选中块的主体复制到剪贴板：消息文本、完整工具输出或代码块内容。\n仅在支持复制的块上提供。\n只想复制命令或文件路径时，请改用 Y。"
+
+[actions.CopyBlockMeta]
+help = "只复制块的标识：工具调用的命令行或文件块的路径，而不是主体内容。\n便于重新执行命令或把路径粘贴到别处。\n要复制完整内容，请改用小写 y。"
+
+[actions.OpenBlockViewer]
+help = "在专注、可滚动的全屏查看器中打开选中的块。\n最适合冗长的工具输出、大文件，或你想脱离上下文单独阅读的代码。\nEsc 返回对话。"
+
+[actions.Rewind]
+help = "把对话回退到更早的回合，丢弃其后的回合。该回合之后产生的文件改动会原样保留。\n从列表中选择一个回合；仍在运行的回合会先提供取消。当 Confirm before rewind 开启时（默认），每次选择都会询问 Yes / Yes, and don't ask again / No。选择 \"Yes, and don't ask again\" 会在 /settings 中关闭该设置。\n破坏性操作：之后的回合会被丢弃。\n也可以在空闲且提示为空时通过 Esc Esc（800ms 内）触发，与 `/rewind` 相同。"
+
+[actions.KillBgTask]
+help = "终止选中任务块所拥有的后台任务（例如被送到后台的长时 shell 命令）。\n用它来停掉失控或已不再需要的进程。\n只对仍在运行的任务生效；已完成的任务不受影响。"
+
+[actions.FocusScrollback]
+help = "把焦点从提示输入框移到回滚区，以便浏览对话记录。\nTab 在简单和 vim 两种回滚模式中都可用。\nEsc 保留给取消/清空/回退策略，不用于切换焦点。"
+
+[actions.CancelTurn]
+help = "中断 agent 当前的回合并停止生成，会话保持打开。\n提示为空时 Ctrl+C 会取消；草稿非空时它会先清空提示，回合继续运行。\nEsc 从不取消回合；在回合进行中按下只会提示你改用 Ctrl+C。\n它停止的是回合，不是应用；要退出请使用退出快捷键。"
+
+[actions.CycleMode]
+help = "依次切换会话模式：Normal -> Plan -> Always-Approve -> Normal。\nPlan 让 agent 先做计划且不写文件；Always-Approve 不经询问就执行每次工具调用。\nCtrl+O 可直接切换自动批准。"
+
+[actions.ToggleTodos]
+help = "显示或隐藏待办窗格：agent 针对当前工作的实时任务清单。\n在回合运行过程中查看它计划做什么、还剩什么。\n这是侧边窗格；关掉可收回宽度。"
+
+[actions.OpenSessions]
+help = "打开会话浏览器，以恢复过去的对话或在它们之间切换。\n选中一个即可重新接入其完整历史。`/resume` 效果相同。\n与 Agent Dashboard（Ctrl+\\）不同，后者可同时管理多个活动 agent。"
+
+[actions.VoiceToggle]
+help = "用麦克风采集听写内容，绑定到 Ctrl+Space（或 F8：在 Ctrl+Space 被占用时很方便，比如 macOS 的输入源切换；笔记本上请用 Fn+F8）。\n行为取决于 Voice capture 设置：toggle（按一次开始，再按一次停止）或 hold-to-talk（按住录音，松开停止）；按住模式需要支持 Kitty 协议的终端，其他终端回退为 toggle。`/voice` 在任何地方都能切换。\n语音会直接转写进提示输入框。"
+
+[actions.ToggleMultiline]
+help = "切换持久的多行提示，让编辑器保持展开，便于撰写较长的消息。\n用 Shift+Enter 或 Alt+Enter（或行尾反斜杠）插入换行；单独按 Enter 仍然发送。\n用 /multiline 或 /settings 切换。Alt+M 打开模型选择器。"
+
+[actions.StashPrompt]
+label = "暂存"
+
+description = "暂存/取回提示草稿"
+
+help = "把当前提示暂存为草稿。\nCtrl+S 会把草稿放到一边并清空输入框。在空的输入框上按 Ctrl+S 可恢复它。发送下一条提示后，草稿也会自行恢复。如果你的终端吞掉了 Ctrl+S，请改用 Alt+S。\n一次只能有一份草稿：新的暂存会替换掉旧的。"
+
+[actions.BashMode]
+help = "不必离开对话即可运行 shell 命令：在空提示的开头输入 !，然后输入命令。\n命令输出会采集到回滚区。\n删掉开头的 ! 即可回到普通提示。"
+
+[actions.ToggleYolo]
+help = "为本会话打开或关闭自动批准（YOLO）。\n开启时，agent 执行每次工具调用（编辑、shell、删除）都不会逐项确认。\n与 Shift+Tab 循环中的 Always-Approve 是同一状态；请谨慎使用。"
+
+[actions.NewSession]
+help = "以空的回滚区和上下文开始一个新会话。\n需要确认：按两次（第一次进入待确认状态，第二次才启动）\n以免误丢弃当前对话。"
+
+[actions.CommandPalette]
+help = "模糊搜索所有操作和斜杠命令，然后按名称运行。\n记不住按键绑定时很有用。\n回滚区获得焦点时也可以按 ? 打开。"
+
+[actions.ModelPicker]
+help = "打开模型选择器以切换本会话使用的模型；该选择会作用于之后的回合。\n在提示输入框和回滚区中都绑定到 Alt+M（AgentScreen 提升）。不使用 Ctrl+M——多数终端会把它作为 Enter 发送。\n也可以通过 /model 或命令面板打开。"
+
+[actions.DashboardTogglePin]
+help = "固定或取消固定选中的 agent，使其无论排序或分组如何都留在列表顶部。\n让你关注的 agent 始终可见，不受其他 agent 增删的影响。\n固定状态在多次打开面板之间保留。"
+
+[actions.DashboardStop]
+help = "在忙碌的顶层行上，Ctrl+X 会取消正在运行的回合。该行空闲后，在 2s 内再按一次 Ctrl+X 会永久删除该会话。\n在子 agent 行上，Ctrl+X 会终止该子 agent。"
+
+[actions.DashboardCycleMode]
+help = "循环切换你从面板启动的 agent 的派发模式：Normal、Plan，然后是 Always-Approve。\nPlan 让新 agent 先做计划再改动文件；Always-Approve 不经询问就运行它们的工具。\n与会话内的 Shift+Tab 循环一致，只是作用于新派发的 agent。"
+
+[actions.DashboardToggleGrouping]
+help = "在平铺列表与按状态分组的行之间切换面板视图，例如工作中与空闲。\n分组会突出需要关注的 agent；平铺列表则保持稳定顺序。\n你的选择会跨会话保留。"
+
+[actions.DashboardExit]
+help = "关闭面板并回到你之前所在的位置。\nEsc 是逐级生效的：先关闭已打开的预览或清除生效中的筛选，只有在没有其他待处理项时才退出。\n把此操作重新绑定到其他按键即可直接退出。"
+
+[actions.DashboardToggleAutoApprove]
+help = "直接在面板中为选中的 agent 打开或关闭自动批准（YOLO），无需接入该会话。\n开启时，该 agent 执行每次工具调用都不会逐项确认。\n会话内的对应操作是 Ctrl+O。"
+
+[actions.DashboardOpenLocationPicker]
+help = "打开选择器，设置面板新派发的 agent 所使用的工作目录。\n不必离开面板就能针对其他仓库或文件夹启动 agent。\n只影响新的派发，不影响已在运行的 agent。"
+
+[actions.DashboardToggleWorktree]
+help = "让下一个从面板派发的 agent 在全新的 git worktree 中启动，把它的工作隔离在独立检出中。\n仅当工作目录是 git 仓库时生效。\n影响新派发的 agent，不影响已在运行的 agent。"
+
+[actions.DashboardOverlayExit]
+help = "离开已接入的会话浮层并回到面板列表，不会停止该 agent。\n也可以通过回滚区上的 q、中性的 Esc 或关闭按钮触发。\n若想停止该 agent 而不只是脱离，请使用 Ctrl+X。"
+
+[actions.DashboardOverlayStop]
+help = "在会话浮层内停止已接入的 agent 并关闭它，回到面板列表。\n需要确认：按两次 Ctrl+X。\n在这里 Ctrl+. 仍可打开速查表；只有 Ctrl+X 被停止操作占用。"
+
+[actions.ToggleQueue]
+help = "显示或隐藏提示队列。\n队列让你在一个回合运行时先排好后续提示；每个提示会在 agent 完成后自动发送。\nmacOS 上的 VS Code 系终端：主键为 Ctrl+4（备选 Ctrl+; / Ctrl+'）。其他终端为 Ctrl+;，备选 Ctrl+'。"
+
+[actions.OpenExtensions]
+help = "打开扩展管理器，管理 MCP 服务器与插件：查看已连接的项目及其新增的工具。\n可用它确认某个集成是否已加载，或浏览可用工具。\n与设置不同，设置里保存的是应用通用选项。"
+
+[actions.InterjectPrompt]
+help = "在回合进行中向 agent 发送消息而不取消它（插话），这样你可以在它继续工作的同时纠偏或补充上下文。\n回合运行时空按 Enter 会把后续提示排入队列；而这个组合键会把输入框内容合并进当前回合。\n当输入框为空时，直接按 Enter（或此组合键）会强制发送队列中最上方的后续提示：无需先聚焦队列面板。在队列面板上，此组合键会强制发送选中的那一行。\n在不丢失当前回合进展的前提下纠偏时用它。"
+
+[actions.Quit]
+help = "退出应用。需要确认：快速连按两次；\n只按一次会被当作误触而忽略。\n绑定到 Ctrl+Q，并以 Ctrl+D 作为别名（VS Code 终端里 Ctrl+D 是主键）。"
+
+[actions.ShortcutsHelp]
+help = "打开这份键盘快捷键速查表。\n用 j/k 浏览，按 e 展开某一行的内联帮助，或按 Enter 查看某个快捷键的完整详情页。\n同时绑定到 Ctrl+. 和 Ctrl+X；状态栏会显示你的终端能可靠发送的那个。"
+
+[actions.OpenDashboard]
+help = "打开智能体仪表盘：列出所有正在运行和最近的 agent，便于监控与切换。\n在任何位置都可用，包括欢迎界面和会话内部。\n在那里可以派发、接入、停止、分组和重排 agent。"
+
+[actions.SendToBackground]
+help = "把正在前台运行的 Execute 分离出去，让它在后台继续执行，而你可以阅读、排队提示或开始别的事情。\n在任务面板（Ctrl+G）中跟踪并恢复它。\n只有当前台确实有 Execute 在运行时才有意义。"
+
+help_minimal = "把正在前台运行的 Execute 分离出去，让它在后台继续执行，而你可以阅读、排队提示或开始别的事情。\n用 /tasks 查看后台任务。\n只有当前台确实有 Execute 在运行时才有意义。"

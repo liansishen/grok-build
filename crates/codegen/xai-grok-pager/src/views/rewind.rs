@@ -363,30 +363,24 @@ pub fn render_rewind_overlay(buf: &mut Buffer, area: Rect, phase: &RewindPhase, 
                 len: points.len(),
                 selected: *selected,
             }
-            .render(
-                buf,
-                area,
-                xai_grok_i18n::t("rewind.pick_turn"),
-                focused,
-                |i, ctx| {
-                    let point = &points[i];
-                    let dot_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
-                    let preview: String = crate::render::line_utils::truncate_str(
-                        point
-                            .prompt_preview
-                            .as_deref()
-                            .unwrap_or_else(|| xai_grok_i18n::t("rewind.no_preview")),
-                        ctx.content_width.saturating_sub(8) as usize,
-                    );
-                    let text_style = Style::default()
-                        .fg(theme.text_primary)
-                        .bg(ctx.row_bg)
-                        .add_modifier(if ctx.is_cursor {
-                            Modifier::BOLD
-                        } else {
-                            Modifier::empty()
-                        });
-                    let meta_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
+            .render(buf, area, xai_grok_i18n::t("rewind.pick_turn"), focused, |i, ctx| {
+                let Some(point) = points.get(i) else {
+                    return Line::from("");
+                };
+                let dot_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
+                let meta_style = Style::default().fg(theme.gray).bg(ctx.row_bg);
+                let preview: String = crate::render::line_utils::truncate_str(
+                    point.prompt_preview.as_deref().unwrap_or(xai_grok_i18n::t("rewind.no_preview")),
+                    ctx.content_width.saturating_sub(8) as usize,
+                );
+                let text_style = Style::default()
+                    .fg(theme.text_primary)
+                    .bg(ctx.row_bg)
+                    .add_modifier(if ctx.is_cursor {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    });
 
                     let file_info = if point.has_file_changes {
                         let count = point.num_file_snapshots.to_string();

@@ -37,7 +37,7 @@ pub(crate) fn request_removal(
     {
         Ok(()) => true,
         Err(RemovalRequestError::ReadOnly) => {
-            app.show_toast("Could not archive session: dashboard workspace is read-only");
+            app.show_toast(xai_grok_i18n::t("task_result.workspace_archive_read_only"));
             false
         }
         Err(RemovalRequestError::InvalidSessionId) => {
@@ -45,7 +45,7 @@ pub(crate) fn request_removal(
                 session_id = raw_session_id,
                 "invalid workspace archive session id"
             );
-            app.show_toast("Could not archive session: invalid session id");
+            app.show_toast(xai_grok_i18n::t("task_result.workspace_archive_invalid_id"));
             false
         }
     }

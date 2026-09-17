@@ -10,6 +10,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Widget};
 
+use xai_grok_i18n::{t, t_fmt};
 use xai_grok_pager::app::PagerTerminal;
 use xai_grok_pager::app::app_view::{ActiveView, AppView};
 use xai_grok_pager::minimal_api;
@@ -58,26 +59,7 @@ pub fn maybe_commit_welcome(app: &mut AppView, terminal: &mut PagerTerminal) {
     };
 
     // Info lines below the logo: title and version, cwd, optional model, hint
-    let mut info: Vec<Line<'static>> = Vec::new();
-    info.push(Line::from(vec![
-        Span::styled(
-            "Grok Build",
-            Style::default()
-                .fg(theme.accent_user)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(format!("  v{version}"), theme.muted()),
-    ]));
-    if !cwd.is_empty() {
-        info.push(Line::from(Span::styled(cwd, theme.muted())));
-    }
-    if let Some(model) = model {
-        info.push(Line::from(Span::styled(
-            format!("Model · {model}"),
-            theme.muted(),
-        )));
-    }
-    info.push(Line::from(Span::styled("/help for commands", theme.dim())));
+    let info = welcome_info_lines(&cwd, model.as_deref(), version, &theme);
 
     let logo_lines = minimal_api::compact_logo_line_count();
     // The card stacks the logo (plus a blank separator row) when present, then the info lines
@@ -127,4 +109,91 @@ pub fn maybe_commit_welcome(app: &mut AppView, terminal: &mut PagerTerminal) {
     minimal_api::set_minimal_welcome_pending(app, false);
     // A trailing gap, matching every committed block, separates the first conversation block from the card
     super::commit::insert_gap(terminal);
+}
+
+/// Info lines below the logo: title and version, cwd, optional model, hint.
+fn welcome_info_lines(
+    cwd: &str,
+    model: Option<&str>,
+    version: &str,
+    theme: &Theme,
+) -> Vec<Line<'static>> {
+    // Resolve catalog copy before the `vec!`: a lookup nested in a macro token tree keeps its argument names opaque to the i18n audit.
+    let version_line = t_fmt("minimal.welcome.version", &[("version", version)]);
+    let mut info: Vec<Line<'static>> = Vec::new();
+    info.push(Line::from(vec![
+        Span::styled(
+            "Grok Build",
+            Style::default()
+                .fg(theme.accent_user)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(version_line, theme.muted()),
+    ]));
+    if !cwd.is_empty() {
+        info.push(Line::from(Span::styled(cwd.to_string(), theme.muted())));
+    }
+    if let Some(model) = model {
+        info.push(Line::from(Span::styled(
+            t_fmt("minimal.welcome.model", &[("model", model)]),
+            theme.muted(),
+        )));
+    }
+    info.push(Line::from(Span::styled(
+        t("minimal.welcome.help_hint"),
+        theme.dim(),
+    )));
+    info
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
+    /// Paint the card's info lines the way `maybe_commit_welcome`'s commit closure does, so the
+    /// assertions read the same cells that land in native scrollback.
+    fn info_text(cwd: &str, model: Option<&str>, width: u16) -> String {
+        let theme = Theme::current();
+        let lines = welcome_info_lines(cwd, model, xai_grok_version::VERSION, &theme);
+        let area = Rect::new(0, 0, width, lines.len() as u16);
+        let mut buf = Buffer::empty(area);
+        for (y, line) in lines.iter().enumerate() {
+            buf.set_line(area.x, area.y + y as u16, line, area.width);
+        }
+        crate::buffer_text(&buf)
+    }
+
+    #[test]
+    fn welcome_card_info_lines_come_from_the_catalog() {
+        xai_grok_i18n::with_pseudo_locale(|| {
+            let text = info_text("/home/agent/project", Some("grok-4"), 80);
+            assert!(text.contains("Grok Build"), "title: {text:?}");
+            assert!(
+                text.contains("⟦minimal.welcome.version⟧"),
+                "version: {text:?}"
+            );
+            assert!(text.contains("/home/agent/project"), "cwd: {text:?}");
+            assert!(text.contains("⟦minimal.welcome.model⟧"), "model: {text:?}");
+            assert!(
+                text.contains("⟦minimal.welcome.help_hint⟧"),
+                "hint: {text:?}"
+            );
+            // The hint is catalog copy now: the English literal must not reappear here.
+            assert!(!text.contains("/help for commands"), "hint: {text:?}");
+            assert!(!text.contains("Model · "), "model line: {text:?}");
+
+            // No model: the line is simply absent, and nothing English sneaks back in.
+            let without = info_text("/home/agent/project", None, 80);
+            assert!(
+                !without.contains("⟦minimal.welcome.model⟧"),
+                "unexpected model line: {without:?}"
+            );
+            assert!(
+                without.contains("⟦minimal.welcome.help_hint⟧"),
+                "hint: {without:?}"
+            );
+        });
+    }
 }

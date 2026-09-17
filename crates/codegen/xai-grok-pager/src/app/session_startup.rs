@@ -10,7 +10,14 @@ pub(crate) fn stamp_phase_traceparent(meta: &mut Option<agent_client_protocol::M
     let Some(span) = xai_grok_telemetry::startup::current_phase_span() else {
         return;
     };
-    if let Some(tp) = xai_grok_otel::traceparent_of_span(&span) {
+    stamp_span_traceparent(meta, &span);
+}
+/// Stamp `span`'s traceparent into `meta` so the agent-side leg of the send nests under `span`.
+pub(crate) fn stamp_span_traceparent(
+    meta: &mut Option<agent_client_protocol::Meta>,
+    span: &tracing::Span,
+) {
+    if let Some(tp) = xai_grok_otel::traceparent_of_span(span) {
         meta.get_or_insert_with(agent_client_protocol::Meta::new)
             .insert("traceparent".into(), serde_json::Value::String(tp));
     }
@@ -76,6 +83,34 @@ impl DeferredStartupActions {
             || self.open_dashboard
     }
 }
+
+/// Shared inputs for all `x.ai/session/fork` request builders.
+#[derive(Debug, Clone, Copy)]
+pub struct SessionRequestContext<'a> {
+    pub parent_session_id: &'a str,
+    pub parent_cwd: &'a Path,
+    pub new_session_id: Option<&'a str>,
+    pub parent_is_worktree: bool,
+    pub new_model_id: Option<&'a str>,
+}
+
+impl<'a> SessionRequestContext<'a> {
+    pub const fn new(
+        parent_session_id: &'a str,
+        parent_cwd: &'a Path,
+        new_session_id: Option<&'a str>,
+        parent_is_worktree: bool,
+        new_model_id: Option<&'a str>,
+    ) -> Self {
+        Self {
+            parent_session_id,
+            parent_cwd,
+            new_session_id,
+            parent_is_worktree,
+            new_model_id,
+        }
+    }
+}
 /// Build `x.ai/session/fork` params shared by TUI effects and headless.
 ///
 /// `new_cwd` is the write namespace for the child (parent session cwd when
@@ -83,13 +118,14 @@ impl DeferredStartupActions {
 ///
 /// LOCAL-PATCH(upstream-fork-secondary-model): `new_model_id` applies
 /// `[ui].fork_secondary_model` when non-empty. Revert with the patch.
-pub fn fork_session_params(
-    parent_session_id: &str,
-    parent_cwd: &Path,
-    new_session_id: Option<&str>,
-    parent_is_worktree: bool,
-    new_model_id: Option<&str>,
-) -> serde_json::Value {
+pub fn fork_session_params(context: SessionRequestContext<'_>) -> serde_json::Value {
+    let SessionRequestContext {
+        parent_session_id,
+        parent_cwd,
+        new_session_id,
+        parent_is_worktree,
+        new_model_id,
+    } = context;
     let parent_cwd_str = parent_cwd.to_string_lossy().into_owned();
     let source_cwd = xai_grok_shell::session::resolve_local_session_any_cwd(parent_session_id)
         .unwrap_or_else(|| parent_cwd_str.clone());
@@ -99,11 +135,19 @@ pub fn fork_session_params(
         "newCwd": parent_cwd_str.clone(),
         "sessionKind": "fork",
     });
-    if let Some(nid) = new_session_id {
-        payload["newSessionId"] = serde_json::Value::String(nid.to_string());
-    }
-    if parent_is_worktree {
-        payload["sourceWorkspaceDir"] = serde_json::Value::String(parent_cwd_str);
+    if let Some(obj) = payload.as_object_mut() {
+        if let Some(nid) = new_session_id {
+            obj.insert(
+                "newSessionId".into(),
+                serde_json::Value::String(nid.to_string()),
+            );
+        }
+        if parent_is_worktree {
+            obj.insert(
+                "sourceWorkspaceDir".into(),
+                serde_json::Value::String(parent_cwd_str),
+            );
+        }
     }
     // LOCAL-PATCH(upstream-fork-secondary-model)
     if let Some(mid) = new_model_id.map(str::trim).filter(|s| !s.is_empty()) {
@@ -1498,8 +1542,33 @@ async fn resolve_session_by_title(
 mod tests {
     use super::*;
     use clap::Parser;
+    fn j<'a>(v: &'a serde_json::Value, key: &str) -> &'a serde_json::Value {
+        let Some(got) = v.get(key) else {
+            panic!("missing json key {key}: {v}");
+        };
+        got
+    }
     fn parse(args: &[&str]) -> PagerArgs {
         PagerArgs::try_parse_from(args).unwrap()
+    }
+    #[test]
+    fn traceparent_of_span_captures_own_span_id_not_parent() {
+        let _guard = xai_grok_otel::set_local_trace_subscriber();
+        let parent = tracing::info_span!("startup");
+        let _entered = parent.enter();
+        let child = tracing::info_span!("startup.session_create.backend_rpc");
+        let mut meta: Option<agent_client_protocol::Meta> = None;
+        stamp_span_traceparent(&mut meta, &child);
+        let stamped = meta
+            .as_ref()
+            .and_then(|m| m.get("traceparent"))
+            .and_then(serde_json::Value::as_str)
+            .expect("stamp_span_traceparent writes a traceparent");
+        let span_id = |tp: &str| tp.split('-').nth(2).unwrap().to_owned();
+        let child_own = xai_grok_otel::traceparent_of_span(&child).expect("child traceparent");
+        let parent_own = xai_grok_otel::traceparent_of_span(&parent).expect("parent traceparent");
+        assert_eq!(span_id(stamped), span_id(&child_own));
+        assert_ne!(span_id(stamped), span_id(&parent_own));
     }
     #[test]
     fn parent_session_is_worktree_detects_standalone_marker() {
@@ -1785,18 +1854,17 @@ mod tests {
     #[test]
     fn fork_session_params_sets_new_session_id_and_workspace_dir() {
         let cwd = PathBuf::from("/wt");
-        let p = fork_session_params("parent-1", &cwd, Some("child-uuid"), true, None);
-        assert_eq!(p["sourceSessionId"], "parent-1");
-        assert_eq!(p["newCwd"], "/wt");
-        assert_eq!(p["newSessionId"], "child-uuid");
-        assert_eq!(p["sourceWorkspaceDir"], "/wt");
-        assert_eq!(p["sessionKind"], "fork");
-        assert!(p.get("newModelId").is_none());
+        let p = fork_session_params(SessionRequestContext::new("parent-1", &cwd, Some("child-uuid"), true, None));
+        assert_eq!(j(&p, "sourceSessionId"), "parent-1");
+        assert_eq!(j(&p, "newCwd"), "/wt");
+        assert_eq!(j(&p, "newSessionId"), "child-uuid");
+        assert_eq!(j(&p, "sourceWorkspaceDir"), "/wt");
+        assert_eq!(j(&p, "sessionKind"), "fork");
     }
     #[test]
     fn fork_session_params_omits_workspace_dir_when_not_worktree() {
         let cwd = PathBuf::from("/proj");
-        let p = fork_session_params("parent-1", &cwd, None, false, None);
+        let p = fork_session_params(SessionRequestContext::new("parent-1", &cwd, None, false, None));
         assert!(p.get("sourceWorkspaceDir").is_none());
         assert!(p.get("newSessionId").is_none());
     }
@@ -1804,13 +1872,13 @@ mod tests {
     #[test]
     fn fork_session_params_includes_new_model_id_when_set() {
         let cwd = PathBuf::from("/proj");
-        let p = fork_session_params(
+        let p = fork_session_params(SessionRequestContext::new(
             "parent-1",
             &cwd,
             None,
             false,
             Some("grok-4.5"),
-        );
+        ));
         assert_eq!(p["newModelId"], "grok-4.5");
     }
     #[test]
@@ -1997,9 +2065,9 @@ mod tests {
             }),
         );
         for (args, expected_parent) in [
-            (&["grok", "-c", "--fork-session"][..], interactive_id),
+            (["grok", "-c", "--fork-session"].as_slice(), interactive_id),
             (
-                &["grok", "-p", "run", "-c", "--fork-session"][..],
+                ["grok", "-p", "run", "-c", "--fork-session"].as_slice(),
                 headless_id,
             ),
         ] {
@@ -2342,7 +2410,7 @@ mod tests {
             .await
             .unwrap_err();
             assert!(
-                err.to_string().contains("invalid conversation id"),
+                err.to_string().contains("Invalid conversation ID"),
                 "expected shape rejection for {bad:?}, got: {err}"
             );
         }

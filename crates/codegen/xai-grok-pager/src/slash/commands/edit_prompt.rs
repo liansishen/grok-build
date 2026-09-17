@@ -6,6 +6,7 @@
 
 use crate::app::actions::Action;
 use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
+use crate::slash::mode_support::{ModeSupport, Remedy};
 
 pub struct EditPromptCommand;
 
@@ -24,6 +25,15 @@ impl SlashCommand for EditPromptCommand {
 
     fn session_scoped(&self) -> bool {
         true
+    }
+
+    fn mode_support(&self) -> ModeSupport {
+        ModeSupport::MinimalOnly(Remedy::SwitchMode {
+            why: xai_grok_i18n::t_or(
+                "slash.remedy.edit_prompt_why",
+                "the full TUI has no external-editor path — Ctrl+G is the tasks pane there",
+            ),
+        })
     }
 
     fn run(&self, ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
@@ -92,7 +102,11 @@ mod tests {
                 ),
                 "",
             ),
-            CommandResult::Error(message) if message.contains("No active session")
+            // The message is catalog-backed, so compare against the localized text rather than
+            // the English literal: a concurrent test that switches the process locale must not
+            // change what this asserts.
+            CommandResult::Error(message)
+                if message == xai_grok_i18n::t("slash.edit_prompt.no_active_session")
         ));
     }
 }

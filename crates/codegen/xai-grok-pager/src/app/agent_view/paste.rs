@@ -83,7 +83,7 @@ impl AgentView {
             crate::prompt_images::SessionPathPolicy::Preserve,
             pasted,
         );
-        self.show_toast("Images can't be attached when editing a shared queued prompt");
+        self.show_toast(xai_grok_i18n::t("toast.images_shared_queue"));
         true
     }
     /// Enqueue attachment probing off-thread so a paste followed by a send still lands in that order.
@@ -179,12 +179,7 @@ impl AgentView {
             ClipboardPasteCompletion, ClipboardPasteFailure, ProbedAttachment,
         };
         self.paste_probe_in_flight = self.paste_probe_in_flight.saturating_sub(1);
-        let insert_deferred_text = matches!(
-            &image,
-            ProbedAttachment::NoRaster
-                | ProbedAttachment::ProbeDropped
-                | ProbedAttachment::ProbeFailed
-        );
+        let text_on_miss = ctx.source.text_to_insert_on_miss(&image);
         let attachment = match image {
             ProbedAttachment::Image(pasted) => {
                 if self.reject_shared_queue_image_edit(&pasted) {
@@ -232,14 +227,9 @@ impl AgentView {
         } else {
             None
         };
-        let text = if insert_deferred_text {
-            ctx.source
-                .text_to_insert_on_miss()
-                .filter(|text| !text.trim().is_empty())
-                .map(|text| self.insert_prompt_plain_text(Some(text)).1)
-        } else {
-            None
-        };
+        let text = text_on_miss
+            .filter(|text| !text.trim().is_empty())
+            .map(|text| self.insert_prompt_plain_text(Some(text)).1);
         let completion = crate::app::actions::reduce_clipboard_paste_completion(
             &ctx.source,
             attachment,
@@ -293,6 +283,13 @@ impl AgentView {
             return ClipboardPasteCompletion::Dropped;
         }
         modal.note_paste_probe_finished();
+        let inserted_caption = match ctx.source.text_to_insert_on_miss(&image) {
+            Some(text) => {
+                modal.handle_paste(text);
+                true
+            }
+            None => false,
+        };
         match image {
             ProbedAttachment::Image(pasted) => match modal.insert_image(pasted) {
                 Ok(()) => ClipboardPasteCompletion::Handled,
@@ -305,23 +302,12 @@ impl AgentView {
                 modal.set_error("Couldn't save pasted image".to_string());
                 ClipboardPasteCompletion::Failed(ClipboardPasteFailure::AlreadyReported)
             }
-            ProbedAttachment::NoRaster => {
-                let inserted_caption = if let Some(text) = ctx
-                    .source
-                    .text_to_insert_on_miss()
-                    .filter(|text| !text.trim().is_empty())
-                {
-                    modal.handle_paste(text);
-                    true
-                } else {
-                    false
-                };
-                if inserted_caption || ctx.source.synchronous_insertion().is_some() {
-                    ClipboardPasteCompletion::Handled
-                } else {
-                    ClipboardPasteCompletion::FullMiss
-                }
+            ProbedAttachment::NoRaster
+                if inserted_caption || ctx.source.synchronous_insertion().is_some() =>
+            {
+                ClipboardPasteCompletion::Handled
             }
+            ProbedAttachment::NoRaster => ClipboardPasteCompletion::FullMiss,
             ProbedAttachment::ProbeDropped => ClipboardPasteCompletion::Dropped,
             ProbedAttachment::ProbeFailed => {
                 ClipboardPasteCompletion::Failed(ClipboardPasteFailure::AttachmentRead)
@@ -435,11 +421,11 @@ impl AgentView {
         &mut self,
         text: &str,
     ) -> Option<(InputOutcome, crate::app::actions::ClipboardPasteCompletion)> {
-        if crate::terminal::terminal_context().is_ssh {
+        if crate::terminal::terminal_context().is_ssh && !cfg!(test) {
             return None;
         }
-        /// Upper bound on the size of a paste payload the drop classifier will scan.
-        /// 10 MB matches `MAX_SEND_BYTES` for individual image attachments: above any realistic drop, below any log/code paste worth iterating.
+        // Upper bound on the size of a paste payload the drop classifier will scan.
+        // 10 MB matches `MAX_SEND_BYTES` for individual image attachments: above any realistic drop, below any log/code paste worth iterating.
         const DROP_CLASSIFIER_MAX_BYTES: usize = 10 * 1024 * 1024;
         if text.len() >= DROP_CLASSIFIER_MAX_BYTES {
             return None;
@@ -641,7 +627,10 @@ pub(super) mod paste_key_tests {
         assert!(matches!(outcome, InputOutcome::Changed));
         assert_eq!(agent.prompt.text(), text);
         assert_eq!(agent.prompt.textarea().elements().len(), 1);
-        assert_eq!(agent.prompt.textarea().elements()[0].kind, KIND_PASTE);
+        assert_eq!(
+            agent.prompt.textarea().elements().first().map(|e| e.kind),
+            Some(KIND_PASTE)
+        );
     }
     #[test]
     fn paste_key_image_preferred_over_text() {
@@ -783,7 +772,15 @@ pub(super) mod paste_key_tests {
         assert!(matches!(outcome, InputOutcome::Changed));
         assert_eq!(agent.prompt.images.len(), 1);
         assert!(agent.prompt.text().contains("[Image #"));
-        assert!(agent.prompt.images[0].preview.is_pending());
+        assert!(
+            agent
+                .prompt
+                .images
+                .first()
+                .unwrap_or_else(|| panic!("missing index"))
+                .preview
+                .is_pending()
+        );
         assert!(agent.pending_effects.iter().any(|effect| matches!(
             effect,
             crate::app::actions::Effect::PreparePromptImagePreview { .. }
@@ -1723,7 +1720,13 @@ pub(super) mod paste_key_tests {
             ],
         );
         for (i, &(r, _, idx)) in buttons.iter().enumerate() {
-            assert_eq!(r.x, cols[i], "hit-rect aligns with painted column");
+            assert_eq!(
+                r.x,
+                cols.get(i)
+                    .copied()
+                    .unwrap_or_else(|| panic!("missing index")),
+                "hit-rect aligns with painted column"
+            );
             assert_eq!(idx, 0, "all buttons index the one source");
         }
         assert_eq!(agent.inline_media_hits.mermaid_sources, vec![source]);
@@ -2106,9 +2109,7 @@ pub(super) mod paste_key_tests {
             .inline_media_ids
             .insert(std::path::PathBuf::from("/tmp/c.png"), 4);
         child.inline_media_active = true;
-        agent
-            .subagent_views
-            .insert("child-sid".into(), Box::new(child));
+        agent.insert_test_child("child-sid".into(), Box::new(child));
         let esc = agent
             .take_inline_media_clear_escapes()
             .expect("drains placed media");
@@ -2151,9 +2152,7 @@ pub(super) mod paste_key_tests {
             .inline_media_ids
             .insert(std::path::PathBuf::from("/tmp/c.png"), 4);
         child.inline_media_active = true;
-        agent
-            .subagent_views
-            .insert("child-sid".into(), Box::new(child));
+        agent.insert_test_child("child-sid".into(), Box::new(child));
         let esc = agent
             .take_own_inline_media_clear_escapes()
             .expect("drains own placed media");
@@ -2188,7 +2187,6 @@ pub(super) mod paste_key_tests {
             false,
             crate::app::agent_view::BannerSlotParams::none(),
             &bundle,
-            false,
             false,
             &mut Vec::new(),
             crate::app::agent_view::AppRenderParams::default(),
@@ -2242,9 +2240,7 @@ pub(super) mod paste_key_tests {
             .insert(std::path::PathBuf::from("/tmp/a.png"), 2);
         agent.last_placed_ids = [2].into_iter().collect();
         agent.inline_media_active = true;
-        agent
-            .subagent_views
-            .insert("child-sid".into(), Box::new(make_agent()));
+        agent.insert_test_child("child-sid".into(), Box::new(make_agent()));
         agent.active_subagent = Some("child-sid".into());
         draw_media_frame(&mut agent);
         assert!(
@@ -2264,9 +2260,7 @@ pub(super) mod paste_key_tests {
             .inline_media_ids
             .insert(std::path::PathBuf::from("/tmp/c.png"), 4);
         child.inline_media_active = true;
-        agent
-            .subagent_views
-            .insert("child-sid".into(), Box::new(child));
+        agent.insert_test_child("child-sid".into(), Box::new(child));
         assert!(agent.active_subagent.is_none(), "subagent view is closed");
         draw_media_frame(&mut agent);
         let child = agent.subagent_views.get("child-sid").unwrap();
@@ -2740,5 +2734,24 @@ pub(super) mod paste_key_tests {
             None,
         );
         assert_eq!(agent.prompt.images.len(), 1);
+    }
+    /// The shared-queue paste refusal is catalog copy: the toast paints the translation, not the key.
+    #[test]
+    fn shared_queue_image_paste_toast_is_localized() {
+        let mut agent = make_agent();
+        agent.prompt_mode = crate::app::queue_edit::PromptMode::EditingQueued {
+            id: 0,
+            original: String::new(),
+            server_id: Some("server-row-1".to_owned()),
+            kind: crate::app::agent::QueueEntryKind::Prompt,
+        };
+        let pasted = test_image_paste();
+        xai_grok_i18n::with_pseudo_locale(|| {
+            assert!(agent.reject_shared_queue_image_edit(&pasted));
+        });
+        assert_eq!(
+            agent.toast.as_ref().map(|(msg, _)| msg.as_str()),
+            Some("\u{27e6}toast.images_shared_queue\u{27e7}")
+        );
     }
 }

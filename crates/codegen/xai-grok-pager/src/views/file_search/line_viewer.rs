@@ -835,7 +835,9 @@ impl LineViewerState {
 
         if start_idx < self.lines.len() {
             // Select the start line.
-            let start_id = self.lines[start_idx].stable_id();
+            let Some(start_id) = self.lines.get(start_idx).map(|line| line.stable_id()) else {
+                return;
+            };
             self.list_state.select_by_id(start_id);
 
             // Enter visual mode and extend to end line.
@@ -843,8 +845,9 @@ impl LineViewerState {
                 self.list_state.enter_visual_mode(&self.lines);
                 // Move selection to the end of the range.
                 let end_line_idx = (end_idx - 1).min(self.lines.len() - 1);
-                let end_id = self.lines[end_line_idx].stable_id();
-                self.list_state.select_by_id(end_id);
+                if let Some(end_id) = self.lines.get(end_line_idx).map(|line| line.stable_id()) {
+                    self.list_state.select_by_id(end_id);
+                }
             }
 
             // Store the range for scroll centering on first render.
@@ -1066,20 +1069,33 @@ impl LineViewerState {
             src.commented = commented_lines.contains(&ln);
             items.push(PlanViewerItem::Source(Box::new(src)));
 
-            while mermaid_i < self.mermaid_after.len() && self.mermaid_after[mermaid_i].0 == src_idx
+            while mermaid_i < self.mermaid_after.len()
+                && self
+                    .mermaid_after
+                    .get(mermaid_i)
+                    .is_some_and(|m| m.0 == src_idx)
             {
+                let Some(diagram) = self.mermaid_after.get(mermaid_i).map(|m| m.1.clone()) else {
+                    break;
+                };
                 items.push(PlanViewerItem::MermaidAffordance(
                     MermaidAffordanceLine::new(
                         MERMAID_AFFORDANCE_ID_BASE + mermaid_i as u64,
-                        self.mermaid_after[mermaid_i].1.clone(),
+                        diagram,
                         max_digits,
                     ),
                 ));
                 mermaid_i += 1;
             }
 
-            while comment_idx < sorted.len() && sorted[comment_idx].line_range.end == ln + 1 {
-                let c = sorted[comment_idx];
+            while comment_idx < sorted.len()
+                && sorted
+                    .get(comment_idx)
+                    .is_some_and(|c| c.line_range.end == ln + 1)
+            {
+                let Some(c) = sorted.get(comment_idx).copied() else {
+                    break;
+                };
                 let item_id = comment_id_base + c.id;
                 items.push(PlanViewerItem::Comment(CommentLine::new(
                     c.id,
@@ -1092,7 +1108,7 @@ impl LineViewerState {
             }
         }
 
-        for c in &sorted[comment_idx..] {
+        for c in sorted.get(comment_idx..).unwrap_or(&[]) {
             let item_id = comment_id_base + c.id;
             items.push(PlanViewerItem::Comment(CommentLine::new(
                 c.id,
@@ -1664,17 +1680,18 @@ pub fn render_line_viewer(
         let (_action_label, action_w, action_spans): (&str, u16, Option<Vec<Span>>) = if is_approval
         {
             let label = if comment_count > 0 {
-                "approve w/ comments"
+                xai_grok_i18n::t("hint.approve_with_comments")
             } else {
-                "approve"
+                xai_grok_i18n::t("hint.approve")
             };
             let spans = build_shortcut_button('a', label, approve_hovered, theme);
             let w: u16 = spans.iter().map(|s| s.width() as u16).sum();
             (label, w, Some(spans))
         } else if comment_count > 0 {
-            let spans = build_shortcut_button('s', "send", approve_hovered, theme);
+            let label = xai_grok_i18n::t("hint.send");
+            let spans = build_shortcut_button('s', label, approve_hovered, theme);
             let w: u16 = spans.iter().map(|s| s.width() as u16).sum();
-            ("send", w, Some(spans))
+            (label, w, Some(spans))
         } else {
             ("", 0, None)
         };
@@ -1682,7 +1699,12 @@ pub fn render_line_viewer(
         // `s revise` button, always visible in approval mode so the user can request changes (switches to prompt for revision notes)
         let (revise_w, revise_spans): (u16, Option<Vec<Span>>) = if is_approval {
             let send_hovered = viewer.plan_ref().is_some_and(|p| p.send_hovered);
-            let spans = build_shortcut_button('s', "request changes", send_hovered, theme);
+            let spans = build_shortcut_button(
+                's',
+                xai_grok_i18n::t("hint.request_changes"),
+                send_hovered,
+                theme,
+            );
             let w: u16 = spans.iter().map(|s| s.width() as u16).sum();
             (w, Some(spans))
         } else {
@@ -1691,7 +1713,12 @@ pub fn render_line_viewer(
 
         // Quit button only renders in approval mode (casual closes via X).
         let quit_spans = if is_approval {
-            let s = build_shortcut_button('q', "quit plan", abandon_hovered, theme);
+            let s = build_shortcut_button(
+                'q',
+                xai_grok_i18n::t("hint.quit_plan"),
+                abandon_hovered,
+                theme,
+            );
             let w: u16 = s.iter().map(|s| s.width() as u16).sum();
             Some((s, w))
         } else {
@@ -1930,7 +1957,9 @@ mod tests {
         let area = *buf.area();
         let mut row = String::new();
         for x in area.left()..area.right() {
-            row.push_str(buf[(x, y)].symbol());
+            if let Some(cell) = buf.cell((x, y)) {
+                row.push_str(cell.symbol());
+            }
         }
         row
     }
@@ -1964,7 +1993,9 @@ mod tests {
     #[test]
     fn markdown_source_blank_line_renders_as_numbered_empty_row() {
         let built = build_markdown_lines("# Plan\n\n- First", Some(80));
-        let blank = &built.source_lines[1];
+        let Some(blank) = built.source_lines.get(1) else {
+            panic!("expected a blank source line");
+        };
         let mut buf = Buffer::empty(Rect::new(0, 0, 20, 1));
 
         blank.render(Rect::new(0, 0, 20, 1), &mut buf, false, true);
@@ -1982,8 +2013,11 @@ mod tests {
         cache::set_render_mermaid(RenderMermaid::On);
         let built = build_markdown_lines(MD, Some(80));
         assert_eq!(built.mermaid_after.len(), 1);
-        assert!(built.mermaid_after[0].1.contains("A --> B"));
-        assert!(built.mermaid_after[0].0 < built.source_lines.len());
+        let Some(first) = built.mermaid_after.first() else {
+            panic!("expected a mermaid affordance: {:?}", built.mermaid_after);
+        };
+        assert!(first.1.contains("A --> B"));
+        assert!(first.0 < built.source_lines.len());
 
         let mut viewer =
             LineViewerState::open_markdown_content("plan.md", MD.to_owned(), None).unwrap();
@@ -1998,8 +2032,11 @@ mod tests {
         );
         let placements = viewer.diagram_affordance_placements(Rect::new(0, 0, 100, 40));
         assert_eq!(placements.len(), 1);
-        assert_eq!(placements[0].screen_rect.height, 1);
-        assert!(placements[0].screen_rect.width > 0);
+        let Some(placement) = placements.first() else {
+            panic!("expected a placement: {placements:?}");
+        };
+        assert_eq!(placement.screen_rect.height, 1);
+        assert!(placement.screen_rect.width > 0);
 
         cache::set_render_mermaid(RenderMermaid::Off);
         assert!(build_markdown_lines(MD, Some(80)).mermaid_after.is_empty());
@@ -2041,7 +2078,10 @@ mod tests {
 
         assert_eq!(viewer.selected_line_range(), Some(4..5));
         assert_eq!(viewer.line_range_suffix(), Some(":4".to_owned()));
-        assert_eq!(source_line(&viewer.lines[3]).plain_text, "");
+        let Some(line) = viewer.lines.get(3) else {
+            panic!("expected line 4");
+        };
+        assert_eq!(source_line(line).plain_text, "");
     }
 
     #[test]
@@ -2061,7 +2101,10 @@ mod tests {
             .iter()
             .map(|item| {
                 let s = source_line(item);
-                (s.line_number, line_text(&s.rendered_lines[0]))
+                (
+                    s.line_number,
+                    s.rendered_lines.first().map(line_text).unwrap_or_default(),
+                )
             })
             .collect();
         assert_eq!(
@@ -2090,5 +2133,43 @@ mod tests {
 
         assert_eq!(viewer.selected_line_range(), Some(1..4));
         assert_eq!(viewer.line_range_suffix(), Some(":1-3".to_owned()));
+    }
+
+    /// The plan footer's action buttons are catalog copy, not hardcoded literals.
+    #[test]
+    fn plan_footer_buttons_come_from_the_catalog() {
+        let area = Rect::new(0, 0, 240, 24);
+        let mut viewer =
+            LineViewerState::open_markdown_content("plan.md", "# Plan".to_owned(), None)
+                .expect("in-memory markdown content opens");
+        viewer.plan_mut().feedback_active = true;
+
+        let painted = xai_grok_i18n::with_pseudo_locale(|| {
+            let mut buf = Buffer::empty(area);
+            render_line_viewer(
+                &mut buf,
+                area,
+                &mut viewer,
+                Path::new("."),
+                &Theme::groknight(),
+                1,
+            );
+            (0..area.height)
+                .map(|y| row_text(&buf, y))
+                .collect::<Vec<_>>()
+                .join("\n")
+        });
+
+        for key in [
+            "hint.approve_with_comments",
+            "hint.request_changes",
+            "hint.quit_plan",
+        ] {
+            let marker = format!("⟦{key}⟧");
+            assert!(
+                painted.contains(&marker),
+                "{key} must be painted from the catalog:\n{painted}"
+            );
+        }
     }
 }

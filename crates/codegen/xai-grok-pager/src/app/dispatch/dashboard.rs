@@ -463,7 +463,7 @@ fn dispatch_dashboard_load_local_build(
         });
 
     let Some((resolved_id, resolved_cwd)) = resolved else {
-        app.show_toast("Session not found locally");
+        app.show_toast(xai_grok_i18n::t("toast.session_not_found_locally"));
         return vec![];
     };
 
@@ -684,11 +684,9 @@ pub(super) fn dispatch_dashboard_overlay_exit(app: &mut AppView) -> Vec<Effect> 
     vec![]
 }
 
-/// Disarm a pending overlay stop-confirm (see
-/// [`dispatch_dashboard_overlay_stop`]). Called from every overlay
-/// navigation that can happen WITHOUT a key press (mouse clicks on
-/// `[Dashboard]` / `[‹]` / `[›]`); key presses already disarm via the
-/// pending-action fast path in `AppView::handle_input`.
+/// Disarm a pending overlay stop-confirm (see [`dispatch_dashboard_overlay_stop`]).
+/// Called from every overlay navigation that can happen WITHOUT a key press (mouse clicks on `[Dashboard]` / `‹` / `›`).
+/// Key presses already disarm via the pending-action fast path in `AppView::handle_input`.
 fn clear_pending_overlay_stop(app: &mut AppView) {
     if app
         .pending_action
@@ -1001,9 +999,8 @@ pub(super) fn dispatch_dashboard_create_new_agent_with_detail(app: &mut AppView)
         d.dispatch.set_text("");
         d.error_toast = None;
         d.filter = crate::views::dashboard::Filter::None;
-        // Snap the cursor onto the new row so the overlay's `i/n`
-        // indicator matches the active view, AND so the chrome's
-        // `[‹]` / `[›]` cycle anchors on the right starting point.
+        // Snap the cursor onto the new row so the overlay's `i/n` indicator matches the active view
+        // The chrome's `‹` / `›` cycle then anchors on the right starting point
         d.focus_row(crate::views::dashboard::DashboardRowId::TopLevel(new_id));
         d.attached_agent = Some(new_id);
     }
@@ -1398,7 +1395,9 @@ pub(super) fn dispatch_dashboard_overlay_cycle(app: &mut AppView, delta: i32) ->
     };
     let n = order.len() as i32;
     let next_idx = (((idx as i32) + delta).rem_euclid(n)) as usize;
-    let next_id = order[next_idx];
+    let Some(&next_id) = order.get(next_idx) else {
+        return vec![];
+    };
     if next_id == current {
         return vec![];
     }
@@ -1414,9 +1413,8 @@ pub(super) fn dispatch_dashboard_overlay_cycle(app: &mut AppView, delta: i32) ->
     if let Some(agent) = app.agents.get_mut(&next_id) {
         agent.close_subagent_fullscreen();
     }
-    // A stop-confirm armed on the CURRENT agent must not carry over to
-    // the next one — a mouse click on `[‹]` / `[›]` lands here without
-    // the key-press disarm ever running.
+    // A stop-confirm armed on the CURRENT agent must not carry over to the next one
+    // A mouse click on `‹` / `›` lands here without the key-press disarm ever running
     clear_pending_overlay_stop(app);
     if let Some(d) = app.dashboard.as_mut() {
         d.restore_peek_viewport(&mut app.agents);
@@ -1552,13 +1550,9 @@ pub(super) fn dispatch_dashboard_dispatch(
         d.filter = crate::views::dashboard::Filter::None;
     }
     if attach {
-        // Ctrl+S (Send+Open) — walk into the new agent's
-        // detail view AND paint the session-overlay chrome.
-        // Mirrors `dispatch_dashboard_attach` and
-        // `dispatch_dashboard_create_new_agent_with_detail`:
-        // both `attached_agent` and `selected` follow the new
-        // row so the overlay's `i/n [‹][›] [✗]` chips have an
-        // anchor and Esc walks back to the dashboard.
+        // Ctrl+S (Send+Open): walk into the new agent's detail view AND paint the session-overlay chrome
+        // Mirrors `dispatch_dashboard_attach` and `dispatch_dashboard_create_new_agent_with_detail`
+        // Both `attached_agent` and `selected` follow the new row so the header's `‹ i/n ›` switcher has an anchor
         if let Some(d) = app.dashboard.as_mut() {
             d.restore_peek_viewport(&mut app.agents);
             d.focus_row(crate::views::dashboard::DashboardRowId::TopLevel(new_id));
@@ -2208,14 +2202,20 @@ fn workspace_layout_target(
     Ok(target)
 }
 
+/// Toast for a refused dashboard pin/reorder gesture; `None` for rows that have no layout of their own.
+fn layout_refusal_toast(refusal: LayoutRefusal) -> Option<&'static str> {
+    match refusal {
+        LayoutRefusal::NotWorkspaceRow => None,
+        LayoutRefusal::NotFound => Some(xai_grok_i18n::t("toast.workspace_layout_not_found")),
+        LayoutRefusal::ReadOnly => Some(xai_grok_i18n::t("toast.workspace_layout_read_only")),
+        LayoutRefusal::NotSavedYet => Some(xai_grok_i18n::t("toast.workspace_layout_not_saved")),
+    }
+}
+
 fn refuse_workspace_layout(app: &mut AppView, refusal: impl Into<LayoutRefusal>) {
-    let message = match refusal.into() {
-        LayoutRefusal::NotWorkspaceRow => return,
-        LayoutRefusal::NotFound => "Session is no longer in the workspace",
-        LayoutRefusal::ReadOnly => "Dashboard workspace is read-only",
-        LayoutRefusal::NotSavedYet => "Session isn't saved to the workspace yet",
-    };
-    app.show_toast(message);
+    if let Some(message) = layout_refusal_toast(refusal.into()) {
+        app.show_toast(message);
+    }
 }
 
 pub(super) fn dispatch_dashboard_toggle_pin(app: &mut AppView) -> Vec<Effect> {
@@ -2383,15 +2383,19 @@ pub(super) fn dashboard_neighbor_row(
     let cur = focusables
         .iter()
         .position(|f| matches!(f, Focusable::Row(id) if id == closed))?;
-    // Next row below (down 1); else the closed row was last → previous row.
-    let next = focusables[cur + 1..].iter().find_map(|f| match f {
-        Focusable::Row(id) => Some(id.clone()),
-        Focusable::Section(_) | Focusable::IdleOverflow => None,
-    });
-    next.or_else(|| {
-        focusables[..cur].iter().rev().find_map(|f| match f {
+    // Next row below (down 1); when the closed row was last, the previous row
+    let next = focusables.get(cur + 1..).and_then(|rest| {
+        rest.iter().find_map(|f| match f {
             Focusable::Row(id) => Some(id.clone()),
             Focusable::Section(_) | Focusable::IdleOverflow => None,
+        })
+    });
+    next.or_else(|| {
+        focusables.get(..cur).and_then(|prefix| {
+            prefix.iter().rev().find_map(|f| match f {
+                Focusable::Row(id) => Some(id.clone()),
+                Focusable::Section(_) | Focusable::IdleOverflow => None,
+            })
         })
     })
 }
@@ -2540,7 +2544,7 @@ impl DashboardStopReadiness {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct DashboardStopPlan {
+pub(super) struct DashboardStopPlan {
     cancel_foreground: bool,
     running_background_tasks: Vec<String>,
     scheduled_tasks: Vec<String>,
@@ -2548,7 +2552,7 @@ struct DashboardStopPlan {
 }
 
 impl DashboardStopPlan {
-    fn for_agent(agent: &crate::app::agent_view::AgentView) -> Self {
+    pub(super) fn for_agent(agent: &crate::app::agent_view::AgentView) -> Self {
         let has_session = agent.session.session_id.is_some();
         Self {
             cancel_foreground: has_session
@@ -2573,7 +2577,20 @@ impl DashboardStopPlan {
         }
     }
 
-    fn is_empty(&self) -> bool {
+    /// Whether [`Self::for_agent`] would produce a non-empty plan, without collecting the task ids. Readiness is resolved
+    /// on every frame of an overlay footer and every dashboard row, so it must not allocate; the owned plan is built only
+    /// when a stop is actually dispatched.
+    pub(super) fn would_stop_anything(agent: &crate::app::agent_view::AgentView) -> bool {
+        let has_session = agent.session.session_id.is_some();
+        (has_session
+            && (!agent.session.state.is_idle()
+                || agent.wake_turn_active()
+                || agent.session.has_running_bg_tasks()
+                || !agent.session.scheduled_tasks.is_empty()))
+            || !agent.session.pending_prompts.is_empty()
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
         !self.cancel_foreground
             && self.running_background_tasks.is_empty()
             && self.scheduled_tasks.is_empty()
@@ -2586,7 +2603,7 @@ pub(crate) fn dashboard_stop_readiness(
 ) -> DashboardStopReadiness {
     if agent.session.loading_replay {
         DashboardStopReadiness::Busy
-    } else if !DashboardStopPlan::for_agent(agent).is_empty() {
+    } else if DashboardStopPlan::would_stop_anything(agent) {
         DashboardStopReadiness::Stoppable
     } else if agent.session.session_id.is_none() {
         DashboardStopReadiness::LocallyClosable
@@ -2802,14 +2819,14 @@ fn archive_dashboard_row(
                     .get(id)
                     .is_some_and(|agent| !dashboard_stop_readiness(agent).can_close())
             }) {
-                app.show_toast("Session became active; stop it before archiving");
+                app.show_toast(xai_grok_i18n::t("dashboard.toast.session_became_active_archive"));
                 return vec![];
             }
             (session_id, loaded_ids)
         }
         DashboardRowId::Workspace { session_id } => (session_id.clone(), Vec::new()),
         DashboardRowId::Subagent { .. } => {
-            app.show_toast("Subagent rows can't be archived from the dashboard");
+            app.show_toast(xai_grok_i18n::t("dashboard.toast.subagent_archive_readonly"));
             return vec![];
         }
         DashboardRowId::Roster { .. } => return vec![],
@@ -2961,12 +2978,12 @@ pub(super) fn dispatch_dashboard_select(app: &mut AppView, next: bool) {
             crate::views::dashboard::Focusable::IdleOverflow => d.focus_idle_overflow(),
         }
     };
-    // Button-focused navigation contract:
-    //   - Down on the button → first focusable (header or row).
-    //   - Up on the button   → stay on the button (no wrap).
-    if d.new_agent_button_focused() {
-        if next && !focusables.is_empty() {
-            set_cursor(d, &focusables[0]);
+    // Actions-row button navigation contract:
+    //   - Down moves to the first focusable section or row
+    //   - Up stays on the current actions-row button
+    if d.actions_focus.is_some() {
+        if next && let Some(first) = focusables.first() {
+            set_cursor(d, first);
             d.clear_manual_scroll();
         }
         return;
@@ -2999,11 +3016,11 @@ pub(super) fn dispatch_dashboard_select(app: &mut AppView, next: bool) {
     } else {
         cur.saturating_sub(1)
     };
-    set_cursor(d, &focusables[new]);
-    // Arrow-key nav is selection-driven: re-engage the clamp's
-    // snap-to-selection so the viewport tracks the cursor. Without
-    // this, ↑/↓ after a wheel scroll would leave the cursor visibly
-    // selected on a row outside the viewport.
+    if let Some(item) = focusables.get(new) {
+        set_cursor(d, item);
+    }
+    // Arrow-key nav is selection-driven: re-engage the clamp's snap-to-selection so the viewport tracks the cursor
+    // Without this, ↑/↓ after a wheel scroll would leave the cursor selected on a row outside the viewport
     d.clear_manual_scroll();
 }
 
@@ -3282,4 +3299,24 @@ pub(super) fn dispatch_dashboard_question_answer(
         crate::app::agent_view::PeekAnswerOutcome::NoOp => {}
     }
     vec![]
+}
+#[cfg(test)]
+mod layout_refusal_i18n_tests {
+    use super::*;
+    /// The refusal toasts are catalog lookups, so the dashboard paints translated copy.
+    #[test]
+    fn layout_refusal_toasts_are_drawn_from_the_catalog() {
+        let rendered = xai_grok_i18n::with_pseudo_locale(|| {
+            [
+                (LayoutRefusal::NotFound, Some("\u{27e6}toast.workspace_layout_not_found\u{27e7}")),
+                (LayoutRefusal::ReadOnly, Some("\u{27e6}toast.workspace_layout_read_only\u{27e7}")),
+                (LayoutRefusal::NotSavedYet, Some("\u{27e6}toast.workspace_layout_not_saved\u{27e7}")),
+                (LayoutRefusal::NotWorkspaceRow, None),
+            ]
+            .map(|(refusal, expected)| (layout_refusal_toast(refusal), expected))
+        });
+        for (got, expected) in rendered {
+            assert_eq!(expected, got);
+        }
+    }
 }

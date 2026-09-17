@@ -28,7 +28,17 @@ pub const GROK_CHAT_MODE_ENV: &str = "GROK_CHAT_MODE";
 /// True when the process is a gateway light-frontend (`--chat`) agent.
 /// Hard-off in release builds so it can't be enabled via env.
 pub fn process_chat_mode_enabled() -> bool {
-    false
+    #[cfg(test)]
+    {
+        return std::env::var(GROK_CHAT_MODE_ENV).is_ok_and(|value| {
+            let value = value.trim();
+            !value.is_empty() && value != "0" && !value.eq_ignore_ascii_case("false")
+        });
+    }
+    #[cfg(not(test))]
+    {
+        false
+    }
 }
 #[derive(Clone)]
 struct CachedModes {
@@ -306,13 +316,15 @@ mod tests {
             default_mode_id: "auto".to_owned(),
         };
         let state = modes_to_model_state(&resp);
-        let info = &state.available_models[0];
+        let Some(info) = state.available_models.first() else {
+            panic!("expected a model: {:?}", state.available_models);
+        };
         assert_eq!(info.name, "Auto");
         assert_eq!(info.description.as_deref(), Some("Picks the best model"));
         let meta = info.meta.as_ref().unwrap();
-        assert_eq!(meta["badgeText"], serde_json::json!("New"));
-        assert_eq!(meta["iconHint"], serde_json::json!("rocket"));
-        assert_eq!(meta["tags"], serde_json::json!(["TAG_PRIMARY"]));
+        assert_eq!(meta.get("badgeText"), Some(&serde_json::json!("New")));
+        assert_eq!(meta.get("iconHint"), Some(&serde_json::json!("rocket")));
+        assert_eq!(meta.get("tags"), Some(&serde_json::json!(["TAG_PRIMARY"])));
     }
     #[test]
     fn name_falls_back_to_id_when_title_blank() {
@@ -323,6 +335,9 @@ mod tests {
             default_mode_id: String::new(),
         };
         let state = modes_to_model_state(&resp);
-        assert_eq!(state.available_models[0].name, "grok-4.5");
+        assert_eq!(
+            state.available_models.first().map(|m| m.name.as_str()),
+            Some("grok-4.5")
+        );
     }
 }

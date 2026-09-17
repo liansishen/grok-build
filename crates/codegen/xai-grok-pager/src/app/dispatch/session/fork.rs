@@ -286,7 +286,8 @@ fn build_fork_placeholder(
 ) -> AgentView {
     let mut scrollback = ScrollbackState::new();
     scrollback.set_appearance(app.appearance.clone());
-    let mut agent = AgentView::new(
+    let mut agent = AgentView::from_app(
+        app,
         AgentSession {
             id: new_id,
             acp_tx: app.acp_tx.clone(),
@@ -482,6 +483,11 @@ pub(in crate::app::dispatch) fn handle_worktree_forked(
             }
             _ => {}
         }
+        if let Some(summary) = strategy_summary {
+            agent
+                .scrollback
+                .push_block(RenderBlock::system(summary));
+        }
         let effective_chat = conversation_entry || app.chat_mode;
         agent.chat_kind = effective_chat;
         agent.conversation_entry = rename_entry;
@@ -561,6 +567,7 @@ pub(in crate::app::dispatch) fn handle_fork_session_failed(
     tracing::error!(agent = ?agent_id, error = %error, "Fork session failed");
     if let Some(agent) = app.agents.get_mut(&agent_id) {
         agent.pending_extensions_fetch = false;
+        agent.session_starting_since = None;
         agent.session.finish_command();
         let elapsed = agent.turn_elapsed();
         agent.mark_turn_finished(TurnEnd::Aborted);

@@ -49,3 +49,29 @@ fn compact_suffix_keeps_blocked_and_failure_formatting() {
         "stop  [hooks: 1/1]"
     );
 }
+
+/// The elapsed-time suffix on a blocked hook run is catalog-backed.
+#[test]
+fn blocked_hook_elapsed_copy_comes_from_the_catalog() {
+    let runs = vec![run(HookRunStatus::Blocked {
+        detail: "denied".to_owned(),
+        elapsed: Duration::from_millis(250),
+    })];
+    let rendered = xai_grok_i18n::with_pseudo_locale(|| {
+        super::render_hooks_detail(&runs, crate::scrollback::types::DisplayMode::Expanded)
+            .iter()
+            .map(|line| {
+                line.content
+                    .spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    });
+    assert!(
+        rendered.contains("⟦tool.hooks.elapsed_ms⟧"),
+        "blocked hook elapsed suffix: {rendered}"
+    );
+}

@@ -157,37 +157,46 @@ impl SearchToolCallBlock {
     fn match_summary(&self) -> String {
         if self.match_count == 0 {
             return match self.meta.output_mode {
-                SearchOutputMode::FilesWithMatches => "(no files)".to_string(),
-                _ => "(no matches)".to_string(),
+                SearchOutputMode::FilesWithMatches => {
+                    xai_grok_i18n::t("tool.search.no_files").to_string()
+                }
+                _ => xai_grok_i18n::t("tool.search.no_matches").to_string(),
             };
         }
+        let total = self.match_count.to_string();
         match self.meta.output_mode {
             SearchOutputMode::Content => {
                 let file_count = self.file_matches.len();
                 if file_count > 1 {
-                    format!("({} matches in {} files)", self.match_count, file_count)
+                    xai_grok_i18n::t_fmt(
+                        "tool.search.matches_in_files",
+                        &[("matches", &total), ("files", &file_count.to_string())],
+                    )
                 } else if self.match_count == 1 {
-                    "(1 match)".to_string()
+                    xai_grok_i18n::t("tool.search.one_match").to_string()
                 } else {
-                    format!("({} matches)", self.match_count)
+                    xai_grok_i18n::t_fmt("tool.search.many_matches", &[("count", &total)])
                 }
             }
             SearchOutputMode::FilesWithMatches => {
                 let n = self.match_count; // match_count = # of files in this mode
                 if n == 1 {
-                    "(1 file)".to_string()
+                    xai_grok_i18n::t("tool.search.one_file").to_string()
                 } else {
-                    format!("({n} files)")
+                    xai_grok_i18n::t_fmt("tool.search.many_files", &[("count", &n.to_string())])
                 }
             }
             SearchOutputMode::Count => {
                 let file_count = self.file_paths.len().max(self.file_matches.len());
                 if file_count > 1 {
-                    format!("({} matches across {} files)", self.match_count, file_count)
+                    xai_grok_i18n::t_fmt(
+                        "tool.search.matches_across_files",
+                        &[("matches", &total), ("files", &file_count.to_string())],
+                    )
                 } else if self.match_count == 1 {
-                    "(1 match)".to_string()
+                    xai_grok_i18n::t("tool.search.one_match").to_string()
                 } else {
-                    format!("({} matches)", self.match_count)
+                    xai_grok_i18n::t_fmt("tool.search.many_matches", &[("count", &total)])
                 }
             }
         }
@@ -229,7 +238,10 @@ impl SearchToolCallBlock {
             theme.fg(theme.path)
         };
 
-        let mut spans = vec![Span::styled("Search ".to_string(), bold_style)];
+        let mut spans = vec![Span::styled(
+            xai_grok_i18n::t("tool.prefix.search").to_string(),
+            bold_style,
+        )];
 
         // The search term: the glob when it replaces a trivial pattern, otherwise the quoted pattern
         if self.is_trivial_pattern()
@@ -243,7 +255,10 @@ impl SearchToolCallBlock {
 
             // Case 2: glob shown as the first "in" scope (string-styled, not path-styled)
             if let Some(ref glob) = self.meta.glob {
-                spans.push(Span::styled(" in ".to_string(), text_style));
+                spans.push(Span::styled(
+                    xai_grok_i18n::t("tool.search.in_scope").to_string(),
+                    text_style,
+                ));
                 spans.push(Span::styled(glob.to_string(), pattern_style));
             }
         }
@@ -251,7 +266,10 @@ impl SearchToolCallBlock {
         // Path scope (always after glob if both present).
         // When width is constrained, shorten the path the way the fish shell does
         if let Some(ref path) = self.meta.path {
-            spans.push(Span::styled(" in ".to_string(), text_style));
+            spans.push(Span::styled(
+                xai_grok_i18n::t("tool.search.in_scope").to_string(),
+                text_style,
+            ));
             if let Some(w) = width {
                 let used: usize = spans
                     .iter()
@@ -325,31 +343,31 @@ impl SearchToolCallBlock {
 
         // Mode comes first so the user sees what kind of search this is
         let mode_str = match self.meta.output_mode {
-            SearchOutputMode::Content => "pattern",
-            SearchOutputMode::FilesWithMatches => "files",
-            SearchOutputMode::Count => "count",
+            SearchOutputMode::Content => xai_grok_i18n::t("tool.search.mode_pattern"),
+            SearchOutputMode::FilesWithMatches => xai_grok_i18n::t("tool.search.mode_files"),
+            SearchOutputMode::Count => xai_grok_i18n::t("tool.search.mode_count"),
         };
         parts.push(vec![
-            Span::styled("mode: ", label_style),
+            Span::styled(xai_grok_i18n::t("tool.search.mode_label"), label_style),
             Span::styled(mode_str.to_string(), value_style),
         ]);
 
         if let Some(ref ft) = self.meta.file_type {
             parts.push(vec![
-                Span::styled("type: ", label_style),
+                Span::styled(xai_grok_i18n::t("tool.search.type_label"), label_style),
                 Span::styled(ft.to_string(), value_style),
             ]);
         }
         if self.meta.case_insensitive {
             parts.push(vec![
-                Span::styled("case-insensitive: ", label_style),
-                Span::styled("true", value_style),
+                Span::styled(xai_grok_i18n::t("tool.search.case_insensitive_label"), label_style),
+                Span::styled(xai_grok_i18n::t("tool.search.true_value"), value_style),
             ]);
         }
         if self.meta.multiline {
             parts.push(vec![
-                Span::styled("multiline: ", label_style),
-                Span::styled("true", value_style),
+                Span::styled(xai_grok_i18n::t("tool.search.multiline_label"), label_style),
+                Span::styled(xai_grok_i18n::t("tool.search.true_value"), value_style),
             ]);
         }
 
@@ -403,8 +421,11 @@ impl BlockContent for SearchToolCallBlock {
                     // No results: show a hint
                     lines.push(Line::from("").into());
                     lines.push(
-                        Line::from(Span::styled("  (no results)".to_string(), theme.muted()))
-                            .into(),
+                        Line::from(Span::styled(
+                            xai_grok_i18n::t("tool.search.no_results").to_string(),
+                            theme.muted(),
+                        ))
+                        .into(),
                     );
                 }
 
@@ -451,9 +472,9 @@ impl BlockContent for SearchToolCallBlock {
                     for path in &self.file_paths {
                         let line = if is_count {
                             // Count mode: "path:N", split at the last ':'; the path part in path color, ":N" in normal fg
-                            if let Some(colon_pos) = path.rfind(':') {
-                                let file_part = &path[..colon_pos];
-                                let count_part = &path[colon_pos..]; // includes ':'
+                            if let Some((file_part, count_part)) =
+                                path.rfind(':').and_then(|pos| path.split_at_checked(pos))
+                            {
                                 Line::from(vec![
                                     Span::styled(
                                         format!("{indent}{file_part}"),
@@ -522,5 +543,139 @@ impl BlockContent for SearchToolCallBlock {
             DisplayMode::Collapsed => DisplayMode::Expanded,
             _ => DisplayMode::Collapsed,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scrollback::types::{BlockContext, DisplayMode, line_plain_text};
+
+    fn ctx(mode: DisplayMode) -> BlockContext {
+        BlockContext {
+            mode,
+            is_running: false,
+            width: 120,
+            raw: false,
+            max_lines: None,
+            appearance: crate::appearance::AppearanceConfig::default(),
+            is_selected: false,
+            cwd: None,
+        }
+    }
+
+    fn rendered(block: &SearchToolCallBlock, mode: DisplayMode) -> String {
+        block
+            .output(&ctx(mode))
+            .lines
+            .iter()
+            .map(|line| line_plain_text(&line.content))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Search chrome (label, scope joiner, empty-result hint) is catalog-backed.
+    #[test]
+    fn search_chrome_copy_comes_from_the_catalog() {
+        let mut scoped = SearchToolCallBlock::new("needle");
+        scoped.meta.glob = Some("**/*.rs".into());
+        scoped.meta.path = Some("crates".into());
+        let empty = SearchToolCallBlock::new("needle");
+
+        let (scoped_text, empty_text) = xai_grok_i18n::with_pseudo_locale(|| {
+            (
+                rendered(&scoped, DisplayMode::Collapsed),
+                rendered(&empty, DisplayMode::Expanded),
+            )
+        });
+
+        assert!(
+            scoped_text.contains("⟦tool.prefix.search⟧"),
+            "search label: {scoped_text}"
+        );
+        assert!(
+            scoped_text.contains("⟦tool.search.in_scope⟧"),
+            "scope joiner: {scoped_text}"
+        );
+        assert!(
+            empty_text.contains("⟦tool.search.no_results⟧"),
+            "empty-result hint: {empty_text}"
+        );
+    }
+
+    /// The match-summary chip is copy, not a bare count: every branch resolves through the catalog.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn search_match_summary_comes_from_the_catalog() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+        let block = |count: usize, files: usize, mode: SearchOutputMode| {
+            let mut b = SearchToolCallBlock::new("needle");
+            b.meta.output_mode = mode;
+            b.set_file_matches(
+                count,
+                (0..files)
+                    .map(|i| SearchFileMatch {
+                        path: format!("f{i}.rs"),
+                        matches: Vec::new(),
+                    })
+                    .collect(),
+            );
+            b
+        };
+
+        let cases = [
+            (block(0, 0, SearchOutputMode::Content), "tool.search.no_matches"),
+            (
+                block(0, 0, SearchOutputMode::FilesWithMatches),
+                "tool.search.no_files",
+            ),
+            (block(1, 0, SearchOutputMode::Content), "tool.search.one_match"),
+            (block(7, 0, SearchOutputMode::Content), "tool.search.many_matches"),
+            (
+                block(7, 2, SearchOutputMode::Content),
+                "tool.search.matches_in_files",
+            ),
+            (
+                block(1, 0, SearchOutputMode::FilesWithMatches),
+                "tool.search.one_file",
+            ),
+            (
+                block(4, 0, SearchOutputMode::FilesWithMatches),
+                "tool.search.many_files",
+            ),
+            (
+                block(7, 2, SearchOutputMode::Count),
+                "tool.search.matches_across_files",
+            ),
+        ];
+        for (b, key) in &cases {
+            let text = xai_grok_i18n::with_pseudo_locale(|| b.match_summary());
+            assert!(
+                text.contains(&format!("\u{27e6}{key}\u{27e7}")),
+                "{key} not resolved: {text:?}"
+            );
+        }
+
+        // The count-bearing variants substitute once the locale yields real copy.
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        assert_eq!(
+            block(7, 2, SearchOutputMode::Content).match_summary(),
+            "（2 个文件中有 7 个匹配）"
+        );
+        assert_eq!(
+            block(4, 0, SearchOutputMode::FilesWithMatches).match_summary(),
+            "（4 个文件）"
+        );
+        assert_eq!(
+            block(1, 0, SearchOutputMode::Content).match_summary(),
+            "（1 个匹配）"
+        );
     }
 }

@@ -1029,7 +1029,7 @@ fn click_from_search_opens_detail_and_clears_query() {
     let filtered = filter_entries(&entries, state.query(), false, &no_collapsed());
     let hint_pos = filtered
         .iter()
-        .position(|&i| matches!(entries[i], ShortcutsHelpEntry::Hint { .. }))
+        .position(|&i| matches!(entries.get(i), Some(ShortcutsHelpEntry::Hint { .. })))
         .expect("hint present in the filtered view");
     state.hit_areas = Some(PickerHitAreas {
         close_button: Rect::default(),
@@ -1327,10 +1327,10 @@ fn render_detail_body_spaces_paragraphs_with_blank_line() {
         first + 2,
         "paragraphs must be separated by exactly one blank row, rows: {rows:?}"
     );
+    let blank = rows.get(first + 1);
     assert!(
-        rows[first + 1].is_empty(),
-        "the row between paragraphs must be blank, got {:?}",
-        rows[first + 1]
+        blank.is_some_and(|r| r.is_empty()),
+        "the row between paragraphs must be blank, got {blank:?}"
     );
 }
 
@@ -1354,7 +1354,9 @@ fn enter_on_search_pseudo_row_opens_detail() {
         })
         .expect("vim-mode entries include the `/`-search pseudo-row");
     assert_eq!(
-        detail_from_entry(&entries[idx])
+        entries
+            .get(idx)
+            .and_then(detail_from_entry)
             .and_then(|m| match m {
                 ShortcutsHelpMode::Detail { body, .. } => Some(body),
                 _ => None,
@@ -1397,7 +1399,9 @@ fn enter_on_paste_pseudo_row_opens_detail() {
         })
         .expect("paste pseudo-row with long_help");
     assert_eq!(
-        detail_from_entry(&entries[idx])
+        entries
+            .get(idx)
+            .and_then(detail_from_entry)
             .and_then(|m| match m {
                 ShortcutsHelpMode::Detail { body, .. } => Some(body),
                 _ => None,
@@ -2075,7 +2079,7 @@ fn vim_l_expands_and_h_collapses_paste() {
         })
         .expect("paste pseudo-row with long_help");
     let key_id = ExpandKey::Pseudo("paste");
-    assert_eq!(expand_key(&entries[paste_idx]), Some(key_id));
+    assert_eq!(entries.get(paste_idx).and_then(expand_key), Some(key_id));
     let mut state = build_initial_picker_state(&entries);
     state.selected = paste_idx;
     let mut mode = ShortcutsHelpMode::Browse;
@@ -2151,7 +2155,10 @@ fn handle_modal_key_left_collapses_expanded_hint() {
     let entries = build_entries(&all_contexts(), &registry, true);
     let mut state = build_initial_picker_state(&entries);
     state.selected = 1;
-    let key_id = expand_key(&entries[1]).expect("row 1 is expandable");
+    let key_id = entries
+        .get(1)
+        .and_then(expand_key)
+        .expect("row 1 is expandable");
     let expanded = std::collections::HashSet::from([key_id]);
     let mut window = crate::views::modal_window::ModalWindowState::default();
     let key = KeyEvent::new(KeyCode::Left, KeyModifiers::NONE);
@@ -2260,14 +2267,16 @@ fn cheatsheet_rows_inline_help_joins_newlines_with_spaces() {
     ];
     let rows = CheatsheetRows::build(&entries, "", false, &no_collapsed());
     let help = rows.help_refs();
+    let Some(inline) = help.get(1) else {
+        panic!("expected help for row 1: {help:?}");
+    };
     assert_eq!(
-        help[1], "First line. Second line.",
+        *inline, "First line. Second line.",
         "inline help must join newlines with spaces"
     );
     assert!(
-        !help[1].contains('\n'),
-        "collapsible help must not contain newlines, got {:?}",
-        help[1]
+        !inline.contains('\n'),
+        "collapsible help must not contain newlines, got {inline:?}"
     );
 }
 
@@ -2295,19 +2304,72 @@ fn inline_expand_with_no_help_renders_no_description_line() {
     let rows = CheatsheetRows::build(&entries, "", false, &no_collapsed());
     let help = rows.help_refs();
     assert_eq!(
-        help[1], "",
+        help.get(1).copied(),
+        Some(""),
         "a hint with no help source has empty inline help"
     );
     let mut state = build_initial_picker_state(&entries);
     state.selected = 1;
     let expanded = std::collections::HashSet::from([ExpandKey::Action(ActionId::Quit)]);
     let picker_entries = rows.picker_entries(&state, &expanded, &help);
-    let PickerEntry::Row(row) = &picker_entries[1] else {
+    let Some(PickerEntry::Row(row)) = picker_entries.get(1) else {
         panic!("row 1 must be a hint row");
     };
     assert!(row.expanded, "row is expanded");
     assert!(
         row.description_lines.is_empty(),
         "empty help must render no description line even when expanded"
+    );
+}
+
+/// The pseudo-entry labels and the dimmed note are catalog copy, not hardcoded English.
+#[test]
+fn pseudo_entry_labels_and_dimmed_note_come_from_the_catalog() {
+    let labels = xai_grok_i18n::with_pseudo_locale(|| {
+        build_entries(&[When::PromptFocused], &ActionRegistry::defaults(), true)
+            .into_iter()
+            .filter_map(|entry| match entry {
+                ShortcutsHelpEntry::Hint { item, .. } => Some(item.label.to_string()),
+                ShortcutsHelpEntry::SectionHeader { .. } => None,
+            })
+            .collect::<Vec<_>>()
+    });
+    for marker in [
+        "⟦hint.search⟧",
+        "⟦hint.paste⟧",
+        "⟦hint.undo⟧",
+        "⟦hint.redo⟧",
+    ] {
+        assert!(
+            labels.iter().any(|label| label == marker),
+            "missing {marker} in {labels:?}"
+        );
+    }
+
+    let area = ratatui::layout::Rect::new(0, 0, 60, 20);
+    let text = xai_grok_i18n::with_pseudo_locale(|| {
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        render_detail_body(
+            &mut buf,
+            area,
+            "title",
+            "",
+            "body",
+            true,
+            0,
+            &crate::theme::Theme::current(),
+        );
+        (area.y..area.y + area.height)
+            .map(|y| {
+                (area.x..area.x + area.width)
+                    .filter_map(|x| buf.cell((x, y)).map(|cell| cell.symbol().to_owned()))
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    });
+    assert!(
+        text.contains("⟦shortcuts.dimmed_note⟧"),
+        "dimmed note must come from the catalog: {text:?}"
     );
 }

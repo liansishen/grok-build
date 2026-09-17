@@ -332,7 +332,9 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                             return vec![];
                         }
                         state.expanded.insert(idx);
-                        let entry = &entries[idx];
+                        let Some(entry) = entries.get(idx) else {
+                            return vec![];
+                        };
                         if native_source && entry.card_detail.is_none() {
                             return vec![Effect::LoadCardDetail {
                                 host: SessionPickerHost::AgentModal,
@@ -408,11 +410,16 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             vec![]
         }
         Action::SendPrompt(text) => dispatch_send_prompt(app, text),
+        Action::RevisePlan(text) => super::prompt::dispatch_revise_plan(app, text),
         Action::SubmitFollowUp(text) => dispatch_send_prompt_inner(app, text, false, true, true),
         Action::SendSlashCommandPreservingDraft(text) => {
             dispatch_send_prompt_inner(app, text, false, false, false)
         }
         Action::Interject { text, images } => dispatch_interject(app, text, images),
+        Action::ExecutePlan {
+            plan_file_content,
+            plan_file_uri,
+        } => super::prompt::dispatch_execute_plan(app, plan_file_content, plan_file_uri),
         Action::SendPromptNow { text, images } => {
             super::interject::dispatch_send_prompt_now(app, text, images)
         }
@@ -651,8 +658,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         }
         Action::ToggleScrollLog => {
             let msg = match app.scroll_state.toggle_scroll_log() {
-                Some(path) => format!("scroll log: recording to {}", path.display()),
-                None => "scroll log: off".to_string(),
+                Some(path) => xai_grok_i18n::t_fmt(
+                    "debug.scroll_log_recording_to",
+                    &[("path", &path.display().to_string())],
+                ),
+                None => xai_grok_i18n::t("debug.scroll_log_off").to_string(),
             };
             if let Some(agent) = get_active_agent_mut(app) {
                 agent
@@ -662,12 +672,20 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             vec![]
         }
         Action::ShowDebugStatus => {
-            let on = |b: bool| if b { "on" } else { "off" };
-            let msg = format!(
-                "debug toggles: scroll {} \u{00b7} fps {} \u{00b7} log {}. Toggle with /debug <scroll|fps|log>",
-                on(app.scroll_debug_hud.enabled()),
-                on(app.fps_hud.enabled()),
-                on(app.scroll_state.scroll_log_active()),
+            let on = |b: bool| {
+                if b {
+                    xai_grok_i18n::t("settings.modal.value_on")
+                } else {
+                    xai_grok_i18n::t("settings.modal.value_off")
+                }
+            };
+            let msg = xai_grok_i18n::t_fmt(
+                "debug.toggles_status",
+                &[
+                    ("scroll", on(app.scroll_debug_hud.enabled())),
+                    ("fps", on(app.fps_hud.enabled())),
+                    ("log", on(app.scroll_state.scroll_log_active())),
+                ],
             );
             if let Some(agent) = get_active_agent_mut(app) {
                 agent
@@ -1086,7 +1104,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::EnterRememberMode => dispatch_enter_remember_mode(app),
         Action::SendRememberNote(text) => dispatch_send_remember_note(app, text),
         Action::SaveRememberNoteFromModal => dispatch_save_remember_note_from_modal(app),
-        Action::SendBtw(question) => dispatch_send_btw(app, question),
+        Action::SendBtw { question, images } => dispatch_send_btw(app, question, images),
         Action::SendRecap { auto } => dispatch_send_recap(app, auto),
         Action::SetCodingDataSharing { opted_in } => set_coding_data_sharing(
             app,
@@ -1367,6 +1385,23 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         } => dispatch_agent_type_mismatch_answered(app, start_new, model_id, effort),
         Action::PersistMemoryFullscreen(fs) => {
             vec![Effect::PersistMemoryFullscreen { fullscreen: fs }]
+        }
+        Action::MemoryForget {
+            path,
+            expected_content_hash,
+        } => {
+            if let ActiveView::Agent(id) = app.active_view
+                && let Some(agent) = app.agents.get(&id)
+                && let Some(session_id) = agent.session.session_id.clone()
+            {
+                return vec![Effect::MemoryForget {
+                    agent_id: id,
+                    session_id,
+                    path,
+                    expected_content_hash,
+                }];
+            }
+            vec![]
         }
         Action::OpenMemoryModal => {
             if let ActiveView::Agent(id) = app.active_view

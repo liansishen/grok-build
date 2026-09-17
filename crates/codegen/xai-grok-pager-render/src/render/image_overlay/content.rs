@@ -18,9 +18,12 @@ pub(super) fn paint_path_line(
     bg: Color,
 ) {
     let raw = path.display().to_string();
-    let label = format!(
-        "Path: {}",
-        truncate_path_for_overlay(&raw, width.saturating_sub(6) as usize)
+    let label = xai_grok_i18n::t_fmt(
+        "img.path",
+        &[(
+            "path",
+            &truncate_path_for_overlay(&raw, width.saturating_sub(6) as usize),
+        )],
     );
     let clipped = crate::render::line_utils::truncate_str(&label, width as usize);
     buf.set_span_safe(
@@ -72,7 +75,10 @@ pub(super) fn truncate_path_for_overlay(path: &str, max_chars: usize) -> String 
     let keep = max_chars.saturating_sub(3) / 2;
     let end_keep = max_chars.saturating_sub(3) - keep;
     let chars: Vec<char> = path.chars().collect();
-    let head: String = chars[..keep].iter().collect();
-    let tail: String = chars[chars.len() - end_keep..].iter().collect();
+    let head: String = chars.iter().take(keep).collect();
+    let tail: String = match chars.len().checked_sub(end_keep) {
+        Some(start) => chars.iter().skip(start).collect(),
+        None => String::new(),
+    };
     format!("{head}...{tail}")
 }
