@@ -937,6 +937,16 @@ async fn rejected_deferred_start_restores_prior_without_publication() {
         .await;
 }
 
+// This test needs two things that cannot both be guaranteed: the ordinary spawn must have
+// finished (it reads the `summary.json`/`meta.json` that spawn produces), and the child must still
+// be admitted as active when the wake message is sent. Nothing synchronizes the second: the child
+// finalizes on its own schedule after `spawn().await` returns, so on a faster machine the send
+// lands after it stops being active and `send_active_message` reports `NotActiveOrFinalizing`.
+// Observed as a real flake: the same commit failed the release run and passed the pull-request run.
+// It does not reproduce locally (10/10 passes), and the sibling tests that do pass send while the
+// spawn future is still pending, which this test cannot do because it needs the spawn's artifacts.
+// Re-enable once the wake path has a testable way to hold a finished child in the wakeable window.
+#[ignore = "depends on an unsynchronized window after spawn().await returns; flaky on CI, not reproducible locally"]
 #[tokio::test(flavor = "current_thread")]
 async fn started_wake_with_failed_metadata_write_preserves_prior_durable_artifacts() {
     use xai_grok_tools::implementations::grok_build::task::backend::{
