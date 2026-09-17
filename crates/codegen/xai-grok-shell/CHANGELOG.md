@@ -1,4 +1,59 @@
 # Changelog
+# 1.0.32-fork.1 — 2026-09-17
+
+本版为上游同步与 Fork 国际化全量补全更新，产品版本随上游从 **1.0.24** 升至 **1.0.32**。发布范围覆盖上一版 `v1.0.24-fork.7` 之后的上游同步提交 `48271133`（上游 Source-Revision 为 `be7ce6e8cffe46d20bef9834b211616082ee866b`）、合并适配修复、`send_feedback` 工具门控，以及一次覆盖全仓库的硬编码英文排查与国际化补全。
+
+### 上游更新
+
+- 同步上游 1.0.25–1.0.32：后台任务列表改为可恢复的持久快照；成功的 hook 默认静默，仅阻塞或失败的 hook 显示状态；`/btw` 支持行内提问；子代理 interject 立即中断长时间后台等待；子代理消息行区分 interject/queued/steer；minimal 模式内置反馈表单。
+- 仪表盘与导航：会话标题栏合并为单行并带 Dashboard 入口；actions row（+ New Agent、Open Previous、Worktree）支持方向键导航与回车激活；Tab 在提示区、回滚区与整个 dock 之间循环；Ctrl+G 显示或隐藏 dock；仪表盘搜索与恢复选择器明确标示当前输入框。
+- 体验与修复：折叠的子代理分组正确区分“运行中/已完成”计数；取消横幅正确显示取消原因而非一律“by user”；回合耗时支持小时进位；长路径统一截短为末两级；MCP 工具的长服务器前缀不再被静默丢弃；多个并发 `grok agent stdio` 进程共用 GROK_HOME 不再启动崩溃；Windows on ARM64 首次 TLS 握手崩溃修复。
+- 性能：仪表盘在只有空闲 spinner 或隐藏行时不再重复重绘相同帧；tmux 下省略逐帧同步更新包裹以消除卡顿。
+- 上游 1.0.25–1.0.32 的逐条英文原文保留在本文档下方对应的版本段中，本段仅为本次同步的范围摘要。
+
+### 本 Fork
+
+- 把本地化审计的扫描范围从固定目录扩到 `crates` 与 `prod` 下的全部 Rust 源文件，使新增 crate 或新增渲染模式不会落在门槛之外；并新增“清空豁免后重跑全量扫描”的豁免归属复核。
+- minimal 模式（`grok --minimal`）的用户可见文案全部接入目录：登录与信任目录流程、welcome、panel、plan、todo、overlay、feedback、live 状态以及 commit/full-view 提示。
+- 全量扫描在其它 crate 报出的文案一并迁移：`xai-grok-login` 的登录提示、`xai-grok-update` 的更新提示、pager 的视图/app/scrollback 文案与 `xai-grok-pager-render` 的图覆盖层。
+- 动作注册表的 label/description/help 改为经目录查询，覆盖全部注册动作；新增完备性测试，任一动作缺任一语系文案、或 zh 值为英文拷贝即失败。
+- 修复一类“目录已备好、调用点未接”的漏接：折叠工具行的展开摘要（如 `Read 2 files, Ran 2 subagents`，中文包含顿号连接的段间分隔）、搜索结果的匹配统计、会话事件行、取消原因、仪表盘子代理行的类型/活动标签与右下角模式徽标。
+- 收紧本地化门槛的豁免：移除过宽的 `/` 前缀豁免（该前缀会吞掉以 `/` 开头的用户文案），改为精确条目并增加回归 fixture；同时逐条复核全部豁免，确认其覆盖的字面量为按键名、布局片段或协议值而非用户文案。
+- 新增 `features.feedback` 配置门控 `send_feedback` 工具。
+
+### 兼容性
+
+- 产品版本随上游从 **1.0.24** 升至 **1.0.32**，Fork 序号从 `-fork.1` 重新开始；发布标签必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的版本。
+- 本地化目录的查找、回退与语言解析机制未改动；未提供翻译的键继续回退英文。其它语种仍使用英文目录回退。
+- 新增 `features.feedback` 门控；未配置该键时保持原有工具可用性。
+- 不新增外部服务、鉴权流程或运行时依赖。
+
+### 国际化
+
+- `en.toml` 与 `zh-CN.toml` 的键集合与 `{placeholder}` 完全一致，zh-CN 值为真实中文；本版新增与迁移的用户可见文案均已覆盖英文与简体中文。
+- 日志与 tracing 输出、发给模型的 prompt 与系统提示、协议/JSON 字段名、错误码、内部标识符，以及 CLI `--help` 与错误消息不在本地化范围内（沿用既有 Non-goals）；新出现的同类文本仍由 diff 门槛把关。
+- 自定义 agent 类型名、按键名、和弦、路径与产品名等不透明值保持原样，逐条精确登记在审计豁免表中。
+
+### 验证
+
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`（设置 `GROK_I18N_AUDIT_BASE` 为 `main` 的合并基点，以复现 CI 的 diff 审计）：16 项通过，全仓扫描 0 findings。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib -- --test-threads=1`：10076 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager-minimal --lib`：90 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager-pty-harness --test minimal_zh_localization`：2 项通过，以真实二进制在 PTY 下端到端核对 minimal 模式的中文与英文界面。
+- `python3 scripts/i18n_catalog.py`：`missing_keys`、`extra_keys`、`placeholder_mismatches` 均为空。
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin` 与 `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`（Protoc 29.3）：通过，版本输出包含本版版本号。
+- `xai-grok-shell --lib` 有 6865 项通过、1 项既有顺序相关 flaky（`agent::mvp_agent::tests::exhausted_fetch_decides_on_the_local_layers`，单独运行通过，与本版改动无关）。
+
+### 产物
+
+- `grok-1.0.32-fork.1-linux-x86_64`
+- `grok-1.0.32-fork.1-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.24-fork.7...v1.0.32-fork.1
+
 # 1.0.24-fork.7 — 2026-09-13
 
 本版为 Fork 功能与问题修复更新，产品版本仍为 **1.0.24**，不包含新的上游同步。发布范围覆盖 `v1.0.24-fork.6` 之后的后台任务提醒控制、状态栏用量数据完善、斜杠命令国际化和相关账本修复。
