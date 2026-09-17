@@ -108,46 +108,6 @@ pub enum VerbGroupKind {
     OtherTool,
 }
 
-impl VerbGroupKind {
-    /// Verb-group row verb: present tense while running, past otherwise.
-    pub fn verb(self, running: bool) -> &'static str {
-        let (past, present) = match self {
-            VerbGroupKind::File | VerbGroupKind::Skill => ("Read", "Reading"),
-            VerbGroupKind::Search
-            | VerbGroupKind::WebSearch
-            | VerbGroupKind::MemorySearch
-            | VerbGroupKind::IntegrationSearch => ("Searched", "Searching"),
-            VerbGroupKind::Dir => ("Listed", "Listing"),
-            VerbGroupKind::WebFetch => ("Fetched", "Fetching"),
-            VerbGroupKind::Subagent | VerbGroupKind::Command | VerbGroupKind::OtherTool => {
-                ("Ran", "Running")
-            }
-            VerbGroupKind::Message => ("Sent", "Sending"),
-            VerbGroupKind::EditFile => ("Edited", "Editing"),
-            VerbGroupKind::McpCall => ("Called", "Calling"),
-        };
-        if running { present } else { past }
-    }
-
-    /// Verb-group row noun, pluralized by `count`.
-    pub fn noun(self, count: usize) -> &'static str {
-        let (one, many) = match self {
-            VerbGroupKind::File | VerbGroupKind::EditFile => ("file", "files"),
-            VerbGroupKind::Skill => ("skill", "skills"),
-            VerbGroupKind::Search => ("pattern", "patterns"),
-            VerbGroupKind::Dir => ("dir", "dirs"),
-            VerbGroupKind::WebFetch | VerbGroupKind::WebSearch => ("website", "websites"),
-            VerbGroupKind::MemorySearch => ("memory", "memories"),
-            VerbGroupKind::IntegrationSearch | VerbGroupKind::McpCall => ("MCP tool", "MCP tools"),
-            VerbGroupKind::Subagent => ("subagent", "subagents"),
-            VerbGroupKind::Command => ("command", "commands"),
-            VerbGroupKind::Message => ("message", "messages"),
-            VerbGroupKind::OtherTool => ("tool", "tools"),
-        };
-        if count == 1 { one } else { many }
-    }
-}
-
 /// BlockContent is implemented via match-based delegation so we can intercept `output()` to prepend the tool bullet configured in appearance.
 #[derive(Debug, Clone)]
 pub enum ToolCallBlock {
@@ -628,59 +588,6 @@ impl ToolCallBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn verb_is_tense_aware() {
-        assert_eq!(VerbGroupKind::File.verb(false), "Read");
-        assert_eq!(VerbGroupKind::File.verb(true), "Reading");
-        assert_eq!(VerbGroupKind::Skill.verb(false), "Read");
-        assert_eq!(VerbGroupKind::Search.verb(false), "Searched");
-        assert_eq!(VerbGroupKind::Search.verb(true), "Searching");
-        assert_eq!(VerbGroupKind::Dir.verb(false), "Listed");
-        assert_eq!(VerbGroupKind::Dir.verb(true), "Listing");
-        assert_eq!(VerbGroupKind::WebFetch.verb(false), "Fetched");
-        assert_eq!(VerbGroupKind::WebFetch.verb(true), "Fetching");
-        assert_eq!(VerbGroupKind::WebSearch.verb(false), "Searched");
-        assert_eq!(VerbGroupKind::MemorySearch.verb(false), "Searched");
-        assert_eq!(VerbGroupKind::IntegrationSearch.verb(true), "Searching");
-        assert_eq!(VerbGroupKind::Subagent.verb(false), "Ran");
-        assert_eq!(VerbGroupKind::Subagent.verb(true), "Running");
-        assert_eq!(VerbGroupKind::Command.verb(false), "Ran");
-        assert_eq!(VerbGroupKind::Command.verb(true), "Running");
-        assert_eq!(VerbGroupKind::EditFile.verb(false), "Edited");
-        assert_eq!(VerbGroupKind::EditFile.verb(true), "Editing");
-        assert_eq!(VerbGroupKind::McpCall.verb(false), "Called");
-        assert_eq!(VerbGroupKind::McpCall.verb(true), "Calling");
-        assert_eq!(VerbGroupKind::Message.verb(false), "Sent");
-        assert_eq!(VerbGroupKind::Message.verb(true), "Sending");
-        assert_eq!(VerbGroupKind::OtherTool.verb(false), "Ran");
-    }
-
-    #[test]
-    fn noun_pluralizes_by_count() {
-        assert_eq!(VerbGroupKind::File.noun(1), "file");
-        assert_eq!(VerbGroupKind::File.noun(2), "files");
-        assert_eq!(VerbGroupKind::Skill.noun(2), "skills");
-        assert_eq!(VerbGroupKind::Search.noun(1), "pattern");
-        assert_eq!(VerbGroupKind::Dir.noun(2), "dirs");
-        assert_eq!(VerbGroupKind::WebFetch.noun(1), "website");
-        assert_eq!(VerbGroupKind::WebSearch.noun(2), "websites");
-        // Irregular plural.
-        assert_eq!(VerbGroupKind::MemorySearch.noun(1), "memory");
-        assert_eq!(VerbGroupKind::MemorySearch.noun(2), "memories");
-        assert_eq!(VerbGroupKind::IntegrationSearch.noun(1), "MCP tool");
-        assert_eq!(VerbGroupKind::IntegrationSearch.noun(2), "MCP tools");
-        assert_eq!(VerbGroupKind::Subagent.noun(1), "subagent");
-        assert_eq!(VerbGroupKind::Subagent.noun(2), "subagents");
-        assert_eq!(VerbGroupKind::Command.noun(1), "command");
-        assert_eq!(VerbGroupKind::Command.noun(2), "commands");
-        assert_eq!(VerbGroupKind::EditFile.noun(2), "files");
-        assert_eq!(VerbGroupKind::McpCall.noun(1), "MCP tool");
-        assert_eq!(VerbGroupKind::Message.noun(1), "message");
-        assert_eq!(VerbGroupKind::Message.noun(2), "messages");
-        assert_eq!(VerbGroupKind::OtherTool.noun(1), "tool");
-        assert_eq!(VerbGroupKind::OtherTool.noun(2), "tools");
-    }
 
     #[test]
     fn every_variant_has_a_group_decision() {

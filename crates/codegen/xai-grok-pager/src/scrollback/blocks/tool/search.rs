@@ -157,37 +157,46 @@ impl SearchToolCallBlock {
     fn match_summary(&self) -> String {
         if self.match_count == 0 {
             return match self.meta.output_mode {
-                SearchOutputMode::FilesWithMatches => "(no files)".to_string(),
-                _ => "(no matches)".to_string(),
+                SearchOutputMode::FilesWithMatches => {
+                    xai_grok_i18n::t("tool.search.no_files").to_string()
+                }
+                _ => xai_grok_i18n::t("tool.search.no_matches").to_string(),
             };
         }
+        let total = self.match_count.to_string();
         match self.meta.output_mode {
             SearchOutputMode::Content => {
                 let file_count = self.file_matches.len();
                 if file_count > 1 {
-                    format!("({} matches in {} files)", self.match_count, file_count)
+                    xai_grok_i18n::t_fmt(
+                        "tool.search.matches_in_files",
+                        &[("matches", &total), ("files", &file_count.to_string())],
+                    )
                 } else if self.match_count == 1 {
-                    "(1 match)".to_string()
+                    xai_grok_i18n::t("tool.search.one_match").to_string()
                 } else {
-                    format!("({} matches)", self.match_count)
+                    xai_grok_i18n::t_fmt("tool.search.many_matches", &[("count", &total)])
                 }
             }
             SearchOutputMode::FilesWithMatches => {
                 let n = self.match_count; // match_count = # of files in this mode
                 if n == 1 {
-                    "(1 file)".to_string()
+                    xai_grok_i18n::t("tool.search.one_file").to_string()
                 } else {
-                    format!("({n} files)")
+                    xai_grok_i18n::t_fmt("tool.search.many_files", &[("count", &n.to_string())])
                 }
             }
             SearchOutputMode::Count => {
                 let file_count = self.file_paths.len().max(self.file_matches.len());
                 if file_count > 1 {
-                    format!("({} matches across {} files)", self.match_count, file_count)
+                    xai_grok_i18n::t_fmt(
+                        "tool.search.matches_across_files",
+                        &[("matches", &total), ("files", &file_count.to_string())],
+                    )
                 } else if self.match_count == 1 {
-                    "(1 match)".to_string()
+                    xai_grok_i18n::t("tool.search.one_match").to_string()
                 } else {
-                    format!("({} matches)", self.match_count)
+                    xai_grok_i18n::t_fmt("tool.search.many_matches", &[("count", &total)])
                 }
             }
         }
@@ -591,6 +600,82 @@ mod tests {
         assert!(
             empty_text.contains("⟦tool.search.no_results⟧"),
             "empty-result hint: {empty_text}"
+        );
+    }
+
+    /// The match-summary chip is copy, not a bare count: every branch resolves through the catalog.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn search_match_summary_comes_from_the_catalog() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+        let block = |count: usize, files: usize, mode: SearchOutputMode| {
+            let mut b = SearchToolCallBlock::new("needle");
+            b.meta.output_mode = mode;
+            b.set_file_matches(
+                count,
+                (0..files)
+                    .map(|i| SearchFileMatch {
+                        path: format!("f{i}.rs"),
+                        matches: Vec::new(),
+                    })
+                    .collect(),
+            );
+            b
+        };
+
+        let cases = [
+            (block(0, 0, SearchOutputMode::Content), "tool.search.no_matches"),
+            (
+                block(0, 0, SearchOutputMode::FilesWithMatches),
+                "tool.search.no_files",
+            ),
+            (block(1, 0, SearchOutputMode::Content), "tool.search.one_match"),
+            (block(7, 0, SearchOutputMode::Content), "tool.search.many_matches"),
+            (
+                block(7, 2, SearchOutputMode::Content),
+                "tool.search.matches_in_files",
+            ),
+            (
+                block(1, 0, SearchOutputMode::FilesWithMatches),
+                "tool.search.one_file",
+            ),
+            (
+                block(4, 0, SearchOutputMode::FilesWithMatches),
+                "tool.search.many_files",
+            ),
+            (
+                block(7, 2, SearchOutputMode::Count),
+                "tool.search.matches_across_files",
+            ),
+        ];
+        for (b, key) in &cases {
+            let text = xai_grok_i18n::with_pseudo_locale(|| b.match_summary());
+            assert!(
+                text.contains(&format!("\u{27e6}{key}\u{27e7}")),
+                "{key} not resolved: {text:?}"
+            );
+        }
+
+        // The count-bearing variants substitute once the locale yields real copy.
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        assert_eq!(
+            block(7, 2, SearchOutputMode::Content).match_summary(),
+            "（2 个文件中有 7 个匹配）"
+        );
+        assert_eq!(
+            block(4, 0, SearchOutputMode::FilesWithMatches).match_summary(),
+            "（4 个文件）"
+        );
+        assert_eq!(
+            block(1, 0, SearchOutputMode::Content).match_summary(),
+            "（1 个匹配）"
         );
     }
 }

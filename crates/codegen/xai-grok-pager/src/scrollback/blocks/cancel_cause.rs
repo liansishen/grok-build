@@ -40,14 +40,14 @@ impl CancelledBy {
 
     pub fn phrase(self) -> &'static str {
         match self {
-            Self::User => "Turn cancelled by user",
-            Self::SessionClosed => "Turn cancelled because the session closed",
-            Self::Shutdown => "Turn cancelled because the session shut down",
-            Self::MaxTurns => "Turn cancelled after reaching the turn limit",
-            Self::PermissionDenied => "Turn cancelled because a permission was denied",
-            Self::PermissionDismissed => "Turn cancelled because a permission prompt was dismissed",
-            Self::HostInterrupt => "Turn cancelled by the agent host",
-            Self::Unspecified => "Turn cancelled",
+            Self::User => xai_grok_i18n::t("cancel.cause.user"),
+            Self::SessionClosed => xai_grok_i18n::t("cancel.cause.session_closed"),
+            Self::Shutdown => xai_grok_i18n::t("cancel.cause.shutdown"),
+            Self::MaxTurns => xai_grok_i18n::t("cancel.cause.max_turns"),
+            Self::PermissionDenied => xai_grok_i18n::t("cancel.cause.permission_denied"),
+            Self::PermissionDismissed => xai_grok_i18n::t("cancel.cause.permission_dismissed"),
+            Self::HostInterrupt => xai_grok_i18n::t("cancel.cause.host_interrupt"),
+            Self::Unspecified => xai_grok_i18n::t("cancel.cause.unspecified"),
         }
     }
 }

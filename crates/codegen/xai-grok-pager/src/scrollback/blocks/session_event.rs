@@ -367,36 +367,53 @@ impl SessionEvent {
                 let duration = format_duration(*elapsed);
                 xai_grok_i18n::t_fmt("session.worked_for", &[("duration", &duration)])
             }
-            SessionEvent::TurnCompleted { elapsed: None } => "Turn completed.".to_string(),
+            SessionEvent::TurnCompleted { elapsed: None } => {
+                xai_grok_i18n::t("session.turn_completed").to_string()
+            }
             SessionEvent::TurnCancelled { elapsed, cause } => {
-                format!("{} in {}.", cause.phrase(), format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.turn_cancelled_in",
+                    &[
+                        ("reason", cause.phrase()),
+                        ("duration", &format_duration(*elapsed)),
+                    ],
+                )
             }
             SessionEvent::TurnBlockedByHook { elapsed } => {
-                format!("Turn blocked by a hook in {}.", format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.turn_blocked_by_hook",
+                    &[("duration", &format_duration(*elapsed))],
+                )
             }
             SessionEvent::TurnHalted { elapsed } => {
-                format!(
-                    "Agent was unable to make progress. Turn ended in {}.",
-                    format_duration(*elapsed)
+                xai_grok_i18n::t_fmt(
+                    "session.turn_halted",
+                    &[("duration", &format_duration(*elapsed))],
                 )
             }
             SessionEvent::TurnFailed {
                 error,
                 elapsed: Some(elapsed),
             } => {
-                format!("Turn failed in {}: {error}", format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.turn_failed_in",
+                    &[("duration", &format_duration(*elapsed)), ("error", error)],
+                )
             }
             SessionEvent::TurnFailed {
                 error,
                 elapsed: None,
             } => {
-                format!("Turn failed: {error}")
+                xai_grok_i18n::t_fmt("session.turn_failed", &[("error", error)])
             }
             SessionEvent::CompactionStarted { percentage, reason } => {
                 if reason == MODEL_FAMILY_SWITCH_COMPACT_BANNER {
-                    MODEL_FAMILY_SWITCH_COMPACT_BANNER.to_string()
+                    xai_grok_i18n::t("session.model_family_switch_compacting").to_string()
                 } else {
-                    format!("Context {percentage}% full. Compacting…")
+                    xai_grok_i18n::t_fmt(
+                        "session.compaction_started",
+                        &[("percentage", &percentage.to_string())],
+                    )
                 }
             }
             SessionEvent::CompactionCompleted {
@@ -422,46 +439,46 @@ impl SessionEvent {
             }
             SessionEvent::CompactionFailed { error } => {
                 if error.trim().is_empty() {
-                    "Compaction failed.".to_string()
+                    xai_grok_i18n::t("session.compaction_failed").to_string()
                 } else {
                     // Multi-line errors (guidance and detail) split in `output`; old one-line replays render unchanged
-                    format!("Compaction failed - {error}")
+                    xai_grok_i18n::t_fmt("session.compaction_failed_error", &[("error", error)])
                 }
             }
-            SessionEvent::CompactionCancelled => "Compaction cancelled.".to_string(),
+            SessionEvent::CompactionCancelled => {
+                xai_grok_i18n::t("session.compaction_cancelled").to_string()
+            }
             SessionEvent::RetryFailed { error, error_type } => {
                 use crate::app::error_display::WireErrorType;
                 if WireErrorType::parse(error_type.as_deref())
                     == WireErrorType::EncryptedContentMismatch
                 {
-                    "This session's conversation history is incompatible with the \
-                     current model. Please start a new session."
-                        .to_string()
+                    xai_grok_i18n::t("session.retry_encrypted_mismatch").to_string()
                 } else {
-                    format!("Retry failed: {error}")
+                    xai_grok_i18n::t_fmt("session.retry_failed", &[("error", error)])
                 }
             }
             SessionEvent::RequestFailed {
                 headline, detail, ..
             } => crate::app::error_display::banner_message(headline, detail),
             SessionEvent::ReAuthRequired => {
-                "Authentication required: your session has expired or your \
-                 credentials were rejected. Run /login to re-authenticate, then resend \
-                 your message."
-                    .to_string()
+                xai_grok_i18n::t("session.reauth_required").to_string()
             }
             SessionEvent::ContextTooLarge => {
-                "This conversation is too large for the model's context window. \
-                 Use /new to start a new session."
-                    .to_string()
+                xai_grok_i18n::t("session.context_too_large").to_string()
             }
             SessionEvent::DiskFull => {
                 xai_grok_shell::extensions::notification::DISK_FULL_USER_MESSAGE.to_string()
             }
             // No "Context N% full." prefix; that phrasing is the auto marker's
-            SessionEvent::CompactStarted => "Compacting conversation…".to_string(),
+            SessionEvent::CompactStarted => {
+                xai_grok_i18n::t("session.compacting_conversation").to_string()
+            }
             SessionEvent::CompactCompleted { elapsed } => {
-                format!("Compaction completed in {}.", format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.compaction_completed_in",
+                    &[("duration", &format_duration(*elapsed))],
+                )
             }
             SessionEvent::HookAnnotation { message } | SessionEvent::HookOutcome { message } => {
                 message.clone()
@@ -474,23 +491,33 @@ impl SessionEvent {
                 if new_model_id.is_empty() {
                     reason.clone()
                 } else {
-                    format!("{reason} Switched to \"{new_model_id}\".")
+                    xai_grok_i18n::t_fmt(
+                        "session.model_switched",
+                        &[("reason", reason), ("model", new_model_id)],
+                    )
                 }
             }
             SessionEvent::MemorySaved { path, trigger } => {
                 let short_path = crate::util::abbreviate_path(path);
-                format!("Memory saved ({trigger}) \u{2192} {short_path}  \u{00b7}  /memory to view")
+                xai_grok_i18n::t_fmt(
+                    "session.memory_saved",
+                    &[("trigger", trigger), ("path", &short_path)],
+                )
             }
             SessionEvent::GoalCompleted { elapsed } => {
-                format!("Goal complete in {} end-to-end.", format_duration(*elapsed))
+                xai_grok_i18n::t_fmt(
+                    "session.goal_complete",
+                    &[("duration", &format_duration(*elapsed))],
+                )
             }
             SessionEvent::Recap { summary, auto: _ } => {
                 // Always "Recap:" (manual `/recap` and auto return-from-away).
-                format!("Recap: {summary}")
+                xai_grok_i18n::t_fmt("session.recap_summary", &[("summary", summary)])
             }
             SessionEvent::PlanModeEnteredByAgent { permission } => {
-                format!(
-                    "Agent entered plan mode · active permission mode: {permission} · file edits outside session plan.md blocked until plan mode exits"
+                xai_grok_i18n::t_fmt(
+                    "session.plan_mode_entered_by_agent",
+                    &[("permission", permission.as_canonical())],
                 )
             }
             SessionEvent::PlanReviewClosed {
@@ -498,10 +525,13 @@ impl SessionEvent {
                 permission,
             } => {
                 let verdict = match outcome {
-                    PlanReviewOutcome::Approved => "approved",
-                    PlanReviewOutcome::Abandoned => "abandoned",
+                    PlanReviewOutcome::Approved => xai_grok_i18n::t("session.plan_review_approved"),
+                    PlanReviewOutcome::Abandoned => xai_grok_i18n::t("session.plan_review_abandoned"),
                 };
-                format!("Plan {verdict} · plan mode off · active permission mode: {permission}")
+                xai_grok_i18n::t_fmt(
+                    "session.plan_review_closed",
+                    &[("verdict", verdict), ("permission", permission.as_canonical())],
+                )
             }
         }
     }
@@ -1856,6 +1886,111 @@ mod tests {
         assert!(
             recap_text.contains("⟦session.recap⟧"),
             "recap header: {recap_text}"
+        );
+    }
+
+    /// `SessionEvent::message()` is the human-readable line the scrollback paints, so each variant
+    /// resolves through the catalog: the pseudo-locale pins the key, zh-CN pins the translation.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn session_event_messages_come_from_the_catalog() {
+        use crate::scrollback::blocks::CancelledBy;
+
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+        let cases: Vec<(SessionEvent, &str)> = vec![
+            (
+                SessionEvent::TurnCompleted { elapsed: None },
+                "session.turn_completed",
+            ),
+            (
+                SessionEvent::TurnFailed {
+                    error: "boom".into(),
+                    elapsed: None,
+                },
+                "session.turn_failed",
+            ),
+            (
+                SessionEvent::CompactionFailed {
+                    error: String::new(),
+                },
+                "session.compaction_failed",
+            ),
+            (
+                SessionEvent::CompactionCancelled,
+                "session.compaction_cancelled",
+            ),
+            (SessionEvent::ContextTooLarge, "session.context_too_large"),
+            (SessionEvent::CompactStarted, "session.compacting_conversation"),
+            (
+                SessionEvent::GoalCompleted {
+                    elapsed: Duration::from_secs(3),
+                },
+                "session.goal_complete",
+            ),
+            (
+                SessionEvent::Recap {
+                    summary: "did stuff".into(),
+                    auto: false,
+                },
+                "session.recap_summary",
+            ),
+        ];
+        for (event, key) in cases {
+            let text = xai_grok_i18n::with_pseudo_locale(|| event.message());
+            assert!(
+                text.contains(&format!("\u{27e6}{key}\u{27e7}")),
+                "{key} not resolved for {event:?}: {text:?}"
+            );
+        }
+
+        // Cancel causes have their own entries, and the duration template wraps them.
+        let cancelled = SessionEvent::TurnCancelled {
+            elapsed: Duration::from_secs(10),
+            cause: CancelledBy::User,
+        };
+        let pseudo = xai_grok_i18n::with_pseudo_locale(|| cancelled.message());
+        // The template resolves through the catalog; its placeholders are only substituted once the
+        // locale yields real copy, so the cause is pinned by the zh-CN assertion below.
+        assert!(
+            pseudo.contains("\u{27e6}session.turn_cancelled_in\u{27e7}"),
+            "cancel message: {pseudo:?}"
+        );
+        for cause in [
+            CancelledBy::User,
+            CancelledBy::MaxTurns,
+            CancelledBy::Unspecified,
+        ] {
+            let phrase = xai_grok_i18n::with_pseudo_locale(|| cause.phrase().to_string());
+            assert!(phrase.starts_with('\u{27e6}'), "{cause:?}: {phrase:?}");
+        }
+
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        assert_eq!(
+            SessionEvent::TurnCompleted { elapsed: None }.message(),
+            "回合已完成。"
+        );
+        assert_eq!(
+            cancelled.message(),
+            "用户取消了回合，用时 10s。"
+        );
+        assert_eq!(
+            SessionEvent::ContextTooLarge.message(),
+            "此对话过大，超出模型上下文窗口。请使用 /new 开始新会话。"
+        );
+        assert_eq!(
+            SessionEvent::Recap {
+                summary: "did stuff".into(),
+                auto: false,
+            }
+            .message(),
+            "回顾：did stuff"
         );
     }
 }

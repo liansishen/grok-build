@@ -424,7 +424,6 @@ impl<'e> BucketAccumulator<'e> {
             } else {
                 bucket.sources.len()
             };
-            let sep = if i == 0 { "" } else { ", " };
             // Subagent tense is per-bucket: a finished-only set must not inherit group-wide Running.
             let segment = match bucket.kind {
                 VerbGroupKind::Subagent => {
@@ -434,27 +433,44 @@ impl<'e> BucketAccumulator<'e> {
                         xai_grok_i18n::t_fmt(
                             "scrollback.verb_group.subagent.mixed",
                             &[
-                                ("sep", sep),
-                                ("verb", bucket.kind.verb(true)),
+                                (
+                                    "verb",
+                                    xai_grok_i18n::t(
+                                        "scrollback.verb_group.subagent.verb_running",
+                                    ),
+                                ),
                                 ("running", &running_n.to_string()),
-                                ("noun", bucket.kind.noun(running_n)),
+                                (
+                                    "noun",
+                                    xai_grok_i18n::t(if running_n == 1 {
+                                        "scrollback.verb_group.subagent.noun_one"
+                                    } else {
+                                        "scrollback.verb_group.subagent.noun_many"
+                                    }),
+                                ),
                                 ("done", &done_n.to_string()),
                             ],
                         )
                     } else {
-                        format!(
-                            "{sep}{} {count} {}",
-                            bucket.kind.verb(running_n > 0),
-                            bucket.kind.noun(count),
+                        xai_grok_i18n::t_fmt(
+                            bucket.kind.i18n_key(running_n > 0, count),
+                            &[("count", &count.to_string())],
                         )
                     }
                 }
-                _ => format!(
-                    "{sep}{} {count} {}",
-                    bucket.kind.verb(self.running),
-                    bucket.kind.noun(count),
+                _ => xai_grok_i18n::t_fmt(
+                    bucket.kind.i18n_key(self.running, count),
+                    &[("count", &count.to_string())],
                 ),
-
+            };
+            // Segments are joined by a catalog separator, so zh-CN can use its own enumeration mark.
+            let segment = if i == 0 {
+                segment
+            } else {
+                xai_grok_i18n::t_fmt(
+                    "scrollback.verb_group.next_segment",
+                    &[("segment", &segment)],
+                )
             };
             text.push_str(&segment);
             spans.push(Span::styled(segment, text_style));
@@ -878,6 +894,67 @@ mod tests {
         assert!(
             text.contains("⟦scrollback.verb_group.subagent.mixed⟧"),
             "mixed subagent segment: {text}"
+        );
+    }
+
+    /// Every bucket kind resolves its header segment from the catalog. The label used to be assembled
+    /// inline from a hardcoded English verb/noun pair, which left the whole segment English under zh-CN.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn verb_group_segments_come_from_the_catalog() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+        const KINDS: [VerbGroupKind; 14] = [
+            VerbGroupKind::File,
+            VerbGroupKind::Skill,
+            VerbGroupKind::Search,
+            VerbGroupKind::Dir,
+            VerbGroupKind::WebFetch,
+            VerbGroupKind::WebSearch,
+            VerbGroupKind::MemorySearch,
+            VerbGroupKind::IntegrationSearch,
+            VerbGroupKind::Subagent,
+            VerbGroupKind::Command,
+            VerbGroupKind::EditFile,
+            VerbGroupKind::McpCall,
+            VerbGroupKind::Message,
+            VerbGroupKind::OtherTool,
+        ];
+        for kind in KINDS {
+            for running in [false, true] {
+                for count in [1usize, 3] {
+                    let key = kind.i18n_key(running, count);
+                    assert!(xai_grok_i18n::has_en(key), "no en entry for {key}");
+                    let zh = xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, key);
+                    assert_ne!(zh, key, "no zh entry for {key}");
+                    assert!(
+                        zh.chars()
+                            .any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
+                        "zh value for {key} is not Chinese: {zh:?}"
+                    );
+                }
+            }
+        }
+
+        // The shipped label path paints the catalog copy, not the old English verb/noun pair.
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        assert_eq!(label(&[read("a.rs"), read("b.rs")]).text, "已读取 2 个文件");
+        assert_eq!(
+            label(&[
+                running_sub("a"),
+                running_sub("b"),
+                sub_completed("c"),
+                sub_completed("d"),
+                sub_completed("e"),
+            ])
+            .text,
+            "正在运行 2 个子智能体，3 个已完成"
         );
     }
 }
