@@ -1547,6 +1547,25 @@ fn fixture_flags_direct_output_but_allows_translation_and_opaque_values() {
     );
 }
 
+/// A UI hint that merely starts with `/` is copy, not a command token: the prefix exemption for
+/// slash commands must not absorb it. This is the class that let the picker's `" / to search"`
+/// hint stay a hardcoded literal.
+#[test]
+fn fixture_reports_a_slash_prefixed_hint_that_is_copy() {
+    let config = AuditConfig::load(&repo_root());
+    let source = br#"
+        fn render() {
+            Span::styled(" / to search", style);
+            Span::styled("/btw {}", style);
+        }
+    "#;
+    let findings =
+        scan_source("slash_hint_fixture.rs", source, &config, None).expect("fixture parses");
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].literal, " / to search");
+    assert_eq!(findings[0].line, 3);
+}
+
 #[test]
 fn settings_renderer_uses_translated_accessors_for_metadata_and_choices() {
     let root = repo_root();

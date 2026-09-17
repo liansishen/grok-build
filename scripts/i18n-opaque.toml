@@ -169,9 +169,17 @@ exact = [
   "{pos}-{end}/{total}  ↑↓  [Esc]",
   "{pos}-{end}/{total}  [Esc]",
   "{}x{} {}",
+  # Stderr diagnostics rather than UI copy: telemetry log-setup failures and the test harness
+  # timer. The fork's non-goals keep logs out of the translation surface, so they stay verbatim.
+  "Failed to create instrumentation log directory {:?}: {}",
+  "Failed to open instrumentation log file {:?}: {}",
+  "Failed to create chrome trace directory {:?}: {}",
+  "Failed to open chrome trace file {:?}: {}",
+  "[harness-timing] {what}: {:?}",
+  # Slash-command name echoed as a block header (`/btw <question>`); the command token is opaque.
+  "/btw {}",
 ]
 prefix = [
-  "/",
   "./",
   "../",
   "http://",

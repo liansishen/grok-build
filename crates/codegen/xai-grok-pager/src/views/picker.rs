@@ -510,7 +510,7 @@ fn render_search_bar_with_label_viewport(
             x,
             y,
             &Line::from(Span::styled(
-                " / to search",
+                t("ui.search_placeholder"),
                 bg_style(Style::default().fg(theme.gray_dim)),
             )),
             width,
@@ -3198,7 +3198,17 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
     fn search_bar_cursor_visible_only_when_search_active() {
+        // The hint text is now a catalog lookup, so pin the locale this test asserts against.
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
         use ratatui::buffer::Buffer;
         use ratatui::layout::Rect;
 
@@ -3244,6 +3254,66 @@ mod tests {
         assert!(
             unfocused_text.contains("/ to search"),
             "unfocused search bar should show the `/ to search` placeholder, got {unfocused_text:?}",
+        );
+    }
+
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn search_hint_placeholder_comes_from_the_catalog() {
+        use ratatui::buffer::Buffer;
+        use ratatui::layout::Rect;
+
+        // The unfocused search bar paints a "press / to search" sentence. It is user-visible copy,
+        // so it must be a catalog lookup rather than a hardcoded literal: the pseudo-locale pins the
+        // exact key it resolves, and zh-CN pins the shipped translation.
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+        let _guard = crate::theme::cache::pin_theme();
+        let theme = Theme::current();
+        let config = cfg(false, false);
+        let area = Rect::new(0, 0, 60, 16);
+
+        let hint = || {
+            let mut state = PickerState::with_mode(PickerMode::FullScreen);
+            state.search_active = false;
+            let mut buf = Buffer::empty(area);
+            let hit = render_picker(&mut buf, area, &theme, &mut state, &[], &config, false, 0);
+            let y = hit.search_bar.y;
+            let mut text = String::new();
+            for x in hit.search_bar.x..hit.search_bar.x + hit.search_bar.width {
+                if let Some(cell) = buf.cell((x, y)) {
+                    text.push_str(cell.symbol());
+                }
+            }
+            text
+        };
+
+        // The row is padded to the full bar width and a wide CJK glyph leaves its second cell
+        // blank when read cell-by-cell, so compare with layout whitespace removed.
+        let squash =
+            |text: &str| -> String { text.chars().filter(|c| !c.is_whitespace()).collect() };
+
+        let pseudo = xai_grok_i18n::with_pseudo_locale(hint);
+        assert!(
+            squash(&pseudo).contains(&squash("⟦ui.search_placeholder⟧")),
+            "the hint row must resolve `ui.search_placeholder` through the catalog, got {pseudo:?}"
+        );
+
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        let translated = hint();
+        let expected = xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, "ui.search_placeholder");
+        assert!(
+            squash(&translated).contains(&squash(expected)),
+            "the hint row must paint the zh-CN catalog value {expected:?}, got {translated:?}"
+        );
+        assert!(
+            !squash(&translated).contains(&squash("/ to search")),
+            "the English literal must not survive under zh-CN, got {translated:?}"
         );
     }
 
