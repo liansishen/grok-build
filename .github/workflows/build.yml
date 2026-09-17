@@ -91,10 +91,17 @@ jobs:
           if [[ "$old_source_rev" =~ ^[0-9a-f]{40}$ \
                 && "$new_source_rev" =~ ^[0-9a-f]{40}$ \
                 && "$old_source_rev" != "$new_source_rev" ]]; then
-            git fetch --no-tags https://github.com/xai-org/grok-build.git \
-              "$old_source_rev" "$new_source_rev"
-            export GROK_I18N_UPSTREAM_OLD="$old_source_rev"
-            export GROK_I18N_UPSTREAM_NEW="$new_source_rev"
+            # The SOURCE_REV values are monorepo revisions, while the public mirror only carries
+            # its own snapshot commits, so these objects can legitimately be unreachable. That must
+            # not abort the job: the current full scan and the repository diff audit below run
+            # either way. Degrade to "upstream comparison unavailable" with a visible warning.
+            if git fetch --no-tags https://github.com/xai-org/grok-build.git \
+                 "$old_source_rev" "$new_source_rev"; then
+              export GROK_I18N_UPSTREAM_OLD="$old_source_rev"
+              export GROK_I18N_UPSTREAM_NEW="$new_source_rev"
+            else
+              echo "::warning title=Upstream diff audit skipped::SOURCE_REV $old_source_rev -> $new_source_rev is not reachable from the public mirror; the current full scan and repository diff audit still run."
+            fi
           fi
 
           cargo +1.92.0 test --locked -p xai-grok-i18n --lib
