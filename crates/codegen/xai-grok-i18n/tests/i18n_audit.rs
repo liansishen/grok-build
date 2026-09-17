@@ -266,9 +266,42 @@ fn has_prose_letters(value: &str) -> bool {
         .any(|character| character.is_ascii_alphabetic())
 }
 
+/// Whether `value` is a number-and-unit template: strip the placeholders and only digits, single
+/// unit letters (`k`/`M`/`s`/…) and punctuation are left, so there is no word to translate.
+fn is_unit_template(value: &str) -> bool {
+    let mut outside = String::with_capacity(value.len());
+    let mut depth = 0usize;
+    for character in value.chars() {
+        match character {
+            '{' => depth = depth.saturating_add(1),
+            '}' if depth > 0 => depth -= 1,
+            _ if depth > 0 => {}
+            _ => outside.push(character),
+        }
+    }
+    outside.chars().all(|character| {
+        character.is_ascii_digit()
+            || matches!(
+                character,
+                'k' | 'K'
+                    | 'm' | 'M'
+                    | 'g' | 'G'
+                    | 'h' | 'H'
+                    | 's' | 'S'
+                    | '%' | '(' | ')' | ' ' | '.' | ':' | '/'
+            )
+    })
+}
+
 fn is_candidate(value: &str, config: &AuditConfig) -> bool {
     let trimmed = value.trim();
     if trimmed.is_empty() || !has_prose_letters(value) || config.is_allowed_opaque(value) {
+        return false;
+    }
+
+    // Number-and-unit templates (`{}K`, `{k}k`, `({}M{suffix})`, `{secs}s`) carry no translatable
+    // words: outside the placeholders there is nothing but digits, unit letters and punctuation.
+    if is_unit_template(value) {
         return false;
     }
 
@@ -473,7 +506,66 @@ fn literal_binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
         }
         current = item.parent();
     }
-    text_buffer_receiver(node, source)
+    text_buffer_receiver(node, source).or_else(|| returned_binding_name(node, source))
+}
+
+/// Name of the function whose return value a literal is, when the literal sits in a returned value
+/// (`return "…"`, or a tail expression such as a `match` arm).
+///
+/// Callers bind that result (`let suffix = next_suffix(…)`) and paint it, and the flow index already
+/// records `used_by[<fn name>] = {suffix}`, so naming the function closes the loop — which is how the
+/// scheduled `/loop` row's ` (due now)` suffix is reachable at all.
+fn returned_binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let mut current = node;
+    loop {
+        let parent = current.parent()?;
+        match parent.kind() {
+            "block" => {
+                let last = parent.named_child(parent.named_child_count().checked_sub(1)?)?;
+                if last.start_byte() != current.start_byte() {
+                    return None;
+                }
+                let owner = parent.parent()?;
+                if owner.kind() == "function_item" {
+                    return owner
+                        .child_by_field_name("name")
+                        .and_then(|name| name.utf8_text(source).ok())
+                        .map(normalized);
+                }
+                current = parent;
+            }
+            "else_clause"
+            | "expression_statement"
+            | "if_expression"
+            | "match_arm"
+            | "match_expression"
+            | "parenthesized_expression"
+            | "return_expression" => current = parent,
+            // Wrappers that still hand the literal's text back: `" (due now)".to_owned()`,
+            // `format!(" (next in {})", d)`. A call that takes the literal as its *receiver*
+            // returns that text; one that takes it as an argument (a token, a key) does not.
+            "field_expression" | "token_tree" => current = parent,
+            "call_expression" => {
+                let function = parent.child_by_field_name("function")?;
+                if current.start_byte() >= function.start_byte()
+                    && current.end_byte() <= function.end_byte()
+                {
+                    current = parent;
+                } else {
+                    return None;
+                }
+            }
+            "macro_invocation" => {
+                let name = macro_name(parent, source)?;
+                if matches!(name.as_str(), "format" | "concat" | "vec") {
+                    current = parent;
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+    }
 }
 
 /// Receiver of the buffer-writing call a literal is an argument of, when that receiver is a plain
@@ -1672,6 +1764,38 @@ fn prose_sinks_stay_within_the_diff_sink_list() {
 #[test]
 fn fixture_reports_copy_pushed_into_a_painted_buffer() {
     let config = AuditConfig::load(&repo_root());
+    // A value the function hands back is copy when the caller paints it — the scheduled `/loop`
+    // row shape: `next_suffix(…)` returns ` (due now)`, `let suffix = …` binds it, a Span shows it.
+    let returned = br#"
+        fn suffix(done: bool) -> String {
+            if done { " (due now)".to_owned() } else { format!(" (next in {})", 5) }
+        }
+        fn render() {
+            let suffix = suffix(true);
+            Line::from(suffix);
+        }
+    "#;
+    let handed_back =
+        scan_full_prose_source("return_fixture.rs", returned, &config).expect("fixture parses");
+    assert!(
+        handed_back
+            .iter()
+            .any(|finding| finding.literal == " (due now)"),
+        "a returned literal the caller paints must be reported: {handed_back:?}"
+    );
+    // The same helper result used only for logic stays out.
+    let logic_only = br#"
+        fn suffix(done: bool) -> String {
+            if done { " (due now)".to_owned() } else { String::new() }
+        }
+        fn is_due() -> bool {
+            suffix(true).starts_with(" (due")
+        }
+    "#;
+    let quiet = scan_full_prose_source("return_fixture.rs", logic_only, &config)
+        .expect("fixture parses");
+    assert!(quiet.is_empty(), "a returned value used for logic is not painted: {quiet:?}");
+    let config = AuditConfig::load(&repo_root());
     let painted = br#"
         fn render() {
             let mut body = String::new();
@@ -1849,3 +1973,4 @@ fn upstream_changed_user_visible_strings_use_translation_or_opaque_allowlist() {
         _ => panic!("GROK_I18N_UPSTREAM_OLD and GROK_I18N_UPSTREAM_NEW must be set together"),
     }
 }
+

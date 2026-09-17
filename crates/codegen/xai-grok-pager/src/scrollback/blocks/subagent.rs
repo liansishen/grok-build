@@ -177,7 +177,11 @@ impl BlockContent for SubagentBlock {
 
         let line = match (&self.kind, self.is_background) {
             (SubagentBlockKind::Started, bg) => {
-                let verb = if bg { "started: " } else { "running: " };
+                let verb = if bg {
+                    xai_grok_i18n::t("scrollback.subagent.verb_started")
+                } else {
+                    xai_grok_i18n::t("scrollback.subagent.verb_running")
+                };
                 let activity_suffix: String = self
                     .activity_label
                     .as_deref()
@@ -189,8 +193,12 @@ impl BlockContent for SubagentBlock {
                     self.role.as_deref(),
                     self.model.as_deref(),
                 );
-                // "Subagent running: " / "Subagent started: " = 18 chars
-                let overhead = 18 + meta.width() + activity_suffix.width();
+                // The label and the verb are catalog copy, so their width decides the budget
+                // ("Subagent " + "running: " is 18 cells in English).
+                let overhead = xai_grok_i18n::t("scrollback.subagent.label").width()
+                    + verb.width()
+                    + meta.width()
+                    + activity_suffix.width();
                 let desc = quoted_desc(&self.description, w.saturating_sub(overhead));
                 let mut spans = vec![
                     Span::styled(xai_grok_i18n::t("scrollback.subagent.label"), bold),

@@ -19,6 +19,7 @@ use crate::views::subagent_catalog_pane::SubagentCatalogPane;
 use crate::views::tasks_pane::TasksPane;
 use crate::views::todo_pane::TodoPane;
 use ratatui::layout::Rect;
+use unicode_width::UnicodeWidthStr;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
 use xai_grok_telemetry::events::{CancellationCompleted, CancellationScope};
@@ -1213,7 +1214,7 @@ impl AgentView {
         if running.len() > 1 {
             let n = running.len();
             return Some(budgeted_subject(
-                &format!("{n} subagents: "),
+                &xai_grok_i18n::t_fmt("session.subject.subagents", &[("count", &n.to_string())]),
                 &description,
                 &format!(" +{}", n - 1),
             ));
@@ -1225,25 +1226,31 @@ impl AgentView {
             .filter(|label| !label.is_empty());
         match activity {
             Some(activity) => {
-                const PREFIX: &str = "Subagent (";
-                const SUFFIX_HEAD: &str = "): ";
-                const SUBAGENT_AFFIX_CHARS: usize = PREFIX.len() + SUFFIX_HEAD.len();
+                let prefix = xai_grok_i18n::t("session.subject.subagent_prefix");
+                let suffix_head = xai_grok_i18n::t("session.subject.subagent_suffix");
+                // Localized copy can be wider or narrower than the English, so the affix budget is
+                // measured from the strings actually painted.
+                let subagent_affix_chars = prefix.width() + suffix_head.width();
                 const ACTIVITY_FLOOR: usize = 8;
                 let desc_claim = description
                     .chars()
                     .count()
-                    .min(MAX_ACTIVITY_SUBJECT_CHARS - SUBAGENT_AFFIX_CHARS - ACTIVITY_FLOOR);
+                    .min(MAX_ACTIVITY_SUBJECT_CHARS.saturating_sub(subagent_affix_chars + ACTIVITY_FLOOR));
                 let activity: String = activity
                     .chars()
-                    .take(MAX_ACTIVITY_SUBJECT_CHARS - SUBAGENT_AFFIX_CHARS - desc_claim)
+                    .take(MAX_ACTIVITY_SUBJECT_CHARS.saturating_sub(subagent_affix_chars + desc_claim))
                     .collect();
                 Some(budgeted_subject(
-                    PREFIX,
+                    prefix,
                     &description,
-                    &format!("{SUFFIX_HEAD}{activity}"),
+                    &format!("{suffix_head}{activity}"),
                 ))
             }
-            None => Some(budgeted_subject("Subagent: ", &description, "")),
+            None => Some(budgeted_subject(
+                xai_grok_i18n::t("session.subject.subagent"),
+                &description,
+                "",
+            )),
         }
     }
     /// Update context state with a full snapshot from live callers.

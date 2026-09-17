@@ -193,16 +193,22 @@ impl MemoryCaptureBlock {
     }
 
     fn title(&self) -> String {
-        let noun = if self.entries.len() == 1 {
-            "memory"
-        } else {
-            "memories"
-        };
-        format!(
-            "Model-generated memory debug output: {} {noun} for turns {}-{}",
-            self.entries.len(),
-            self.from_turn,
-            self.through_turn
+        let args = [
+            ("count", self.entries.len().to_string()),
+            ("from", self.from_turn.to_string()),
+            ("through", self.through_turn.to_string()),
+        ];
+        let args = args
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect::<Vec<_>>();
+        xai_grok_i18n::t_fmt(
+            if self.entries.len() == 1 {
+                "scrollback.memory_capture.debug_output_one"
+            } else {
+                "scrollback.memory_capture.debug_output_many"
+            },
+            &args,
         )
     }
 

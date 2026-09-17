@@ -4729,6 +4729,7 @@ required = " （必填）"
 
 unselected = "（请选择）"
 
+none_selected = "（未选择）"
 [feedback]
 trace_disclosure = "本次会话的一份存档会随这份报告一并发送，仅此一次。不会为后续会话开启任何内容。"
 
@@ -4854,6 +4855,9 @@ observation = "模型生成的不可信观察 {index}"
 
 open_file = "打开文件 → "
 
+debug_output_one = "模型生成的记忆调试输出：{count} 条记忆，覆盖回合 {from}-{through}"
+
+debug_output_many = "模型生成的记忆调试输出：{count} 条记忆，覆盖回合 {from}-{through}"
 [scrollback.subagent]
 label = "子代理 "
 
@@ -4863,6 +4867,9 @@ failed_in = "已在 {time}{detail} 内失败："
 
 cancelled_in = "已在 {time} 内取消："
 
+verb_started = "已启动："
+
+verb_running = "运行中："
 [scrollback.verb_group.subagent]
 mixed = "{sep}{verb} {running} {noun}，{done} 个已完成"
 
@@ -4905,3 +4912,12 @@ deleted = "已删除 {name}。"
 
 [modal]
 vim_search_hint = "i 搜索"
+
+[session.subject]
+subagent_prefix = "子代理（"
+
+subagent_suffix = "）："
+
+subagent = "子代理："
+
+subagents = "{count} 个子代理："

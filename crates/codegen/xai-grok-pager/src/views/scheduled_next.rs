@@ -39,8 +39,8 @@ fn suffix(
     };
     match remaining {
         None => String::new(),
-        Some(d) if d.is_zero() => " (due now)".to_owned(),
-        Some(d) => format!(" (next in {})", format_duration(d)),
+        Some(d) if d.is_zero() => xai_grok_i18n::t("tasks.due_now").to_owned(),
+        Some(d) => xai_grok_i18n::t_fmt("tasks.next_in", &[("duration", &format_duration(d))]),
     }
 }
 

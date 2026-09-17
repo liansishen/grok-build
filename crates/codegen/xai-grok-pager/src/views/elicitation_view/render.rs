@@ -494,7 +494,7 @@ fn multi_select_summary(field: &FormFieldUi) -> String {
         .filter_map(|(i, o)| field.option_selected(i).then_some(o.label.as_str()))
         .collect();
     if labels.is_empty() {
-        "(none selected)".into()
+        xai_grok_i18n::t("elicitation.field.none_selected").into()
     } else {
         labels.join(", ")
     }

@@ -4739,6 +4739,7 @@ required = " (required)"
 
 unselected = "(select)"
 
+none_selected = "(none selected)"
 [feedback]
 trace_disclosure = "One archive of this session is sent with this report only. Nothing is turned on for future sessions."
 
@@ -4864,6 +4865,9 @@ observation = "Untrusted model-generated observation {index}"
 
 open_file = "Open file → "
 
+debug_output_one = "Model-generated memory debug output: {count} memory for turns {from}-{through}"
+
+debug_output_many = "Model-generated memory debug output: {count} memories for turns {from}-{through}"
 [scrollback.subagent]
 label = "Subagent "
 
@@ -4873,6 +4877,9 @@ failed_in = "failed in {time}{detail}: "
 
 cancelled_in = "cancelled in {time}: "
 
+verb_started = "started: "
+
+verb_running = "running: "
 [scrollback.verb_group.subagent]
 mixed = "{sep}{verb} {running} {noun}, {done} completed"
 
@@ -4915,3 +4922,12 @@ deleted = "Deleted {name}."
 
 [modal]
 vim_search_hint = "i search"
+
+[session.subject]
+subagent_prefix = "Subagent ("
+
+subagent_suffix = "): "
+
+subagent = "Subagent: "
+
+subagents = "{count} subagents: "

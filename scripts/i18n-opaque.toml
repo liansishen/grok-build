@@ -138,6 +138,8 @@ exact = [
   "Ctrl+Y",
   "TB",
   "GBOOM",
+  # Fixed-width numeric marker (`{pct:.2}%`-style column): 5 cells by contract, never translated.
+  "MAX %",
   "mermaid: {header}",
   # Key/chord tokens, layout-only fragments, and compared identifiers (grammars, path
   # components, protocol states) are matched or measured, never read as prose.

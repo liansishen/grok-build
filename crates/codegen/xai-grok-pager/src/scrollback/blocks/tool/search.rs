@@ -339,25 +339,25 @@ impl SearchToolCallBlock {
             SearchOutputMode::Count => xai_grok_i18n::t("tool.search.mode_count"),
         };
         parts.push(vec![
-            Span::styled("mode: ", label_style),
+            Span::styled(xai_grok_i18n::t("tool.search.mode_label"), label_style),
             Span::styled(mode_str.to_string(), value_style),
         ]);
 
         if let Some(ref ft) = self.meta.file_type {
             parts.push(vec![
-                Span::styled("type: ", label_style),
+                Span::styled(xai_grok_i18n::t("tool.search.type_label"), label_style),
                 Span::styled(ft.to_string(), value_style),
             ]);
         }
         if self.meta.case_insensitive {
             parts.push(vec![
-                Span::styled("case-insensitive: ", label_style),
+                Span::styled(xai_grok_i18n::t("tool.search.case_insensitive_label"), label_style),
                 Span::styled(xai_grok_i18n::t("tool.search.true_value"), value_style),
             ]);
         }
         if self.meta.multiline {
             parts.push(vec![
-                Span::styled("multiline: ", label_style),
+                Span::styled(xai_grok_i18n::t("tool.search.multiline_label"), label_style),
                 Span::styled(xai_grok_i18n::t("tool.search.true_value"), value_style),
             ]);
         }
