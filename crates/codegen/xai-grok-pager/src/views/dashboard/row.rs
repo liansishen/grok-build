@@ -14,7 +14,6 @@ use std::path::PathBuf;
 use std::time::{Instant, SystemTime};
 /// Title prefix for a session that has no name / generated title / prompt yet.
 /// [`RowTitle::render_wide`](crate::views::dashboard::row_title::RowTitle::render_wide) paints the trailing ` #<id>` suffix dimly.
-pub(crate) const NEW_SESSION_LABEL: &str = "New session";
 pub(crate) fn new_session_label() -> &'static str {
     xai_grok_i18n::t("dashboard.new_session")
 }
@@ -737,7 +736,10 @@ fn top_level_subtitle(agent: &AgentView) -> Option<String> {
 fn subagent_subtitle(info: &SubagentInfo, cwd: &std::path::Path) -> Option<String> {
     let name = cwd_basename(cwd)?;
     if info.worktree_path.is_some() {
-        Some(format!("{name} worktree"))
+        Some(format!(
+            "{name} {}",
+            xai_grok_i18n::t("dashboard.location.worktree_badge")
+        ))
     } else {
         Some(name)
     }
@@ -781,7 +783,14 @@ fn subagent_activity(info: &SubagentInfo, state: RowState) -> Option<String> {
         let turns = info.attempt.turns.unwrap_or(0);
         let tools = info.attempt.tool_calls.unwrap_or(0);
         let toks = info.attempt.tokens_used.unwrap_or(0);
-        Some(format!("{tools} tools · {toks} tok · {turns} turns"))
+        Some(xai_grok_i18n::t_fmt(
+            "dashboard.subagent.usage_summary",
+            &[
+                ("tools", &tools.to_string()),
+                ("toks", &toks.to_string()),
+                ("turns", &turns.to_string()),
+            ],
+        ))
     } else {
         None
     }
@@ -1276,6 +1285,59 @@ mod tests {
         assert_eq!(
             subagent_activity(&info, RowState::Working).as_deref(),
             Some("Running: bash")
+        );
+    }
+    /// Subagent row copy is user-visible: the worktree marker reuses the top-level row's badge and
+    /// the finished-row usage summary is a catalog template, not an inline `format!`.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn subagent_row_copy_comes_from_the_catalog() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+        let cwd = std::path::Path::new("/home/me/wt/my-wt-dir");
+        let mut info = make_subagent("a", true, Some("completed"));
+
+        // Outside a worktree the subtitle is just the folder name and translates nothing.
+        assert_eq!(subagent_subtitle(&info, cwd).as_deref(), Some("my-wt-dir"));
+
+        info.worktree_path = Some(Arc::from("/home/me/wt"));
+        let pseudo_sub = xai_grok_i18n::with_pseudo_locale(|| subagent_subtitle(&info, cwd));
+        assert!(
+            pseudo_sub
+                .as_deref()
+                .unwrap_or_default()
+                .contains("⟦dashboard.location.worktree_badge⟧"),
+            "{pseudo_sub:?}"
+        );
+
+        info.attempt.tool_calls = Some(3);
+        info.attempt.tokens_used = Some(1200);
+        info.attempt.turns = Some(5);
+        let pseudo_usage =
+            xai_grok_i18n::with_pseudo_locale(|| subagent_activity(&info, RowState::Completed));
+        assert!(
+            pseudo_usage
+                .as_deref()
+                .unwrap_or_default()
+                .contains("⟦dashboard.subagent.usage_summary⟧"),
+            "{pseudo_usage:?}"
+        );
+
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        let zh_sub = subagent_subtitle(&info, cwd);
+        assert!(
+            zh_sub.as_deref().unwrap_or_default().contains("工作树"),
+            "{zh_sub:?}"
+        );
+        assert_eq!(
+            subagent_activity(&info, RowState::Completed).as_deref(),
+            Some("3 个工具 · 1200 词元 · 5 轮")
         );
     }
     /// Subagent rows never reach `NeedsInput` in v1.

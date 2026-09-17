@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::render::line_utils::truncate_str;
 use crate::theme::Theme;
-use crate::views::dashboard::row::{DashboardRow, NEW_SESSION_LABEL, RowBadge};
+use crate::views::dashboard::row::{DashboardRow, RowBadge, new_session_label};
 
 pub(crate) struct RowTitle<'a> {
     pub row: &'a DashboardRow,
@@ -41,11 +41,11 @@ impl RowTitle<'_> {
             };
             // The # distinguishes the fallback from user titles beginning with "New session".
             let dim_suffix = (!row.is_more_placeholder)
-                .then(|| row.label.strip_prefix(NEW_SESSION_LABEL))
+                .then(|| row.label.strip_prefix(new_session_label()))
                 .flatten()
                 .filter(|rest| rest.starts_with(" #"));
             if let Some(suffix) = dim_suffix {
-                let head = truncate_str(NEW_SESSION_LABEL, usize::from(area.width));
+                let head = truncate_str(new_session_label(), usize::from(area.width));
                 cx = buf
                     .set_stringn(cx, area.y, head, usize::from(area.width), label_style)
                     .0;

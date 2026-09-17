@@ -4668,3 +4668,58 @@ fn render_footer_expired_delete_confirm_shows_regular_hints() {
         "expired stop-confirm must fall back to the regular hints, got: {content:?}",
     );
 }
+
+/// The bottom-right model/mode badge is user-visible copy: every mode flag resolves through the
+/// catalog rather than the literal the badge used to hardcode (`plan` / `auto` / `always-approve`).
+#[test]
+#[serial_test::serial(GROK_UI_LOCALE)]
+fn dispatch_badge_mode_flags_come_from_the_catalog() {
+    use crate::views::dashboard::state::DashboardDispatchMode;
+
+    struct RestoreLocale(xai_grok_i18n::Locale);
+    impl Drop for RestoreLocale {
+        fn drop(&mut self) {
+            xai_grok_i18n::set_locale(self.0);
+        }
+    }
+    let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+    let theme = Theme::default();
+    let area = Rect::new(0, 0, 60, 3);
+    let badge = |mode: DashboardDispatchMode| -> String {
+        let mut state = DashboardState::default();
+        state.pending_mode = mode;
+        let mut buf = Buffer::empty(area);
+        paint_dispatch_config_badge(&mut buf, area, &theme, &state, true);
+        let mut text = String::new();
+        for x in area.x..area.x + area.width {
+            if let Some(cell) = buf.cell((x, area.y + area.height - 1)) {
+                text.push_str(cell.symbol());
+            }
+        }
+        text
+    };
+
+    let pseudo = xai_grok_i18n::with_pseudo_locale(|| {
+        (
+            badge(DashboardDispatchMode::Plan),
+            badge(DashboardDispatchMode::Auto),
+            badge(DashboardDispatchMode::AlwaysApprove),
+        )
+    });
+    assert!(pseudo.0.contains("⟦mode.flag.plan⟧"), "{:?}", pseudo.0);
+    assert!(pseudo.1.contains("⟦mode.flag.auto⟧"), "{:?}", pseudo.1);
+    assert!(
+        pseudo.2.contains("⟦mode.flag.always_approve⟧"),
+        "{:?}",
+        pseudo.2
+    );
+
+    // A wide CJK glyph leaves its second cell blank when read cell-by-cell, so drop layout
+    // whitespace before comparing.
+    let squash = |text: &str| -> String { text.chars().filter(|c| !c.is_whitespace()).collect() };
+    xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+    let zh = badge(DashboardDispatchMode::AlwaysApprove);
+    assert!(squash(&zh).contains("始终批准"), "{zh:?}");
+    assert!(!squash(&zh).contains("always-approve"), "{zh:?}");
+}

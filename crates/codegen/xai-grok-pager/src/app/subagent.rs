@@ -940,15 +940,18 @@ fn dedup_persona_role<'a, 'b>(
 
 pub(crate) fn format_type_label(subagent_type: &str) -> &str {
     match subagent_type {
-        "general-purpose" => "general",
+        "general-purpose" => xai_grok_i18n::t("subagent.type.general"),
+        "explore" => xai_grok_i18n::t("subagent.type.explore"),
+        "plan" => xai_grok_i18n::t("subagent.type.plan"),
+        // Custom agent types are free-form identifiers with no catalog entry, so they stay verbatim.
         other => other,
     }
 }
 
 pub(crate) fn format_context_badge(info: &SubagentInfo) -> &str {
     match info.attempt.context_source.as_deref() {
-        Some("resumed") => "resumed",
-        Some("forked") => "forked",
+        Some("resumed") => xai_grok_i18n::t("subagent.context.resumed"),
+        Some("forked") => xai_grok_i18n::t("subagent.context.forked"),
         _ => "",
     }
 }
@@ -1011,7 +1014,7 @@ pub(crate) fn format_subagent_label(info: &SubagentInfo) -> (String, String) {
     } else if let Some(tag) = tag {
         tag.to_string()
     } else {
-        "general".to_string()
+        xai_grok_i18n::t("subagent.type.general").to_string()
     };
 
     // Iterating handles uppercase mappings that span several codepoints (`ß` becomes `SS`)
@@ -1043,8 +1046,8 @@ pub(crate) fn format_subagent_meta(
 pub(crate) fn format_activity_label(activity: &crate::acp::tracker::TurnActivity) -> String {
     use crate::acp::tracker::TurnActivity;
     match activity {
-        TurnActivity::Thinking => "Thinking".to_string(),
-        TurnActivity::Responding => "Responding".to_string(),
+        TurnActivity::Thinking => xai_grok_i18n::t("subagent.activity.thinking").to_string(),
+        TurnActivity::Responding => xai_grok_i18n::t("subagent.activity.responding").to_string(),
         TurnActivity::ToolRunning { title, description } => {
             if let Some(desc) = description
                 .as_deref()
@@ -1053,25 +1056,26 @@ pub(crate) fn format_activity_label(activity: &crate::acp::tracker::TurnActivity
             {
                 crate::acp::tracker::format_waiting_for_subject(desc)
             } else if title.is_empty() {
-                "Running tool".to_string()
+                xai_grok_i18n::t("subagent.activity.running_tool").to_string()
             } else {
                 let first_line = title.lines().next().unwrap_or(title);
                 let max_len = crate::acp::tracker::MAX_ACTIVITY_SUBJECT_CHARS;
                 // Byte length is the char count for ASCII, so this skips the char walk for the common title
                 if first_line.len() <= max_len {
-                    format!("Running: {first_line}")
+                    xai_grok_i18n::t_fmt("subagent.activity.running", &[("title", first_line)])
                 } else {
                     let char_count = first_line.chars().count();
                     if char_count <= max_len {
-                        format!("Running: {first_line}")
+                        xai_grok_i18n::t_fmt("subagent.activity.running", &[("title", first_line)])
                     } else {
                         let truncated: String = first_line.chars().take(max_len).collect();
-                        format!("Running: {truncated}\u{2026}")
+                        let subject = format!("{truncated}\u{2026}");
+                        xai_grok_i18n::t_fmt("subagent.activity.running", &[("title", &subject)])
                     }
                 }
             }
         }
-        TurnActivity::AutoCompacting => "Compacting".to_string(),
+        TurnActivity::AutoCompacting => xai_grok_i18n::t("subagent.activity.compacting").to_string(),
         TurnActivity::Retrying {
             attempt,
             max_retries,

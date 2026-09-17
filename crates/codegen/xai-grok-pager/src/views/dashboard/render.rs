@@ -2677,17 +2677,17 @@ fn paint_dispatch_config_badge(
     let mut flags: Vec<PromptFlag> = Vec::new();
     match state.pending_mode {
         DashboardDispatchMode::Plan => flags.push(PromptFlag {
-            text: "plan",
+            text: xai_grok_i18n::t("mode.flag.plan"),
             color: Some(theme.accent_plan),
             bold: false,
         }),
         DashboardDispatchMode::Auto => flags.push(PromptFlag {
-            text: "auto",
+            text: xai_grok_i18n::t("mode.flag.auto"),
             color: Some(theme.accent_system),
             bold: false,
         }),
         DashboardDispatchMode::AlwaysApprove => flags.push(PromptFlag {
-            text: "always-approve",
+            text: xai_grok_i18n::t("mode.flag.always_approve"),
             color: None,
             bold: false,
         }),
