@@ -8,7 +8,7 @@ use crate::diagnostics::probes::{
 use crate::diagnostics::{
     ClipboardFacts, ColorFacts, DataControlFact, DiagnosticFacts, DiagnosticFinding, DiagnosticId,
     DiagnosticReport, FindingDisposition, KeyboardFact, ManualRemediation, NewlineFact, ProbeNote,
-    ProbeStatus, RuntimeFact,
+    ProbeStatus, RuntimeFact, VOICE_NO_INPUT_DEVICE_ID,
 };
 use crate::host::{DisplayServer, HostOs};
 use crate::terminal::{
@@ -247,7 +247,15 @@ fn fake_standalone_facts_compose_through_shared_view() {
     );
     let report = collect_report_with(snapshot);
 
-    assert_eq!(report.issue_count(), 1);
+    // `collect_report_with` runs `apply_voice_probe`, which probes real input devices. A headless
+    // runner without /dev/snd appends a voice finding on top of the tmux-clipboard one, so discount
+    // it here instead of encoding the runner's audio hardware into the expected count.
+    let voice_issues = report
+        .findings
+        .iter()
+        .filter(|finding| finding.id == VOICE_NO_INPUT_DEVICE_ID)
+        .count();
+    assert_eq!(report.issue_count() - voice_issues, 1);
     assert!(
         report
             .findings
