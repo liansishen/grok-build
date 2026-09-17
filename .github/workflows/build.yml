@@ -249,6 +249,17 @@ jobs:
         shell: bash
         run: cargo +1.92.0 test --locked -p xai-grok-sampler --lib
 
+      - name: Install ripgrep for the workspace tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # xai-grok-workspace resolves `rg` from PATH (see build_ripgrep_command), and the
+          # runner image does not ship it; the child-kill test spawns rg directly, so its
+          # absence fails the suite with `spawn rg: NotFound`.
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+          rg --version
+
       - name: Test workspace permission manager
         if: runner.os == 'Linux'
         shell: bash
