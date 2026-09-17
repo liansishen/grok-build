@@ -231,6 +231,27 @@ impl ActionDef {
         xai_grok_i18n::t_or(key, self.label)
     }
 
+    /// Localized man-style help for the cheatsheet detail pane.
+    ///
+    /// Actions that ship no long help fall back to their (also localized) description, matching the
+    /// `Consumers should fall back to description` contract on [`ActionDef::long_help`].
+    pub fn help_t(&self) -> &'static str {
+        match self.long_help {
+            // Some actions ship mode- or terminal-specific help (`SendToBackground` names the tasks
+            // pane in fullscreen and `/tasks` in minimal), so the source text is looked up first and
+            // the per-action key is the fallback.
+            Some(help) => {
+                if xai_grok_i18n::has_source(help) {
+                    xai_grok_i18n::tr(help)
+                } else {
+                    let key = xai_grok_i18n::intern_key(&format!("actions.{:?}.help", self.id));
+                    xai_grok_i18n::t_or(key, help)
+                }
+            }
+            None => self.description_t(),
+        }
+    }
+
     /// Localized description for the current UI locale.
     pub fn description_t(&self) -> &'static str {
         let key = xai_grok_i18n::intern_key(&format!("actions.{:?}.description", self.id));
@@ -1050,6 +1071,127 @@ mod tests {
         assert_eq!(
             registry.lookup(&ctrl_backslash, When::Always),
             Some(ActionId::OpenDashboard)
+        );
+    }
+
+    /// The minimal Ctrl-G hint is the `EditPromptExternal` action. Its label, description and help
+    /// used to exist only as hardcoded English in the registry, so the minimal shortcuts bar stayed
+    /// English under zh-CN; this drives the shipped registry and the real `hint()` path.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn minimal_ctrl_g_hint_is_localized() {
+        struct RestoreEn;
+        impl Drop for RestoreEn {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(xai_grok_i18n::Locale::En);
+            }
+        }
+        let _guard = RestoreEn;
+        let registry = ActionRegistry::defaults_for(crate::app::ScreenMode::Minimal);
+        let def = registry
+            .find(ActionId::EditPromptExternal)
+            .expect("minimal mode binds Ctrl-G to EditPromptExternal");
+        assert_eq!(
+            registry.lookup(
+                &ratatui::crossterm::event::KeyEvent::new(
+                    KeyCode::Char('g'),
+                    KeyModifiers::CONTROL
+                ),
+                When::AgentScreen
+            ),
+            Some(ActionId::EditPromptExternal),
+            "minimal mode must resolve Ctrl-G to EditPromptExternal"
+        );
+
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        let hint = def.hint();
+        assert_eq!(
+            hint.label.as_ref(),
+            xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, "actions.EditPromptExternal.label")
+        );
+        assert_eq!(
+            hint.description.as_deref(),
+            Some(xai_grok_i18n::t_for(
+                xai_grok_i18n::Locale::ZhCn,
+                "actions.EditPromptExternal.description"
+            ))
+        );
+        assert_ne!(hint.label.as_ref(), "edit prompt", "the registry's English fallback leaked");
+        assert_ne!(
+            hint.description.as_deref(),
+            Some("Edit prompt in external editor"),
+            "the registry's English fallback leaked"
+        );
+        assert!(
+            hint.label.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
+            "minimal Ctrl-G label must be Chinese under zh-CN: {:?}",
+            hint.label
+        );
+
+        // The cheatsheet detail body takes the same path.
+        assert_ne!(
+            def.help_t(),
+            def.long_help.expect("EditPromptExternal ships long help"),
+            "help_t must not fall back to the English long help under zh-CN"
+        );
+        assert!(def
+            .help_t()
+            .chars()
+            .any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)));
+    }
+
+    /// Every registered action's label, description and long help must exist in both catalogs, so a
+    /// new action cannot ship English-only copy (the minimal Ctrl-G `EditPromptExternal` hint was
+    /// exactly that) and a zh-CN value cannot be an English copy.
+    #[test]
+    fn every_registered_action_has_catalog_copy() {
+        let zh_keys: std::collections::BTreeSet<String> = xai_grok_i18n::zh_cn_keys()
+            .map(str::to_owned)
+            .collect();
+        let mut missing = Vec::new();
+        let mut untranslated = Vec::new();
+        for def in ActionRegistry::defaults().actions {
+            let mut wanted = vec![
+                (format!("actions.{:?}.label", def.id), def.label),
+                (format!("actions.{:?}.description", def.id), def.description),
+            ];
+            if let Some(help) = def.long_help {
+                // Help is resolved by source text (some actions ship a mode-specific variant), so the
+                // contract is that the English the action carries exists as a catalog source.
+                if !xai_grok_i18n::has_source(help) {
+                    missing.push(format!("actions.{:?}.help", def.id));
+                } else {
+                    let zh = xai_grok_i18n::tr_for(xai_grok_i18n::Locale::ZhCn, help);
+                    let prose = help.chars().filter(|c| c.is_ascii_alphabetic()).count() > 2;
+                    if prose
+                        && (zh == help
+                            || !zh.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)))
+                    {
+                        untranslated.push(format!("actions.{:?}.help", def.id));
+                    }
+                }
+            }
+            for (key, english) in wanted {
+                if !xai_grok_i18n::has_en(&key) || !zh_keys.contains(&key) {
+                    missing.push(key);
+                    continue;
+                }
+                let zh = xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, &key);
+                let prose = english
+                    .chars()
+                    .filter(|c| c.is_ascii_alphabetic())
+                    .count()
+                    > 2;
+                if prose && (zh == english || !zh.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)))
+                {
+                    untranslated.push(key);
+                }
+            }
+        }
+        assert!(missing.is_empty(), "actions without catalog copy: {missing:?}");
+        assert!(
+            untranslated.is_empty(),
+            "actions with English-copy translations: {untranslated:?}"
         );
     }
 

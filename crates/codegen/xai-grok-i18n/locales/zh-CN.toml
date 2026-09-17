@@ -4921,3 +4921,136 @@ subagent_suffix = "）："
 subagent = "子代理："
 
 subagents = "{count} 个子代理："
+
+[actions.EditPromptExternal]
+label = "编辑提示"
+
+description = "在外部编辑器中编辑提示"
+
+help = "用 $VISUAL 或 $EDITOR 打开当前提示草稿，两者都未设置时回退到 vi。\n保存并关闭编辑器后，更新后的文本会回到输入框；不会发送提示。\n在精简模式下对无附件的普通草稿可用。"
+
+[actions.ToggleTasks]
+help = "显示或隐藏任务窗格，其中列出后台任务及其状态。\n用它来查看或回到你用 Ctrl+B 送到后台的工作。\n这是侧边窗格；关掉可收回宽度。"
+
+[actions.ToggleFold]
+help = "折叠或展开选中的回滚区条目，以隐藏或显示其完整内容。\n适合快速浏览冗长的工具输出或推理过程。\n相关：E 折叠/展开所有条目，Ctrl+E 切换所有思考块。"
+
+[actions.ToggleExpandAll]
+help = "一次性折叠或展开所有回滚区条目，不同于 e 只切换选中的那一行。\n折叠冗长的对话记录以便浏览标题，然后再全部展开。\n思考块有自己的开关：Ctrl+E。"
+
+[actions.ExpandAllThinking]
+help = "一次按键即可显示或隐藏整份对话记录中 agent 的推理（思考）块。\n可以看清 agent 如何得出答案，也可以隐藏推理以专注于结果。\n与 E 不同，E 会折叠所有条目，不论类型。"
+
+[actions.ToggleRaw]
+help = "在渲染后的 markdown 与其原始源文本之间切换选中的条目。\n可用于复制精确的 markdown、查看链接目标，或看到渲染器隐藏的格式。\n再按一次回到渲染视图。"
+
+[actions.CopyBlockContent]
+help = "把选中块的主体复制到剪贴板：消息文本、完整工具输出或代码块内容。\n仅在支持复制的块上提供。\n只想复制命令或文件路径时，请改用 Y。"
+
+[actions.CopyBlockMeta]
+help = "只复制块的标识：工具调用的命令行或文件块的路径，而不是主体内容。\n便于重新执行命令或把路径粘贴到别处。\n要复制完整内容，请改用小写 y。"
+
+[actions.OpenBlockViewer]
+help = "在专注、可滚动的全屏查看器中打开选中的块。\n最适合冗长的工具输出、大文件，或你想脱离上下文单独阅读的代码。\nEsc 返回对话。"
+
+[actions.Rewind]
+help = "把对话回退到更早的回合，丢弃其后的回合。该回合之后产生的文件改动会原样保留。\n从列表中选择一个回合；仍在运行的回合会先提供取消。当 Confirm before rewind 开启时（默认），每次选择都会询问 Yes / Yes, and don't ask again / No。选择 \"Yes, and don't ask again\" 会在 /settings 中关闭该设置。\n破坏性操作：之后的回合会被丢弃。\n也可以在空闲且提示为空时通过 Esc Esc（800ms 内）触发，与 `/rewind` 相同。"
+
+[actions.KillBgTask]
+help = "终止选中任务块所拥有的后台任务（例如被送到后台的长时 shell 命令）。\n用它来停掉失控或已不再需要的进程。\n只对仍在运行的任务生效；已完成的任务不受影响。"
+
+[actions.FocusScrollback]
+help = "把焦点从提示输入框移到回滚区，以便浏览对话记录。\nTab 在简单和 vim 两种回滚模式中都可用。\nEsc 保留给取消/清空/回退策略，不用于切换焦点。"
+
+[actions.CancelTurn]
+help = "中断 agent 当前的回合并停止生成，会话保持打开。\n提示为空时 Ctrl+C 会取消；草稿非空时它会先清空提示，回合继续运行。\nEsc 从不取消回合；在回合进行中按下只会提示你改用 Ctrl+C。\n它停止的是回合，不是应用；要退出请使用退出快捷键。"
+
+[actions.CycleMode]
+help = "依次切换会话模式：Normal -> Plan -> Always-Approve -> Normal。\nPlan 让 agent 先做计划且不写文件；Always-Approve 不经询问就执行每次工具调用。\nCtrl+O 可直接切换自动批准。"
+
+[actions.ToggleTodos]
+help = "显示或隐藏待办窗格：agent 针对当前工作的实时任务清单。\n在回合运行过程中查看它计划做什么、还剩什么。\n这是侧边窗格；关掉可收回宽度。"
+
+[actions.OpenSessions]
+help = "打开会话浏览器，以恢复过去的对话或在它们之间切换。\n选中一个即可重新接入其完整历史。`/resume` 效果相同。\n与 Agent Dashboard（Ctrl+\\）不同，后者可同时管理多个活动 agent。"
+
+[actions.VoiceToggle]
+help = "用麦克风采集听写内容，绑定到 Ctrl+Space（或 F8：在 Ctrl+Space 被占用时很方便，比如 macOS 的输入源切换；笔记本上请用 Fn+F8）。\n行为取决于 Voice capture 设置：toggle（按一次开始，再按一次停止）或 hold-to-talk（按住录音，松开停止）；按住模式需要支持 Kitty 协议的终端，其他终端回退为 toggle。`/voice` 在任何地方都能切换。\n语音会直接转写进提示输入框。"
+
+[actions.ToggleMultiline]
+help = "切换持久的多行提示，让编辑器保持展开，便于撰写较长的消息。\n用 Shift+Enter 或 Alt+Enter（或行尾反斜杠）插入换行；单独按 Enter 仍然发送。\n用 /multiline 或 /settings 切换。Alt+M 打开模型选择器。"
+
+[actions.StashPrompt]
+label = "暂存"
+
+description = "暂存/取回提示草稿"
+
+help = "把当前提示暂存为草稿。\nCtrl+S 会把草稿放到一边并清空输入框。在空的输入框上按 Ctrl+S 可恢复它。发送下一条提示后，草稿也会自行恢复。如果你的终端吞掉了 Ctrl+S，请改用 Alt+S。\n一次只能有一份草稿：新的暂存会替换掉旧的。"
+
+[actions.BashMode]
+help = "不必离开对话即可运行 shell 命令：在空提示的开头输入 !，然后输入命令。\n命令输出会采集到回滚区。\n删掉开头的 ! 即可回到普通提示。"
+
+[actions.ToggleYolo]
+help = "为本会话打开或关闭自动批准（YOLO）。\n开启时，agent 执行每次工具调用（编辑、shell、删除）都不会逐项确认。\n与 Shift+Tab 循环中的 Always-Approve 是同一状态；请谨慎使用。"
+
+[actions.NewSession]
+help = "以空的回滚区和上下文开始一个新会话。\n需要确认：按两次（第一次进入待确认状态，第二次才启动）\n以免误丢弃当前对话。"
+
+[actions.CommandPalette]
+help = "模糊搜索所有操作和斜杠命令，然后按名称运行。\n记不住按键绑定时很有用。\n回滚区获得焦点时也可以按 ? 打开。"
+
+[actions.ModelPicker]
+help = "打开模型选择器以切换本会话使用的模型；该选择会作用于之后的回合。\n在提示输入框和回滚区中都绑定到 Alt+M（AgentScreen 提升）。不使用 Ctrl+M——多数终端会把它作为 Enter 发送。\n也可以通过 /model 或命令面板打开。"
+
+[actions.DashboardTogglePin]
+help = "固定或取消固定选中的 agent，使其无论排序或分组如何都留在列表顶部。\n让你关注的 agent 始终可见，不受其他 agent 增删的影响。\n固定状态在多次打开面板之间保留。"
+
+[actions.DashboardStop]
+help = "在忙碌的顶层行上，Ctrl+X 会取消正在运行的回合。该行空闲后，在 2s 内再按一次 Ctrl+X 会永久删除该会话。\n在子 agent 行上，Ctrl+X 会终止该子 agent。"
+
+[actions.DashboardCycleMode]
+help = "循环切换你从面板启动的 agent 的派发模式：Normal、Plan，然后是 Always-Approve。\nPlan 让新 agent 先做计划再改动文件；Always-Approve 不经询问就运行它们的工具。\n与会话内的 Shift+Tab 循环一致，只是作用于新派发的 agent。"
+
+[actions.DashboardToggleGrouping]
+help = "在平铺列表与按状态分组的行之间切换面板视图，例如工作中与空闲。\n分组会突出需要关注的 agent；平铺列表则保持稳定顺序。\n你的选择会跨会话保留。"
+
+[actions.DashboardExit]
+help = "关闭面板并回到你之前所在的位置。\nEsc 是逐级生效的：先关闭已打开的预览或清除生效中的筛选，只有在没有其他待处理项时才退出。\n把此操作重新绑定到其他按键即可直接退出。"
+
+[actions.DashboardToggleAutoApprove]
+help = "直接在面板中为选中的 agent 打开或关闭自动批准（YOLO），无需接入该会话。\n开启时，该 agent 执行每次工具调用都不会逐项确认。\n会话内的对应操作是 Ctrl+O。"
+
+[actions.DashboardOpenLocationPicker]
+help = "打开选择器，设置面板新派发的 agent 所使用的工作目录。\n不必离开面板就能针对其他仓库或文件夹启动 agent。\n只影响新的派发，不影响已在运行的 agent。"
+
+[actions.DashboardToggleWorktree]
+help = "让下一个从面板派发的 agent 在全新的 git worktree 中启动，把它的工作隔离在独立检出中。\n仅当工作目录是 git 仓库时生效。\n影响新派发的 agent，不影响已在运行的 agent。"
+
+[actions.DashboardOverlayExit]
+help = "离开已接入的会话浮层并回到面板列表，不会停止该 agent。\n也可以通过回滚区上的 q、中性的 Esc 或关闭按钮触发。\n若想停止该 agent 而不只是脱离，请使用 Ctrl+X。"
+
+[actions.DashboardOverlayStop]
+help = "在会话浮层内停止已接入的 agent 并关闭它，回到面板列表。\n需要确认：按两次 Ctrl+X。\n在这里 Ctrl+. 仍可打开速查表；只有 Ctrl+X 被停止操作占用。"
+
+[actions.ToggleQueue]
+help = "显示或隐藏提示队列。\n队列让你在一个回合运行时先排好后续提示；每个提示会在 agent 完成后自动发送。\nmacOS 上的 VS Code 系终端：主键为 Ctrl+4（备选 Ctrl+; / Ctrl+'）。其他终端为 Ctrl+;，备选 Ctrl+'。"
+
+[actions.OpenExtensions]
+help = "打开扩展管理器，管理 MCP 服务器与插件：查看已连接的项目及其新增的工具。\n可用它确认某个集成是否已加载，或浏览可用工具。\n与设置不同，设置里保存的是应用通用选项。"
+
+[actions.InterjectPrompt]
+help = "在回合进行中向 agent 发送消息而不取消它（插话），这样你可以在它继续工作的同时纠偏或补充上下文。\n回合运行时空按 Enter 会把后续提示排入队列；而这个组合键会把输入框内容合并进当前回合。\n当输入框为空时，直接按 Enter（或此组合键）会强制发送队列中最上方的后续提示：无需先聚焦队列面板。在队列面板上，此组合键会强制发送选中的那一行。\n在不丢失当前回合进展的前提下纠偏时用它。"
+
+[actions.Quit]
+help = "退出应用。需要确认：快速连按两次；\n只按一次会被当作误触而忽略。\n绑定到 Ctrl+Q，并以 Ctrl+D 作为别名（VS Code 终端里 Ctrl+D 是主键）。"
+
+[actions.ShortcutsHelp]
+help = "打开这份键盘快捷键速查表。\n用 j/k 浏览，按 e 展开某一行的内联帮助，或按 Enter 查看某个快捷键的完整详情页。\n同时绑定到 Ctrl+. 和 Ctrl+X；状态栏会显示你的终端能可靠发送的那个。"
+
+[actions.OpenDashboard]
+help = "打开智能体仪表盘：列出所有正在运行和最近的 agent，便于监控与切换。\n在任何位置都可用，包括欢迎界面和会话内部。\n在那里可以派发、接入、停止、分组和重排 agent。"
+
+[actions.SendToBackground]
+help = "把正在前台运行的 Execute 分离出去，让它在后台继续执行，而你可以阅读、排队提示或开始别的事情。\n在任务面板（Ctrl+G）中跟踪并恢复它。\n只有当前台确实有 Execute 在运行时才有意义。"
+
+help_minimal = "把正在前台运行的 Execute 分离出去，让它在后台继续执行，而你可以阅读、排队提示或开始别的事情。\n用 /tasks 查看后台任务。\n只有当前台确实有 Execute 在运行时才有意义。"

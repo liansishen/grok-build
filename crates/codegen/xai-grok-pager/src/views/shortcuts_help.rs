@@ -193,7 +193,9 @@ pub fn build_entries(
                 item,
                 dimmed,
                 action_id: Some(def.id),
-                long_help: def.long_help,
+                // Localized man-style help (`actions.<Id>.help`); stays `None` for actions that
+                // ship no long help, whose detail falls back to the localized description.
+                long_help: def.long_help.map(|_| def.help_t()),
             };
             match seen_in_cat.entry(def.default_key) {
                 std::collections::hash_map::Entry::Vacant(slot) => {
