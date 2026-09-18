@@ -1420,6 +1420,7 @@
 "media.play" = "[播放]"
 "media.rendering_diagram" = "正在渲染图表…"
 "memory.confirm_delete_inline" = " [按 x 确认]"
+"memory.delete_confirm" = "从{scope}删除 {name}？Dream 可能会在后续会话中重新推导出该笔记。按 x 确认 · 其它任意键取消"
 "memory.delete_unreadable" = "无法删除：读取此笔记进行校验失败。"
 "memory.deleting" = "正在删除 {name}…"
 "memory.file_too_large" = "*(文件过大，无法预览)*"

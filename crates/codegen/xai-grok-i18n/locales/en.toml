@@ -1420,6 +1420,7 @@
 "media.play" = "[Play]"
 "media.rendering_diagram" = "rendering diagram…"
 "memory.confirm_delete_inline" = " [x to confirm]"
+"memory.delete_confirm" = "Delete {name} from {scope}? Dream may re-derive it from future sessions. x confirm · any other key cancels"
 "memory.delete_unreadable" = "Can't delete: this note couldn't be read for verification."
 "memory.deleting" = "Deleting {name}…"
 "memory.file_too_large" = "*(File too large to preview)*"

@@ -1797,9 +1797,9 @@ fn handle_browse(state: &mut MemoryModalState, key: &KeyEvent) -> InputOutcome {
                 }
             };
             state.status = Some(MemoryStatusLine {
-                text: format!(
-                    "Delete {} from {scope}? Dream may re-derive it from future sessions. x confirm · any other key cancels",
-                    entry.label
+                text: xai_grok_i18n::t_fmt(
+                    "memory.delete_confirm",
+                    &[("name", &entry.label), ("scope", &scope)],
                 ),
                 is_error: false,
                 ticks_remaining: None,
@@ -2030,6 +2030,21 @@ fn load_fullscreen_pref() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Restores the previous UI locale when the test ends.
+    struct LocaleGuard(xai_grok_i18n::Locale);
+
+    impl Drop for LocaleGuard {
+        fn drop(&mut self) {
+            xai_grok_i18n::set_locale(self.0);
+        }
+    }
+
+    fn set_test_locale(locale: xai_grok_i18n::Locale) -> LocaleGuard {
+        let guard = LocaleGuard(xai_grok_i18n::current_locale());
+        xai_grok_i18n::set_locale(locale);
+        guard
+    }
 
     #[test]
     fn format_modified_relative() {
@@ -3358,7 +3373,8 @@ mod tests {
         ]
     }
 
-    /// The onboarding headline and the delete-confirmation scope wording are catalog copy.
+    /// The onboarding headline and the delete-confirmation copy are catalog copy.
+    #[serial_test::serial(GROK_UI_LOCALE)]
     #[test]
     fn memory_copy_comes_from_the_catalog() {
         use xai_grok_shell::extensions::notification::MemoryFileInfo;
@@ -3381,45 +3397,76 @@ mod tests {
             "onboarding headline must come from the catalog: {headline:?}"
         );
 
-        let dir = tempfile::tempdir().unwrap();
-        let session_path = dir.path().join("sessions/2026-01-15-fix-bug.md");
-        std::fs::create_dir_all(session_path.parent().unwrap()).unwrap();
-        std::fs::write(&session_path, "# session\n").unwrap();
-        let mut state = MemoryModalState::new(build_entries(vec![MemoryFileInfo {
-            path: session_path.to_string_lossy().into_owned(),
-            source: "session".into(),
-            size_bytes: 10,
-            modified_epoch_secs: None,
-            generated: false,
-            title: None,
-        }]));
-        select_label(&mut state, "2026-01-15-fix-bug.md");
-        let scope = xai_grok_i18n::with_pseudo_locale(|| {
-            handle_memory_key(&mut state, &plain_key('x'));
+        // The delete-confirmation sentence is one catalog lookup whose scope argument is
+        // itself a lookup: the pseudo locale pins the sentence, zh-CN pins the scope inside it.
+        let session_state = || {
+            let dir = tempfile::tempdir().unwrap();
+            let session_path = dir.path().join("sessions/2026-01-15-fix-bug.md");
+            std::fs::create_dir_all(session_path.parent().unwrap()).unwrap();
+            std::fs::write(&session_path, "# session\n").unwrap();
+            let state = MemoryModalState::new(build_entries(vec![MemoryFileInfo {
+                path: session_path.to_string_lossy().into_owned(),
+                source: "session".into(),
+                size_bytes: 10,
+                modified_epoch_secs: None,
+                generated: false,
+                title: None,
+            }]));
+            (dir, state)
+        };
+        let confirm_text = |state: &mut MemoryModalState| -> String {
+            handle_memory_key(state, &plain_key('x'));
             state
                 .status
                 .as_ref()
                 .map(|status| status.text.clone())
                 .unwrap_or_default()
-        });
+        };
+
+        let (_dir, mut state) = session_state();
+        select_label(&mut state, "2026-01-15-fix-bug.md");
+        let sentence = xai_grok_i18n::with_pseudo_locale(|| confirm_text(&mut state));
+        assert_eq!(
+            sentence, "⟦memory.delete_confirm⟧",
+            "delete-confirmation sentence must come from the catalog"
+        );
+
+        let (_dir, mut state) = session_state();
+        select_label(&mut state, "2026-01-15-fix-bug.md");
+        let localized = {
+            let _locale = set_test_locale(xai_grok_i18n::Locale::ZhCn);
+            confirm_text(&mut state)
+        };
         assert!(
-            scope.contains("⟦memory.scope.session_logs⟧"),
-            "delete-confirmation scope must come from the catalog: {scope:?}"
+            localized.contains("会话日志"),
+            "delete-confirmation scope must be translated: {localized:?}"
+        );
+        assert!(
+            !localized.contains("Delete "),
+            "delete-confirmation sentence must be translated: {localized:?}"
         );
 
         let (_dir, mut workspace) = v2_store_state();
         select_label(&mut workspace, "anyrun.md");
-        let source_memory = xai_grok_i18n::with_pseudo_locale(|| {
-            handle_memory_key(&mut workspace, &plain_key('x'));
-            workspace
-                .status
-                .as_ref()
-                .map(|status| status.text.clone())
-                .unwrap_or_default()
-        });
+        let source_sentence = xai_grok_i18n::with_pseudo_locale(|| confirm_text(&mut workspace));
+        assert_eq!(
+            source_sentence, "⟦memory.delete_confirm⟧",
+            "delete-confirmation sentence must come from the catalog"
+        );
+
+        let (_dir, mut workspace) = v2_store_state();
+        select_label(&mut workspace, "anyrun.md");
+        let source_localized = {
+            let _locale = set_test_locale(xai_grok_i18n::Locale::ZhCn);
+            confirm_text(&mut workspace)
+        };
         assert!(
-            source_memory.contains("⟦memory.scope.source_memory⟧"),
-            "delete-confirmation scope must name the source through the catalog: {source_memory:?}"
+            source_localized.contains("记忆"),
+            "delete-confirmation scope must name the source through the translation: {source_localized:?}"
+        );
+        assert!(
+            !source_localized.contains(" memory"),
+            "delete-confirmation sentence must be translated: {source_localized:?}"
         );
     }
 }
