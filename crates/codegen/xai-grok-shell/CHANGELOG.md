@@ -1,4 +1,69 @@
 # Changelog
+
+# 1.0.35-fork.1 — 2026-09-18
+
+同步上游 monorepo `a28ee2b2` / Source-Revision `e8563f8f182296ebb53cadb3e1eab7615d76408e`，产品版本随上游从 **1.0.32** 升至 **1.0.35**。发布范围覆盖上一版 `v1.0.32-fork.1` 之后的上游更新（1.0.33–1.0.35），以及吸收该更新所需的合并适配与本地化修复（32 个冲突文件、78 个冲突块）。
+
+### 上游更新
+
+- 记忆（`/memory`）弹窗重写：支持复制确认、按内容搜索笔记、拖拽选择与窄终端布局，删除明显加快；配置禁用记忆的会话里开关记忆也能正确接线。
+- 终端退出与清理重构：入口/写入线程拆分为独立模块，退出时先排空写入线程并在有界时间内完成 teardown（终端停止读取数据时不再卡住退出），kitty 键盘增强标志最多弹一次，无 kitty 标志时不发 DA1 探测，并新增一组 PTY 回归测试。
+- 配置写入改为绑定目标路径的原子写：读配置时只有文件不存在才视为空配置，其它读取错误不再静默兜底；写入前重新校验目标未被替换。
+- MCP：工具结果在服务器提供时携带结构化 JSON；daemon 路径下工具搜索与调用会渲染查询、结果、参数与输出；headless 状态上报与“正在连接”提醒改为反映真实握手状态；取消或超时的 MCP 调用会通知服务器停止后台工作；无参数工具不再在权限面板显示多余的 `{}`。
+- 语法高亮重写：内存占用大幅下降、大文件更快；修复 Swift 字符串插值中嵌套括号的高亮；修复 Markdown 标题的主题配色。
+- 其它修复：`--minimal` 模式复制粘贴不再插入多余空行或在折行处截断长路径，确认 `/delete`、`/exit` 立即打开新空会话，`/new` 后恢复会话能正确载入历史；SSH 下 Cmd+Enter 不可用时底栏显示 Alt+Enter 换行提示；修复 macOS 粘贴图片可能贴错图片；父会话关闭后后台子代理任务正确显示已取消，子代理 dock 不再残留不可点击的 “Done N completed” 行；`/rewind` 在会话清扫后缺少旧压缩检查点也能用；skill 文件与其它读取一致限制在 25k token 并提示截断；长时间会话不再在 30 天清理中丢掉旧压缩检查点或 prompt 卸载数据；计划任务/monitor/workflow 仍在运行时不再弹自动回顾；Windows 上仓库 git config 含反斜杠或引号时 `grok clone` 不再失败。
+- 上游 1.0.33–1.0.35 的逐条英文原文保留在本文档下方对应的版本段中，本段仅为本次同步的范围摘要。
+
+### 本 Fork
+
+- 合并适配：`persist.rs` 的 `update_config_with_root`（清空 Web Search 模型覆盖用）在上游 `BoundDest` 结构上重新实现并改用完整写锁；`app/mod.rs` 中 Fork 与上游重复的终端 teardown 实现删除，统一使用上游 `app/terminal_restore`；`Effect::SetCodingDataSharing` 采纳上游去掉 `rollback_to_opted_in` 的形态（回滚值改由 `PendingCodingDataWrite` 承载）。
+- 测试构建接线：`xai-grok-shell` 的 `test-support` 特性新增转发 `xai-grok-workspace/test-support`，使上游新增的 `isolated_spawn_e2e` 模块在下游测试构建（如 pager 测试）中可编译。
+- 记忆弹窗本地化重接：删除确认整句接入目录（新增 `memory.delete_confirm`，含 `{name}`/`{scope}` 占位符），并补齐本版新增文案的英中词条（共 25 个键：记忆弹窗、`agent.command.*` 新命令、会话创建超时、文件夹信任 toast 等）；`memory.footer.toggle_on/off` 随上游改为 “t turn on” / “t turn off”。
+- 本地化回归护栏调整：`memory_copy_comes_from_the_catalog` 改为伪语言锁定整句目录键、zh-CN 锁定句内 scope 翻译的双向验证（行内英文模板已消除）。
+- minimal 提交视图的分色回归测试在 Fork 透明画布下先关闭透明背景，使上游更强的断言可确定性通过。
+- 保留此前版本的简体中文界面、透明背景、账户计费与 CPA 配额、会话用量、次要模型与推理强度、压缩模型、逐次请求指标开关等 fork 变更。
+
+### 兼容性
+
+- 产品版本随上游从 **1.0.32** 升至 **1.0.35**；发布标签 `v1.0.35-fork.1` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的 `1.0.35`。
+- 行为随上游变化：子会话上下文条在压缩**开始**时即刷新（此前 Fork 只在压缩完成时刷新）；配置写入遵循上游的绑定目标语义，读取错误不再静默当作空配置。
+- 本地化目录的查找、回退与语言解析机制未改动；未提供翻译的键继续回退英文，其它语种仍使用英文目录回退。
+- 不新增外部服务、鉴权流程或运行时依赖。
+
+### 国际化
+
+- 本版新增与迁移的用户可见文案均已覆盖英文与简体中文：`en.toml` 与 `zh-CN.toml` 各从 4293 个键增至 4317 个键（+25 键，并移除 1 个不再使用的 `memory.time.unknown`），两侧键集合与 `{placeholder}` 完全一致。
+- 未提供翻译的键继续回退英文；日志与 tracing 输出、发给模型的 prompt 与系统提示、协议/JSON 字段名、错误码、内部标识符，以及 CLI `--help` 与错误消息不在本地化范围内（沿用既有 Non-goals），新出现的同类文本仍由 diff 门槛把关。
+- 自定义 agent 类型名、按键名、和弦、路径与产品名等不透明值保持原样，继续登记在审计豁免表中。
+
+### 验证
+
+本地等 CI 验证（Rust 1.92.0、Protoc 29.3、全部 `--locked`，`GROK_VERSION=1.0.35-fork.1`）：
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；`target/release/xai-grok-pager --version` 输出 `grok 1.0.35-fork.1 (923bcbed528c) [fork]`，包含本版版本号。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib -- --test-threads=1`：10156 项通过、4 项忽略。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib settings_render_uses_pseudo_locale_for_core_modes`：1 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager-minimal --lib`：102 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-shell --lib -- --test-threads=1`：6920 项通过、7 项忽略（仍包含 `agent::subagent::tests::wake` 下两个由上游合并带入的 `#[ignore]` 测试，本版不改动其断言）。
+- `cargo +1.92.0 test --locked -p xai-grok-workspace --lib`：2077 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`（`GROK_I18N_AUDIT_BASE=main`）：16 项通过，含全仓扫描与对 main 的 diff 审计。
+- `python3 scripts/i18n_catalog.py`：`missing_keys`、`extra_keys`、`placeholder_mismatches` 均为空。
+- `python3 scripts/upstream_merge.py audit-markers` 与 `preflight`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --test settings_e2e`（隔离 `GROK_HOME`）：279 项通过。该测试会读取真实 `~/.grok/config.toml`，未隔离时会因本机配置而误报。
+- `cargo +1.92.0 test --locked -p xai-grok-pager-pty-harness --test minimal_zh_localization`：2 项通过，以真实二进制在 PTY 下端到端核对 minimal 模式的中文与英文界面。
+- `git diff --check` 与冲突标记扫描：通过。
+- Windows x86_64 由 GitHub Actions 的 `Build` 工作流验证。
+
+### 产物
+
+- `grok-1.0.35-fork.1-linux-x86_64`
+- `grok-1.0.35-fork.1-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.32-fork.1...v1.0.35-fork.1
+
 # 1.0.32-fork.1 — 2026-09-17
 
 本版为上游同步与 Fork 国际化全量补全更新，产品版本随上游从 **1.0.24** 升至 **1.0.32**。发布范围覆盖上一版 `v1.0.24-fork.7` 之后的上游同步提交 `48271133`（上游 Source-Revision 为 `be7ce6e8cffe46d20bef9834b211616082ee866b`）、合并适配修复、`send_feedback` 工具门控，以及一次覆盖全仓库的硬编码英文排查与国际化补全。
