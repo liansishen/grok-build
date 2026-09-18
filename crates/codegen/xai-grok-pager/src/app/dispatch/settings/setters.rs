@@ -1605,17 +1605,9 @@ fn auto_theme_setting_is_live(key: &str) -> bool {
     crate::theme::cache::is_auto_mode() && system_is_in_matching_mode(key)
 }
 
-// ── theme (commit path) ─────────────────────────────────────────────
-
-/// State + cache + visual mutation for `theme`. **Commit path.**
-/// Updates `app.current_ui.theme`, toggles `AUTO_MODE` based on
-/// whether the value is `"auto"`, and applies the live theme.
-///
-/// Also called from `apply_setting_rollback` — when a disk persist
-/// fails, we replay the inner with the prior value so both the
-/// snapshot and the visual revert. Unknown / unrecognised names log
-/// at `warn` (defensive — a malformed `rollback_value` is a softer
-/// failure mode than an unknown commit-time value) and no-op.
+/// State, cache, and visual mutation for `theme`; the commit path.
+/// Updates `app.current_ui.theme`, toggles `AUTO_MODE` based on whether the value is `"auto"`, and applies the live theme.
+/// Unknown / unrecognised names log at `warn` and no-op (a malformed `rollback_value` is a softer failure mode than an unknown commit-time value).
 pub(super) fn set_theme_inner(app: &mut AppView, value: &str) {
     let Some(canonical) = crate::theme::canonical_name(value) else {
         tracing::warn!(
@@ -1681,12 +1673,9 @@ pub(in crate::app::dispatch) fn set_theme(app: &mut AppView, new: String) -> Vec
     }]
 }
 
-// ── theme (preview path) ────────────────────────────────────────────
-
-/// Preview-only mutation for `theme`. Applies the live visual without
-/// modifying state, toggling `AUTO_MODE`, persisting, or toasting.
-/// For `"auto"`, resolves and applies the theme but does NOT toggle
-/// `AUTO_MODE` (commit-only side effect).
+/// Preview-only mutation for `theme`.
+/// Applies the live visual without modifying state, toggling `AUTO_MODE`, persisting, or toasting.
+/// For `"auto"`, resolves and applies the theme but does NOT toggle `AUTO_MODE` (commit-only side effect).
 fn preview_theme_inner(value: &str) {
     if crate::theme::Theme::preview_name(value).is_none() {
         tracing::warn!(
@@ -1712,11 +1701,9 @@ pub(in crate::app::dispatch) fn preview_theme(_app: &mut AppView, new: String) -
     vec![]
 }
 
-// ── auto_dark_theme (commit path) ───────────────────────────────────
-
-/// State + cache + visual mutation for `auto_dark_theme`. Commit path.
-/// Applies visually only when the setting is live (auto mode + dark).
-/// Rejects `"auto"` as an invalid value (log + no-op).
+/// State, cache, and visual mutation for `auto_dark_theme`; the commit path.
+/// Applies visually only when the setting is live (auto mode and the system dark).
+/// Rejects `"auto"` as an invalid value (logs and no-ops).
 pub(super) fn set_auto_dark_theme_inner(app: &mut AppView, value: &str) {
     let Some(canonical) = crate::theme::canonical_name(value) else {
         tracing::warn!(
@@ -1787,9 +1774,7 @@ pub(in crate::app::dispatch) fn set_auto_dark_theme(
     }]
 }
 
-// ── auto_dark_theme (preview path) ──────────────────────────────────
-
-/// Preview-only mutation for `auto_dark_theme`. Visual only when live.
+/// Preview-only mutation for `auto_dark_theme`; applies visually only when the setting is live.
 fn preview_auto_dark_theme_inner(value: &str) {
     if auto_theme_setting_is_live("auto_dark_theme") {
         let _ = crate::theme::Theme::preview_name(value);
@@ -1816,9 +1801,7 @@ pub(in crate::app::dispatch) fn preview_auto_dark_theme(
     vec![]
 }
 
-// ── auto_light_theme (commit path) ──────────────────────────────────
-
-/// State + cache + visual mutation for `auto_light_theme`. Commit path.
+/// State, cache, and visual mutation for `auto_light_theme`; the commit path.
 /// Mirror of `set_auto_dark_theme_inner` for the light bucket.
 pub(super) fn set_auto_light_theme_inner(app: &mut AppView, value: &str) {
     let Some(canonical) = crate::theme::canonical_name(value) else {
@@ -1890,10 +1873,8 @@ pub(in crate::app::dispatch) fn set_auto_light_theme(
     }]
 }
 
-// ── auto_light_theme (preview path) ─────────────────────────────────
-
-/// Preview-only mutation for `auto_light_theme`. Mirror of
-/// `preview_auto_dark_theme_inner` for the light bucket.
+/// Preview-only mutation for `auto_light_theme`.
+/// Mirror of `preview_auto_dark_theme_inner` for the light bucket.
 fn preview_auto_light_theme_inner(value: &str) {
     if auto_theme_setting_is_live("auto_light_theme") {
         let _ = crate::theme::Theme::preview_name(value);
@@ -2592,10 +2573,7 @@ pub(in crate::app::dispatch) fn set_auto_update(app: &mut AppView, new: bool) ->
     }]
 }
 
-// ---------------------------------------------------------------------------
-// display_refresh_auto_cadence — SHELL-OWNED nested Option on
-// `[ui.display_refresh].auto_cadence_enabled`. Restart-required.
-// ---------------------------------------------------------------------------
+// display_refresh_auto_cadence is a SHELL-OWNED nested Option on `[ui.display_refresh].auto_cadence_enabled`. Restart-required.
 
 /// State-only mutation for `display_refresh_auto_cadence`.
 pub(super) fn set_display_refresh_auto_cadence_inner(app: &mut AppView, value: bool) {

@@ -1191,8 +1191,8 @@ fn slash_hooks_opens_modal() {
 fn acp_bootstrap_command_appears_in_autocomplete() {
     let mut app = test_app();
     app.bootstrap_acp_commands = vec![acp::AvailableCommand::new(
-        "flush".to_string(),
-        "Flush memory".to_string(),
+        "goal".to_string(),
+        "Run a goal".to_string(),
     )];
     dispatch(Action::NewSession, &mut app);
     let id = AgentId(0);
@@ -1210,7 +1210,7 @@ fn acp_bootstrap_command_appears_in_autocomplete() {
         .unwrap()
         .prompt
         .textarea
-        .insert_str("/flu");
+        .insert_str("/goa");
     app.agents
         .get_mut(&id)
         .unwrap()
@@ -1219,7 +1219,7 @@ fn acp_bootstrap_command_appears_in_autocomplete() {
     let snap = agent_ref(&app, id).prompt.slash_snapshot();
     assert!(snap.open, "dropdown should be open");
     assert!(
-        snap.matches.iter().any(|r| r.display == "/flush"),
+        snap.matches.iter().any(|r| r.display == "/goal"),
         "bootstrap ACP command should appear in matches, got: {:?}",
         snap.matches.iter().map(|r| &r.display).collect::<Vec<_>>()
     );
@@ -1228,8 +1228,8 @@ fn acp_bootstrap_command_appears_in_autocomplete() {
 fn acp_bootstrap_command_executes_as_passthrough() {
     let mut app = test_app();
     app.bootstrap_acp_commands = vec![acp::AvailableCommand::new(
-        "flush".to_string(),
-        "Flush memory".to_string(),
+        "goal".to_string(),
+        "Run a goal".to_string(),
     )];
     dispatch(Action::NewSession, &mut app);
     let id = AgentId(0);
@@ -1242,10 +1242,10 @@ fn acp_bootstrap_command_executes_as_passthrough() {
             &agent.session.models,
         );
     }
-    let effects = dispatch(Action::SendPrompt("/flush".into()), &mut app);
+    let effects = dispatch(Action::SendPrompt("/goal".into()), &mut app);
     assert_eq!(effects.len(), 1);
     assert!(
-        matches!(effects.first(), Some(Effect::SendPrompt { text, .. }) if text == "/flush"),
+        matches!(effects.first(), Some(Effect::SendPrompt { text, .. }) if text == "/goal"),
         "ACP command should passthrough, got: {effects:?}"
     );
 }

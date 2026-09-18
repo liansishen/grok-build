@@ -27,14 +27,7 @@ use crate::app::cancel_latency::CancelOrigin;
 use agent_client_protocol as acp;
 use xai_grok_telemetry::events::CancellationScope;
 
-// ---------------------------------------------------------------------------
-// Agent Dashboard dispatchers
-// ---------------------------------------------------------------------------
-
-/// Build a `DashboardState` from the persisted layout (pins / reorder /
-/// grouping), loading + caching `app.dashboard_persisted` on first use. Used
-/// both to materialize the real dashboard and to compute a correct cycle order
-/// before the dashboard has been opened.
+/// Keeps v1 config layout separate from v2 workspace layout.
 fn dashboard_state_for_mode(app: &mut AppView) -> crate::views::dashboard::DashboardState {
     use crate::views::dashboard::{DashboardState, load_persisted};
     if app.workspace_dashboard_enabled {
