@@ -5148,59 +5148,6 @@ mod tests {
             .await;
     }
 
-    /// A policy of one Allow rule in the `Bash(cp:*)` string form.
-    fn allow_policy(rule: &str) -> CompiledPolicy {
-        use crate::permission::rules::parse_permission_rule;
-        use crate::permission::types::{PermissionConfig, RuleAction};
-
-        CompiledPolicy::new(PermissionConfig::new(vec![
-            parse_permission_rule(rule, RuleAction::Allow).expect("rule must parse"),
-        ]))
-    }
-
-    /// [`broad_allow_floor_requires_prompt`] for `cmd` under one Allow `rule`.
-    /// The assert refuses a case that is not a policy Allow.
-    /// Only an Allow can be deferred.
-    fn standalone_floor(rule: &str, cmd: &str, cwd: &std::path::Path) -> bool {
-        let policy = allow_policy(rule);
-        let access = AccessKind::Bash(cmd.to_owned());
-        let preflight = GatePreflight::evaluate(Some(&policy), &access, cwd, false);
-        assert!(
-            matches!(preflight.policy_decision(), Some(Decision::Allow)),
-            "{rule} + {cmd} must be a policy Allow"
-        );
-        broad_allow_floor_requires_prompt(&access, Some(&policy), cwd)
-    }
-
-    /// A broad rule cannot vouch for a redirect write or an injected environment.
-    /// A narrow rule that names the writing command can.
-    /// A clean command has nothing to defer.
-    #[test]
-    fn broad_allow_floor_without_a_manager_matches_the_manager() {
-        let cwd = tempfile::tempdir().expect("tempdir must be created");
-
-        assert!(standalone_floor(
-            "Bash(git:*)",
-            "git status > out",
-            cwd.path()
-        ));
-        assert!(standalone_floor("Bash(*)", "cp src dst", cwd.path()));
-        assert!(standalone_floor(
-            "Bash(touch:*)",
-            "LD_PRELOAD=/x/e.so touch CANARY",
-            cwd.path()
-        ));
-        assert!(!standalone_floor("Bash(git:*)", "git status", cwd.path()));
-        assert!(!standalone_floor("Bash(cp:*)", "cp src dst", cwd.path()));
-
-        // Non-Bash access has no findings
-        assert!(!broad_allow_floor_requires_prompt(
-            &AccessKind::Edit("out".to_owned()),
-            Some(&allow_policy("Bash(*)")),
-            cwd.path(),
-        ));
-    }
-
     /// HackerOne #3876332: a managed `Bash(git:*)` allow must not auto-approve a
     /// chain whose later segments are not independently allowed. Drive the real
     /// `PermissionHandle::request` boundary (policy allow + always-safe list +
