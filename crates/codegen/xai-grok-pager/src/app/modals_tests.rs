@@ -8,7 +8,7 @@ use crate::app::agent_view::AgentPane;
 use crate::app::agent_view::test_fixtures::make_agent;
 use crate::views::modal::ActiveModal;
 
-/// Ctrl+M, then Enter on a reasoning model: the effort sub-menu opens on the model's default effort row.
+/// Alt+M, then Enter on a reasoning model: the effort sub-menu opens on the model's default effort row.
 #[test]
 fn arg_picker_effort_phase_opens_on_default_row() {
     let mut agent = make_agent();
@@ -21,12 +21,12 @@ fn arg_picker_effort_phase_opens_on_default_row() {
                 .cloned(),
         ),
     );
-    // Ctrl+M is the multiline toggle while the prompt is focused; the picker binding lives on the agent screen
+    // Alt+M opens the model picker from the agent screen; Ctrl+M is Enter on most terminals.
     agent.set_active_pane(AgentPane::Scrollback, true);
 
     let registry = ActionRegistry::defaults();
     agent.handle_input(
-        &Event::Key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::CONTROL)),
+        &Event::Key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::ALT)),
         &registry,
     );
     assert!(
@@ -35,7 +35,7 @@ fn arg_picker_effort_phase_opens_on_default_row() {
             Some(ActiveModal::ArgPicker { command, args_query, .. })
                 if command == "model" && args_query.is_empty()
         ),
-        "Ctrl+M must open the /model picker in the model phase"
+        "Alt+M must open the /model picker in the model phase"
     );
 
     agent.handle_input(
