@@ -112,7 +112,8 @@ fn chip_budget_uses_display_width_for_unicode_left_text() {
     row.subtitle = Some("界".to_owned());
     row.badges = vec![RowBadge::Watchers(2)];
     let subtitle = " · 界";
-    let chip = "Watchers 2";
+    let chip_name = xai_grok_i18n::t("dashboard.chip.watchers");
+    let chip = format!("{chip_name} 2");
     let width = (row.label.width() + subtitle.width() + 1 + chip.width()) as u16;
     let area = Rect::new(0, 0, width, 1);
     let mut actual = Buffer::empty(area);
@@ -135,14 +136,14 @@ fn chip_budget_uses_display_width_for_unicode_left_text() {
     expected.set_string(
         x + 1,
         0,
-        "Watchers",
+        chip_name,
         Style::default()
             .fg(theme.gray_bright)
             .bg(theme.bg_base)
             .add_modifier(Modifier::BOLD),
     );
     expected.set_string(
-        x + 9,
+        x + 1 + chip_name.width() as u16,
         0,
         " 2",
         Style::default().fg(theme.gray).bg(theme.bg_base),
@@ -456,4 +457,35 @@ fn fallback_and_failed_title_styles_stay_consistent() {
     assert_eq!(theme.text_primary, buf_cell(&buf, 0, 0).fg);
     assert_eq!(theme.gray_dim, buf_cell(&buf, 12, 0).fg);
     assert_eq!(theme.accent_error, buf_cell(&buf, 21, 0).fg);
+}
+
+#[test]
+fn live_work_chips_come_from_the_catalog() {
+    assert_eq!(
+        xai_grok_i18n::t_for(xai_grok_i18n::Locale::En, "dashboard.chip.tasks"),
+        "Tasks"
+    );
+    assert_eq!(
+        xai_grok_i18n::t_for(xai_grok_i18n::Locale::En, "dashboard.chip.watchers"),
+        "Watchers"
+    );
+    assert_eq!(
+        xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, "dashboard.chip.tasks"),
+        "任务"
+    );
+    assert_eq!(
+        xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, "dashboard.chip.watchers"),
+        "监视器"
+    );
+
+    let badges = [RowBadge::Tasks(3), RowBadge::Watchers(4)];
+    let pseudo = xai_grok_i18n::with_pseudo_locale(|| fit_chips(&badges, 400, 400));
+    assert!(
+        pseudo.contains("⟦dashboard.chip.tasks⟧"),
+        "Tasks chip must come from the catalog: {pseudo:?}"
+    );
+    assert!(
+        pseudo.contains("⟦dashboard.chip.watchers⟧"),
+        "Watchers chip must come from the catalog: {pseudo:?}"
+    );
 }
