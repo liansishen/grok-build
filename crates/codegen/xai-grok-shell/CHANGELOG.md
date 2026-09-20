@@ -1,5 +1,54 @@
 # Changelog
 
+# 1.0.38-fork.2 — 2026-09-20
+
+本版为 Fork 问题修复，产品版本仍为 **1.0.38**，不包含新的上游同步。修复两处上游同步后仍硬编码英文的界面文案：排队行操作和仪表盘工作中智能体右侧 live-work chip。
+
+### 问题修复
+
+- 选中排队中的命令后，行右侧操作 `[Send now]` / `[edit]` / `[cancel]` 现在走翻译目录。简体中文下显示 `[立即发送]` / `[编辑]` / `[取消]`。英文界面仍为原文案。
+- 点击热区按 Unicode 显示宽度计算，CJK 标签不会因按字节长度计宽而点偏。窄行仍优先丢 `[edit]`，保留更紧急的 `[Send now]`。
+- 仪表盘中正在工作的智能体右侧 `Tasks n` / `Watchers n` 现在走目录。简体中文下显示 `任务 n` / `监视器 n`；窄宽时的短形为 `任务` / `监视`。英文仍为 `Tasks` / `Task` / `Watchers` / `Watch`。
+- 同一行的 Subagents / Workflows chip 一并翻译（简体中文 `子代理` / `工作流`，短形 `子` / `流`），避免一行中英混排。折叠到 `后台` / `N 后台` 的路径不变。
+
+### 本 Fork
+
+- 排队操作接已有 key：`queue.send_now`、`queue.edit`、`queue.cancel`（英文值仍为 `[Send now]` / `[edit]` / `[cancel]`）。
+- 仪表盘 live-work chip 使用新的 Title Case key `dashboard.chip.*`，不复用小写的 `dashboard.badge.tasks` / `watchers` 等，以避免改变英文界面。
+- 本版未改 dock 面板分区标题、键盘快捷键或排队操作本身的发送/编辑/取消语义。
+
+### 兼容性
+
+- 产品版本仍为 **1.0.38**；发布标签 `v1.0.38-fork.2` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的 `1.0.38`。
+- 不改变排队、仪表盘或任务 chip 的交互逻辑、布局优先级或点击路径；英文默认界面的可见文案与上一版字节级相同。
+- 本地化目录的查找、回退与语言解析机制未改动；未提供翻译的键继续回退英文。不新增外部服务、鉴权流程或运行时依赖。
+
+### 国际化
+
+- 本版新增用户可见文案已覆盖英文与简体中文：`en.toml` 与 `zh-CN.toml` 各从 4327 个键增至 4339 个键（+12 个 `dashboard.chip.*`），两侧键集合与 `{placeholder}` 完全一致。
+- 排队操作使用已有目录项，本版只把绘制路径接上去。不扩展其它语种。
+- 日志与 tracing、发给模型的 prompt、协议/错误码以及 CLI `--help` 仍按既有 Non-goals 保持英文。
+
+### 验证
+
+发布范围已逐项复核上一版 `v1.0.38-fork.1` 之后的提交（排队操作与仪表盘 chip 本地化及本 changelog）。
+
+本地等 CI 验证（Rust 1.92.0、Protoc 29.3、全部 `--locked`）：
+
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`（`GROK_I18N_AUDIT_BASE=main`）：全仓扫描与 Markdown 覆盖审计通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib -- queue_pane:: row_title::`：57 项通过，含伪语言环境下的排队操作 chip 与仪表盘 live-work chip 回归。
+- `python3 scripts/i18n_catalog.py`：`missing_keys`、`extra_keys`、`placeholder_mismatches` 均为空。
+- Windows x86_64 由 GitHub Actions 的 `Build` 工作流验证。
+
+### 产物
+
+- `grok-1.0.38-fork.2-linux-x86_64`
+- `grok-1.0.38-fork.2-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.38-fork.1...v1.0.38-fork.2
+
 # 1.0.38-fork.1 — 2026-09-20
 
 同步上游 monorepo `4247f661` / Source-Revision `9bb727ccdff0a793ee73bcde4e2e09cbef6b5387`，产品版本随上游从 **1.0.35** 升至 **1.0.38**。发布范围覆盖上一版 `v1.0.35-fork.1` 之后的上游更新（1.0.36–1.0.38），以及吸收该更新所需的合并适配与本地化修复（22 个冲突文件、150 个冲突块，其中 112 个 cosmetic 块自动采用上游）。

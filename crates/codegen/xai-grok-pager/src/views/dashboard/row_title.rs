@@ -130,7 +130,7 @@ impl RowTitle<'_> {
         let mut spans = Vec::with_capacity(counts.iter().filter(|count| **count > 0).count() * 3);
         for (count, (full, short, short_plural)) in counts
             .iter()
-            .zip(CHIP_KINDS)
+            .zip(chip_kinds())
             .filter(|(count, _)| **count > 0)
         {
             if !spans.is_empty() {
@@ -232,12 +232,30 @@ fn paint_failed(buf: &mut Buffer, x: u16, y: u16, theme: &Theme, bg: Color) {
     );
 }
 
-const CHIP_KINDS: [(&str, &str, &str); 4] = [
-    ("Subagents", "Sub", "Subs"),
-    ("Tasks", "Task", "Tasks"),
-    ("Watchers", "Watch", "Watch"),
-    ("Workflows", "Flow", "Flows"),
-];
+fn chip_kinds() -> [(&'static str, &'static str, &'static str); 4] {
+    [
+        (
+            xai_grok_i18n::t("dashboard.chip.subagents"),
+            xai_grok_i18n::t("dashboard.chip.subagents_short"),
+            xai_grok_i18n::t("dashboard.chip.subagents_short_plural"),
+        ),
+        (
+            xai_grok_i18n::t("dashboard.chip.tasks"),
+            xai_grok_i18n::t("dashboard.chip.tasks_short"),
+            xai_grok_i18n::t("dashboard.chip.tasks_short_plural"),
+        ),
+        (
+            xai_grok_i18n::t("dashboard.chip.watchers"),
+            xai_grok_i18n::t("dashboard.chip.watchers_short"),
+            xai_grok_i18n::t("dashboard.chip.watchers_short_plural"),
+        ),
+        (
+            xai_grok_i18n::t("dashboard.chip.workflows"),
+            xai_grok_i18n::t("dashboard.chip.workflows_short"),
+            xai_grok_i18n::t("dashboard.chip.workflows_short_plural"),
+        ),
+    ]
+}
 
 #[cfg(test)]
 #[path = "row_title_tests.rs"]

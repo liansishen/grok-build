@@ -953,8 +953,8 @@ impl QueuePane {
                 let mut right = inner.x + inner.width;
                 let fits = |right: u16, w: u16| right.checked_sub(w).filter(|&x| x >= inner.x);
 
-                let cancel_label = "[cancel]";
-                let cancel_w = cancel_label.len() as u16;
+                let cancel_label = xai_grok_i18n::t("queue.cancel");
+                let cancel_w = cancel_label.width() as u16;
                 if entry.capabilities.can_delete()
                     && let Some(cancel_x) = fits(right, cancel_w)
                 {
@@ -969,15 +969,15 @@ impl QueuePane {
                         .bind(Rect::new(cancel_x, screen_y, cancel_w, 1), entry.id);
                 }
 
-                let interject_label = "[Send now]";
-                let interject_w = interject_label.len() as u16;
+                let interject_label = xai_grok_i18n::t("queue.send_now");
+                let interject_w = interject_label.width() as u16;
                 let show_send_now = can_send_now && entry.capabilities.can_send_now();
 
                 // [edit] always paints; keyboard `e` works either way. Flush to
                 // neighbours so the queued message cannot leak through a gap.
                 // Drop [edit] if [Send now] fits alone but not with [edit].
-                let edit_label = "[edit]";
-                let edit_w = edit_label.len() as u16;
+                let edit_label = xai_grok_i18n::t("queue.edit");
+                let edit_w = edit_label.width() as u16;
                 let send_now_fits_alone = show_send_now && fits(right, interject_w).is_some();
                 if entry.capabilities.can_edit()
                     && (!send_now_fits_alone || fits(right, interject_w + edit_w).is_some())
@@ -1147,7 +1147,11 @@ mod tests {
                 assert_eq!(None, pane.send_now_click(col, area.y), "{setup}");
             }
             let text = buffer_text(&buf, area);
-            for chip in ["[Send now]", "[edit]", "[cancel]"] {
+            for chip in [
+                xai_grok_i18n::t("queue.send_now"),
+                xai_grok_i18n::t("queue.edit"),
+                xai_grok_i18n::t("queue.cancel"),
+            ] {
                 assert!(!text.contains(chip), "{setup}: {chip} rendered: {text:?}");
             }
             assert!(
@@ -1928,11 +1932,17 @@ mod tests {
             );
         };
 
-        render(&mut pane, "[Send now][edit][cancel]".len() as u16 - 1);
+        let send_now = xai_grok_i18n::t("queue.send_now");
+        let edit = xai_grok_i18n::t("queue.edit");
+        let cancel = xai_grok_i18n::t("queue.cancel");
+        render(
+            &mut pane,
+            (send_now.width() + edit.width() + cancel.width()) as u16 - 1,
+        );
         assert!(pane.send_now.rect.is_some(), "[Send now] survives");
         assert!(pane.edit_button.rect.is_none(), "[edit] is dropped first");
 
-        render(&mut pane, "[Send now][cancel]".len() as u16 - 1);
+        render(&mut pane, (send_now.width() + cancel.width()) as u16 - 1);
         assert!(pane.send_now.rect.is_none(), "[Send now] can't fit");
         assert!(pane.edit_button.rect.is_some(), "[edit] takes the space");
     }
@@ -2281,6 +2291,69 @@ mod tests {
         assert!(
             many.contains("⟦queue.lines_many⟧"),
             "multiple extra lines must come from the catalog: {many:?}"
+        );
+    }
+
+    /// Selected-row action chips are catalog copy, not hardcoded English.
+    #[test]
+    fn selected_row_action_chips_come_from_the_catalog() {
+        assert_eq!(
+            xai_grok_i18n::t_for(xai_grok_i18n::Locale::En, "queue.send_now"),
+            "[Send now]"
+        );
+        assert_eq!(
+            xai_grok_i18n::t_for(xai_grok_i18n::Locale::En, "queue.edit"),
+            "[edit]"
+        );
+        assert_eq!(
+            xai_grok_i18n::t_for(xai_grok_i18n::Locale::En, "queue.cancel"),
+            "[cancel]"
+        );
+        assert_eq!(
+            xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, "queue.send_now"),
+            "[立即发送]"
+        );
+        assert_eq!(
+            xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, "queue.edit"),
+            "[编辑]"
+        );
+        assert_eq!(
+            xai_grok_i18n::t_for(xai_grok_i18n::Locale::ZhCn, "queue.cancel"),
+            "[取消]"
+        );
+
+        let paint = || {
+            let mut pane = QueuePane::new();
+            let mut local = std::collections::VecDeque::new();
+            local.push_back(local_prompt(1, "queued command"));
+            pane.sync_from_merged(&local, &[], None, None, &Default::default());
+            let ids = pane.entry_ids();
+            pane.list_state.select_by_id(*at(&ids, 0));
+            let area = Rect::new(0, 0, 80, 1);
+            let mut buf = Buffer::empty(area);
+            pane.render(
+                area,
+                &mut buf,
+                true,
+                &crate::appearance::LayoutConfig::default(),
+                None,
+                true,
+            );
+            buffer_text(&buf, area)
+        };
+
+        let pseudo = xai_grok_i18n::with_pseudo_locale(paint);
+        assert!(
+            pseudo.contains("⟦queue.send_now⟧"),
+            "Send now chip must come from the catalog: {pseudo:?}"
+        );
+        assert!(
+            pseudo.contains("⟦queue.edit⟧"),
+            "edit chip must come from the catalog: {pseudo:?}"
+        );
+        assert!(
+            pseudo.contains("⟦queue.cancel⟧"),
+            "cancel chip must come from the catalog: {pseudo:?}"
         );
     }
 }
