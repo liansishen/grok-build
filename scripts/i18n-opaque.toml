@@ -178,6 +178,16 @@ exact = [
   "[harness-timing] {what}: {:?}",
   # Slash-command name echoed as a block header (`/btw <question>`); the command token is opaque.
   "/btw {}",
+  # `grok trace` CLI stderr (non-goals: CLI help/errors stay English). Line-continued
+  # Rust strings keep the newline-plus-indent the audit decoder produces.
+  "Found session at: {}",
+  """Trace upload is off for this account (data retention opted out or not yet 
+                     confirmed); exporting locally.""",
+  """No upload credentials for this account (run `grok login` or set a deployment 
+                     key); exporting locally.""",
+  "Per-turn trace skipped: {}",
+  """Per-turn trace: {} of {} turns reconstructed; {} artifacts uploaded, 
+                             {} already present, {} skipped (size), {} failed{in_flight_note}""",
 ]
 prefix = [
   "./",
