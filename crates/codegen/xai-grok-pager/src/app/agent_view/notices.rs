@@ -359,6 +359,107 @@ impl AgentView {
             }
         }
     }
+
+    /// Re-bind orphan `[Image #N]` text to the images the composer still holds, then name the
+    /// placeholders no record backs. Logged against this session; the caller queues the message on
+    /// `AppView::pending_image_notices`.
+    pub(crate) fn unbound_image_placeholder_notice(&mut self) -> Option<String> {
+        self.prompt.rebind_image_placeholders();
+        let unbound = self.prompt.unbound_image_placeholders();
+        if unbound.is_empty() {
+            return None;
+        }
+        let numbers = image_number_list(&unbound);
+        let message = if unbound.len() == 1 {
+            xai_grok_i18n::t_fmt("toast.image_not_attached", &[("numbers", &numbers)])
+        } else {
+            xai_grok_i18n::t_fmt("toast.images_not_attached", &[("numbers", &numbers)])
+        };
+        crate::unified_log::warn(
+            "prompt.image_placeholder_unbound",
+            self.session.session_id.as_ref().map(|s| s.0.as_ref()),
+            Some(serde_json::json!({
+                "display_numbers": unbound,
+                "attached": self.prompt.images.len(),
+            })),
+        );
+        Some(message)
+    }
+
+    /// Attached images whose bytes could not be loaded for the wire, logged against this session.
+    pub(crate) fn skipped_image_send_notice(&self, display_numbers: &[usize]) -> Option<String> {
+        if display_numbers.is_empty() {
+            return None;
+        }
+        let numbers = image_number_list(display_numbers);
+        let key = if display_numbers.len() == 1 {
+            "toast.image_unread"
+        } else {
+            "toast.images_unread"
+        };
+        crate::unified_log::warn(
+            "prompt.image_send_skipped",
+            self.session.session_id.as_ref().map(|s| s.0.as_ref()),
+            Some(serde_json::json!({ "display_numbers": display_numbers })),
+        );
+        Some(xai_grok_i18n::t_fmt(key, &[("numbers", &numbers)]))
+    }
+
+    /// Composer images a submission cannot carry, logged against this session; the caller releases
+    /// the records.
+    pub(crate) fn images_dropped_by_command_notice(
+        &self,
+        count: usize,
+        dropped_by: ImagesDroppedBy,
+    ) -> String {
+        let (message, ctx) = match dropped_by {
+            ImagesDroppedBy::CompactCommand => (
+                xai_grok_i18n::t("toast.images_not_sent_compact").to_owned(),
+                serde_json::json!({ "count": count, "reason": "compact_command" }),
+            ),
+            ImagesDroppedBy::SkillPrompt => (
+                xai_grok_i18n::t("toast.images_not_sent_skill_prompt").to_owned(),
+                serde_json::json!({ "count": count, "reason": "skill_prompt" }),
+            ),
+            ImagesDroppedBy::SlashAction(command) => (
+                xai_grok_i18n::t_fmt(
+                    "toast.images_not_sent_slash",
+                    &[("command", &command)],
+                ),
+                serde_json::json!({
+                    "count": count,
+                    "reason": "slash_action",
+                    "command": command,
+                }),
+            ),
+        };
+        crate::unified_log::info(
+            "prompt.images_dropped_by_command",
+            self.session.session_id.as_ref().map(|s| s.0.as_ref()),
+            Some(ctx),
+        );
+        message
+    }
+}
+
+/// Which submission left the composer images behind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ImagesDroppedBy {
+    /// `/compact` queued as a command row.
+    CompactCommand,
+    /// Skill injection: the wire carries the skill blocks only.
+    SkillPrompt,
+    /// A slash command whose result cannot carry images; holds the command token.
+    SlashAction(String),
+}
+
+/// `#1, #3` for a toast.
+fn image_number_list(display_numbers: &[usize]) -> String {
+    display_numbers
+        .iter()
+        .map(|n| format!("#{n}"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 #[cfg(test)]

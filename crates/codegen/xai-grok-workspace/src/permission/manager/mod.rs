@@ -17,10 +17,13 @@ use crate::permission::exec_risk::{
 use crate::permission::gate_preflight::GatePreflight;
 use crate::permission::grants::{
     BashEvaluation, BashGrantOpts, bash_grant_pre_decision, bash_request_floor_requires_prompt,
-    evaluate_bash, evaluate_bash_with_ambient, mcp_pre_decision, protected_target,
-    record_prompt_outcome, session_grant_pre_decision, web_fetch_deny_pre_decision,
+    evaluate_bash, mcp_pre_decision, protected_target, record_prompt_outcome,
+    session_grant_pre_decision, web_fetch_deny_pre_decision,
 };
 use crate::permission::hub_permission::prompt_outcome_allows;
+use crate::permission::manager::bash_policy_allow::{
+    broad_allow_deferred, configured_filename_allow, requires_recovered_classification,
+};
 use crate::permission::policy::CompiledPolicy;
 use crate::permission::prompter::{AcpPrompter, PromptOutcome, PromptOutcomeKind};
 use crate::permission::reasons;
@@ -35,8 +38,10 @@ use xai_grok_tools::implementations::grok_build::web_fetch::{
     DomainMatcher, config::DEFAULT_ALLOWED_DOMAINS, domain::normalize_domain,
 };
 
+mod bash_policy_allow;
 mod request_classification;
 
+pub use bash_policy_allow::broad_allow_floor_requires_prompt;
 pub use request_classification::{AUTO_DENY_CONSECUTIVE_LIMIT, AUTO_DENY_TOTAL_LIMIT};
 use request_classification::{
     AUTO_DENY_GUIDANCE, ClassificationOutcome, ClassificationSource, DenialCounters,
@@ -402,42 +407,6 @@ fn prompted_decision_approved(decision: &Decision, outcome_str: &str) -> Option<
 /// Bash is carved out: its post-classify grant path is gated on `!auto_forced_prompt` upstream.
 fn auto_prompt_blocks_allow(access: &AccessKind) -> bool {
     !matches!(access, AccessKind::Bash(_))
-}
-
-/// Whether a configured allow rule clears the bash request floor in ask/dontAsk. The assessment is `FileWrite`-only (other floor findings describe effects outside the rule's matched words).
-/// The writes are command-word operands rather than redirects (which word matching cannot see).
-fn narrow_allow_clears_write_floor(
-    evaluation: Option<&BashEvaluation>,
-    policy: Option<&CompiledPolicy>,
-    access: &AccessKind,
-) -> bool {
-    evaluation.is_some_and(|e| e.assessment.is_file_write_only() && !e.redirect_write)
-        && policy.is_some_and(|p| p.narrow_allow_authorizes(access))
-}
-
-/// Whether a configured policy Allow is deferred to the confirmation floor for this request.
-fn broad_allow_deferred(
-    evaluation: Option<&BashEvaluation>,
-    policy: Option<&CompiledPolicy>,
-    access: &AccessKind,
-) -> bool {
-    bash_request_floor_requires_prompt(evaluation)
-        && !narrow_allow_clears_write_floor(evaluation, policy, access)
-}
-
-/// [`broad_allow_deferred`] for a caller with no manager and no session grants.
-/// Each call assesses the command in full, ambient git scan included, on the caller's thread.
-/// Non-Bash access is never deferred.
-pub fn broad_allow_floor_requires_prompt(
-    access: &AccessKind,
-    policy: Option<&CompiledPolicy>,
-    cwd: &std::path::Path,
-) -> bool {
-    let AccessKind::Bash(cmd) = access else {
-        return false;
-    };
-    let evaluation = evaluate_bash_with_ambient(cmd, &PermissionState::default(), cwd);
-    broad_allow_deferred(Some(&evaluation), policy, access)
 }
 
 /// A request has no static-analysis findings at all: the only case where a broad configured policy Allow may bypass the classifier.
@@ -915,6 +884,8 @@ pub fn spawn_permission_manager_with_pin(
                         }
                         _ => None,
                     };
+                    let recovered_classification =
+                        auto_mode && requires_recovered_classification(bash_evaluation.as_ref());
                     let protected_edit = protected_target(
                         &access,
                         bash_evaluation.as_ref(),
@@ -980,6 +951,7 @@ pub fn spawn_permission_manager_with_pin(
                                 .then_some(&static_domain_matcher),
                             yolo_pin,
                         )
+                        && (!recovered_classification || !matches!(decision, Decision::Allow))
                     {
                         tracing::debug!(
                             tool = %tool_name,
@@ -994,11 +966,15 @@ pub fn spawn_permission_manager_with_pin(
                         continue;
                     }
 
+                    let covering_filename_allow =
+                        configured_filename_allow(bash_evaluation.as_ref());
                     if auto_mode
+                        && (covering_filename_allow || !recovered_classification)
                         && !pre_classifier_forced_prompt
                         && protected_edit.is_none()
                         && matches!(policy_decision, Some(Decision::Allow))
-                        && (bash_assessment_is_clear(bash_evaluation.as_ref())
+                        && (covering_filename_allow
+                            || bash_assessment_is_clear(bash_evaluation.as_ref())
                             || (!bash_request_floor_requires_prompt(bash_evaluation.as_ref())
                                 && compiled_policy
                                     .as_ref()
@@ -1261,6 +1237,7 @@ pub fn spawn_permission_manager_with_pin(
                     }
 
                     if matches!(&access, AccessKind::Bash(_))
+                        && !recovered_classification
                         && sandbox_may_auto_allow_bash(
                             bash_evaluation.as_ref(),
                             xai_grok_sandbox::should_auto_allow_bash(),
@@ -1293,10 +1270,12 @@ pub fn spawn_permission_manager_with_pin(
                             if protected_edit.is_some()
                                 || auto_forced_prompt
                                 || hook_forced_prompt
+                                || recovered_classification
                                 || broad_allow_deferred(
                                     bash_evaluation.as_ref(),
                                     compiled_policy.as_ref(),
                                     &access,
+                                    prompt_policy != PromptPolicy::Deny,
                                 ) =>
                         {
                             tracing::info!(
@@ -1461,8 +1440,8 @@ pub fn spawn_permission_manager_with_pin(
                                 if *reason == reasons::STATIC_ALLOWLIST
                                     || *reason == reasons::PERSISTED_GRANT
                         );
-                    if auto_forced_prompt
-                        && auto_prompt_blocks_allow(&access)
+                    if (recovered_classification
+                        || (auto_forced_prompt && auto_prompt_blocks_allow(&access)))
                         && matches!(pre_decision, Some((Decision::Allow, _)))
                         && !webfetch_static_fallback
                     {
@@ -1493,6 +1472,7 @@ pub fn spawn_permission_manager_with_pin(
                     }
 
                     if prompt_policy == crate::permission::types::PromptPolicy::Allow
+                        && !recovered_classification
                         && !hook_forced_prompt
                     {
                         tracing::info!(
@@ -1698,6 +1678,8 @@ mod tests {
     use crate::permission::types::RequestPathContext;
     use std::collections::HashSet;
 
+    #[path = "bash_filename_arguments_tests.rs"]
+    mod bash_filename_arguments_tests;
     #[path = "stack_routing_tests.rs"]
     mod stack_routing_tests;
 

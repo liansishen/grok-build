@@ -618,6 +618,7 @@ pub fn current_value_for(
         "transparent_bg" => Some(SettingValue::Bool(ui.transparent_bg_enabled())),
         "show_shortcuts_bar" => Some(SettingValue::Bool(ui.show_shortcuts_bar_enabled())),
         "show_timeline" => Some(SettingValue::Bool(ui.show_timeline_enabled())),
+        "dashboard_preview" => Some(SettingValue::Bool(ui.dashboard_preview_enabled())),
         // The cache is the send-path source of truth (same pattern as group_tool_verbs)
         "page_flip_on_send" => Some(SettingValue::Bool(
             crate::appearance::cache::load_page_flip_on_send(),
@@ -969,6 +970,9 @@ mod tests {
                         ui.show_timeline_enabled(),
                         "show_timeline default drifts from UiConfig::default()"
                     );
+                }
+                ("dashboard_preview", SettingKind::Bool { default }) => {
+                    assert_eq!(ui.dashboard_preview_enabled(), *default);
                 }
                 ("page_flip_on_send", SettingKind::Bool { default }) => {
                     assert_eq!(

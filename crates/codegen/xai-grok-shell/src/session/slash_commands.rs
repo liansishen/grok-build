@@ -780,16 +780,8 @@ pub(super) fn available_commands(
         catalog.builtins.len() + catalog.skills.commands.len() + catalog.workflows.len(),
     );
     commands.extend(catalog.builtins.iter().map(|builtin| {
-        acp::AvailableCommand::new(
-            builtin.name.to_string(),
-            builtin_description(builtin).to_string(),
-        )
-        .input(builtin.argument_hint.map(|_| {
-            acp::AvailableCommandInput::Unstructured(acp::UnstructuredCommandInput::new(
-                builtin_hint(builtin).to_string(),
-            ))
-        }))
-        .meta(exact_workflow_projection(builtin, workflows).map(workflow_meta))
+        available_command(builtin)
+            .meta(exact_workflow_projection(builtin, workflows).map(workflow_meta))
     }));
     commands.extend(catalog.skills.commands.iter().map(|command| {
         let skill = command.skill;
@@ -856,15 +848,24 @@ pub(crate) fn builtin_commands(availability: CommandAvailability) -> Vec<acp::Av
     BUILTIN_COMMANDS
         .iter()
         .filter(|cmd| availability.allows(cmd.gate))
-        .map(|cmd| {
-            acp::AvailableCommand::new(cmd.name.to_string(), builtin_description(cmd).to_string())
-                .input(cmd.argument_hint.map(|_| {
-                    acp::AvailableCommandInput::Unstructured(acp::UnstructuredCommandInput::new(
-                        builtin_hint(cmd).to_string(),
-                    ))
-                }))
-        })
+        .map(available_command)
         .collect()
+}
+/// One builtin by name, as `builtin_commands` would advertise it. For backends that serve a
+/// subset of the shell's commands and must describe them identically.
+pub fn builtin_command(name: &str) -> Option<acp::AvailableCommand> {
+    BUILTIN_COMMANDS
+        .iter()
+        .find(|cmd| cmd.name == name)
+        .map(available_command)
+}
+fn available_command(cmd: &BuiltinCommand) -> acp::AvailableCommand {
+    acp::AvailableCommand::new(cmd.name.to_string(), builtin_description(cmd).to_string())
+        .input(cmd.argument_hint.map(|_| {
+            acp::AvailableCommandInput::Unstructured(acp::UnstructuredCommandInput::new(
+                builtin_hint(cmd).to_string(),
+            ))
+        }))
 }
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]

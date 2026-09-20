@@ -4909,6 +4909,19 @@ prompt_not_accepted_restored = "Prompt not accepted, text restored"
 
 prompt_not_accepted_stopped = "Prompt not accepted, turn stopped"
 
+image_not_attached = "Image {numbers} not attached — placeholder sent as text"
+
+images_not_attached = "Images {numbers} not attached — placeholders sent as text"
+
+image_unread = "Image {numbers} couldn't be read — not sent"
+
+images_unread = "Images {numbers} couldn't be read — not sent"
+
+images_not_sent_compact = "Images not sent with /compact — paste them again"
+
+images_not_sent_skill_prompt = "Images not sent with a skill prompt — paste them again"
+
+images_not_sent_slash = "Images not sent with /{command} — paste them again"
 [task_result]
 workspace_archive_invalid_id = "Could not archive session: invalid session id"
 
@@ -5116,3 +5129,11 @@ help = "Opens the Agent Dashboard: a list of all your running and recent agents 
 help = "Detaches the running foreground Execute so it keeps working in the background while you read, queue prompts, or start something else.\nTrack and resume it from the tasks pane (Ctrl+G).\nOnly meaningful while a foreground Execute is actually running."
 
 help_minimal = "Detaches the running foreground Execute so it keeps working in the background while you read, queue prompts, or start something else.\nTrack background work with /tasks.\nOnly meaningful while a foreground Execute is actually running."
+
+[settings.dashboard_preview]
+label = "Dashboard preview"
+
+description = "Show the selected session's preview and reply panel in the dashboard. Turn off to give the session list more space. Open a session to reply or answer permissions when the preview is off."
+
+[scrollback.context]
+already_counted = "Already counted above"

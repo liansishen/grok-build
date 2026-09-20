@@ -10,6 +10,7 @@ dunce = { workspace = true }
 xai-grok-hooks = { path = "../xai-grok-hooks" }
 xai-grok-i18n = { workspace = true }
 xai-grok-sampling-types = { path = "../xai-grok-sampling-types" }
+xai-grok-telemetry = { workspace = true }
 xai-grok-tools = { path = "../xai-grok-tools" }
 xai-tty-utils = { workspace = true }
 xai-token-estimation = { workspace = true }

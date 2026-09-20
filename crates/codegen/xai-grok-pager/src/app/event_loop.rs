@@ -2520,13 +2520,18 @@ pub(crate) async fn run(
                 // without its `session/prompt` RPC response arriving
                 // (see `dispatch::reconcile_overdue_turn_ends`).
                 let reconciled = dispatch::reconcile_overdue_turn_ends(&mut app);
+                // The reconcile drains queues outside any dispatched action; its image notices show now.
+                let notice_shown = app.flush_image_notices_if_root();
                 if let Some(effs) = reconciled {
                     if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
                         break;
                     }
                     presenter.request(false);
-                } else if app.tick() {
-                    presenter.request(false);
+                } else {
+                    let ticked = app.tick();
+                    if ticked || notice_shown {
+                        presenter.request(false);
+                    }
                 }
                 // Keep ticking as long as there are running animations
                 // or pending actions waiting to expire.

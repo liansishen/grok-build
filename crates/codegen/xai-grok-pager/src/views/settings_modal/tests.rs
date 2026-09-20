@@ -700,6 +700,7 @@ fn rows_contain_categories_and_settings_through_pr_14() {
             "transparent_bg",
             "show_shortcuts_bar",
             "show_timeline",
+            "dashboard_preview",
             // PAGER-owned page_flip_on_send (Appearance).
             "page_flip_on_send",
             "simple_mode",

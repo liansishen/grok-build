@@ -4899,6 +4899,19 @@ prompt_not_accepted_restored = "提示未被接受，文本已恢复"
 
 prompt_not_accepted_stopped = "提示未被接受，回合已停止"
 
+image_not_attached = "图片 {numbers} 未附加 — 占位符已作为文本发送"
+
+images_not_attached = "图片 {numbers} 未附加 — 占位符已作为文本发送"
+
+image_unread = "图片 {numbers} 无法读取 — 未发送"
+
+images_unread = "图片 {numbers} 无法读取 — 未发送"
+
+images_not_sent_compact = "未能随 /compact 发送图片 — 请重新粘贴"
+
+images_not_sent_skill_prompt = "未能随技能提示发送图片 — 请重新粘贴"
+
+images_not_sent_slash = "未能随 /{command} 发送图片 — 请重新粘贴"
 [task_result]
 workspace_archive_invalid_id = "无法归档会话：会话 ID 无效"
 
@@ -5106,3 +5119,11 @@ help = "打开智能体仪表盘：列出所有正在运行和最近的 agent，
 help = "把正在前台运行的 Execute 分离出去，让它在后台继续执行，而你可以阅读、排队提示或开始别的事情。\n在任务面板（Ctrl+G）中跟踪并恢复它。\n只有当前台确实有 Execute 在运行时才有意义。"
 
 help_minimal = "把正在前台运行的 Execute 分离出去，让它在后台继续执行，而你可以阅读、排队提示或开始别的事情。\n用 /tasks 查看后台任务。\n只有当前台确实有 Execute 在运行时才有意义。"
+
+[settings.dashboard_preview]
+label = "仪表盘预览"
+
+description = "在仪表盘显示所选会话的预览与回复面板。关闭后会话列表会有更多空间。预览关闭时需打开会话才能回复或处理权限。"
+
+[scrollback.context]
+already_counted = "已计入上方"
