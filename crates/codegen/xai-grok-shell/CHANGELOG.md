@@ -1,5 +1,65 @@
 # Changelog
 
+# 1.0.38-fork.1 — 2026-09-20
+
+同步上游 monorepo `4247f661` / Source-Revision `9bb727ccdff0a793ee73bcde4e2e09cbef6b5387`，产品版本随上游从 **1.0.35** 升至 **1.0.38**。发布范围覆盖上一版 `v1.0.35-fork.1` 之后的上游更新（1.0.36–1.0.38），以及吸收该更新所需的合并适配与本地化修复（22 个冲突文件、150 个冲突块，其中 112 个 cosmetic 块自动采用上游）。
+
+### 上游更新
+
+- 粘贴图片在 yank/undo/历史召回后仍可发送，无法发送时会通知用户；技能提示、`/compact` 和其它斜杠命令不会把图片带上线，并提示重新粘贴。
+- 新增仪表盘预览开关：可隐藏所选会话的预览与回复面板，把空间留给会话列表。
+- 后台 shell 命令以实时任务行显示流式输出；子代理 overlay 在子回合结束后不再卡在 “Cancelling”。
+- `/context` 图例各段占比合计为 100%；复杂或大尺寸 Mermaid 流程图可正确渲染和打开。
+- 权限提示中过长的引号参数会换行而不截断；带引号文件名变量的 Bash 命令遵循已配置的权限规则。
+- `/model` 推理强度菜单默认打开模型推荐档位；`config.toml` 接受大小写混合的 `reasoning_effort`（如 `xHigh`）。
+- 组织可禁止非托管策略中的 hook；`[agent]` 配置在默认 TUI 会话中生效；仪表盘回车不再误开空会话。
+- `use_tool` 对 Messages 后端只发 inline schema，修复工具调用错误；MCP 插件清单里声明的 client ID 可完成鉴权。
+- 其它修复：子代理后台命令的审批会显示而不再静默拒绝；`grok --sandbox` 接受目录信任后不再退出；钉住的仪表盘行不再因活动变化跳动；Swift 三引号字符串高亮；提示建议里的长回复不再中途截断。
+- 上游 1.0.36–1.0.38 的逐条英文原文保留在本文档下方对应的版本段中，本段仅为本次同步的范围摘要。
+
+### 本 Fork
+
+- 合并适配：保留 fork 的三参数 `push_turn_terminal_marker`（按 ending prompt id 匹配 stop-hook stash），并接到上游新增的 `finalize_child_view_turn`；MCP 文件输入授权改为 `request_permission(PermissionRequest)`，以匹配上游去掉单参数 `request` 后的权限 API；清空 Web Search 模型覆盖仍走 `update_config_with_root` + BoundDest + `TomlValue`。
+- 斜杠内置命令走上游抽出的 `available_command` 辅助函数，描述与 hint 仍经 `builtin_description` / `builtin_hint` 查目录。
+- 次要模型 `LOCAL-PATCH(upstream-fork-secondary-model)` 接到当前 `SessionRequestContext` / `fork_session_params` API，headless `-p` 子会话继续遵守该补丁。
+- 本批上游新增用户可见文案接入目录：未发送图片通知、仪表盘预览设置、`/context` 图例「已计入上方」、Mermaid「正在渲染图表…」。`grok trace` 的 CLI stderr 仍按 Non-goals 保持英文，并登记在审计豁免表。
+- 简体中文用户指南补上压缩模型与默认智能体两节。
+- 保留此前版本的简体中文界面、透明背景、账户计费与 CPA 配额、会话用量、次要模型与推理强度、压缩模型、逐次请求指标开关等 fork 变更。
+
+### 兼容性
+
+- 产品版本随上游从 **1.0.35** 升至 **1.0.38**；发布标签 `v1.0.38-fork.1` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的 `1.0.38`。
+- 行为随上游变化：粘贴图片在不能随命令发送时会留下可本地化的通知；仪表盘预览默认开启，可在设置中关闭。
+- 本地化目录的查找、回退与语言解析机制未改动；未提供翻译的键继续回退英文，其它语种仍使用英文目录回退。
+- 不新增外部服务、鉴权流程或运行时依赖。
+
+### 国际化
+
+- 本版新增与迁移的用户可见文案均已覆盖英文与简体中文：`en.toml` 与 `zh-CN.toml` 各从 4317 个键增至 4327 个键（+10 键），两侧键集合与 `{placeholder}` 完全一致。
+- 未提供翻译的键继续回退英文；日志与 tracing 输出、发给模型的 prompt 与系统提示、协议/JSON 字段名、错误码、内部标识符，以及 CLI `--help` 与错误消息不在本地化范围内（沿用既有 Non-goals），新出现的同类文本仍由 diff 门槛把关。
+- 自定义 agent 类型名、按键名、和弦、路径与产品名等不透明值保持原样，继续登记在审计豁免表中。
+
+### 验证
+
+本地等 CI 验证（Rust 1.92.0、Protoc 29.3、全部 `--locked`，`GROK_VERSION=1.0.38-fork.1`）：
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；`target/release/xai-grok-pager --version` 输出 `grok 1.0.38-fork.1 (fa566a783511) [fork]`，包含本版版本号。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`（`GROK_I18N_AUDIT_BASE=main`）：全仓扫描与对 main 的 diff 审计通过。
+- `python3 scripts/i18n_catalog.py`：`missing_keys`、`extra_keys`、`placeholder_mismatches` 均为空。
+- `python3 scripts/upstream_merge.py audit-markers`：通过。
+- 冲突相关的 pager / shell 库测试（含 `turn_completion`、slash 命令、MCP 文件输入、设置写入）通过。
+- Windows x86_64 由 GitHub Actions 的 `Build` 工作流验证。
+
+### 产物
+
+- `grok-1.0.38-fork.1-linux-x86_64`
+- `grok-1.0.38-fork.1-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.35-fork.1...v1.0.38-fork.1
+
 # 1.0.35-fork.1 — 2026-09-18
 
 同步上游 monorepo `a28ee2b2` / Source-Revision `e8563f8f182296ebb53cadb3e1eab7615d76408e`，产品版本随上游从 **1.0.32** 升至 **1.0.35**。发布范围覆盖上一版 `v1.0.32-fork.1` 之后的上游更新（1.0.33–1.0.35），以及吸收该更新所需的合并适配与本地化修复（32 个冲突文件、78 个冲突块）。
@@ -1262,6 +1322,52 @@
 - `SHA256SUMS`
 
 **Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.3...v1.0.5-fork.4
+
+# 1.0.38 — 2026-09-19
+
+## Features
+
+- **Long agent replies** in prompt-suggestion transcripts are no longer cut off mid-sentence.
+- **read_file** on skill and instruction files can now be configured per deployment.
+- **Pasted images** survive yank/undo/history recall and the user is notified when any cannot be sent.
+
+## Bug Fixes
+
+- **Subagent overlays** no longer stay stuck showing "Cancelling" after the child turn ends.
+- **Long quoted arguments** in permission prompts now wrap instead of clipping.
+- **Fixed tool-calling errors** by sending inline-only use_tool schema.
+
+
+# 1.0.37 — 2026-09-18
+
+## Bug Fixes
+
+- **Mermaid flowcharts** with complex labels or large sizes now render and open correctly.
+- **`/context`** legend now shows accurate percentages that always add up to 100%.
+- **Pressing `y`** on a queue row now copies the prompt text to the clipboard.
+- **`/model`** effort picker now defaults to the model's recommended effort level.
+- **Bash commands** using quoted filename variables now respect configured permission rules instead of always prompting.
+
+
+# 1.0.36 — 2026-09-17
+
+## Features
+
+- **New Dashboard preview setting** lets you hide the selected-session preview panel on the dashboard.
+- **New policy setting** allows organizations to disable hooks that are not from managed policy.
+- **Background shell commands** now appear as live task rows with streaming output.
+
+## Bug Fixes
+
+- **`grok --sandbox`** no longer exits when accepting folder trust.
+- **Pinned agents** in the dashboard no longer jump when their activity changes.
+- **Swift code** with triple-quoted strings now highlights correctly in the pager.
+- **Mixed-case reasoning_effort** values (e.g. "xHigh") are now accepted in config.toml.
+- **Fixed accidental empty agent sessions** when pressing Enter right after sending from the dashboard.
+- **Fixed default TUI sessions** so an [agent] set in config.toml is respected instead of always using a builtin plan.
+- **MCP plugin authentication** now succeeds for servers that declare a client ID in their manifest.
+- **Shell command approvals** from background subagents are now shown instead of being silently rejected.
+
 
 # 1.0.35 — 2026-09-16
 

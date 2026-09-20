@@ -473,9 +473,7 @@ impl PagerLeaderCluster {
                     .meta(
                         serde_json::json!({
                             "startupHints": {
-                                "nonInteractive": true,
-                                "skipGitStatus": true,
-                                "skipProjectLayout": true
+                                "nonInteractive": true
                             },
                             "clientType": "pager-cluster",
                             "clientVersion": "0.0.0-test",

@@ -15,6 +15,8 @@ use crate::theme::Theme;
 use crate::util::format_duration;
 
 /// What kind of bg task lifecycle event this block represents.
+/// The signal recorded on a task the user stopped.
+pub(crate) const KILLED_SIGNAL: &str = "killed";
 #[derive(Debug, Clone)]
 pub enum BgTaskKind {
     /// Task was started (process is running).
@@ -159,7 +161,7 @@ impl BlockContent for BgTaskBlock {
                 let duration = format_duration(*elapsed);
                 let is_killed = signal
                     .as_deref()
-                    .is_some_and(|s| matches!(s, "killed" | "SIGTERM" | "SIGKILL" | "oom"));
+                    .is_some_and(|s| matches!(s, KILLED_SIGNAL | "SIGTERM" | "SIGKILL" | "oom"));
                 let (key, detail) = if is_killed {
                     ("scrollback.bg_task.killed", String::new())
                 } else {

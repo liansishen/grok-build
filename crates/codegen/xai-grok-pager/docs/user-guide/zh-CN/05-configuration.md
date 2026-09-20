@@ -91,6 +91,28 @@ load_envrc = true                      # 加载 .envrc 环境变量
 respect_gitignore = false              # 默认：false；设为 true 后每个工具都会跳过被 gitignore 的文件
 ```
 
+#### 压缩模型
+
+`/compact` 和自动压缩默认使用当前会话模型。若要用**同一提供方**的另一个模型做摘要，在该目录条目上设置 `compaction_model`。未设置或留空则继续用会话模型。只改模型 id；端点、后端和凭据仍跟会话模型走。
+
+```toml
+[model.gpt-luna]
+model = "gpt-5.6-luna"
+compaction_model = "gpt-5.4-mini"
+```
+
+### 默认智能体
+
+交互式 `grok` 在未传入 `--plan`、`--ask-user` 或 `--agent-profile` 时，会使用 `config.toml` 里的 `[agent]`：
+
+```toml
+[agent]
+name = "my-custom-agent"
+# definition = "/path/to/agent.md"   # 路径优先于名称
+```
+
+`definition` 是带 YAML frontmatter 的 markdown 文件。`name` 是内置或已发现的智能体（`~/.grok/agents/`、`.grok/agents/`）。若指定名称不存在，Grok 会依次使用 `GROK_AGENT`、再回退到内置默认。`--agent-profile`、`--plan` 和 `--ask-user` 仍会覆盖该会话。字段列表见 [26-config-reference.md](26-config-reference.md)。
+
 <a id="input-mode"></a>
 #### 输入模式
 
