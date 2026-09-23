@@ -839,7 +839,15 @@ pub async fn run_update_if_available(
     }
     if inst == WINGET {
         eprintln!(
-            "A new version of Grok Build is available: {current_version} -> {latest_version}"
+            "{}",
+            t_fmt(
+                "update.available.with_versions",
+                &[
+                    ("current", current_version.as_str()),
+                    ("latest", latest_version.as_str()),
+                    ("channel", channel),
+                ],
+            )
         );
         let target = if has_version_cap(&policy) {
             crate::winget::Target::Exact(&latest_version)
@@ -2740,7 +2748,13 @@ pub async fn run_update(
                             && needs_update(&current, &target, "stable", above_hard_cap)
                                 == Some(false)
                         {
-                            eprintln!("Already up to date ({current}).");
+                            eprintln!(
+                                "{}",
+                                t_fmt(
+                                    "update.already_up_to_date",
+                                    &[("version", current.as_str())]
+                                )
+                            );
                             return Ok(None);
                         }
                         Some(target)
