@@ -3368,7 +3368,7 @@
 "workflow.phase_count" = "{done}/{total} phases"
 "workflow.phase_count_one" = "{done}/{total} phase"
 "workflow.phases" = "Phases"
-"workflow.run_meta" = "{phases} · {agents} · {elapsed}"
+"workflow.run_meta" = "{phases} · {elapsed}"
 "workflow.shortcut_close" = "esc close"
 "workflow.shortcut_open" = "enter open"
 "workflow.shortcut_pause" = "p pause"
@@ -3521,7 +3521,7 @@
 "shortcuts.pseudo.paste_long_help_windows" = "Pastes clipboard images into the prompt as chips, and plain text as typed.\nPrefer Ctrl+V. Use Alt+V as a fallback when Ctrl+V fails (some terminals or configs drop image clipboards; older Windows Terminal versions only pasted text).\nYou can also drag an image file from Explorer into the prompt."
 "shortcuts.pseudo.paste_long_help_macos" = "Pastes clipboard images into the prompt as chips, and plain text as typed.\nUse Ctrl+V for screenshots, browser \"Copy Image\", and file-manager image copies (many terminals swallow Cmd+V and never deliver it to the TUI).\nYou can also drag an image file into the prompt."
 "shortcuts.pseudo.paste_long_help_other" = "Pastes clipboard images into the prompt as chips, and plain text as typed.\nUse Ctrl+V for screenshots, browser \"Copy Image\", and file-manager image copies.\nYou can also drag an image file into the prompt."
-"shortcuts.pseudo.undo_long_help" = "Undoes the last change in the prompt editor.\nCovers typing, deletes, line/word kills, and clearing a draft."
+"shortcuts.pseudo.undo_long_help" = "Undoes the last change in the prompt editor.\nCovers typing, deletes, line/word kills, and clearing a draft.\nPressed right after a stash or a double-Esc clear, brings the draft back."
 "shortcuts.pseudo.redo_long_help" = "Redoes the last undone change in the prompt editor.\nCtrl+Shift+Z is primary; Alt+Z is an alternate."
 "shortcuts.pseudo.history_long_help" = "Recalls previously sent prompts.\nPress Up on an empty prompt to browse earlier prompts, newest first; each move live-populates the composer so you can edit and resend.\nWith prompts queued, Up moves focus into the queue pane on the last row instead.\nRun /history to open a searchable history panel and filter by text."
 "shortcuts.pseudo.search_scrollback_long_help" = "Searches the conversation scrollback for text and jumps between matches.\nIn the prompt input, run /find to search. In vim mode, you can also press / while the scrollback is focused.\nType a query, then use n and N (or the arrow keys) to step through matches. Press Enter to jump to a match and Esc to dismiss."
@@ -3895,7 +3895,7 @@
 "plan_mode.file.inaccessible" = "The file could not be accessed."
 "plan_mode.file.unavailable" = "The plan file location is unavailable."
 "plan_mode.file.missing" = "Write your plan to {path}. {detail}"
-"plan_mode.instructions" = "{message}\n\n{plan_status}\n\nIn plan mode, you should:\n1. Thoroughly explore the codebase to understand existing patterns{task_hint}\n2. Identify similar features, codebase architecture, and understand trade-offs\n3. Use {ask_user} if you need to clarify the approach\n4. Design a concrete implementation strategy\n5. Write your plan to the plan file above\n6. When ready, use {exit_plan} to present your plan to the user."
+"plan_mode.instructions" = "{message}\n\n{plan_status}\n\nIn plan mode, you should:\n1. Thoroughly explore the codebase to understand existing patterns\n2. Identify similar features, codebase architecture, and understand trade-offs\n3. Use {ask_user} if you need to clarify the approach\n4. Design a concrete implementation strategy\n5. Write your plan to the plan file above\n6. When ready, use {exit_plan} to present your plan to the user."
 "plan_mode.exit.saved" = "{message}\n\nYour plan has been saved at: {path}\n\n## Plan:\n{content}"
 "tool.monitor.persistent" = "Monitor started (task {task}, persistent -- runs until {kill_tool} or session end).\nYou will be notified on each event. Keep working -- do not poll or sleep.\nEvents may arrive while you are waiting for the user -- an event is not their reply."
 "tool.monitor.timeout" = "Monitor started (task {task}, timeout {timeout_ms}ms).\nYou will be notified on each event. Keep working -- do not poll or sleep.\nEvents may arrive while you are waiting for the user -- an event is not their reply."
@@ -3953,11 +3953,11 @@
 "task_output.invalid_args.empty_ids" = "Provide a non-empty task_ids list."
 "task_output.invalid_args.too_many_ids" = "task_ids exceeds maximum of {max} entries."
 
-"tool.description.task" = "Start a subagent that works on a task independently and reports back.\n\nAgent types:\n\n{agent_lines}\n\n## Usage notes\n- When the agent is done, it returns a single message with its agent ID. Use that ID to resume the agent later for follow-up work.\n- {run_in_background_param}: Returns immediately with a subagent_id. Use {background_retrieval_tool} to retrieve results. This is set to true by default.\n- Subagents receive a compacted version of project instructions (AGENTS.md). If the task requires detailed conventions (e.g., build rules, testing patterns), include the relevant rules directly in the prompt.\n- When using the {task_tool} tool, you must specify a {subagent_type_param} parameter to select which agent type to use.\n- When launching independent subagents, you MUST incorporate the results into the task based on requirements BEFORE concluding.\n\nResuming a previous agent (resume_from):\n- Use {resume_from_param} to continue a previously completed subagent's conversation. Pass the subagent_id returned by a prior {task_tool} call. A resumed agent keeps its full transcript and tool state, so you only need to describe what changed since the last run -- don't re-explain the original task.\n- The resumed agent must use the same subagent_type as the source.\n\nIsolation mode:\n- Use {isolation_param} to control the child's execution environment. With 'worktree', the child runs in an isolated git worktree whose edits don't affect the parent workspace; the worktree is preserved after completion and its path is returned in the output."
+"tool.description.task" = "Start a subagent that works on a task independently and reports back.\n\n## Usage notes\n- When the agent is done, it returns a single message with its agent ID. Use that ID to resume the agent later for follow-up work.\n- {run_in_background_param}: Returns immediately with a subagent_id. Use {background_retrieval_tool} to retrieve results. This is set to true by default.\n- Subagents receive a compacted version of project instructions (AGENTS.md). If the task requires detailed conventions (e.g., build rules, testing patterns), include the relevant rules directly in the prompt.\n- When launching independent subagents, you MUST incorporate the results into the task based on requirements BEFORE concluding.\n\nResuming a previous agent ({resume_from_param}):\n- Use {resume_from_param} to continue a previously completed subagent's conversation. Pass the subagent_id returned by a prior {task_tool} call. A resumed agent keeps its full transcript and tool state, so you only need to describe what changed since the last run — don't re-explain the original task.\n\nIsolation mode:\n- Use {isolation_param} to control the child's execution environment. With \"worktree\", the child runs in an isolated git worktree whose edits don't affect the parent workspace; the worktree is preserved after completion and its path is returned in the output."
 "tool.description.subagent.general_purpose" = "General purpose agent for multi-step tasks."
 "tool.description.subagent.explore" = "Fast, read-only agent specialized for codebase exploration."
 "tool.description.subagent.plan" = "Software architect for planning implementation strategies."
-"tool.description.lifecycle.target_suffix.monitor_subagent" = " or monitor or subagent"
+"tool.description.lifecycle.target_suffix.monitor_subagent" = ", monitor, or subagent"
 "tool.description.lifecycle.target_suffix.monitor" = " or monitor"
 "tool.description.lifecycle.target_suffix.subagent" = " or subagent"
 "tool.description.lifecycle.target_suffix.none" = ""
@@ -4023,18 +4023,18 @@
 
 "tool.task.continue_parent_work" = "Do not only poll the child. Continue unfinished parent work now."
 "tool.task.background_result_line" = "When you need its result, use {task_output_tool} with {task_ids_param}=[\"{subagent_id}\"] and a positive {timeout_ms_param}."
-"tool.task.started_background" = "Subagent started in background.\nsubagent_id: {subagent_id}\ntype: {subagent_type}\ndescription: {description}\n\n{result_line}"
-"tool.task.auto_backgrounded.notify_clause" = " -- you will be notified when it completes"
-"tool.task.auto_backgrounded" = "Subagent took longer than the foreground budget and was moved to the background to keep the conversation responsive. It is still running{notify_clause}.\nsubagent_id: {subagent_id}\ntype: {subagent_type}\ndescription: {description}\n\n{result_line}"
-"tool.task.completed" = "{output}\n\n<subagent_meta>id={subagent_id}, type={subagent_type}, tool_calls={tool_calls}, turns={turns}, duration_ms={duration_ms}</subagent_meta>\n\n{footer}"
-"tool.task.resume_footer" = "<subagent_result>\nsubagent_id: {subagent_id}\nsubagent_type: {subagent_type}\nTo continue this subagent's conversation, use resume_from=\"{subagent_id}\"."
+"tool.task.started_background" = "Subagent started in background.\nsubagent_id: {subagent_id}\ndescription: {description}\n\n{result_line}"
+"tool.task.auto_backgrounded.notify_clause" = " — you will be notified when it completes"
+"tool.task.auto_backgrounded" = "Subagent took longer than the foreground budget and was moved to the background to keep the conversation responsive. It is still running{notify_clause}.\nsubagent_id: {subagent_id}\ndescription: {description}\n\n{result_line}"
+"tool.task.completed" = "{output}\n\n<subagent_meta>id={subagent_id}, tool_calls={tool_calls}, turns={turns}, duration_ms={duration_ms}</subagent_meta>\n\n{footer}"
+"tool.task.resume_footer" = "<subagent_result>\nsubagent_id: {subagent_id}\nTo continue this subagent's conversation, use resume_from=\"{subagent_id}\"."
 "tool.task.resume_persona" = "\nThe subagent used persona=\"{persona}\". Pass the same persona when resuming."
 "tool.task.resume_footer_end" = "\n</subagent_result>"
 "tool.description.lifecycle.wait_cap.seconds" = "{ms} (~{seconds} s)"
 "tool.description.lifecycle.wait_cap.minutes" = "{ms} (~{minutes} min)"
 "tool.description.lifecycle.wait_cap.hours" = "{ms} (~{hours} h)"
-"tool.description.task.model_guidance.none" = "\n\nNo explicit model slugs are currently available. Omit `{model_param}` to inherit the parent model."
-"tool.description.task.model_guidance.available" = "\n\nIf the user explicitly asks for the model of a subagent/task, you may ONLY use model slugs from this list:\n{model_list}\n\nIf the user does not explicitly request a model, omit `{model_param}` to inherit the parent model."
+"tool.description.task.model_guidance.none" = "\n\nNo explicit model slugs are currently available. OMIT the `{model_param}` field."
+"tool.description.task.model_guidance.available" = "\n\nIf the user explicitly asks for the model of a subagent/task, you may ONLY use model slugs from this list:\n{model_list}\n\nIf the user does NOT _explicitly_ request a model, OMIT the `{model_param}` field."
 
 "tool.schema.the_full_task_prompt_for_the_subagent_to_execute" = "The full task prompt for the subagent to execute."
 "tool.schema.short_description_of_the_task_3_5_words" = "Short description of the task (3-5 words)."
@@ -4934,6 +4934,16 @@ images_not_sent_compact = "Images not sent with /compact — paste them again"
 images_not_sent_skill_prompt = "Images not sent with a skill prompt — paste them again"
 
 images_not_sent_slash = "Images not sent with /{command} — paste them again"
+
+daemon_session_worktree_unsupported = "Daemon sessions can't be resumed in a worktree"
+
+setting_fixed_by = "✗ {label} is fixed by {by}"
+
+setting_nothing_to_reset = "{label}: nothing to reset"
+
+setting_nothing_to_reset_layer = "{label}: nothing to reset; {layer} sets it"
+
+setting_reset = "✓ {label}: reset"
 [task_result]
 workspace_archive_invalid_id = "Could not archive session: invalid session id"
 
@@ -5072,7 +5082,7 @@ label = "stash"
 
 description = "Stash / pop prompt draft"
 
-help = "Stash your current prompt as a draft.\nCtrl+S sets the draft aside and clears the composer. Ctrl+S on an empty composer restores it. The draft also restores by itself after you send your next prompt. Use Alt+S if your terminal swallows Ctrl+S.\nOne draft at a time: a new stash replaces the old one."
+help = "Stash your current prompt as a draft.\nCtrl+S sets the draft aside and clears the composer. Ctrl+S on an empty composer restores it, as does Ctrl+Z pressed right after the stash. The draft also restores by itself after you send your next prompt. Use Alt+S if your terminal swallows Ctrl+S.\nOne draft at a time: a new stash replaces the old one."
 
 [actions.BashMode]
 help = "Runs a shell command without leaving the chat: type ! at the start of an empty prompt, then the command.\nThe command output is captured into the scrollback.\nDelete the leading ! to go back to a normal prompt."
@@ -5149,3 +5159,11 @@ description = "Show the selected session's preview and reply panel in the dashbo
 
 [scrollback.context]
 already_counted = "Already counted above"
+
+[subagent.label]
+fallback = "subagent"
+
+[settings.subagent_model_inheritance]
+label = "Subagent model inheritance"
+
+description = "On: Grok cannot set models for subagents\nOff: Grok may choose a different model for a subagent. Takes effect after restart.\nNOTE: This setting only applies when all models are xAI \"model_family\". You likely don't need to configure this setting."

@@ -299,6 +299,14 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `hooks.<event>[].hooks[].type` | `command` | `yes` | `user` | hook 处理器类型；支持命令 hook。 |
 | `hooks.<event>[].matcher` | `string` | `yes` | `user` | 该 hook 组的工具名匹配器。 |
 
+### `long_reasoning_reminder`
+
+| 键 | 类型／取值 | Requirements | 托管 | 说明 |
+| --- | --- | --- | --- | --- |
+| `long_reasoning_reminder.enabled` | `boolean` | `yes` | `user` | 在隐藏推理很长的模型调用之后，于轮次中途注入一条简短推理提醒。默认 false。也可通过 `GROK_LONG_REASONING_REMINDER` 设置（一个布尔词，或形状与本表相同的 JSON 对象）。 |
+| `long_reasoning_reminder.tokens` | `integer` | `yes` | `user` | 单次模型调用中计为很长的推理 token 数。默认 1000，限制在 100–200000。也可在 `GROK_LONG_REASONING_REMINDER` JSON 对象的 `tokens` 字段中设置。 |
+| `long_reasoning_reminder.delay` | `integer` | `yes` | `user` | 长调用之后、发出提醒之前要等待的模型调用次数。默认 1，限制在 0–10。也可在 `GROK_LONG_REASONING_REMINDER` JSON 对象的 `delay` 字段中设置。 |
+
 ### `managed_mcps`
 
 | 键 | 类型／取值 | Requirements | 托管 | 说明 |
@@ -378,6 +386,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `model.<id>.hidden` | `boolean` | `yes` | `user` | 从选择器隐藏模型；仍可用 `-m` 选择。 |
 | `model.<id>.inference_idle_timeout_secs` | `number` | `yes` | `user` | 该模型流式推理的空闲超时。 |
 | `model.<id>.max_completion_tokens` | `number` | `yes` | `user` | 该模型最大补全 token 数。 |
+| `model.<id>.max_request_bytes` | `number` | `yes` | `user` | 内联图像会被驱逐以保持在其下的提供方请求体上限。未设置时先继承 `[model_providers.<id>]` 的值，再使用 `api_backend` 默认值：`messages` 为 30 MB，其他为 50 MiB。 |
 | `model.<id>.max_retries` | `number` | `yes` | `user` | 该模型的推理重试次数。 |
 | `model.<id>.model` | `string` | `yes` | `user` | 发送给 API 的模型 ID。 |
 | `model.<id>.model_family` | `string` | `yes` | `user` | 用于压缩和能力分组的模型家族 ID。 |
@@ -385,13 +394,13 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `model.<id>.name` | `string` | `yes` | `user` | 模型选择器中显示的标签。 |
 | `model.<id>.query_params` | `map<string,string>` | `yes` | `user` | 该模型请求的额外查询参数。 |
 | `model.<id>.reasoning_effort` | `string` | `yes` | `user` | 已弃用的单模型推理强度；优先使用 `reasoning_efforts`。 |
-| `model.<id>.reasoning_efforts` | `array of tables` | `yes` | `user` | 该模型允许的推理强度取值。 |
+| `model.<id>.reasoning_efforts` | `array of tables` | `yes` | `user` | 该模型允许的推理强度取值。省略时，菜单来自端点的 `/v1/models` 行（`reasoning_efforts`；若没有该字段，则使用 `capabilities.reasoning_effort`）。 |
 | `model.<id>.reasoning_summary` | `none / auto / concise / detailed` | `yes` | `user` | 此模型的 Responses API `reasoning.summary`；默认 `concise`。对于拒绝该字段的端点（例如 AWS Bedrock Mantle），`none` 会省略该字段。 |
 | `model.<id>.show_model_fingerprint` | `boolean` | `yes` | `user` | 提供方返回模型 fingerprint 时在 UI 中显示。 |
 | `model.<id>.stream_tool_calls` | `boolean` | `yes` | `user` | 该模型工具调用流式请求的形状。 |
 | `model.<id>.supported_in_api` | `boolean` | `yes` | `user` | 此目录条目是否作为公共 API 模型提供。 |
 | `model.<id>.supports_backend_search` | `boolean` | `yes` | `user` | 端点是否支持 Grok 托管的服务端搜索工具。 |
-| `model.<id>.supports_reasoning_effort` | `boolean` | `yes` | `user` | 已弃用；优先使用 `reasoning_efforts`。 |
+| `model.<id>.supports_reasoning_effort` | `boolean` | `yes` | `user` | 已弃用；优先使用 `reasoning_efforts`。显式的 `false` 会使该模型不进入它原本会从端点或同模型目录条目继承的任何菜单。 |
 | `model.<id>.system_prompt_label` | `string` | `yes` | `user` | 单模型系统提示身份标签。 |
 | `model.<id>.temperature` | `number` | `yes` | `user` | 单模型采样 temperature。 |
 | `model.<id>.top_p` | `number` | `yes` | `user` | 单模型 `top_p`。 |
@@ -508,7 +517,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 
 | 键 | 类型／取值 | Requirements | 托管 | 说明 |
 | --- | --- | --- | --- | --- |
-| `subagents.enabled` | `boolean` | `pin` | `user` | 子智能体／任务工具总开关。也对应 `GROK_SUBAGENTS`。 |
+| `subagents.enabled` | `boolean` | `pin` | `user` | 子智能体／任务工具总开关；即使设置了其他 `subagents.*` 键，默认仍为 true。也对应 `GROK_SUBAGENTS` 或 `--no-subagents`。 |
 | `subagents.limit_behavior` | `queue / fail` | `yes` | `user` | 达到并发子智能体上限时的处理方式。 |
 | `subagents.max_concurrent` | `integer` | `yes` | `user` | 最大并发子智能体数。 |
 | `subagents.max_depth` | `integer` | `yes` | `user` | 最大嵌套深度（至少为 1）。 |

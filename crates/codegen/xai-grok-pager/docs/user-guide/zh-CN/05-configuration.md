@@ -62,8 +62,7 @@ group_tool_verbs = true                # 将连续的 read/search/list 工具调
                                        # ——以及其中已完成的思考——折叠成一行（默认：true）
 collapsed_edit_blocks = false          # 将编辑显示为单行 +N/-M diffstat 摘要，并把
                                        # 同一文件连续编辑合并为一行；展开可查看
-                                       # 差异（默认：false；pager.toml [scrollback.blocks.edit]
-                                       # expanded_by_default/line_summary 可覆盖其折叠形状）
+                                       # 差异（默认：false）
 page_flip_on_send = true               # 将刚发送的提示固定在视口顶部，使
                                        # 回复从新页面开始（默认：true）；设为 false
                                        # 后发送不会移动滚动位置
@@ -735,8 +734,8 @@ dim_accent = 0.5                      # 折叠强调色的变暗因子（0.0-1.0
 [scrollback.blocks.edit]
 indent = true                         # 缩进差异内容
 vpad = false                          # 垂直内边距
-# expanded_by_default = true          # 未设置：遵循 config.toml 中 [ui] collapsed_edit_blocks
-                                      #（该标志开启时为折叠单行）；取消注释可固定任一形状
+# expanded_by_default = true          # 未设置时遵循 Collapsed edit blocks。该设置开启时，
+                                      # 即使此行为 true，编辑也会以折叠状态开始。
 dual_line_numbers = false             # 双列行号（旧 + 新）
 # line_summary = false                # 在折叠标题中显示 +N/-M；未设置时遵循相同标志
 hunk_separator = "…"                  # 差异块之间的分隔符（默认：“…”）

@@ -62,19 +62,6 @@ fn subagent_meta_line_joins_present_fields() {
 }
 
 #[test]
-fn subagent_type_label_abbreviates_general_purpose() {
-    let cases = [
-        ("general-purpose", "general"),
-        ("explore", "explore"),
-        ("plan", "plan"),
-        ("custom-agent", "custom-agent"),
-    ];
-    for (input, expected) in cases {
-        assert_eq!(format_type_label(input), expected);
-    }
-}
-
-#[test]
 fn context_badge_shown_only_for_resumed_and_forked() {
     let cases = [
         (Some("resumed"), "resumed"),
@@ -90,7 +77,7 @@ fn context_badge_shown_only_for_resumed_and_forked() {
 }
 
 #[test]
-fn subagent_label_prefers_persona_then_role_then_type_then_tag() {
+fn subagent_label_prefers_persona_then_role_then_tag() {
     struct Case {
         persona: Option<&'static str>,
         role: Option<&'static str>,
@@ -129,7 +116,7 @@ fn subagent_label_prefers_persona_then_role_then_type_then_tag() {
             None,
             "explore",
             "[deep-dive] find auth code",
-            "Explore",
+            "Deep-dive",
             "find auth code",
         ),
         case(
@@ -145,7 +132,7 @@ fn subagent_label_prefers_persona_then_role_then_type_then_tag() {
             None,
             "general-purpose",
             "do a thing",
-            "General",
+            "Subagent",
             "do a thing",
         ),
         case(
@@ -169,7 +156,7 @@ fn subagent_label_prefers_persona_then_role_then_type_then_tag() {
             None,
             "general-purpose",
             "[] do something",
-            "General",
+            "Subagent",
             "[] do something",
         ),
         case(
@@ -177,7 +164,7 @@ fn subagent_label_prefers_persona_then_role_then_type_then_tag() {
             None,
             "general-purpose",
             "[broken description",
-            "General",
+            "Subagent",
             "[broken description",
         ),
         case(
@@ -185,7 +172,7 @@ fn subagent_label_prefers_persona_then_role_then_type_then_tag() {
             None,
             "custom-agent",
             "test task",
-            "Custom-agent",
+            "Subagent",
             "test task",
         ),
         case(
@@ -340,7 +327,7 @@ fn subagent_labels_resolve_through_the_catalog() {
         )
     });
     assert!(pseudo.0.contains("⟦subagent.type.general⟧"), "{:?}", pseudo.0);
-    assert!(pseudo.1.contains("⟦subagent.type.explore⟧"), "{:?}", pseudo.1);
+    assert!(pseudo.1.contains("⟦subagent.label.fallback⟧"), "{:?}", pseudo.1);
     assert!(pseudo.2.contains("⟦subagent.context.resumed⟧"), "{:?}", pseudo.2);
     assert!(pseudo.3.contains("⟦subagent.activity.thinking⟧"), "{:?}", pseudo.3);
     assert!(pseudo.4.contains("⟦subagent.activity.compacting⟧"), "{:?}", pseudo.4);
@@ -351,7 +338,7 @@ fn subagent_labels_resolve_through_the_catalog() {
     xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
     assert_eq!(format_type_label("general-purpose"), "通用");
     assert_eq!(format_type_label("custom-agent"), "custom-agent");
-    assert_eq!(format_subagent_label(&info).0, "探索");
+    assert_eq!(format_subagent_label(&info).0, "子代理");
     assert_eq!(format_context_badge(&info), "已恢复");
     assert_eq!(format_activity_label(&TurnActivity::Thinking), "思考中");
     assert_eq!(format_activity_label(&TurnActivity::Responding), "回复中");
@@ -361,7 +348,7 @@ fn subagent_labels_resolve_through_the_catalog() {
 
     info.subagent_type = "general-purpose".into();
     info.description = "plain task".into();
-    assert_eq!(format_subagent_label(&info).0, "通用");
+    assert_eq!(format_subagent_label(&info).0, "子代理");
 }
 
 #[test]

@@ -3368,7 +3368,7 @@
 "workflow.phase_count" = "{done}/{total} 个阶段"
 "workflow.phase_count_one" = "{done}/{total} 个阶段"
 "workflow.phases" = "阶段"
-"workflow.run_meta" = "{phases} · {agents} · {elapsed}"
+"workflow.run_meta" = "{phases} · {elapsed}"
 "workflow.shortcut_close" = "esc 关闭"
 "workflow.shortcut_open" = "enter 打开"
 "workflow.shortcut_pause" = "p 暂停"
@@ -3521,7 +3521,7 @@
 "shortcuts.pseudo.paste_long_help_windows" = "将剪贴板图像作为图片块粘贴到提示词中，纯文本则按原样粘贴。\n首选 Ctrl+V。当 Ctrl+V 失效时使用 Alt+V 作为备选（部分终端或配置会丢弃图像剪贴板；旧版 Windows Terminal 只会粘贴文本）。\n也可以从资源管理器拖拽图像文件到提示词中。"
 "shortcuts.pseudo.paste_long_help_macos" = "将剪贴板图像作为图片块粘贴到提示词中，纯文本则按原样粘贴。\n截图、浏览器“复制图像”以及文件管理器复制图像请使用 Ctrl+V（许多终端会吞掉 Cmd+V，无法送达 TUI）。\n也可以将图像文件拖入提示词。"
 "shortcuts.pseudo.paste_long_help_other" = "将剪贴板图像作为图片块粘贴到提示词中，纯文本则按原样粘贴。\n截图、浏览器“复制图像”以及文件管理器复制图像请使用 Ctrl+V。\n也可以将图像文件拖入提示词。"
-"shortcuts.pseudo.undo_long_help" = "撤销提示词编辑器中的最后一次更改。\n涵盖输入、删除、行/词级剪切以及清空草稿。"
+"shortcuts.pseudo.undo_long_help" = "撤销提示词编辑器中的最后一次更改。\n涵盖输入、删除、行/词级剪切以及清空草稿。\n在暂存或连按两次 Esc 清空之后立即按下，会恢复草稿。"
 "shortcuts.pseudo.redo_long_help" = "重做提示词编辑器中刚撤销的更改。\nCtrl+Shift+Z 为主快捷键；Alt+Z 为备选。"
 "shortcuts.pseudo.history_long_help" = "召回之前发送过的提示词。\n在空提示词上按 Up 浏览较早的提示词，最新的在前；每次移动都会实时填充编辑器，方便修改后重新发送。\n若已有排队提示词，Up 会把焦点移到队列窗格的最后一行。\n运行 /history 打开可搜索的历史面板，并按文本过滤。"
 "shortcuts.pseudo.search_scrollback_long_help" = "搜索会话滚动区中的文本并在匹配之间跳转。\n在提示词输入中运行 /find 进行搜索。在 vim 模式下，滚动区获得焦点时也可以按 /。\n输入查询后，使用 n 和 N（或方向键）在匹配之间切换。按 Enter 跳转到匹配处，按 Esc 关闭。"
@@ -3896,7 +3896,7 @@
 "plan_mode.file.inaccessible" = "无法访问该文件。"
 "plan_mode.file.unavailable" = "计划文件位置不可用。"
 "plan_mode.file.missing" = "请将计划写入 {path}。{detail}"
-"plan_mode.instructions" = "{message}\n\n{plan_status}\n\n在计划模式下，你应该：\n1. 彻底探索代码库，了解现有模式{task_hint}\n2. 找出相似功能和代码库架构，并理解其中的权衡\n3. 如果需要澄清方案，请使用 {ask_user}\n4. 设计具体的实现策略\n5. 将计划写入上面的计划文件\n6. 准备好后，使用 {exit_plan} 向用户展示计划。"
+"plan_mode.instructions" = "{message}\n\n{plan_status}\n\n在计划模式下，你应该：\n1. 彻底探索代码库，了解现有模式\n2. 找出相似功能和代码库架构，并理解其中的权衡\n3. 如果需要澄清方案，请使用 {ask_user}\n4. 设计具体的实现策略\n5. 将计划写入上面的计划文件\n6. 准备好后，使用 {exit_plan} 向用户展示计划。"
 "plan_mode.exit.saved" = "{message}\n\n你的计划已保存到：{path}\n\n## 计划：\n{content}"
 "tool.monitor.persistent" = "监视器已启动（任务 {task}，持久运行，直到 {kill_tool} 或会话结束）。\n每个事件到达时都会通知你。请继续工作，不要轮询或休眠等待。\n你等待用户期间也可能收到事件；事件不是用户的回复。"
 "tool.monitor.timeout" = "监视器已启动（任务 {task}，超时 {timeout_ms} 毫秒）。\n每个事件到达时都会通知你。请继续工作，不要轮询或休眠等待。\n你等待用户期间也可能收到事件；事件不是用户的回复。"
@@ -3954,7 +3954,7 @@
 "task_output.invalid_args.empty_ids" = "请提供非空的 task_ids 列表。"
 "task_output.invalid_args.too_many_ids" = "task_ids 超过最大条目数 {max}。"
 
-"tool.description.task" = "启动一个独立处理任务并返回结果的子代理。\n\n代理类型：\n\n{agent_lines}\n\n## 使用说明\n- 代理完成后会返回一条包含其代理 ID 的消息。使用该 ID 可在之后继续代理对话。\n- {run_in_background_param}：立即返回 subagent_id。使用 {background_retrieval_tool} 获取结果。该值默认为 true。\n- 子代理会接收一份压缩后的项目说明（AGENTS.md）。如果任务需要详细约定（例如构建规则、测试模式），请在提示中直接包含相关规则。\n- 使用 {task_tool} 工具时，必须指定 {subagent_type_param} 参数来选择代理类型。\n- 启动相互独立的子代理时，必须在结束前根据要求将结果纳入任务。\n\n继续之前的代理（resume_from）：\n- 使用 {resume_from_param} 继续之前已完成的子代理对话。传入之前调用 {task_tool} 返回的 subagent_id。继续的代理会保留完整对话记录和工具状态，因此只需描述发生了什么变化，无需重新解释原始任务。\n- 继续的代理必须与源代理使用相同的 subagent_type。\n\n隔离模式：\n- 使用 {isolation_param} 控制子代理的执行环境。使用 'worktree' 时，子代理在隔离的工作树中运行，其编辑不会影响父工作区；子代理完成后会保留该工作树，路径会在结果中返回。"
+"tool.description.task" = "启动一个独立处理任务并返回结果的子代理。\n\n## 使用说明\n- 代理完成后会返回一条包含其代理 ID 的消息。使用该 ID 可在之后继续代理对话。\n- {run_in_background_param}：立即返回 subagent_id。使用 {background_retrieval_tool} 获取结果。该值默认为 true。\n- 子代理会接收一份压缩后的项目说明（AGENTS.md）。如果任务需要详细约定（例如构建规则、测试模式），请在提示中直接包含相关规则。\n- 启动相互独立的子代理时，必须在结束前根据要求将结果纳入任务。\n\n继续之前的代理（{resume_from_param}）：\n- 使用 {resume_from_param} 继续之前已完成的子代理对话。传入之前调用 {task_tool} 返回的 subagent_id。继续的代理会保留完整对话记录和工具状态，因此只需描述自上次运行以来发生了什么变化——无需重新解释原始任务。\n\n隔离模式：\n- 使用 {isolation_param} 控制子代理的执行环境。使用 \"worktree\" 时，子代理在隔离的 git 工作树中运行，其编辑不会影响父工作区；完成后会保留该工作树，路径会在结果中返回。"
 "tool.description.subagent.general_purpose" = "用于多步骤任务的通用代理。"
 "tool.description.subagent.explore" = "专用于探索代码库的快速只读代理。"
 "tool.description.subagent.plan" = "负责制定实现策略的软件架构师。"
@@ -4024,18 +4024,18 @@
 
 "tool.task.continue_parent_work" = "不要只轮询子代理。现在继续完成父任务中尚未完成的工作。"
 "tool.task.background_result_line" = "需要结果时，请使用 {task_output_tool}，传入 {task_ids_param}=[\"{subagent_id}\"] 和正数 {timeout_ms_param}。"
-"tool.task.started_background" = "子代理已在后台启动。\nsubagent_id: {subagent_id}\ntype: {subagent_type}\ndescription: {description}\n\n{result_line}"
+"tool.task.started_background" = "子代理已在后台启动。\nsubagent_id: {subagent_id}\ndescription: {description}\n\n{result_line}"
 "tool.task.auto_backgrounded.notify_clause" = "，完成后会通知你"
-"tool.task.auto_backgrounded" = "子代理运行时间超过前台等待预算，已移至后台以保持对话响应。它仍在运行{notify_clause}。\nsubagent_id: {subagent_id}\ntype: {subagent_type}\ndescription: {description}\n\n{result_line}"
-"tool.task.completed" = "{output}\n\n<subagent_meta>id={subagent_id}, type={subagent_type}, tool_calls={tool_calls}, turns={turns}, duration_ms={duration_ms}</subagent_meta>\n\n{footer}"
-"tool.task.resume_footer" = "<subagent_result>\nsubagent_id: {subagent_id}\nsubagent_type: {subagent_type}\n要继续此子代理的对话，请使用 resume_from=\"{subagent_id}\"。"
+"tool.task.auto_backgrounded" = "子代理运行时间超过前台等待预算，已移至后台以保持对话响应。它仍在运行{notify_clause}。\nsubagent_id: {subagent_id}\ndescription: {description}\n\n{result_line}"
+"tool.task.completed" = "{output}\n\n<subagent_meta>id={subagent_id}, tool_calls={tool_calls}, turns={turns}, duration_ms={duration_ms}</subagent_meta>\n\n{footer}"
+"tool.task.resume_footer" = "<subagent_result>\nsubagent_id: {subagent_id}\n要继续此子代理的对话，请使用 resume_from=\"{subagent_id}\"。"
 "tool.task.resume_persona" = "\n该子代理使用了 persona=\"{persona}\"。恢复时请传入相同的 persona。"
 "tool.task.resume_footer_end" = "\n</subagent_result>"
 "tool.description.lifecycle.wait_cap.seconds" = "{ms}（约 {seconds} 秒）"
 "tool.description.lifecycle.wait_cap.minutes" = "{ms}（约 {minutes} 分钟）"
 "tool.description.lifecycle.wait_cap.hours" = "{ms}（约 {hours} 小时）"
-"tool.description.task.model_guidance.none" = "\n\n当前没有可用的显式模型 slug。省略 `{model_param}` 以继承父代理模型。"
-"tool.description.task.model_guidance.available" = "\n\n如果用户明确要求指定子代理或任务使用的模型，则只能从以下模型 slug 列表中选择：\n{model_list}\n\n如果用户没有明确要求指定模型，请省略 `{model_param}` 以继承父代理模型。"
+"tool.description.task.model_guidance.none" = "\n\n当前没有可用的显式模型 slug。请省略 `{model_param}` 字段。"
+"tool.description.task.model_guidance.available" = "\n\n如果用户明确要求指定子代理或任务使用的模型，则只能从以下模型 slug 列表中选择：\n{model_list}\n\n如果用户没有_明确_要求指定模型，请省略 `{model_param}` 字段。"
 
 "tool.schema.the_full_task_prompt_for_the_subagent_to_execute" = "要由子代理执行的完整任务提示。"
 "tool.schema.short_description_of_the_task_3_5_words" = "任务的简短描述（3-5 个词）。"
@@ -4924,6 +4924,16 @@ images_not_sent_compact = "未能随 /compact 发送图片 — 请重新粘贴"
 images_not_sent_skill_prompt = "未能随技能提示发送图片 — 请重新粘贴"
 
 images_not_sent_slash = "未能随 /{command} 发送图片 — 请重新粘贴"
+
+daemon_session_worktree_unsupported = "无法在工作树中恢复守护进程会话"
+
+setting_fixed_by = "✗ {label} 已被 {by} 固定"
+
+setting_nothing_to_reset = "{label}：没有可重置的内容"
+
+setting_nothing_to_reset_layer = "{label}：没有可重置的内容；由 {layer} 设置"
+
+setting_reset = "✓ {label}：已重置"
 [task_result]
 workspace_archive_invalid_id = "无法归档会话：会话 ID 无效"
 
@@ -5062,7 +5072,7 @@ label = "暂存"
 
 description = "暂存/取回提示草稿"
 
-help = "把当前提示暂存为草稿。\nCtrl+S 会把草稿放到一边并清空输入框。在空的输入框上按 Ctrl+S 可恢复它。发送下一条提示后，草稿也会自行恢复。如果你的终端吞掉了 Ctrl+S，请改用 Alt+S。\n一次只能有一份草稿：新的暂存会替换掉旧的。"
+help = "把当前提示暂存为草稿。\nCtrl+S 会把草稿放到一边并清空输入框。在空的输入框上按 Ctrl+S 可恢复它，暂存后立刻按 Ctrl+Z 也可以。发送下一条提示后，草稿也会自行恢复。如果你的终端吞掉了 Ctrl+S，请改用 Alt+S。\n一次只能有一份草稿：新的暂存会替换掉旧的。"
 
 [actions.BashMode]
 help = "不必离开对话即可运行 shell 命令：在空提示的开头输入 !，然后输入命令。\n命令输出会采集到回滚区。\n删掉开头的 ! 即可回到普通提示。"
@@ -5139,3 +5149,11 @@ description = "在仪表盘显示所选会话的预览与回复面板。关闭�
 
 [scrollback.context]
 already_counted = "已计入上方"
+
+[subagent.label]
+fallback = "子代理"
+
+[settings.subagent_model_inheritance]
+label = "子代理模型继承"
+
+description = "开启：Grok 不能为子代理指定模型\n关闭：Grok 可以为子代理选择不同的模型。重启后生效。\n注意：此设置仅在所有模型都属于 xAI「model_family」时适用。通常不需要配置此项。"

@@ -264,8 +264,8 @@ wave_rows = 32     # 强调色动画每个波形周期的行数
 [scrollback.blocks.edit]
 indent = true                   # 缩进差异内容
 vpad = false                    # 差异周围的垂直内边距
-# expanded_by_default = true    # 未设置：遵循 config.toml 中 [ui] collapsed_edit_blocks
-                                #（该标志开启时为折叠单行）；取消注释可固定任一形状
+# expanded_by_default = true    # 未设置时遵循 Collapsed edit blocks。该设置开启时，
+                                # 即使此行为 true，编辑也会以折叠状态开始。
 hunk_separator = "…"            # 差异块之间的分隔符（"…"、"───"、"⋯" 或空字符串 "" 表示无分隔符）
 dual_line_numbers = false       # 双列行号（旧 + 新，如 GitHub）
 # line_summary = false          # 在折叠标题中显示 +N/-M；未设置时遵循相同标志
@@ -416,8 +416,8 @@ selection_buttons = false          # Show copy/view buttons on selection box
 [scrollback.blocks.edit]
 indent = true                   # Indent diff content
 vpad = false                    # Vertical padding around diffs
-# expanded_by_default = true    # Unset: follows [ui] collapsed_edit_blocks in config.toml
-                                # (flag on = collapsed one-liner); uncomment to pin either shape
+# expanded_by_default = true    # Unset follows Collapsed edit blocks. When that setting is on,
+                                # edits start collapsed even if this line is true.
 hunk_separator = "…"            # Separator between hunks ("…", "───", "⋯", or "" for none)
 dual_line_numbers = false       # Two-column line numbers (old + new, like GitHub)
 # line_summary = false          # Show +N/-M in the collapsed header; unset follows the same flag

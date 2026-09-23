@@ -1,5 +1,65 @@
 # Changelog
 
+# 1.0.41-fork.1 — 2026-09-23
+
+同步上游 monorepo `07e35a3d` / Source-Revision `84745de98b3d3996729aefcefd518890ffb73930`，产品版本随上游从 **1.0.38** 升至 **1.0.41**。发布范围覆盖上一版 `v1.0.38-fork.2` 之后的上游更新（1.0.39–1.0.41），以及吸收该更新所需的合并适配与本地化修复（39 个冲突文件、95 个冲突块，其中 12 个 cosmetic 块自动采用上游）。
+
+### 上游更新
+
+- 子代理不再必须指定类型，省略时默认为 general-purpose；可以始终使用父会话模型，并在 `/settings` 里开关「子代理模型继承」。子代理全屏视图不再出现多余的 `[Dashboard]` 按钮，标签在没有人设或角色时显示为 Subagent，而不是类型名。
+- 新增 `sports_search` 工具，可查询 NFL 实时比分、排名、赛程、球员数据和球队战绩。按模型配置请求体大小上限，超限时淘汰较早的内联图片。可开启长推理提醒，在隐藏推理过长后提示模型。
+- 欢迎界面 `Ctrl+P` 直接打开命令面板；仪表盘聚焦「+ New Agent」而不是上次选中的会话。崩溃中断的会话会留下明确标记。暂存提示后立刻按 `Ctrl+Z` 可以恢复。
+- 折叠编辑块在 `expanded_by_default` 被钉成 true 时仍然折叠。插话会先给出可见回复再继续原任务。取消卡在 `spawn_subagent` 的回合时，会告诉模型子任务已转到后台。保存排队提示的编辑后，焦点回到输入框。
+- 智能体 `agent.md` 里的 `mcpServers` 头和 URL 覆盖 `config.toml`，并在配置重载或切换智能体后仍然有效。推理强度菜单改由接口提供，选择时既接受 ID 也接受菜单标签。更早的图片附件在多次压缩后仍保留。MCP 工具收到形状明确不符的 JSON 时会自动修正。
+- 其它修复：未初始化子模块不再阻止本地 worktree 捕获；记忆捕获不再写入不透明的模型推理；空闲超时改为可读提示；自定义智能体配置在恢复和重载后仍在；只设置限额或模型的 `[subagents]` 表不再把子代理关掉。
+- 上游 1.0.39–1.0.41 的逐条英文原文保留在本文档下方对应的版本段中，本段仅为本次同步的范围摘要。
+
+### 本 Fork
+
+- 合并适配：保留三参数回合结束标记和 prompt 确认语义（点名的 `session/update` 解除对应等待，子会话更新只解除子会话等待，去重后的旧事件不回退用量）。次要模型 `LOCAL-PATCH(upstream-fork-secondary-model)` 仍接在当前设置与 headless fork 路径上。
+- 任务工具文案跟随上游新签名：描述不再列出类型名册，恢复页脚去掉 `subagent_type`；这些字符串仍走翻译目录，英文与上游默认文案一致。子代理行标签在没有人设、角色或标签时使用 `subagent.label.fallback`（英文 Subagent，简体中文「子代理」）。
+- 本批新增用户可见文案接入目录：守护进程会话不能在工作树中恢复、子代理模型继承的设置名与说明，以及固定、无可重置、已重置这几条提示。`xai-grok-i18n` 的 tree-sitter 开发依赖对齐到工作区的 0.26，审计里的子节点下标改为 `u32`。
+- 简体中文用户指南补上本批行为：`Ctrl+Z` 恢复暂存、欢迎界面 `Ctrl+P`、请求体上限、`mcpServers` 覆盖、子代理开关与 Grove 重定向。
+- 暂存提示的快捷键说明补上「暂存后立刻按 Ctrl+Z 也可恢复」，英文与简体中文目录与上游动作一致。
+- 保留此前版本的简体中文界面、排队行操作与仪表盘 live-work chip、透明背景、账户计费与 CPA 配额、会话用量、次要模型与推理强度、压缩模型、逐次请求指标开关等 fork 变更。
+
+### 兼容性
+
+- 产品版本随上游从 **1.0.38** 升至 **1.0.41**；发布标签 `v1.0.41-fork.1` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的 `1.0.41`。
+- 行为随上游变化：省略子代理类型即 general-purpose；`run_in_background` 默认开启；子代理行不再用类型名当标签；折叠编辑块优先于 `expanded_by_default`。
+- 本地化目录的查找、回退与语言解析机制未改动；未提供翻译的键继续回退英文，其它语种仍使用英文目录回退。
+- 不新增外部服务、鉴权流程或运行时依赖。
+
+### 国际化
+
+- 本版新增与迁移的用户可见文案均已覆盖英文与简体中文：`en.toml` 与 `zh-CN.toml` 各从 4339 个键增至 4347 个键（+8 键），两侧键集合与 `{placeholder}` 完全一致。
+- 未提供翻译的键继续回退英文；日志与 tracing 输出、发给模型的 prompt 与系统提示、协议/JSON 字段名、错误码、内部标识符，以及 CLI `--help` 与错误消息不在本地化范围内（沿用既有 Non-goals），新出现的同类文本仍由 diff 门槛把关。
+- 自定义 agent 类型名、按键名、和弦、路径与产品名等不透明值保持原样，继续登记在审计豁免表中。
+
+### 验证
+
+发布范围已逐项复核上一版 `v1.0.38-fork.2` 之后的提交（上游 1.0.39–1.0.41 合并适配、新增文案本地化及本 changelog）。
+
+本地等 CI 验证（Rust 1.92.0、Protoc 29.3、全部 `--locked`，`GROK_VERSION=1.0.41-fork.1`）：
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；`target/release/xai-grok-pager --version` 输出 `grok 1.0.41-fork.1 (b533f61e5cbe) [fork]`，包含本版版本号。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit` 的全仓扫描与 Markdown 覆盖审计通过。
+- `cargo +1.92.0 test --locked -p xai-tool-types --lib`：105 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib` 中与冲突相关的 `turn_completion`、子代理标签、子代理模型继承和 `acp_handler` 测试：624 项通过。
+- `python3 scripts/i18n_catalog.py`：`missing_keys`、`extra_keys`、`placeholder_mismatches` 均为空。
+- `python3 scripts/upstream_merge.py audit-markers`：通过。
+- Windows x86_64 由 GitHub Actions 的 `Build` 工作流验证。
+
+### 产物
+
+- `grok-1.0.41-fork.1-linux-x86_64`
+- `grok-1.0.41-fork.1-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.38-fork.2...v1.0.41-fork.1
+
 # 1.0.38-fork.2 — 2026-09-20
 
 本版为 Fork 问题修复，产品版本仍为 **1.0.38**，不包含新的上游同步。修复两处上游同步后仍硬编码英文的界面文案：排队行操作和仪表盘工作中智能体右侧 live-work chip。
@@ -1371,6 +1431,59 @@
 - `SHA256SUMS`
 
 **Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.5-fork.3...v1.0.5-fork.4
+
+# 1.0.41 — 2026-09-22
+
+## Features
+
+- **Added a new `sports_search` tool** that can look up live NFL scores, standings, schedules, player stats, and team records directly from X data.
+- **Subagent model inheritance** setting added to /settings; persists in config.toml and respects managed/overlay layers.
+- **Per-model request size limits** can now be configured to match provider HTTP body caps and control inline image eviction.
+- **Long reasoning reminder** can now be enabled via config to nudge the model after long hidden-reasoning steps.
+
+## Bug Fixes
+
+- **Fixed** the subagent fullscreen view so it no longer shows a stray [Dashboard] button in the header.
+- **Fixed** agent frontmatter `mcpServers` so that headers and URLs from the active agent's agent.md now correctly override config.toml and survive config reloads or agent switches.
+- **Ctrl+P** now opens the command palette immediately from the welcome screen.
+- **Dashboard** now focuses the "+ New Agent" row instead of leaving the previous session selected.
+- Sessions that were interrupted by a crash now show a clear marker instead of silently dropping the turn.
+- **Ctrl+Z** right after stashing a prompt now restores it.
+- **Collapsed edit blocks** setting now correctly collapses edits even if `expanded_by_default` was pinned true.
+- Interjections now receive a visible reply before the agent resumes prior tasks.
+- Canceling a turn that blocked on spawn_subagent now tells the model the child moved to the background instead of claiming it was never executed.
+- Saving a queued-prompt edit now returns focus to the composer so the next keys type the next message.
+- Subagent activation is now consistent between the TUI and `grok agent stdio`; tables that only set limits or models no longer disable subagents.
+- **Effort level selection** now accepts menu labels in addition to IDs.
+
+
+# 1.0.40 — 2026-09-20
+
+## Bug Fixes
+
+- **Miscellaneous bug fixes and updates**.
+
+
+# 1.0.39 — 2026-09-20
+
+## Features
+
+- **Subagents** can always use the parent model, with that choice locked in when the session starts.
+- Earlier image attachments now survive multiple compactions via a persisted path list.
+- **Subagent spawning** no longer requires choosing a type; omitted calls default to general-purpose.
+- The agent now keeps helper scripts, logs, and PR drafts in the system temp directory instead of the repository.
+- read_file descriptions now tell the model when offset/limit are ignored for SKILL.md and instruction files.
+- Effort levels for models now come from the API instead of hard-coded lists, and config aliases inherit the menu.
+- MCP tools that receive the wrong JSON shape are now automatically fixed when the mismatch is unambiguous.
+
+## Bug Fixes
+
+- Local worktree capture no longer refuses repositories that contain uninitialized submodules.
+- **Memory captures** no longer include opaque model reasoning blobs.
+- Idle timeouts now show a clear message instead of raw internal text.
+- Images attached to the last user prompt now survive compaction.
+- **Custom agent profiles** now persist correctly across session resume and reload.
+- **Subagent labels** now appear as "Subagent" instead of "General" in transcripts and the tasks pane.
 
 # 1.0.38 — 2026-09-19
 

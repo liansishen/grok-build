@@ -885,14 +885,6 @@ impl ToolOutput {
             }) => {
                 let ask = &tool_hints.ask_user;
                 let exit = &tool_hints.exit_plan;
-                let task_hint = if tool_hints.task.is_empty() {
-                    String::new()
-                } else {
-                    t_fmt(
-                        "plan_mode.task_hint",
-                        &[("tool", &tool_hints.task)],
-                    )
-                };
                 let plan_status = match plan_file_seed {
                     PlanFileSeedStatus::Empty => t_fmt(
                         "plan_mode.file.empty",
@@ -928,7 +920,6 @@ impl ToolOutput {
                     &[
                         ("message", message),
                         ("plan_status", &plan_status),
-                        ("task_hint", &task_hint),
                         ("ask_user", ask),
                         ("exit_plan", exit),
                     ],
@@ -2258,8 +2249,8 @@ mod tests {
             "resume_from hint with correct ID"
         );
         assert!(
-            rendered.contains("subagent_type: explore"),
-            "subagent_type visible"
+            !rendered.contains("subagent_type"),
+            "completion text must not advertise subagent_type"
         );
         assert!(
             rendered.contains("<subagent_result>"),
@@ -2411,8 +2402,8 @@ mod tests {
             plan_file_seed: PlanFileSeedStatus::Empty,
         });
         let prompt = output.to_prompt_format();
-        assert!(prompt.contains("delegate-xyz"));
-        assert!(prompt.contains("subagent_type"));
+        assert!(!prompt.contains("delegate-xyz"));
+        assert!(!prompt.contains("subagent_type"));
     }
     #[test]
     fn enter_plan_mode_prompt_format_with_custom_tool_names() {

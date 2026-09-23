@@ -1802,6 +1802,7 @@ mod tests {
             owner: SubagentOwner::Task,
             cancel_token: tokio_util::sync::CancellationToken::new(),
             spawn_root: Default::default(),
+            tool_call_id: None,
         }
     }
     fn test_result(id: &str, success: bool) -> SubagentResult {
@@ -1858,11 +1859,10 @@ mod tests {
               === Output ===\n\
               output for sub-1\n\
               \n\
-              <subagent_meta>id=sub-1, type=general-purpose, tool_calls=3, turns=2, duration_ms=5000</subagent_meta>\n\
+              <subagent_meta>id=sub-1, tool_calls=3, turns=2, duration_ms=5000</subagent_meta>\n\
               \n\
               <subagent_result>\n\
               subagent_id: sub-1\n\
-              subagent_type: general-purpose\n\
               To continue this subagent's conversation, use resume_from=\"sub-1\".\n\
               </subagent_result>"
             ]
@@ -2058,11 +2058,10 @@ mod tests {
              === Output ===\n\
              output for sub-abc\n\
              \n\
-             <subagent_meta>id=sub-abc, type=general-purpose, tool_calls=3, turns=2, duration_ms=5000</subagent_meta>\n\
+             <subagent_meta>id=sub-abc, tool_calls=3, turns=2, duration_ms=5000</subagent_meta>\n\
              \n\
              <subagent_result>\n\
              subagent_id: sub-abc\n\
-             subagent_type: general-purpose\n\
              To continue this subagent's conversation, use resume_from=\"sub-abc\".\n\
              </subagent_result>"
         );
@@ -2196,11 +2195,10 @@ mod tests {
                  [output truncated: 4000 of 50000 bytes shown]\n\
                  Use get_task_output(\"sub-loop\") to see the full output.\n\
                  \n\
-                 <subagent_meta>id=sub-loop, type=general-purpose, tool_calls=3, turns=2, duration_ms=5000</subagent_meta>\n\
+                 <subagent_meta>id=sub-loop, tool_calls=3, turns=2, duration_ms=5000</subagent_meta>\n\
                  \n\
                  <subagent_result>\n\
                  subagent_id: sub-loop\n\
-                 subagent_type: general-purpose\n\
                  To continue this subagent's conversation, use resume_from=\"sub-loop\".\n\
                  </subagent_result>\n\
                  \n\
@@ -2362,11 +2360,10 @@ mod tests {
              === Output ===\n\
              the answer for a\n\
              \n\
-             <subagent_meta>id=a, type=explore, tool_calls=2, turns=2, duration_ms=1000</subagent_meta>\n\
+             <subagent_meta>id=a, tool_calls=2, turns=2, duration_ms=1000</subagent_meta>\n\
              \n\
              <subagent_result>\n\
              subagent_id: a\n\
-             subagent_type: explore\n\
              To continue this subagent's conversation, use resume_from=\"a\".\n\
              </subagent_result>\n\
              \n\
@@ -2404,11 +2401,10 @@ mod tests {
              === Output ===\n\
              output for sub-loop\n\
              \n\
-             <subagent_meta>id=sub-loop, type=general-purpose, tool_calls=3, turns=2, duration_ms=5000</subagent_meta>\n\
+             <subagent_meta>id=sub-loop, tool_calls=3, turns=2, duration_ms=5000</subagent_meta>\n\
              \n\
              <subagent_result>\n\
              subagent_id: sub-loop\n\
-             subagent_type: general-purpose\n\
              To continue this subagent's conversation, use resume_from=\"sub-loop\".\n\
              </subagent_result>\n\
              \n\

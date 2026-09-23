@@ -740,6 +740,7 @@ mod tests {
                 .into_iter()
                 .collect(),
             context_window: Some(200_000),
+            max_request_bytes: None,
             auto_compact_threshold_percent: Some(80),
             compaction_model: Some("grok-3".into()),
             system_prompt_label: Some("label".into()),

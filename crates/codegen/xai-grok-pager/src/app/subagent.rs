@@ -1016,12 +1016,10 @@ pub(crate) fn format_subagent_label(info: &SubagentInfo) -> (String, String) {
         .filter(|s| !s.is_empty())
     {
         r.to_string()
-    } else if info.subagent_type.as_ref() != "general-purpose" {
-        format_type_label(&info.subagent_type).to_string()
     } else if let Some(tag) = tag {
         tag.to_string()
     } else {
-        xai_grok_i18n::t("subagent.type.general").to_string()
+        xai_grok_i18n::t_or("subagent.label.fallback", "subagent").to_string()
     };
 
     // Iterating handles uppercase mappings that span several codepoints (`ß` becomes `SS`)

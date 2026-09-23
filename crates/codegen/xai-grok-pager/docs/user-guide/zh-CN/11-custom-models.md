@@ -148,6 +148,28 @@ Grok 按以下顺序解析 API 密钥：
 
 `context_window` 值告诉 Grok 何时触发自动压缩。覆盖已知模型时，Grok 会继承该模型的上下文窗口。定义新模型并省略 `context_window` 时，Grok 默认使用 200,000 个 token，因此应显式设置为与你的提供商匹配的值。
 
+### 请求大小限制
+
+`max_request_bytes` 是端点接受的最大请求体。Grok 会从对话中驱逐较旧的内联图像，以保持在该限制之下，因此包含大量截图的会话可以继续工作，而不会被拒绝。省略时，Grok 按 `api_backend` 选择默认值：`messages` 为 30 MB，`chat_completions` 和 `responses` 为 50 MiB。仅当你的主机强制使用不同上限时才设置它。
+
+该上限是端点的属性，因此也可以写在共享的 `[model_providers.<id>]` 块中，指向该提供方的每个模型都会继承它；模型自身的 `max_request_bytes` 会覆盖提供方的值。
+
+```toml
+[model_providers.messages-gateway]
+base_url = "https://gateway.example/v1"
+api_backend = "messages"
+max_request_bytes = 25000000   # every model on this provider inherits it
+
+[model.claude-sonnet]
+model = "claude-sonnet"
+model_provider = "messages-gateway"   # inherits 25 MB
+
+[model.claude-opus]
+model = "claude-opus"
+model_provider = "messages-gateway"
+max_request_bytes = 20000000   # per-model override
+```
+
 <a id="global-default-headers"></a>
 ### 全局默认标头
 

@@ -80,6 +80,7 @@ pub(crate) fn refresh_open_settings_modals(app: &mut AppView) {
     let auto_mode_gate_from_app = app.auto_mode_gate;
     let ask_user_question_timeout_enabled_from_app = app.ask_user_question_timeout_enabled;
     let voice_stt_language_from_app = app.voice_config.language.clone();
+    let subagent_model_inheritance_from_app = app.subagent_model_inheritance;
     for agent in app.agents.values_mut() {
         // Walk both `Settings` and `ResetSettingsConfirm` — the
         // confirm dialog embeds settings state that must stay fresh
@@ -145,6 +146,7 @@ pub(crate) fn refresh_open_settings_modals(app: &mut AppView) {
                         })
                         .unwrap_or_default()
                 },
+                subagent_model_inheritance: subagent_model_inheritance_from_app,
             };
         }
     }
@@ -244,6 +246,7 @@ pub(in crate::app::dispatch) fn dispatch_open_settings(
     let auto_mode_gate_from_app = app.auto_mode_gate;
     let ask_user_question_timeout_enabled_from_app = app.ask_user_question_timeout_enabled;
     let voice_stt_language_from_app = app.voice_config.language.clone();
+    let subagent_model_inheritance_from_app = app.subagent_model_inheritance;
     // Theme rows are `hidden_in_minimal`. Snapshot this AppView's mode, not `MINIMAL_MODE_ACTIVE`
     // (other tests flip that process flag in parallel and would drop `theme` from the list).
     let visibility = RowVisibility {
@@ -323,6 +326,7 @@ pub(in crate::app::dispatch) fn dispatch_open_settings(
                 })
                 .unwrap_or_default()
         },
+        subagent_model_inheritance: subagent_model_inheritance_from_app,
     };
     let mut state = Box::new(SettingsModalState::new_with_row_visibility(
         registry,
@@ -498,11 +502,15 @@ pub(in crate::app::dispatch) fn dispatch_confirm_reset_setting(
 
             // Gate idempotent reset: a value already at its default only shows a toast
             // Not for the coding-data setter, which owns that decision: its local "opt-out" may be the unconfirmed fail-safe, so it writes anyway
+            // Nor for a `[features]` override, where reset deletes the key: a saved value equal to the default is still an override
             let pager_snapshot = build_pager_snapshot(app);
             let current_value =
                 crate::settings::current_value_for(key, &app.current_ui, &pager_snapshot);
             if current_value.as_ref() == Some(&default_value)
-                && !matches!(action, Action::SetCodingDataSharing { .. })
+                && !matches!(
+                    action,
+                    Action::SetCodingDataSharing { .. } | Action::ClearSubagentModelInheritance
+                )
             {
                 tracing::debug!(
                     target: "settings",
@@ -845,6 +853,7 @@ pub(crate) fn build_pager_snapshot(app: &AppView) -> crate::settings::PagerLocal
         ask_user_question_timeout_enabled: app.ask_user_question_timeout_enabled,
         voice_stt_language: app.voice_config.language.clone(),
         fork_secondary_effort_options: fork_secondary_effort_options(app),
+        subagent_model_inheritance: app.subagent_model_inheritance,
     }
 }
 
@@ -910,6 +919,9 @@ pub(in crate::app::dispatch) fn action_for_reset(
         }
         ("show_background_task_completion_reminders", SettingValue::Bool(b)) => {
             Some(Action::SetShowBackgroundTaskCompletionReminders(*b))
+        }
+        ("subagent_model_inheritance", SettingValue::Bool(_)) => {
+            Some(Action::ClearSubagentModelInheritance)
         }
         ("keep_text_selection", SettingValue::Enum(s)) => {
             crate::appearance::TextSelection::from_canonical(s).map(Action::SetKeepTextSelection)
@@ -1215,8 +1227,15 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
             set_yolo_mode_inner(app, kind.is_always_approve());
             // Restore canonical (meaningful for `Default`).
             app.current_ui.permission_mode = Some(kind.as_canonical().to_string());
-            // Sync the per-session auto flag ONLY for a permission_mode rollback;
-            // other rollback arms must not clobber it from the global canonical.
+            // The staged word has to roll back too, or SessionCreated replays the value that failed to save
+            if let ActiveView::Agent(id) = app.active_view
+                && let Some(agent) = app.agents.get_mut(&id)
+                && (agent.session.session_id.is_none() || agent.deferred_permission_mode.is_some())
+            {
+                agent.deferred_permission_mode = Some(kind.as_canonical());
+            }
+            // Sync the per-session auto flag only for a permission_mode rollback
+            // Other rollback arms must not clobber it from the global canonical
             sync_active_auto_flag(app);
         }
         // default_model: best-effort rollback. If the prior model no
