@@ -331,10 +331,18 @@ pub(super) fn set_coding_data_sharing(
     }]
 }
 
-/// Scrub an untrusted error string for toast display. Substitutes a
-/// generic placeholder when the input exceeds 120 chars or contains
-/// control / bidi-override characters (prevents escape-sequence
-/// injection and visual spoofing). Full error stays in tracing logs.
+/// The toast for a setting that could not be written to `config.toml`.
+pub(super) fn toast_persist_failure(app: &mut AppView, key: &str, error: &str) {
+    let scrubbed = scrub_error_for_toast(error);
+    app.show_toast(&xai_grok_i18n::t_fmt(
+        "toast.setting_save_failed",
+        &[("key", key), ("error", scrubbed.as_str())],
+    ));
+}
+
+/// Scrub an untrusted error string for toast display.
+/// Substitutes a generic placeholder when the input exceeds 120 chars or contains control / bidi-override characters.
+/// That prevents escape-sequence injection and visual spoofing.
 pub(super) fn scrub_error_for_toast(error: &str) -> String {
     const MAX_TOAST_ERROR_LEN: usize = 120;
     if error.len() > MAX_TOAST_ERROR_LEN

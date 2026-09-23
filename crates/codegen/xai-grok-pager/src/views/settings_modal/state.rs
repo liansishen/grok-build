@@ -284,6 +284,12 @@ impl SettingsModalState {
         }
     }
 
+    /// The expanded-row text: a lock reason replaces the description.
+    pub fn detail_text(&self, key: SettingKey, meta: &SettingMeta) -> &'static str {
+        self.row_lock(key)
+            .map_or(meta.description_t(), CodingDataSharingLock::reason)
+    }
+
     /// The currently-focused setting row, if any.
     pub fn focused_setting(&self) -> Option<(SettingKey, &SettingMeta)> {
         match self.rows.get(self.selected)? {
@@ -934,6 +940,7 @@ pub(super) fn action_for_bool(key: SettingKey, new: bool) -> Option<Action> {
         "show_background_task_completion_reminders" => {
             Some(Action::SetShowBackgroundTaskCompletionReminders(new))
         }
+        "subagent_model_inheritance" => Some(Action::SetSubagentModelInheritance(new)),
         "show_thinking_blocks" => Some(Action::SetShowThinkingBlocks(new)),
         "group_tool_verbs" => Some(Action::SetGroupToolVerbs(new)),
         "collapsed_edit_blocks" => Some(Action::SetCollapsedEditBlocks(new)),

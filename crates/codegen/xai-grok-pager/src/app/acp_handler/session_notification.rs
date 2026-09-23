@@ -193,6 +193,9 @@ fn synthesize_replay_turn_marker(
     let visible = agent.replayed_visible_prompts.contains(prompt_id);
     let chatty_rate_limit = is_wake && stop == TurnStopReason::RateLimit && visible;
     if is_wake && (matches!(stop, TurnStopReason::Error) || chatty_rate_limit) {
+        if stop == TurnStopReason::Error {
+            super::prompt_origin::log_failed_wake(prompt_id, agent_result, "replay");
+        }
         agent.failed_wake_marker_for = Some(prompt_id.to_string());
     }
     let suppress = super::prompt_origin::suppress_replay_marker_for_origin(
@@ -281,24 +284,15 @@ pub(super) fn handle_session_notification_with_origin(
     };
     let parent_id = matched.agent_id();
     let is_active = is_matched_agent_active(app, parent_id);
-    let session_update_prompt_id = meta.prompt_id.as_deref();
     let agent = app
         .agents
         .get_mut(&parent_id)
         .expect("find_session_match returned an existing AgentId");
     if matches!(matched, SessionMatch::Child(_)) {
         let child_sid: &str = session_notif.session_id.0.as_ref();
-        if let Some(prompt_id) = session_update_prompt_id
-            && let Some(child) = agent.subagent_views.get_mut(child_sid)
-            && child
-                .prompt_ack
-                .as_ref()
-                .is_some_and(|watch| watch.prompt_id() == prompt_id)
-        {
-            child.note_prompt_ack(
-                crate::app::prompt_ack::AckSignal::SessionUpdate,
-                std::time::Instant::now(),
-            );
+        // A child-session update disarms only that child's watch. The root watch stays armed.
+        if let Some(child) = agent.subagent_views.get_mut(child_sid) {
+            super::ack_prompt_from_update(child, &meta);
         }
         let changed = handle_child_session_notification(
             session_notif.update,
@@ -449,28 +443,26 @@ pub(super) fn handle_session_notification_with_origin(
                     let errored = matches!(stop_reason.as_str(), "error" | "rate_limit");
                     if errored && agent.failed_wake_marker_for.as_deref() != Some(&*prompt_id) {
                         agent.failed_wake_marker_for = Some(prompt_id.clone());
-                        if crate::app::dispatch::scrollback_has_recent_error_banner(
+                        if stop_reason == "error" {
+                            super::prompt_origin::log_failed_wake(
+                                &prompt_id,
+                                agent_result.as_deref(),
+                                "busy",
+                            );
+                            false
+                        } else if crate::app::dispatch::scrollback_has_recent_error_banner(
                             &agent.scrollback,
                         ) {
                             false
                         } else {
-                            let event = if stop_reason == "rate_limit" {
+                            agent.push_end_marker_block(
                                 super::prompt_origin::rate_limited_wake_failure_event(
                                     agent_result.as_deref(),
                                     None,
-                                )
-                            } else {
-                                crate::scrollback::blocks::SessionEvent::TurnFailed {
-                                    error: crate::app::error_display::format_request_failure(
-                                        None,
-                                        None,
-                                        agent_result.as_deref().unwrap_or("unknown error"),
-                                    )
-                                    .message(),
-                                    elapsed: None,
-                                }
-                            };
-                            agent.push_end_marker_block(event, Vec::new(), Some(prompt_id.clone()));
+                                ),
+                                Vec::new(),
+                                Some(prompt_id.clone()),
+                            );
                             true
                         }
                     } else {
@@ -491,7 +483,6 @@ pub(super) fn handle_session_notification_with_origin(
                                 session_notif.meta.as_ref(),
                                 super::super::turn_completion::CANCELLATION_CATEGORY_KEY,
                             ),
-                            error_kind,
                         },
                     );
                     true
@@ -738,13 +729,6 @@ pub(super) fn handle_session_notification_with_origin(
                 child_view.set_sharing_enabled(agent.sharing_enabled);
                 child_view.set_billing_surface_visible(agent.billing_surface_visible);
                 child_view.set_usage_command_visible(agent.usage_command_visible);
-                let dashboard_visible = agent
-                    .prompt
-                    .slash_controller
-                    .registry()
-                    .get("dashboard")
-                    .is_some();
-                child_view.set_dashboard_visible(dashboard_visible);
                 child_view.set_has_session_announcements(
                     agent.prompt.slash_controller.has_session_announcements(),
                 );

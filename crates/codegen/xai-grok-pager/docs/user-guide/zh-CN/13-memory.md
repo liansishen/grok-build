@@ -102,19 +102,7 @@ export GROK_MEMORY=0
 <a id="how-memory-is-stored"></a>
 ## 记忆如何存储
 
-记忆以 Markdown 文件形式存储在 `~/.grok/memory/` 下：
-
-| 位置 | 范围 | 说明 |
-|----------|-------|-------------|
-| `~/.grok/memory/MEMORY.md` | 全局 | 适用于所有项目的事实 |
-| `~/.grok/memory/<project-slug>-<hash8>/MEMORY.md` | 工作区 | 项目专用的约定和上下文 |
-| `~/.grok/memory/<project-slug>-<hash8>/sessions/` | 会话 | 每个会话的摘要和日志 |
-
-Grok 会在每个工作区目录名后附加仓库身份的短哈希。若该目录是带有 `origin` 远程的 Git 仓库，身份采用 `org/repo` 形式的 `origin` 远程；否则使用目录路径。由于同一仓库的克隆和工作树共享 `origin` 远程，它们也会共享一个记忆目录。
-
-SQLite 索引支持对全部记忆文件的混合搜索：
-- **FTS5** 提供用于关键词匹配的全文搜索。
-- **vec0** 提供用于语义相似度的向量搜索。向量搜索是可选的，需要嵌入。
+开启 v2（`[memory_v2] enabled`）时，每个范围将 Markdown 存放在 `~/.grok/memory-v2/` 下：`topics/` 存放整理后的笔记，`observations/_inbox/` 存放新事实。关闭 v2 且旧版记忆开启时，文件位于 `~/.grok/memory/`（`MEMORY.md` 以及带哈希的工作区目录）。`[memory] enabled` 与 `[memory_v2] enabled` 默认都为关闭。
 
 ---
 

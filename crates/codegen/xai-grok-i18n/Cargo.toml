@@ -9,7 +9,7 @@ description = "UI localization (message catalogs) for Grok Build"
 toml = { workspace = true }
 
 [dev-dependencies]
-tree-sitter = "0.25.10"
+tree-sitter = { workspace = true }
 tree-sitter-rust = "0.24.0"
 
 [lints]

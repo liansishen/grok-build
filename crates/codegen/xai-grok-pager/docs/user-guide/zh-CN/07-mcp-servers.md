@@ -351,6 +351,8 @@ See the [MCP Server Registry](https://github.com/modelcontextprotocol/servers) f
 
 ## Subagents and MCP
 
+同名服务器同时出现在 `config.toml` / `.mcp.json` 与当前智能体的 `mcpServers` frontmatter 中时，**以 agent.md 为准**（包括 HTTP 标头）。配置热重载、插件重载以及切换智能体时都会重新套用该覆盖层，因此从磁盘重新物化不能恢复 toml 中的标头。切换智能体时只用新席位替换覆盖层：新智能体未列出的服务器会被去掉，没有 `mcpServers` 的智能体会清除先前的覆盖层。
+
 Subagents inherit the parent session’s connected MCP servers by default, including plugin-sourced agents. Use agent frontmatter `mcpInheritance` to restrict that set (`all`, `none`, `named`, or `except`). Details are in [Subagents — MCP inheritance](16-subagents.md#mcp-inheritance).
 
 If a child lists `search_tool` / `use_tool` but returns an empty catalog, check that:

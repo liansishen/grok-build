@@ -30,9 +30,10 @@
 <a id="disabling-subagents"></a>
 ## 禁用子智能体
 
-可通过环境变量或配置文件禁用子智能体：
+可通过 CLI 标志、环境变量或配置文件禁用子智能体（优先级从高到低）。同一规则适用于交互式 `grok` TUI、`grok agent stdio` 和无头运行。
 
 ```bash
+grok --no-subagents                  # 仅本次会话
 export GROK_SUBAGENTS=0              # Environment variable
 ```
 
@@ -41,6 +42,8 @@ export GROK_SUBAGENTS=0              # Environment variable
 [subagents]
 enabled = false
 ```
+
+只有显式的 `enabled = false` 才会关闭子智能体。`[subagents]` 表若只设置 `max_depth`、`[subagents.models]` 或 `[subagents.toggle]` 而没有 `enabled` 键，子智能体仍保持开启。
 
 ---
 
@@ -60,7 +63,7 @@ enabled = false
 <a id="built-in-agent-types"></a>
 ## 内置智能体类型
 
-`spawn_subagent` 工具接受 `subagent_type` 参数，用于选择子智能体的角色：
+内置类型仍作为宿主类型存在。面向模型的生成 schema 省略了 `subagent_type`。省略该键时即为 `general-purpose`。
 
 | 类型              | 说明                                          |
 | ----------------- | -------------------------------------------- |
@@ -152,15 +155,14 @@ description = "Path to write review notes"
 
 主智能体调用 `spawn_subagent` 工具。参数如下：
 
-| 参数         | 说明                                                       |
-| ---------------- | ------------------------------------------------------------ |
-| `prompt`          | 给子智能体的完整任务提示。                           |
-| `description`     | 任务的简短标签（3–5 个单词）。                          |
-| `subagent_type`   | 要启动的智能体类型。默认为 `general-purpose`。         |
-| `background`      | 在后台运行子智能体并立即返回子智能体 ID。默认为 `false`。 |
-| `isolation`       | `none`（共享工作区，默认）或 `worktree`（隔离的 Git 工作树）。 |
-| `resume_from`     | 继续已完成的子智能体对话。传入其子智能体 ID。 |
-| `cwd`             | 子智能体的工作目录。与 `isolation: worktree` 互斥；设置 `resume_from` 时忽略（恢复的子级继承源目录）。 |
+| 参数                | 说明                                                       |
+| ------------------- | ------------------------------------------------------------ |
+| `prompt`            | 给子智能体的完整任务提示。                           |
+| `description`       | 任务的简短标签（3–5 个单词）。                          |
+| `run_in_background` | 在后台运行并返回子智能体 ID。默认为 `true`。 |
+| `isolation`         | `none`（共享工作区，默认）或 `worktree`（隔离的 Git 工作树）。 |
+| `resume_from`       | 继续已完成的子智能体对话。传入其子智能体 ID。 |
+| `cwd`               | 子智能体的工作目录。与 `isolation: worktree` 互斥；设置 `resume_from` 时忽略（恢复的子级继承源目录）。 |
 
 后台运行子智能体时，稍后使用 `get_command_or_subagent_output` 获取其结果。
 
@@ -185,12 +187,12 @@ description = "Path to write review notes"
 
 如果子智能体处于活跃状态但正处于轮次之间，`steer` 和 `interject` 都会变成一个受保护的排队轮次，随后子智能体开始处理。旧版 `queue: true` 仍受支持，并表示 `delivery: "queue"`；两者同时存在时以 `delivery` 为准。
 
-记录会将每次发送显示为一行 `Message`：先显示结果动词，再显示子智能体标签（类型、Persona 或角色）以及花括号引号中的描述；其 `Subagent …: “…”` 回滚行会引用该描述，并截断到首行 40 个字符。动词体现投递方式，因此 steer 不带标记：
+记录会将每次发送显示为一行 `Message`：先显示结果动词，再显示子智能体标签（其 Persona、角色、标签，或回退名 Subagent）以及花括号引号中的描述；其 `Subagent …: “…”` 回滚行会引用该描述，并截断到首行 40 个字符。动词体现投递方式，因此 steer 不带标记：
 
-- `Message sent to Explore “find callers”`（steer）
-- `Message queued for Explore “find callers”` / `Message interjected to Explore “find callers”`
+- `Message sent to Subagent “find callers”`（steer）
+- `Message queued for Subagent “find callers”` / `Message interjected to Subagent “find callers”`
 - 发送进行中显示带动画项目符号的 `Message sending to …`
-- 拒绝发送显示 `Message rejected · Explore “find callers”`，Shell 无法确认的发送显示 `Message unconfirmed · Explore “find callers”`
+- 拒绝发送显示 `Message rejected · Subagent “find callers”`，Shell 无法确认的发送显示 `Message unconfirmed · Subagent “find callers”`
 - 子级向父级发送消息时显示 `Message sent to parent`
 
 折叠行不会显示消息或原因。**Right**（Vim 模式下为 `l`/`e`）展开后会显示请求的投递方式、完整消息文本以及拒绝或未确认发送的原因；**Left**（或 `h`）再次折叠。按 **Enter**、**Ctrl+F** 或双击该行会打开对应子智能体的视图，与其 `Subagent` 行完全相同（Right/Left 仍用于折叠）。如果子智能体未在本会话中生成（无头 `grok export` 或来自其他会话的 ID），该行会用 ID 最后 8 个字符命名为 `subagent …xxxxxxxx`，展开时显示原始 `Subagent ID:`，且无法打开。
@@ -226,6 +228,8 @@ description = "Path to write review notes"
 
 <a id="mcp-inheritance"></a>
 ### MCP 继承
+
+主会话会按名称把当前智能体的 `mcpServers` frontmatter 覆盖到磁盘与客户端的合并结果上（agent.md 的标头优先于 `config.toml`）。切换主智能体时，只用新席位替换该覆盖层。子级内联的 `mcpServers` 仍会成为其自有客户端，并优先于继承来的共享客户端。插件智能体不能声明 `mcpServers`。
 
 默认情况下，子智能体继承父会话中**已经连接**的 MCP 服务器。这包括本地 stdio/HTTP 服务器和插件提供的智能体（例如 `my-plugin:reviewer`）。子级通过 `search_tool` / `use_tool` 以与父级相同的方式发现和调用这些工具。
 
@@ -292,6 +296,14 @@ explore = "grok-4.6"                 # route explore to a specific model
 ```
 
 按类型的模型覆盖适用于任何父级。没有覆盖时，子智能体继承父级模型。
+
+可在 `/settings` → Models → **Subagent model inheritance** 中切换该项：
+
+- 开启：Grok 不能为子智能体设置模型
+- 关闭：Grok 可以为子智能体选择不同的模型。重启后生效。
+- 注意：此设置仅当所有模型都属于 xAI 的 `model_family` 时适用。你很可能不需要配置此项。
+
+该行显示重启后生效的值。切换会写入 `[features] subagent_model_inheritance = true` 或 `= false`（显式的 `false` 会覆盖远程的 `true`）；按 `d`（重置）会删除该键，使 `managed_config.toml`、远程设置或默认值重新生效。已经在运行的智能体保持其启动时的模式。当某一层不能被你的 `config.toml` 覆盖并决定该值时——`requirements.toml`／MDM 固定、环境变量、`GROK_CONFIG` 覆盖层，或进行中的 campaign——切换和重置都会被拒绝，并弹出指明该层的 toast。
 
 <a id="custom-roles-and-personas"></a>
 ### 自定义角色和 Persona
@@ -376,7 +388,7 @@ Grok Build 会在智能体屏幕的侧窗格中显示运行中和已完成的工
 - 滚动、折叠、复制、打开链接，以及在子级记录中打开块查看器。
 - `Ctrl+C` 取消**子级**轮次，不会取消父级。
 - `Ctrl+.` / `Ctrl+X` 打开子级按键的快捷键速查表。
-- 接管标题中的 dashboard 控件（`[Dashboard]`、`‹` / `›`）仍作用于**父级**。
+- 子级视图不绘制 `[Dashboard]` 按钮。在 dashboard 覆盖层内，该按钮用于返回。
 - 块查看器中空闲时按 `Enter` 会将选中行引用到父级编写器并关闭视图。
 
 **无效操作（安全关闭）**

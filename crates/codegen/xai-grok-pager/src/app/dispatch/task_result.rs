@@ -44,7 +44,7 @@ use super::session::picker_routing::PickerRequest;
 use super::settings::ui::apply_setting_rollback;
 use super::status::{
     handle_coding_data_sharing_failed, handle_coding_data_sharing_updated,
-    handle_context_info_complete, handle_session_usage_result, scrub_error_for_toast,
+    handle_context_info_complete, handle_session_usage_result, toast_persist_failure,
     usage_modal_state_mut,
 };
 use super::transcript::{
@@ -2513,11 +2513,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         } => {
             let rollback_effects = apply_setting_rollback(app, key, &rollback_value);
             tracing::warn!(target: "settings", ?key, ?rollback_value, %error, "setting persist failed; rolled back");
-            let scrubbed = scrub_error_for_toast(&error);
-            app.show_toast(&xai_grok_i18n::t_fmt(
-                "toast.setting_save_failed",
-                &[("key", key), ("error", scrubbed.as_str())],
-            ));
+            toast_persist_failure(app, key, &error);
             rollback_effects
         }
         TaskResult::SettingPersistFailedBestEffort { key, error } => {
@@ -2526,12 +2522,11 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                 ?key, %error,
                 "setting persist failed (best-effort); in-memory state stays at optimistic value",
             );
-            let scrubbed = scrub_error_for_toast(&error);
-            app.show_toast(&xai_grok_i18n::t_fmt(
-                "toast.setting_save_failed",
-                &[("key", key), ("error", scrubbed.as_str())],
-            ));
+            toast_persist_failure(app, key, &error);
             vec![]
+        }
+        TaskResult::FeatureOverridePersisted { feature, result } => {
+            settings::handle_feature_override_persisted(app, feature, result)
         }
     }
 }

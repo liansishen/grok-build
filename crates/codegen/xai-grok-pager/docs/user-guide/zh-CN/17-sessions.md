@@ -337,6 +337,30 @@ Worktree 会话在内部通过 `x.ai/git/worktree/*` 扩展方法管理。关键
 
 使用 `grok -w -r <session-id>` 在新的 worktree 中恢复会话。
 
+### 管理 Grove 重定向
+
+Grove worktree 可以把 `target`、`node_modules` 等被忽略的产物目录重定向到投影树之外的存储。重定向命令的第一个参数是挂载路径。
+
+```bash
+grok worktree redirect list /path/to/worktree
+grok worktree redirect list /path/to/worktree --json
+grok worktree redirect add /path/to/worktree target bind
+grok worktree redirect del /path/to/worktree target
+grok worktree redirect fixup /path/to/worktree
+grok worktree redirect unmount /path/to/worktree target
+```
+
+`list` 会打印 `repo_path`、`type`、`mechanism`、`target`、`source` 和 `state`。不带仓库相对路径运行 `unmount`，会卸下该挂载上的全部重定向。使用 `fixup --force` 替换 Grove 拥有的残留。使用 `fixup --strict` 拒绝已经有内容的普通目录。
+
+```bash
+grok clone https://example.com/org/repo.git --redirect-ignored
+grok clone https://example.com/org/repo.git \
+  --redirect-ignored --redirect-dir build --redirect-dir '**/node_modules'
+grok clone https://example.com/org/repo.git --no-redirects
+```
+
+`GROVE_REDIRECTS=0` 仍是运行时终止开关。Grok 不会把该终止开关保存为这次克隆的重定向选择。
+
 ### 检查磁盘用量
 
 `grok du`（别名：`grok disk-usage`）报告 grok 主目录（`~/.grok`）在磁盘上
@@ -360,6 +384,8 @@ Worktrees
 To reclaim space, run `grok worktree gc --max-age 7d --dry-run`, then the same command without `--dry-run`. Without `--max-age`, gc expires nothing.
 Untracked rows are not in the registry, so gc never visits them. Remove one with `grok worktree rm --dry-run <path>`, then without `--dry-run`.
 ```
+
+在 grok 主目录表格之后，`grok du` 可能会打印 **Redirections**、**Orphaned redirections** 和 **Unattributed redirect directories**。这些字节位于 Grove escape jail，不计入 grok 主目录总量。扫描为空时不打印任何内容。使用 `grok worktree clean-artifacts` 回收仍在使用的 jail。使用 `grok du --clean --yes` 清除仍在使用的 jail 以及已证实的孤立项。仅删除已证实的孤立项时，使用 `grok du --clean-orphaned --yes`。
 
 `AGE` 是 `grok worktree gc` 衡量的值：从 worktree 上次访问起经过的时间，或者从
 创建起经过的时间（以较近者为准）。会话和智能体活动会更新它；留在目录中的 Shell
@@ -421,7 +447,7 @@ ACP 会话更新事件。这种格式支持：
 - `num_messages` 和 `num_chat_messages` —— 更新和聊天消息计数
 - `current_model_id` —— 当前使用的模型
 - `parent_session_id` —— 分叉或恢复时的源会话
-- `agent_name` —— 上次保存会话时处于活动状态的智能体定义
+- `agent_name` —— 具名智能体只持久化此项；内联 `--agent-profile` 会话还会持久化 `agent_profile` JSON
 
 ### 磁盘用量
 

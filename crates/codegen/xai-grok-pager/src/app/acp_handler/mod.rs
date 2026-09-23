@@ -1,26 +1,6 @@
-//! ACP message handling.
-//!
-//! Routes incoming [`AcpClientMessage`] notifications to the appropriate
-//! agent's tracker, queues permission requests for interactive handling,
-//! and xAI session extension notifications (`x.ai/session_notification` and
-//! replay-path `x.ai/session/update`).
-
-use std::collections::hash_map::Entry;
-use std::path::PathBuf;
-use std::sync::Arc;
-
-use agent_client_protocol as acp;
-use xai_acp_lib::AcpClientMessage;
-
 use super::actions::Effect;
-use xai_grok_shell::extensions::notification::{
-    HookAnnotationKind, SessionNotification, SessionUpdate as XaiSessionUpdate,
-    is_reauthable_failure,
-};
-use xai_grok_shell::tools::todo::todo_item_from_plan_entry;
-use xai_grok_tools::notification::ScheduledTaskRemovedReason;
-use xai_grok_workspace::permission::bash_command_splitting::BashCommandHighlights;
-
+use super::agent_view::{AgentPane, AgentView, InputMode};
+use super::app_view::{ActiveView, AppView};
 use crate::acp::meta::{NotificationMeta, SessionUpdateEnvelope};
 use crate::acp::tracker::AcpUpdateTracker;
 use crate::acp::tracker::TurnActivity;
@@ -36,10 +16,18 @@ use crate::views::permission_view::{
     McpScope, McpScopeState, PermissionFocus, PermissionViewState, SubagentInfo,
 };
 use crate::views::plan_approval_view::PlanReviewSource;
-
-use super::agent_view::{AgentPane, AgentView, InputMode};
-use super::app_view::{ActiveView, AppView};
-
+use agent_client_protocol as acp;
+use std::collections::hash_map::Entry;
+use std::path::PathBuf;
+use std::sync::Arc;
+use xai_acp_lib::AcpClientMessage;
+use xai_grok_shell::extensions::notification::{
+    HookAnnotationKind, SessionNotification, SessionUpdate as XaiSessionUpdate,
+    is_reauthable_failure,
+};
+use xai_grok_shell::tools::todo::todo_item_from_plan_entry;
+use xai_grok_tools::notification::ScheduledTaskRemovedReason;
+use xai_grok_workspace::permission::bash_command_splitting::BashCommandHighlights;
 mod background;
 mod follow_ups;
 mod interactions;
@@ -53,21 +41,39 @@ mod settings;
 mod subagent_activity;
 mod subagent_lifecycle;
 mod workflow_ingest;
-
+#[cfg(test)]
+#[allow(unused_imports)]
+use background::*;
+use background::{
+    derive_child_cwd, handle_git_head_changed, handle_monitor_event, handle_scheduled_task_created,
+    handle_scheduled_task_deleted, handle_scheduled_task_fired, handle_task_backgrounded,
+    handle_task_completed, route_bg_task_stdout,
+};
+use follow_ups::handle_follow_ups;
+#[cfg(test)]
+#[allow(unused_imports)]
+use follow_ups::*;
+pub(crate) use interactions::handle_ask_user_question;
+#[cfg(test)]
+#[allow(unused_imports)]
+use interactions::*;
+use interactions::{handle_exit_plan_mode, handle_mcp_elicit};
+#[cfg(test)]
+#[allow(unused_imports)]
+use mcp::*;
+use mcp::{
+    handle_mcp_elicit_complete, handle_mcp_init_progress, handle_mcp_server_status,
+    handle_mcp_servers_updated, handle_mcp_tools_changed, push_server_status_enabled,
+};
 #[cfg(test)]
 use permissions::{MCP_ARGS_MAX_LINE_CHARS, MCP_ARGS_MAX_LINES, mcp_args_lines};
 use permissions::{
     apply_recap_block, handle_permission_request, should_drop_duplicate_auto_recap,
     should_drop_late_auto_recap,
 };
-
-// Hub + child modules (via `use super::*`) need sibling symbols in this scope.
-pub(crate) use routing::task_view_by_session_id;
-use routing::{
-    SessionMatch, find_session_match, interaction_target_agent, is_matched_agent_active,
-    mcp_target_agent, resolve_notif_agent, resolve_target_view, setup_phase_target_agent,
-};
-
+#[cfg(test)]
+#[allow(unused_imports)]
+use prompt_origin::*;
 use prompt_origin::{
     backdate_child_turn_clock, finish_wake_turn, note_child_live_prompt, viewer_turn_anchor,
 };
@@ -75,80 +81,50 @@ pub(crate) use prompt_origin::{
     is_scheduler_fired_prompt, is_server_initiated_prompt, is_wake_prompt,
     should_adopt_running_prompt,
 };
-
-pub(crate) use subagent_activity::finalize_killed_subagent;
-use subagent_activity::{subagent_activity_label, sync_subagent_activity};
-use subagent_lifecycle::{
-    LifecycleOrigin, classify_subagent_lifecycle, prepare_tui_subagent_lifecycle,
+pub(crate) use queue::PendingRunningAdoption;
+#[cfg(test)]
+#[allow(unused_imports)]
+use queue::*;
+use queue::{handle_prompt_complete, handle_queue_changed};
+pub(crate) use routing::task_view_by_session_id;
+#[cfg(test)]
+#[allow(unused_imports)]
+use routing::*;
+use routing::{
+    SessionMatch, find_session_match, interaction_target_agent, is_matched_agent_active,
+    mcp_target_agent, resolve_notif_agent, resolve_target_view, setup_phase_target_agent,
 };
-
-use workflow_ingest::ingest_workflow_update;
-
 pub(crate) use session_notification::apply_child_view_session_event;
 #[cfg(test)]
 pub(crate) use session_notification::apply_session_event_for_test;
 pub(crate) use session_notification::detect_plan_mode_change_replayed;
 pub(crate) use session_notification::drop_unexpected_replay;
+#[cfg(test)]
+#[allow(unused_imports)]
+use session_notification::*;
 use session_notification::{
     PlanModeTransition, advance_reconnect_cursor, confirm_context_used,
     handle_session_notification, handle_session_notification_with_origin,
 };
-
-pub(crate) use queue::PendingRunningAdoption;
-use queue::{handle_prompt_complete, handle_queue_changed};
-
-use background::{
-    derive_child_cwd, handle_git_head_changed, handle_monitor_event, handle_scheduled_task_created,
-    handle_scheduled_task_deleted, handle_scheduled_task_fired, handle_task_backgrounded,
-    handle_task_completed, route_bg_task_stdout,
-};
-use follow_ups::handle_follow_ups;
-pub(crate) use interactions::handle_ask_user_question;
-use interactions::{handle_exit_plan_mode, handle_mcp_elicit};
-use mcp::{
-    handle_mcp_elicit_complete, handle_mcp_init_progress, handle_mcp_server_status,
-    handle_mcp_servers_updated, handle_mcp_tools_changed, push_server_status_enabled,
-};
+#[cfg(test)]
+#[allow(unused_imports)]
+use settings::*;
 use settings::{
     handle_announcements_update, handle_models_update, handle_sessions_changed,
     handle_settings_update,
 };
-
-// Test-only bare-name surface for `tests/*` (`use super::*`).
-#[cfg(test)]
-#[allow(unused_imports)]
-use background::*;
-#[cfg(test)]
-#[allow(unused_imports)]
-use follow_ups::*;
-#[cfg(test)]
-#[allow(unused_imports)]
-use interactions::*;
-#[cfg(test)]
-#[allow(unused_imports)]
-use mcp::*;
-#[cfg(test)]
-#[allow(unused_imports)]
-use prompt_origin::*;
-#[cfg(test)]
-#[allow(unused_imports)]
-use queue::*;
-#[cfg(test)]
-#[allow(unused_imports)]
-use routing::*;
-#[cfg(test)]
-#[allow(unused_imports)]
-use session_notification::*;
-#[cfg(test)]
-#[allow(unused_imports)]
-use settings::*;
+pub(crate) use subagent_activity::finalize_killed_subagent;
 #[cfg(test)]
 #[allow(unused_imports)]
 use subagent_activity::*;
+use subagent_activity::{subagent_activity_label, sync_subagent_activity};
+use subagent_lifecycle::{
+    LifecycleOrigin, classify_subagent_lifecycle, prepare_tui_subagent_lifecycle,
+};
+use workflow_ingest::ingest_workflow_update;
 #[cfg(test)]
 #[allow(unused_imports)]
 use workflow_ingest::*;
-
 fn is_replay_bash_execute(update: &acp::SessionUpdate) -> bool {
     let acp::SessionUpdate::ToolCall(tc) = update else {
         return false;
@@ -159,33 +135,25 @@ fn is_replay_bash_execute(update: &acp::SessionUpdate) -> bool {
         .and_then(|v| v.as_bool())
         == Some(true)
 }
-
-/// Handle an ACP notification (session update, permission request, etc.).
-///
-/// Returns `true` if the active view was visually affected (needs redraw).
-/// Notifications are routed to the agent whose `session_id` matches, even when
-/// that agent is not the currently active view -- streaming chunks for a
-/// background agent must still land in its own scrollback so the user sees
-/// the full turn after switching back.
+/// Any live update stamped with the awaited prompt id proves the shell accepted it, whichever branch applies it.
+fn ack_prompt_from_update(view: &mut AgentView, meta: &NotificationMeta) {
+    if !meta.is_replay {
+        view.ack_prompt_if_named(
+            meta.prompt_id.as_deref(),
+            crate::app::prompt_ack::AckSignal::SessionUpdate,
+            std::time::Instant::now(),
+        );
+    }
+}
 pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
     let state_changed = handle_inner(msg, app);
-    // Queue drains driven by session updates run outside any dispatched action. A notice landing on the
-    // visible view from a background session's update is a change even when the update itself was not.
     let flushed = app.flush_image_notices_if_root();
     state_changed || flushed
 }
-
 fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
     match msg {
         AcpClientMessage::SessionNotification(notif) => {
-            let envelope = SessionUpdateEnvelope::from_method_and_meta(
-                "session/update",
-                notif.request.meta.as_ref(),
-            )
-            .expect("standard session update has a known carrier");
-            let carrier = envelope.carrier;
-            let mut meta = envelope.meta;
-
+            let mut meta = NotificationMeta::from_json(notif.request.meta.as_ref());
             let affected = match find_session_match(app, &notif.request.session_id) {
                 Some(SessionMatch::Root(id)) => {
                     let is_active = is_matched_agent_active(app, id);
@@ -198,18 +166,6 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         .agents
                         .get_mut(&id)
                         .expect("find_session_match returned an existing AgentId");
-                    if let Some(prompt_id) = meta.prompt_id.as_deref()
-                        && agent
-                            .prompt_ack
-                            .as_ref()
-                            .is_some_and(|watch| watch.prompt_id() == prompt_id)
-                    {
-                        agent.note_prompt_ack(
-                            crate::app::prompt_ack::AckSignal::SessionUpdate,
-                            std::time::Instant::now(),
-                        );
-                    }
-
                     // Live-only dedup: a per-session `eventId` highwater drops
                     // re-delivered live duplicates (leader fan-out, reconnect
                     // re-emit). Replay is EXEMPT — the per-process counter resets
@@ -240,36 +196,16 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                     {
                         agent.last_applied_event_seq = Some(seq);
                     }
-
+                    ack_prompt_from_update(agent, &meta);
                     if drop_unexpected_replay(
                         agent,
                         &meta,
                         notif.request.session_id.0.as_ref(),
-                        carrier.method(),
+                        "session/update",
                     ) {
                         notif.response_tx.send(Ok(())).ok();
                         return false;
                     }
-
-                    // Re-derive the per-turn viewer flag from prompt-id
-                    // ownership BEFORE the adopt/drop gate below.
-                    //
-                    // `attached_as_viewer` starts true on a `session/load`
-                    // attach and is cleared when this client sends its own
-                    // prompt — but a client that has driven a turn can later
-                    // VIEW a turn ANOTHER client drives (a `/loop` cron, or a
-                    // plain prompt typed in a different pane). Left sticky-false,
-                    // the gate dropped those deltas and the pane rendered
-                    // nothing. A non-synthetic prompt id this client never
-                    // originated is another client's turn → view it; one it
-                    // originated is its own → drive it (strict gate).
-                    //
-                    // Server-initiated / auto-wake turns (synthetic prompt ids)
-                    // are excluded: they have no client finish path, so they
-                    // must not flip the role (see the adopt gate below).
-                    //
-                    // Only re-derive on a real, non-replay, non-duplicate delta
-                    // that does NOT match the active turn.
                     if !dedup_drop
                         && !meta.is_replay
                         && let Some(notif_pid) = meta.prompt_id.as_deref()
@@ -278,7 +214,6 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                     {
                         agent.attached_as_viewer = !agent.is_self_originated_prompt(notif_pid);
                     }
-
                     // Store context usage and turn timing on agent state.
                     //
                     // Gate on `!dedup_drop`: a deduped delta is an
@@ -315,11 +250,8 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                             agent.turn_start_ms_prompt = meta.prompt_id.clone();
                         }
                     }
-
                     let mut plan_mode_modal_refresh_needed = false;
                     let mut workflows_modal_refresh = false;
-
-                    // Extract Plan updates before passing to tracker (tracker skips them).
                     let mutated = if dedup_drop {
                         tracing::debug!(
                             session_id = notif.request.session_id.0.as_ref(),
@@ -343,7 +275,6 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         !meta.is_replay && !agent.session.loading_replay
                     } else if let acp::SessionUpdate::UsageUpdate(ref usage) = notif.request.update
                     {
-                        // The context bar reads this; a replayed one is as current as the history it closes
                         agent.apply_context_used(usage.used, usage.size);
                         advance_reconnect_cursor(agent, &mut meta);
                         is_active
@@ -468,14 +399,12 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         {
                             agent.note_streaming_wake_turn(notif_pid);
                         }
-
                         let plan_transition = detect_plan_mode_change_replayed(
                             &notif.request.update,
                             agent,
                             meta.is_replay,
                         );
                         plan_mode_modal_refresh_needed |= plan_transition.is_some();
-                        // User-driven entries already got a banner or toast; a replay must not duplicate the row
                         if plan_transition == Some(PlanModeTransition::EnteredByAgent)
                             && !meta.is_replay
                             && !agent.session.loading_replay
@@ -486,7 +415,6 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                                 },
                             ));
                         }
-
                         let had_activity_before = agent.session.tracker.activity().is_some();
                         let update = notif.request.update;
                         let (is_visible_kind, is_bash) = if meta.is_replay {
@@ -535,10 +463,6 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         if !had_activity_before && agent.session.tracker.activity().is_some() {
                             note_first_turn_activity(agent);
                         }
-
-                        // Drain pending ACP commands immediately after handle_update.
-                        // This is the SINGLE generation bump site — ensures exactly
-                        // one bump per AvailableCommandsUpdate received.
                         if let Some(commands) = agent.session.tracker.take_pending_acp_commands() {
                             let workflows_changed = workflow_commands(&commands)
                                 != workflow_commands(&agent.session.available_commands);
@@ -560,42 +484,6 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         for entry_id in agent.session.tracker.take_pending_edit_hl() {
                             agent.submit_edit_highlight(entry_id);
                         }
-
-                        // Viewer chrome (leader / multi-client). A viewer has no
-                        // turn of its own and never calls start_turn(), so it
-                        // would stay `Idle` — hiding the "⠿ Responding…" status
-                        // line, the elapsed/token counter, and the Ctrl+c:cancel
-                        // / Ctrl+Enter:interject footer hints (all gated on
-                        // `AgentState::TurnRunning`). Enter TurnRunning whenever a
-                        // turn is in flight (a prompt id is adopted) and we are
-                        // not already running.
-                        //
-                        // This is placed AFTER `handle_update` (not in the adopt
-                        // block above) on purpose: the adopt block only fires on
-                        // a prompt-id MISMATCH and is suppressed during the
-                        // `loading_replay` window. A client that reattaches
-                        // MID-turn adopts the running id during its replay window
-                        // (TurnRunning suppressed there) and then receives
-                        // post-load deltas that MATCH `current_prompt_id` — which
-                        // skip the adopt block — so it would never flip to
-                        // TurnRunning. Checking here on every applied live viewer
-                        // delta closes that gap, independent of whether the load
-                        // response conveyed `runningPromptId`, of delta ordering,
-                        // and of whether a given delta carries a prompt id.
-                        //
-                        // Do NOT call start_turn(): it resets the tracker and
-                        // arms `expect_user_echo()`, which would corrupt the
-                        // driver's live stream. We only flip state + stamp the
-                        // elapsed timer (monotonic: only on the Idle→TurnRunning
-                        // transition).
-                        //
-                        // Enter TurnRunning only for an adoptable prompt — see
-                        // `should_adopt_running_prompt` (true iff the turn has a
-                        // terminal `prompt_complete` exit). This is what lets a
-                        // viewer (and the dashboard's locally-tracked row, which
-                        // reads live turn state) show a running `/loop` session as
-                        // Working without stranding "Responding…" forever on an
-                        // exit-less auto-wake / server-initiated turn.
                         if agent.attached_as_viewer
                             && !meta.is_replay
                             && !agent.session.loading_replay
@@ -612,12 +500,9 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                             // starting at the time-to-first-delta.
                             agent.turn_started_at = Some(viewer_turn_anchor(agent.turn_start_ms));
                         }
-
                         advance_reconnect_cursor(agent, &mut meta);
-
                         !meta.is_replay && !agent.session.loading_replay
                     };
-
                     if plan_mode_modal_refresh_needed {
                         crate::app::dispatch::refresh_open_settings_modals(app);
                     }
@@ -635,7 +520,6 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                             crate::app::dispatch::flush_held_local_queue_into_wait(app, Some(id));
                         app.pending_effects.extend(flush);
                     }
-
                     if process_usage_snapshot_changed && is_active {
                         app.refresh_status_line_now();
                     }
@@ -654,22 +538,12 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                     // Re-derive the &str key to avoid making SessionMatch::Child
                     // carry an owned String (see find_session_match docs).
                     let child_key: &str = notif.request.session_id.0.as_ref();
-
                     let activity_label = {
                         let child_view = parent
                             .child_view_for_live_update_mut(child_key)
                             .expect("find_session_match returned an existing subagent_views key");
-                        if let Some(prompt_id) = meta.prompt_id.as_deref()
-                            && child_view
-                                .prompt_ack
-                                .as_ref()
-                                .is_some_and(|watch| watch.prompt_id() == prompt_id)
-                        {
-                            child_view.note_prompt_ack(
-                                crate::app::prompt_ack::AckSignal::SessionUpdate,
-                                std::time::Instant::now(),
-                            );
-                        }
+                        // An overlay prompt arms the watch on this child, so the child's own updates must disarm it.
+                        ack_prompt_from_update(child_view, &meta);
                         if let Some(tokens) = meta.total_tokens {
                             confirm_context_used(child_view, tokens);
                         }
@@ -693,8 +567,6 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                             if apply {
                                 if is_live {
                                     if let Some(ts) = meta.turn_start_ms {
-                                        // Nameless chunks must not replace a named turn's wall
-                                        // anchor. `honest_turn_elapsed` trusts the pair.
                                         let named = meta
                                             .prompt_id
                                             .as_deref()
@@ -724,9 +596,7 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
                         }
                         subagent_activity_label(child_view)
                     };
-
                     sync_subagent_activity(parent, child_key, activity_label);
-
                     is_active
                 }
                 None => {
@@ -757,14 +627,8 @@ fn handle_inner(msg: AcpClientMessage, app: &mut AppView) -> bool {
         _ => false,
     }
 }
-
-/// The turn's first activity (tracker flip None→Some): the server has started
-/// producing, so drop the Ctrl+C rewind stash and log TTFA once per turn.
-/// Shared by `handle_update` and the `ToolCallDeltaChunk` arm so the rails can't drift.
 pub(super) fn note_first_turn_activity(agent: &mut AgentView) {
     agent.session.in_flight_prompt = None;
-
-    // Log initial TTFA once per turn (activity flips None→Some each loop).
     if let Some(started) = agent.turn_started_at
         && agent.first_activity_logged_for != Some(started)
     {
@@ -787,7 +651,6 @@ pub(super) fn note_first_turn_activity(agent: &mut AgentView) {
         );
     }
 }
-
 fn workflow_commands(
     commands: &[acp::AvailableCommand],
 ) -> Vec<(&str, &str, Option<&str>, Option<&str>)> {
@@ -805,7 +668,6 @@ fn workflow_commands(
         })
         .collect()
 }
-
 pub(super) fn is_builtin_workflow_handle(
     commands: &[acp::AvailableCommand],
     display_name: &str,
@@ -828,7 +690,6 @@ pub(super) fn is_builtin_workflow_handle(
                 .is_some_and(|ordinal| ordinal.parse::<u32>().is_ok_and(|n| n >= 2))
     })
 }
-
 pub(crate) fn refresh_workflow_run_capabilities(agent: &mut AgentView) {
     let management_available = agent
         .session
@@ -840,7 +701,6 @@ pub(crate) fn refresh_workflow_run_capabilities(agent: &mut AgentView) {
         run.builtin = is_builtin_workflow_handle(&agent.session.available_commands, &run.name);
     }
 }
-
 fn queue_open_workflows_modal_refresh(app: &mut AppView, agent_id: AgentId) {
     let Some(session_id) = app
         .agents
@@ -865,8 +725,6 @@ fn queue_open_workflows_modal_refresh(app: &mut AppView, agent_id: AgentId) {
         });
     }
 }
-
-/// Handle an xAI extension notification.
 fn handle_ext_notification(notif: &acp::ExtNotification, app: &mut AppView) -> bool {
     let method = notif.method.as_ref();
     if crate::acp::is_session_update_ext_method(method) {
@@ -901,7 +759,6 @@ fn handle_ext_notification(notif: &acp::ExtNotification, app: &mut AppView) -> b
         _ => false,
     }
 }
-
 /// Record the shell's latest `session/new` setup step so a create timeout can name where it stalled.
 fn handle_session_setup_phase(notif: &acp::ExtNotification, app: &mut AppView) -> bool {
     #[derive(serde::Deserialize)]
@@ -919,7 +776,6 @@ fn handle_session_setup_phase(notif: &acp::ExtNotification, app: &mut AppView) -
     if payload.method.as_deref() != Some("session/new") {
         return false;
     }
-    // Ignore any phase not in the allowlist so the pager never renders arbitrary wire text.
     let Ok(phase) = payload
         .phase
         .parse::<xai_grok_shell::agent::SessionSetupPhase>()
@@ -943,7 +799,6 @@ fn handle_version_mismatch(notif: &acp::ExtNotification, app: &mut AppView) -> b
     app.show_toast(&banner);
     true
 }
-
 fn user_message_text(update: &acp::SessionUpdate) -> Option<&str> {
     let acp::SessionUpdate::UserMessageChunk(chunk) = update else {
         return None;
@@ -953,7 +808,6 @@ fn user_message_text(update: &acp::SessionUpdate) -> Option<&str> {
         _ => None,
     }
 }
-
 fn handle_interjection(notif: &acp::ExtNotification, app: &mut AppView) -> bool {
     let Ok(parsed) = serde_json::from_str::<serde_json::Value>(notif.params.get()) else {
         tracing::warn!("Failed to parse x.ai/session/interjection");
@@ -966,7 +820,6 @@ fn handle_interjection(notif: &acp::ExtNotification, app: &mut AppView) -> bool 
         return false;
     };
     let interjection_id = parsed.get("interjectionId").and_then(|v| v.as_str());
-
     let sid = acp::SessionId::new(session_id.to_string());
     let Some(SessionMatch::Root(id)) = find_session_match(app, &sid) else {
         return false;
@@ -975,7 +828,6 @@ fn handle_interjection(notif: &acp::ExtNotification, app: &mut AppView) -> bool 
     let Some(agent) = app.agents.get_mut(&id) else {
         return false;
     };
-
     if let Some(iid) = interjection_id {
         // Two self-message flows land here, painted differently on the
         // originator: a direct interjection (already an interjection block,
@@ -1006,18 +858,11 @@ fn handle_interjection(notif: &acp::ExtNotification, app: &mut AppView) -> bool 
             return false;
         }
     }
-
     agent
         .scrollback
         .push_block(RenderBlock::interjection_prompt(text));
     is_active
 }
-
-/// Handle an ACP `ext_method` request (blocking request that expects a response).
-///
-/// Dispatches on method string. Unknown methods get `method_not_found` error.
-/// The response sender is stashed (for `ask_user_question`) or replied to
-/// immediately (for unknown methods).
 fn handle_ext_method(ext: xai_acp_lib::AcpArgs<acp::ExtRequest>, app: &mut AppView) -> bool {
     match ext.request.method.as_ref() {
         "x.ai/ask_user_question" => handle_ask_user_question(ext, app),
@@ -1035,6 +880,5 @@ fn handle_ext_method(ext: xai_acp_lib::AcpArgs<acp::ExtRequest>, app: &mut AppVi
         }
     }
 }
-
 #[cfg(test)]
 mod tests;

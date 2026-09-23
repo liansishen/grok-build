@@ -410,6 +410,9 @@ pub(in crate::app::dispatch) fn dispatch_pick_session(
             app.welcome_history_load_as_build = true;
         }
     }
+    if crate::app::is_daemon_session_row(&source) {
+        return dispatch_daemon_session_pick(app, session_id, cwd);
+    }
     if chat_kind {
         return dispatch_load_session(app, session_id, None, true);
     }
@@ -444,6 +447,14 @@ pub(in crate::app::dispatch) fn dispatch_pick_session(
         app.show_toast(xai_grok_i18n::t("toast.session_not_found_locally"));
         vec![]
     }
+}
+fn dispatch_daemon_session_pick(app: &mut AppView, session_id: String, cwd: String) -> Vec<Effect> {
+    #[cfg(feature = "local-workspace")]
+    {
+        app.welcome_history_load_as_build = true;
+    }
+    let session_cwd = (!cwd.is_empty()).then(|| std::path::PathBuf::from(cwd));
+    dispatch_load_session(app, session_id, session_cwd, false)
 }
 /// Pick a session from the picker and resume it in a new git worktree.
 pub(in crate::app::dispatch) fn dispatch_pick_session_in_worktree(
@@ -518,6 +529,12 @@ pub(in crate::app::dispatch) fn dispatch_pick_session_in_worktree(
     if source == "conversation" {
         app.show_toast(xai_grok_i18n::t(
             "toast.chat_conversation_worktree_unsupported",
+        ));
+        return vec![];
+    }
+    if crate::app::is_daemon_session_row(&source) {
+        app.show_toast(xai_grok_i18n::t(
+            "toast.daemon_session_worktree_unsupported",
         ));
         return vec![];
     }
@@ -1243,10 +1260,11 @@ pub(in crate::app::dispatch) fn handle_session_loaded(
             app.models = Some(m).into();
             agent.session.models = app.models.clone();
         }
-        if agent.apply_session_modes(modes) {
-            app.default_yolo = false;
-            app.current_ui.permission_mode = Some("ask".into());
-        }
+        crate::app::dispatch::session::lifecycle::apply_session_modes_dropping_auto(
+            agent,
+            modes,
+            &mut app.current_ui.permission_mode,
+        );
         let deferred = crate::app::dispatch::session::lifecycle::apply_deferred_model_switch(
             agent,
             app.cli_effort_token.as_deref(),

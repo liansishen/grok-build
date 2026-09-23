@@ -35,8 +35,7 @@ pub(crate) struct DeferredSwitchOutcome {
     pub switch: Option<DeferredModelSwitch>,
     pub effort_error: Option<EffortTokenError>,
 }
-/// Resolve the stashed `-m` switch and/or `cli_effort_token` against the session catalog via [`ModelState::resolve_effort_for_model`].
-/// This is the same gate-first policy as `/effort` and headless.
+/// Resolve the stashed `-m` switch and/or `cli_effort_token` against the session catalog via [`ModelState::resolve_cli_effort_for_model`].
 pub(crate) fn take_deferred_model_switch(
     stashed: Option<DeferredModelSwitch>,
     models: &ModelState,
@@ -50,7 +49,7 @@ pub(crate) fn take_deferred_model_switch(
     {
         let effort_error = match cli_effort_token {
             Some(token) if effort.is_none() => {
-                match models.resolve_effort_for_model(&model_id, token) {
+                match models.resolve_cli_effort_for_model(&model_id, token) {
                     Ok(resolved) => {
                         effort = Some(resolved);
                         None
@@ -81,7 +80,7 @@ pub(crate) fn take_deferred_model_switch(
             effort_error: Some(EffortTokenError::NoActiveModel),
         };
     };
-    match models.resolve_effort_for_model(&current, token) {
+    match models.resolve_cli_effort_for_model(&current, token) {
         Ok(effort) if models.reasoning_effort == Some(effort) => DeferredSwitchOutcome {
             switch: None,
             effort_error: None,
@@ -1409,10 +1408,7 @@ pub(in crate::app::dispatch) fn handle_session_created(
             app.models = Some(m).into();
             agent.session.models = app.models.clone();
         }
-        if agent.apply_session_modes(modes) {
-            app.default_yolo = false;
-            app.current_ui.permission_mode = Some("ask".into());
-        }
+        apply_session_modes_dropping_auto(agent, modes, &mut app.current_ui.permission_mode);
         let deferred = apply_deferred_model_switch(agent, app.cli_effort_token.as_deref());
         let deferred_mode = agent.deferred_session_mode.take();
         let deferred_permission = agent.deferred_permission_mode.take();
@@ -1490,6 +1486,16 @@ pub(in crate::app::dispatch) fn handle_session_created(
     }
     abandoned_husk_cleanup_effects(app, session_id)
 }
+/// `sync_active_auto_flag` reads Auto back from `current_ui.permission_mode`.
+pub(super) fn apply_session_modes_dropping_auto(
+    agent: &mut AgentView,
+    modes: Option<acp::SessionModeState>,
+    permission_mode: &mut Option<String>,
+) {
+    if agent.apply_session_modes(modes) && permission_mode.as_deref() == Some("auto") {
+        *permission_mode = Some("ask".into());
+    }
+}
 /// Mode changes made before the session was bound (Shift+Tab on a pre-session
 /// agent) go out ahead of the queued first prompt, so the shell enforces the
 /// displayed mode when that prompt's tool calls arrive.
@@ -1541,11 +1547,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
             app.models = Some(m).into();
             agent.session.models = app.models.clone();
         }
-        let deferred_permission = agent.deferred_permission_mode.take();
-        if agent.apply_session_modes(modes) {
-            app.default_yolo = false;
-            app.current_ui.permission_mode = Some("ask".into());
-        }
+        apply_session_modes_dropping_auto(agent, modes, &mut app.current_ui.permission_mode);
         agent.prompt.file_search.retarget(&session_cwd);
         let worktree_path = worktree_path.display().to_string();
         agent.scrollback.push_block(RenderBlock::system(xai_grok_i18n::t_fmt(
@@ -1557,7 +1559,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
         }
         let deferred = apply_deferred_model_switch(agent, app.cli_effort_token.as_deref());
         let deferred_mode = agent.deferred_session_mode.take();
-        let deferred_permission = deferred_permission;
+        let deferred_permission = agent.deferred_permission_mode.take();
         let cwd = agent.session.cwd.clone();
         if deferred.is_some() {
             agent.session.model_switch_pending = true;

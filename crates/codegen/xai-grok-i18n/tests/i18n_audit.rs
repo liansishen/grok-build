@@ -521,7 +521,8 @@ fn returned_binding_name(node: Node<'_>, source: &[u8]) -> Option<String> {
         let parent = current.parent()?;
         match parent.kind() {
             "block" => {
-                let last = parent.named_child(parent.named_child_count().checked_sub(1)?)?;
+                let last_index = u32::try_from(parent.named_child_count().checked_sub(1)?).ok()?;
+                let last = parent.named_child(last_index)?;
                 if last.start_byte() != current.start_byte() {
                     return None;
                 }
