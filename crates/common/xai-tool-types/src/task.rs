@@ -1281,6 +1281,35 @@ pub const PLAN_SUBAGENT: BuiltinSubagent = BuiltinSubagent {
 pub const BUILTIN_SUBAGENTS: [BuiltinSubagent; 3] =
     [GENERAL_PURPOSE_SUBAGENT, EXPLORE_SUBAGENT, PLAN_SUBAGENT];
 
+/// Catalog key for a built-in subagent type's display label.
+///
+/// `None` for user-defined types: those names are free-form identifiers with no catalog entry,
+/// so callers keep them verbatim.
+fn builtin_subagent_type_label_key(subagent_type: &str) -> Option<&'static str> {
+    match subagent_type {
+        "general-purpose" => Some("subagent.type.general"),
+        "explore" => Some("subagent.type.explore"),
+        "plan" => Some("subagent.type.plan"),
+        _ => None,
+    }
+}
+
+/// Display label for a subagent type in the active UI locale.
+///
+/// The localizable copy wraps this slug (tool results, permission prompts), so the slug is
+/// translated with it instead of leaking English into a non-English UI.
+pub fn subagent_type_label(subagent_type: &str) -> &str {
+    subagent_type_label_for(xai_grok_i18n::current_locale(), subagent_type)
+}
+
+/// [`subagent_type_label`] for an explicit locale.
+pub fn subagent_type_label_for(locale: xai_grok_i18n::Locale, subagent_type: &str) -> &str {
+    match builtin_subagent_type_label_key(subagent_type) {
+        Some(key) => xai_grok_i18n::t_for(locale, key),
+        None => subagent_type,
+    }
+}
+
 /// Tool-access fragment for a subagent type whose toolset the host resolved at build time, in the
 /// same voice as the `tools_template` fragments: `Has access to: a, b, and c.` or, when `read_only`,
 /// `Read-only — has access to: a and b.` The caller passes `names` already ordered and deduplicated.
@@ -1563,6 +1592,39 @@ pub fn build_wait_tasks_description(naming: &WaitTasksToolNaming) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn builtin_type_labels_resolve_and_custom_types_stay_verbatim() {
+        use xai_grok_i18n::Locale;
+
+        assert_eq!(
+            subagent_type_label_for(Locale::En, "general-purpose"),
+            "general-purpose"
+        );
+        assert_eq!(subagent_type_label_for(Locale::En, "explore"), "explore");
+        assert_eq!(subagent_type_label_for(Locale::En, "plan"), "plan");
+
+        assert_eq!(subagent_type_label_for(Locale::ZhCn, "general-purpose"), "通用");
+        assert_eq!(subagent_type_label_for(Locale::ZhCn, "explore"), "探索");
+        assert_eq!(subagent_type_label_for(Locale::ZhCn, "plan"), "计划");
+
+        for custom in ["custom-agent", "my-plugin:reviewer", ""] {
+            assert_eq!(subagent_type_label_for(Locale::ZhCn, custom), custom);
+        }
+    }
+
+    #[test]
+    fn every_builtin_type_has_a_catalog_label() {
+        for builtin in BUILTIN_SUBAGENTS {
+            let key = builtin_subagent_type_label_key(builtin.name)
+                .unwrap_or_else(|| panic!("built-in type {} has no label key", builtin.name));
+            assert!(
+                xai_grok_i18n::has_en(key),
+                "built-in type {} is missing the English catalog entry {key}",
+                builtin.name
+            );
+        }
+    }
 
     fn result_with_status(status: &str) -> TaskOutputOutput {
         TaskOutputOutput::Result(TaskOutputResult {

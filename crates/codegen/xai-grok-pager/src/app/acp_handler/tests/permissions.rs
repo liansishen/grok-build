@@ -656,3 +656,41 @@
         assert!(agent.permission_stashed_pane.is_none());
     }
 
+    /// The provenance label wraps localized copy, so the type name is localized with it instead of
+    /// leaking the raw slug (`explore`) into a Chinese UI.
+    #[test]
+    #[serial_test::serial(GROK_UI_LOCALE)]
+    fn subagent_provenance_label_localizes_the_type_name() {
+        struct RestoreLocale(xai_grok_i18n::Locale);
+        impl Drop for RestoreLocale {
+            fn drop(&mut self) {
+                xai_grok_i18n::set_locale(self.0);
+            }
+        }
+        let _restore = RestoreLocale(xai_grok_i18n::current_locale());
+
+        let mut app = make_app_with_agent("sess-root");
+        {
+            let parent = app.agents.get_mut(&AgentId(0)).unwrap();
+            parent
+                .subagent_sessions
+                .insert("child-1".into(), make_subagent_info("child-1"));
+        }
+        let child = acp::SessionId::new("child-1");
+
+        let english = crate::app::acp_handler::permissions::resolve_subagent_label(
+            test_agent(&app, AgentId(0)),
+            &child,
+        )
+        .expect("a tracked child session needs a provenance label");
+        assert_eq!(english, "Subagent \"test\" (general-purpose):");
+
+        xai_grok_i18n::set_locale(xai_grok_i18n::Locale::ZhCn);
+        let chinese = crate::app::acp_handler::permissions::resolve_subagent_label(
+            test_agent(&app, AgentId(0)),
+            &child,
+        )
+        .expect("a tracked child session needs a provenance label");
+        assert_eq!(chinese, "\u{5b50}\u{4ee3}\u{7406} \"test\" (\u{901a}\u{7528}):");
+    }
+

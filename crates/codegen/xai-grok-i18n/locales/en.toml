@@ -3605,7 +3605,7 @@
 "subagent.error.dropped" = "Child session dropped unexpectedly"
 "subagent.error.unknown_type" = "Unknown subagent type: {name}"
 "subagent.error.cannot_validate" = "Cannot validate subagent '{name}'"
-"subagent.type.general" = "general"
+"subagent.type.general" = "general-purpose"
 "subagent.type.explore" = "explore"
 "subagent.type.plan" = "plan"
 "subagent.context.resumed" = "resumed"

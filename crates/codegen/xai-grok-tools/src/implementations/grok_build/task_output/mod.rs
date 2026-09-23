@@ -23,6 +23,7 @@ use crate::types::template_renderer::TemplateRenderer;
 use crate::types::tool::{ToolKind, ToolNamespace};
 use xai_tool_types::{
     MultiTaskOutputResult, TaskOutputOutput, TaskOutputResult, TaskOutputToolInput,
+    subagent_type_label,
 };
 use xai_grok_i18n::{t, t_fmt};
 
@@ -642,6 +643,19 @@ fn render_legacy_task_output_not_found(task_id: &str) -> String {
     format!("Task {} not found", task_id)
 }
 
+/// Display command for a subagent row: `[subagent:explore] find callers`.
+///
+/// The tag and the type are both catalog copy, so a non-English UI does not fall back to English
+/// for the kind of task the row describes.
+fn subagent_command(snap: &SubagentSnapshot) -> String {
+    format!(
+        "[{}:{}] {}",
+        t("subagent.label.fallback"),
+        subagent_type_label(snap.subagent_type.as_str()),
+        snap.description
+    )
+}
+
 pub(crate) fn format_subagent_snapshot(
     snap: &SubagentSnapshot,
     wait_hint: WaitHint,
@@ -654,7 +668,7 @@ pub(crate) fn format_subagent_snapshot(
             let body = t_fmt(
                 "task_output.subagent.initializing",
                 &[
-                    ("type", snap.subagent_type.as_str()),
+                    ("type", subagent_type_label(snap.subagent_type.as_str())),
                     ("description", snap.description.as_str()),
                     ("elapsed", &format!("{duration_secs:.1}")),
                 ],
@@ -663,7 +677,7 @@ pub(crate) fn format_subagent_snapshot(
             let output = with_still_running_wait_hint(body, wait_hint, WaitSubject::Subagent);
             TaskOutputOutput::Result(TaskOutputResult {
                 task_id: snap.subagent_id.clone(),
-                command: format!("[subagent:{}] {}", snap.subagent_type, snap.description),
+                command: subagent_command(snap),
                 status: "initializing".to_string(),
                 exit_code: None,
                 started,
@@ -697,7 +711,7 @@ pub(crate) fn format_subagent_snapshot(
             let body = t_fmt(
                 "task_output.subagent.running",
                 &[
-                    ("type", snap.subagent_type.as_str()),
+                    ("type", subagent_type_label(snap.subagent_type.as_str())),
                     ("description", snap.description.as_str()),
                     ("elapsed", &elapsed),
                     ("turns", &turn_count.to_string()),
@@ -713,7 +727,7 @@ pub(crate) fn format_subagent_snapshot(
             let output = with_still_running_wait_hint(body, wait_hint, WaitSubject::Subagent);
             TaskOutputOutput::Result(TaskOutputResult {
                 task_id: snap.subagent_id.clone(),
-                command: format!("[subagent:{}] {}", snap.subagent_type, snap.description),
+                command: subagent_command(snap),
                 status: "running".to_string(),
                 exit_code: None,
                 started,
@@ -774,7 +788,7 @@ pub(crate) fn terminal_subagent_result(snap: &SubagentSnapshot) -> TaskOutputRes
     let ended_at_epoch_ms = snap.started_at_epoch_ms + snap.duration_ms;
     TaskOutputResult {
         task_id: snap.subagent_id.clone(),
-        command: format!("[subagent:{}] {}", snap.subagent_type, snap.description),
+        command: subagent_command(snap),
         status: status.to_string(),
         exit_code,
         started: format_epoch_ms_as_rfc3339(snap.started_at_epoch_ms),
@@ -1101,6 +1115,38 @@ mod tests {
     use crate::types::tool_metadata::ToolMetadata;
     use crate::types::tool_metadata::test_ctx;
     use std::sync::Arc;
+
+    /// The row's display command is what the tool title and the model-facing reminder quote, so the
+    /// tag and the type both have to come from the catalog rather than from an English literal.
+    #[test]
+    fn subagent_command_localizes_the_tag_and_the_type() {
+        let snap = SubagentSnapshot {
+            subagent_id: "sa-command".to_string(),
+            description: "find callers".to_string(),
+            subagent_type: "explore".to_string(),
+            persona: None,
+            status: SubagentSnapshotStatus::Running {
+                turn_count: 0,
+                tool_call_count: 0,
+                tokens_used: 0,
+                context_window_tokens: 128_000,
+                context_usage_pct: 0,
+                tools_used: vec![],
+                error_count: 0,
+            },
+            started_at_epoch_ms: 1_700_000_000_000,
+            duration_ms: 0,
+        };
+
+        assert_eq!(subagent_command(&snap), "[subagent:explore] find callers");
+
+        // The pseudo-locale wraps every catalog lookup, so a hardcoded tag or type cannot pass.
+        let pseudo = xai_grok_i18n::with_pseudo_locale(|| subagent_command(&snap));
+        assert_eq!(
+            pseudo,
+            "[\u{27e6}subagent.label.fallback\u{27e7}:\u{27e6}subagent.type.explore\u{27e7}] find callers"
+        );
+    }
 
     // A blocking wait must never hold the turn for longer than the wait
     // cap, regardless of the model's requested `timeout_ms` (repro: an
@@ -2266,7 +2312,7 @@ mod tests {
              3K/128K tokens (2% context)\n\
              Tools used: bash\n\
              Errors: 0",
-            snap.subagent_type,
+            subagent_type_label(snap.subagent_type.as_str()),
             snap.description,
             snap.duration_ms as f64 / 1000.0,
         );

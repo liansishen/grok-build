@@ -946,13 +946,7 @@ fn dedup_persona_role<'a, 'b>(
 }
 
 pub(crate) fn format_type_label(subagent_type: &str) -> &str {
-    match subagent_type {
-        "general-purpose" => xai_grok_i18n::t("subagent.type.general"),
-        "explore" => xai_grok_i18n::t("subagent.type.explore"),
-        "plan" => xai_grok_i18n::t("subagent.type.plan"),
-        // Custom agent types are free-form identifiers with no catalog entry, so they stay verbatim.
-        other => other,
-    }
+    xai_tool_types::subagent_type_label(subagent_type)
 }
 
 pub(crate) fn format_context_badge(info: &SubagentInfo) -> &str {
