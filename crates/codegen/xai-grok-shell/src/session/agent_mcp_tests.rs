@@ -939,6 +939,9 @@ fn rematerialize_honors_parent_kill_switch_from_worktree() {
 #[test]
 fn child_rematerialize_does_not_regain_parent_mcp_excluded_by_inheritance() {
     let parent = cwd_with_project_mcp("agent_md_inherit_x", true);
+    // Release-stamped builds drop project MCP until the folder is trusted. This
+    // case is about inheritance, not the trust gate.
+    crate::agent::folder_trust::record_for_test(parent.path(), true);
     let worktree = tempfile::tempdir().unwrap();
     let mut child = definition_with(vec![inline_http(
         "owned",
