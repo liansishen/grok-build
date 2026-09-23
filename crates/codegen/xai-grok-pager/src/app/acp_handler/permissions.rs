@@ -244,7 +244,7 @@ fn enqueue_permission(
 ///    `Child session (untracked):` to signal reduced confidence.
 ///
 /// Returns `None` for root session (no provenance needed).
-fn resolve_subagent_label(agent: &AgentView, session_id: &acp::SessionId) -> Option<String> {
+pub(super) fn resolve_subagent_label(agent: &AgentView, session_id: &acp::SessionId) -> Option<String> {
     let sid = session_id.0.as_ref();
     // Check if this is the root session (no provenance needed).
     if let Some(ref root_sid) = agent.session.session_id
@@ -258,7 +258,7 @@ fn resolve_subagent_label(agent: &AgentView, session_id: &acp::SessionId) -> Opt
             "{} \"{}\" ({}):",
             xai_grok_i18n::t("dashboard.response.subagent"),
             info.description,
-            info.subagent_type
+            crate::app::subagent::format_type_label(info.subagent_type.as_ref())
         ));
     }
     // Tier 2: non-root session with no tracked info.

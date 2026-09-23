@@ -1,5 +1,70 @@
 # Changelog
 
+# 1.0.41-fork.2 — 2026-09-24
+
+同步上游 monorepo `f0e3be11` / Source-Revision `036a5d8348cd744767cd0b08518ab17bf608fa7f`，产品版本仍为 **1.0.41**（上游本次未升版本）。发布范围覆盖上一版 `v1.0.41-fork.1` 之后的上游更新：1 个上游同步提交、187 个文件、+5955/−4764 行，以及吸收该更新所需的合并适配与本地化修复（23 个冲突文件、44 个冲突块，其中 3 个 cosmetic 块自动采用上游）。
+
+### 上游更新
+
+- **远程 Agent Host 与守护进程**：远程调用改用控制端密钥签名；守护进程的回合开始会上报给 pager，`send-now` 会停止唤醒回合并公布新提示；登录变化时推送到 pager。pager 新增守护进程路由模型与头部，Agent Host 标签页按会话 ID 路由，Await 与 shell 行映射到基础路径的界面；位于另一台机器的会话只提供 Agent 模式并做有界回放；守护进程的压缩状态显示在 pager 横幅上；删除空闲 dump 并改写 Agent Host 文档。
+- **仪表盘与子代理视图**：移除仪表盘中隐藏的子代理行和不可达的子代理目录面板——`DashboardRowId::Subagent`、目录条目的 `TaskResult`/`Effect` 与 `views/subagent_catalog_pane.rs` 一并删除，`[dashboard] pinned` 只接受 `top:` 条目。
+- **渲染、输入与信号**：整屏重绘清屏后重新发送内联图片（Ghostty 等会在 `ESC[2J` 后丢弃图片数据）；minimal 模式改尺寸时重印历史并修正 live region 锚定；非剪贴板的括号粘贴跳过剪贴板图片；headless pager 模式处理信号；第二次 Ctrl+C 前先等待退出确认。
+- **会话与回合**：`send-now` 的停止路径在普通提示回合与唤醒回合之间共用；被取消的回合也会被记忆捕获；回合结束前等待 `usage.json`；"Worked for" 在每个回合起点锚定，不再把空闲间隔算进去；保持 cwd 本地会话；空评论时用 Ctrl+C 取消计划评论。
+- **更新与安装**：WinGet 安装的更新交给 `winget upgrade`，`grok update` 此时只打印命令；`xai-grok-update` 新增 winget 模块与对应测试。
+- **MCP 与工具**：MCP SDK（`rmcp`）从 3.2.0 升到 3.4.0；MCP 鉴权重试失败按自身错误归类；`grok-computer` 工具集限定为 `browser_execute`；chat sandbox 的任务输出轮询上限 5k。
+- **能力、工作树与中继**：缓存会话补齐 team 能力（新增 `x.ai/auth/hydrate_team_capability`）；Windows 上离线清理 fast-worktree 产物；中继断开后重试更久、向用户点名并让列表项过期。
+
+### 本 Fork
+
+- 合并适配：
+  - `AppView::apply_auth_meta` 继续返回计费刷新判断；上游新增的 `refresh_open_settings_modals` 调用与 `apply_recheck_meta` 包装都在，后者把返回值透传给计费刷新判断。
+  - 团队主体判定保留 fork 语义：`meta.is_team_principal` 为真，或 `principal_type` 为 `Team` 且 `team_id` 非空（个人账号携带工作区 `team_id` 时不会隐藏计费面）。上游新增的 `can_administer_team` 字段、能力水合与 `AuthIdentity` 一并保留。
+  - 删除 fork 的 `is_team_non_admin`：上游改用服务端能力 `can_administer_team` 与 `coding_data_sharing_lock()` 取代 `team_role` 代理判定，编码数据共享的锁定与欢迎页隐私横幅都按能力判定，能力未知时按可编辑处理并在启动后水合。
+  - 删除 `views/dashboard/render.rs` 中重复的 header/actions row 实现（上游已把它们移到 `views/dashboard/chrome.rs`），改用上游实现并接回 fork 的本地化：状态 chip 用稳定的英文 slug 作为 `chip_rects` 键，显示文本走 `dashboard.state.*`。dashboard 头部因此同时获得上游新增的 spinner 动画标记与 `worktree_armed()` 判定。
+  - 目录条目与子代理行相关代码随上游删除；`task_output` 的字节上限重构与子代理标签本地化在合并后仍走翻译目录。
+  - `grok update` 的「不在允许更新范围」通知继续使用本地化的 `skipped_not_allowed_notice`，上游新增的第二个调用点也改用它。
+- 新增用户可见文案接入目录：`dashboard.load_session_before_reply`、`status.coding_data_sharing_team_admin`、`update.reinstall.winget`、`minimal.reprint.earlier_blocks_footer`；`actions.DashboardStop.help` 的源文本随上游删去子代理一句后同步更新。
+- 英文用户指南本批 6 处改动同步到简体中文：WinGet 更新、暂存恢复后的光标位置、已取消的回合也会被记忆捕获、子智能体全屏视图入口、仪表盘 `pinned` 示例、Windows 上通过 ProjFS 挂载 clone。`13-memory.md` 的对应英文段落在本分支的中文版本里没有对应段落（既有翻译缺口），本次未新增。
+
+### 兼容性
+
+- 产品版本仍为 **1.0.41**，发布标签 `v1.0.41-fork.2` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的 `1.0.41`。
+- 行为随上游变化：仪表盘不再显示子代理行，也没有子代理目录面板；编码数据共享能否修改取决于服务端 `canAdministerTeam` 能力（未知时按可编辑处理，并在启动后水合）；WinGet 安装不再由 `grok update` 自行替换；MCP SDK 升到 3.4.0。
+- 本地化目录的查找、回退与语言解析机制未改动；未提供翻译的键继续回退英文，其它语种仍使用英文目录回退。
+- 不新增外部服务、鉴权流程或运行时依赖。
+
+### 国际化
+
+- 本版新增 4 个键，`en.toml` 与 `zh-CN.toml` 各从 4347 个键增至 4351 个键，两侧键集合与 `{placeholder}` 完全一致。
+- 随上游删除的子代理行与目录面板文案（`dash.subagent_not_running`、`dashboard.toast.subagent_*`、`subagent_catalog.*`、`pane.no_bundled`、`task_result.catalog_entry_load_failed` 等）成为无引用键，本版未清理，留待后续统一收尾。
+- 未提供翻译的键继续回退英文；日志与 tracing 输出、发给模型的 prompt 与系统提示、协议/JSON 字段名、错误码、内部标识符，以及 CLI `--help` 与错误消息不在本地化范围内（沿用既有 Non-goals），新出现的同类文本仍由 diff 门槛把关。
+
+### 验证
+
+发布范围已逐项复核上一版 `v1.0.41-fork.1` 之后的提交（上游合并适配、新增文案本地化及本 changelog）。
+
+本地等 CI 验证（Rust 1.92.0、Protoc 29.3、全部 `--locked`，`GROK_VERSION=1.0.41-fork.2`）：
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；`target/release/xai-grok-pager --version` 输出 `grok 1.0.41-fork.2 (250adbf9322b) [fork]`，包含本版版本号。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-workspace --lib`：2143 项通过。
+- `cargo +1.92.0 test --locked -p xai-tool-types --lib`：107 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-shell --lib -- --test-threads=1`：7064 项通过，7 项忽略。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib -- --test-threads=1`：10232 项通过，4 项忽略。唯一失败项 `fs_size::tests::later_sibling_is_visited_after_another_filesystem` 与本次改动无关：该测试文件及其实现都不在改动范围内，仅在本机以 root 允许挂载 tmpfs 时真正执行，其断言依赖目录项顺序（CI 上无法挂载 tmpfs 会提前返回）。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`--test i18n_audit` 在无基线与 `GROK_I18N_AUDIT_BASE=origin/main` 两种情况下均 16 项通过（含全仓扫描、Markdown 覆盖与仓库 diff 审计）。
+- `python3 scripts/i18n_catalog.py`：`missing_keys`、`extra_keys`、`placeholder_mismatches` 均为空。
+- `python3 scripts/upstream_merge.py audit-markers`：通过。
+- Windows x86_64 由 GitHub Actions 的 `Build` 工作流验证。
+
+### 产物
+
+- `grok-1.0.41-fork.2-linux-x86_64`
+- `grok-1.0.41-fork.2-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.41-fork.1...v1.0.41-fork.2
+
 # 1.0.41-fork.1 — 2026-09-23
 
 同步上游 monorepo `07e35a3d` / Source-Revision `84745de98b3d3996729aefcefd518890ffb73930`，产品版本随上游从 **1.0.38** 升至 **1.0.41**。发布范围覆盖上一版 `v1.0.38-fork.2` 之后的上游更新（1.0.39–1.0.41），以及吸收该更新所需的合并适配与本地化修复（39 个冲突文件、95 个冲突块，其中 12 个 cosmetic 块自动采用上游）。
@@ -1436,10 +1501,8 @@
 
 ## Features
 
-- **Added a new `sports_search` tool** that can look up live NFL scores, standings, schedules, player stats, and team records directly from X data.
 - **Subagent model inheritance** setting added to /settings; persists in config.toml and respects managed/overlay layers.
 - **Per-model request size limits** can now be configured to match provider HTTP body caps and control inline image eviction.
-- **Long reasoning reminder** can now be enabled via config to nudge the model after long hidden-reasoning steps.
 
 ## Bug Fixes
 

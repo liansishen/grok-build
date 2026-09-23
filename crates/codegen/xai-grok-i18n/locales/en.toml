@@ -798,6 +798,7 @@
 "dashboard.hint.new_agent" = "New Agent"
 "dashboard.hint.send_open" = "send+open"
 "dashboard.load_session_before_rename" = "Load the session before renaming"
+"dashboard.load_session_before_reply" = "Load the session before replying"
 "dashboard.loading" = "Loading…"
 "dashboard.loading_sessions" = "Loading sessions…"
 "dashboard.location.path_label" = " path: "
@@ -2772,6 +2773,7 @@
 "startup.failure.display.timed_out" = "startup timed out after {waited}"
 "startup.failure.display.cancelled" = "startup cancelled before an agent was ready"
 "status.check_usage_on_url" = "Please check your usage on {url}"
+"status.coding_data_sharing_team_admin" = "Ask a team admin to change this setting."
 "status.coding_data_sharing_update_failed" = "✗ Couldn't update coding data sharing: {error}"
 "status.gboom_no_graphics" = "No demons here — GBOOM needs a graphics-capable terminal (kitty, Ghostty, WezTerm, iTerm2)"
 "status.no_tasks" = "No background tasks."
@@ -3226,6 +3228,7 @@
 "update.reinstall.github_releases" = "Please reinstall from this fork's GitHub Releases:\n  https://github.com/{repo}/releases/latest"
 "update.reinstall.manual" = "Please reinstall manually:\n  {command}"
 "update.reinstall.npm_uses_github" = "This fork updates through GitHub Releases, not the official npm package."
+"update.reinstall.winget" = "Update with WinGet:\n  {command}"
 "update.restart_required" = "  Please restart Grok."
 "update.restarting" = "Restarting Grok..."
 "update.run_manual" = "Run `grok update` to get the latest version."
@@ -3605,7 +3608,7 @@
 "subagent.error.dropped" = "Child session dropped unexpectedly"
 "subagent.error.unknown_type" = "Unknown subagent type: {name}"
 "subagent.error.cannot_validate" = "Cannot validate subagent '{name}'"
-"subagent.type.general" = "general"
+"subagent.type.general" = "general-purpose"
 "subagent.type.explore" = "explore"
 "subagent.type.plan" = "plan"
 "subagent.context.resumed" = "resumed"
@@ -4720,6 +4723,9 @@ starting_session = "Signing in… starting your session."
 [minimal.commit]
 more_lines_footer = "… {count} more lines · /transcript to view"
 
+[minimal.reprint]
+earlier_blocks_footer = "… {count} earlier blocks · /transcript to view"
+
 [minimal.feedback]
 band_too_small_hint = "Feedback form needs a bigger terminal - press Esc to close"
 
@@ -5103,7 +5109,7 @@ help = "Opens the model picker to switch the model for this session; the choice 
 help = "Pins or unpins the selected agent so it stays at the top of the list regardless of sorting or grouping.\nKeep the agents you care about in view as others come and go.\nPins persist across dashboard sessions."
 
 [actions.DashboardStop]
-help = "On a busy top-level row, Ctrl+X cancels the running turn. Once the row is idle, press Ctrl+X again within 2s to permanently delete the session.\nOn a subagent row, Ctrl+X kills the subagent."
+help = "On a busy top-level row, Ctrl+X cancels the running turn.\nOnce the row is idle, press Ctrl+X again within 2s to permanently delete the session."
 
 [actions.DashboardCycleMode]
 help = "Cycles the dispatch mode for agents you launch from the dashboard: Normal, Plan, then Always-Approve.\nPlan has new agents plan before changing files; Always-Approve runs their tools without prompting.\nMirrors the in-session Shift+Tab cycle, applied to new dispatches."

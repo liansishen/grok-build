@@ -2616,8 +2616,6 @@ mod tests {
         );
     }
 
-    // --- dual_line_numbers = true snapshots ---
-
     fn dual_config() -> DiffRenderConfig {
         DiffRenderConfig {
             dual_line_numbers: true,
@@ -2798,7 +2796,6 @@ mod tests {
         );
     }
 
-    // ── Edit syntax-highlight harness (triple-quote spill) ──
     // Asserts use **raw syntect RGB** (not ratatui FG after quantize)
     // Under `NO_COLOR` quantize maps every RGB to Reset, which would make keyword vs string asserts tautological / false
 

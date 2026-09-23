@@ -170,7 +170,7 @@ Ctrl+/ 切换搜索模式，使普通输入始终执行分派。前缀从 ❯ �
 [dashboard]
 enabled = true
 grouping = "state"   # or "directory"
-pinned   = ["top:<session_id>", "sub:<parent_session_id>:<child_session_id>"]
+pinned   = ["top:<session_id>"]
 reorder  = ["top:<session_id>"]
 ```
 

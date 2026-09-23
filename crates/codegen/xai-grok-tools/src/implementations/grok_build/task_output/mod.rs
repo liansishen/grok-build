@@ -23,6 +23,7 @@ use crate::types::template_renderer::TemplateRenderer;
 use crate::types::tool::{ToolKind, ToolNamespace};
 use xai_tool_types::{
     MultiTaskOutputResult, TaskOutputOutput, TaskOutputResult, TaskOutputToolInput,
+    subagent_type_label,
 };
 use xai_grok_i18n::{t, t_fmt};
 
@@ -204,6 +205,7 @@ impl TaskOutputTool {
         timeout_ms: Option<u64>,
         ctx: &xai_tool_runtime::ToolCallContext,
         resources: SharedResources,
+        output_byte_limit: Option<usize>,
     ) -> Result<TaskOutputOutput, xai_tool_runtime::ToolError> {
         let contract_version = ctx
             .extensions
@@ -247,17 +249,10 @@ impl TaskOutputTool {
                     .render("${{ tools.by_kind.read }}")
                     .map_err(|e| xai_tool_runtime::ToolError::invalid_arguments(e.to_string()))?;
             }
-            let max_output_bytes = resources
-                .lock()
-                .await
-                .get::<TruncationCfg>()
-                .map(|cfg| {
-                    cfg.0.max_output_bytes_for(
-                        "get_command_or_subagent_output",
-                        DEFAULT_TOOL_OUTPUT_BYTES,
-                    )
-                })
-                .unwrap_or(DEFAULT_TOOL_OUTPUT_BYTES);
+            let max_output_bytes = {
+                let res = resources.lock().await;
+                resolved_max_output_bytes(&res, "get_command_or_subagent_output", output_byte_limit)
+            };
             return Ok(TaskOutputOutput::Result(apply_running_wait_hint(
                 snapshot_to_result(snapshot, &read_file_name, max_output_bytes),
                 wait_hint,
@@ -323,6 +318,23 @@ impl TaskOutputTool {
         resources: SharedResources,
         tool_name_for_truncation: &str,
     ) -> Result<TaskOutputOutput, xai_tool_runtime::ToolError> {
+        Self::run_multi_tasks_limited(
+            task_ids,
+            timeout_ms,
+            resources,
+            tool_name_for_truncation,
+            None,
+        )
+        .await
+    }
+
+    pub(crate) async fn run_multi_tasks_limited(
+        task_ids: &[String],
+        timeout_ms: Option<u64>,
+        resources: SharedResources,
+        tool_name_for_truncation: &str,
+        output_byte_limit: Option<usize>,
+    ) -> Result<TaskOutputOutput, xai_tool_runtime::ToolError> {
         let waits = xai_tool_types::task_output_waits(timeout_ms);
         let requested = requested_wait_timeout(timeout_ms);
         let timeout = capped_wait_timeout(timeout_ms, max_wait_block());
@@ -335,13 +347,7 @@ impl TaskOutputTool {
             let rfn = renderer
                 .render("${{ tools.by_kind.read }}")
                 .map_err(|e| xai_tool_runtime::ToolError::invalid_arguments(e.to_string()))?;
-            let mob = res
-                .get::<TruncationCfg>()
-                .map(|cfg| {
-                    cfg.0
-                        .max_output_bytes_for(tool_name_for_truncation, DEFAULT_TOOL_OUTPUT_BYTES)
-                })
-                .unwrap_or(DEFAULT_TOOL_OUTPUT_BYTES);
+            let mob = resolved_max_output_bytes(&res, tool_name_for_truncation, output_byte_limit);
             (terminal, backend, rfn, mob)
         };
 
@@ -642,6 +648,19 @@ fn render_legacy_task_output_not_found(task_id: &str) -> String {
     format!("Task {} not found", task_id)
 }
 
+/// Display command for a subagent row: `[subagent:explore] find callers`.
+///
+/// The tag and the type are both catalog copy, so a non-English UI does not fall back to English
+/// for the kind of task the row describes.
+fn subagent_command(snap: &SubagentSnapshot) -> String {
+    format!(
+        "[{}:{}] {}",
+        t("subagent.label.fallback"),
+        subagent_type_label(snap.subagent_type.as_str()),
+        snap.description
+    )
+}
+
 pub(crate) fn format_subagent_snapshot(
     snap: &SubagentSnapshot,
     wait_hint: WaitHint,
@@ -654,7 +673,7 @@ pub(crate) fn format_subagent_snapshot(
             let body = t_fmt(
                 "task_output.subagent.initializing",
                 &[
-                    ("type", snap.subagent_type.as_str()),
+                    ("type", subagent_type_label(snap.subagent_type.as_str())),
                     ("description", snap.description.as_str()),
                     ("elapsed", &format!("{duration_secs:.1}")),
                 ],
@@ -663,7 +682,7 @@ pub(crate) fn format_subagent_snapshot(
             let output = with_still_running_wait_hint(body, wait_hint, WaitSubject::Subagent);
             TaskOutputOutput::Result(TaskOutputResult {
                 task_id: snap.subagent_id.clone(),
-                command: format!("[subagent:{}] {}", snap.subagent_type, snap.description),
+                command: subagent_command(snap),
                 status: "initializing".to_string(),
                 exit_code: None,
                 started,
@@ -697,7 +716,7 @@ pub(crate) fn format_subagent_snapshot(
             let body = t_fmt(
                 "task_output.subagent.running",
                 &[
-                    ("type", snap.subagent_type.as_str()),
+                    ("type", subagent_type_label(snap.subagent_type.as_str())),
                     ("description", snap.description.as_str()),
                     ("elapsed", &elapsed),
                     ("turns", &turn_count.to_string()),
@@ -713,7 +732,7 @@ pub(crate) fn format_subagent_snapshot(
             let output = with_still_running_wait_hint(body, wait_hint, WaitSubject::Subagent);
             TaskOutputOutput::Result(TaskOutputResult {
                 task_id: snap.subagent_id.clone(),
-                command: format!("[subagent:{}] {}", snap.subagent_type, snap.description),
+                command: subagent_command(snap),
                 status: "running".to_string(),
                 exit_code: None,
                 started,
@@ -774,7 +793,7 @@ pub(crate) fn terminal_subagent_result(snap: &SubagentSnapshot) -> TaskOutputRes
     let ended_at_epoch_ms = snap.started_at_epoch_ms + snap.duration_ms;
     TaskOutputResult {
         task_id: snap.subagent_id.clone(),
-        command: format!("[subagent:{}] {}", snap.subagent_type, snap.description),
+        command: subagent_command(snap),
         status: status.to_string(),
         exit_code,
         started: format_epoch_ms_as_rfc3339(snap.started_at_epoch_ms),
@@ -924,6 +943,19 @@ impl xai_tool_runtime::Tool for TaskOutputTool {
         ctx: xai_tool_runtime::ToolCallContext,
         input: TaskOutputToolInput,
     ) -> Result<TaskOutputOutput, xai_tool_runtime::ToolError> {
+        self.run_with_output_byte_limit(ctx, input, None).await
+    }
+}
+
+impl TaskOutputTool {
+    /// `output_byte_limit` is set only by `get_terminal_command_output`. `None`
+    /// is `get_task_output`: the shared truncation lookup.
+    pub(crate) async fn run_with_output_byte_limit(
+        &self,
+        ctx: xai_tool_runtime::ToolCallContext,
+        input: TaskOutputToolInput,
+        output_byte_limit: Option<usize>,
+    ) -> Result<TaskOutputOutput, xai_tool_runtime::ToolError> {
         use crate::types::tool_metadata::shared_resources;
         let resources = shared_resources(&ctx)?;
 
@@ -947,18 +979,36 @@ impl xai_tool_runtime::Tool for TaskOutputTool {
                 ));
             };
             return self
-                .run_single_task(id, input.timeout_ms, &ctx, resources)
+                .run_single_task(id, input.timeout_ms, &ctx, resources, output_byte_limit)
                 .await;
         }
 
-        Self::run_multi_tasks(
+        Self::run_multi_tasks_limited(
             &ids,
             input.timeout_ms,
             resources,
             "get_command_or_subagent_output",
+            output_byte_limit,
         )
         .await
     }
+}
+
+/// `output_byte_limit` is `get_terminal_command_output`'s session param. `Some`
+/// is that tool's builtin cap, and `TruncationConfig` may override it under
+/// `get_terminal_command_output`. `None` keeps `lookup_name`.
+fn resolved_max_output_bytes(
+    res: &crate::types::resources::Resources,
+    lookup_name: &str,
+    output_byte_limit: Option<usize>,
+) -> usize {
+    let (name, builtin) = match output_byte_limit {
+        Some(limit) => ("get_terminal_command_output", limit),
+        None => (lookup_name, DEFAULT_TOOL_OUTPUT_BYTES),
+    };
+    res.get::<TruncationCfg>()
+        .map(|cfg| cfg.0.max_output_bytes_for(name, builtin))
+        .unwrap_or(builtin)
 }
 
 #[cfg(test)]
@@ -1101,6 +1151,38 @@ mod tests {
     use crate::types::tool_metadata::ToolMetadata;
     use crate::types::tool_metadata::test_ctx;
     use std::sync::Arc;
+
+    /// The row's display command is what the tool title and the model-facing reminder quote, so the
+    /// tag and the type both have to come from the catalog rather than from an English literal.
+    #[test]
+    fn subagent_command_localizes_the_tag_and_the_type() {
+        let snap = SubagentSnapshot {
+            subagent_id: "sa-command".to_string(),
+            description: "find callers".to_string(),
+            subagent_type: "explore".to_string(),
+            persona: None,
+            status: SubagentSnapshotStatus::Running {
+                turn_count: 0,
+                tool_call_count: 0,
+                tokens_used: 0,
+                context_window_tokens: 128_000,
+                context_usage_pct: 0,
+                tools_used: vec![],
+                error_count: 0,
+            },
+            started_at_epoch_ms: 1_700_000_000_000,
+            duration_ms: 0,
+        };
+
+        assert_eq!(subagent_command(&snap), "[subagent:explore] find callers");
+
+        // The pseudo-locale wraps every catalog lookup, so a hardcoded tag or type cannot pass.
+        let pseudo = xai_grok_i18n::with_pseudo_locale(|| subagent_command(&snap));
+        assert_eq!(
+            pseudo,
+            "[\u{27e6}subagent.label.fallback\u{27e7}:\u{27e6}subagent.type.explore\u{27e7}] find callers"
+        );
+    }
 
     // A blocking wait must never hold the turn for longer than the wait
     // cap, regardless of the model's requested `timeout_ms` (repro: an
@@ -2266,7 +2348,7 @@ mod tests {
              3K/128K tokens (2% context)\n\
              Tools used: bash\n\
              Errors: 0",
-            snap.subagent_type,
+            subagent_type_label(snap.subagent_type.as_str()),
             snap.description,
             snap.duration_ms as f64 / 1000.0,
         );
