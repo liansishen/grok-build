@@ -798,6 +798,7 @@
 "dashboard.hint.new_agent" = "新智能体"
 "dashboard.hint.send_open" = "发送并打开"
 "dashboard.load_session_before_rename" = "请先加载会话再重命名"
+"dashboard.load_session_before_reply" = "请先加载会话再回复"
 "dashboard.loading" = "加载中…"
 "dashboard.loading_sessions" = "正在加载会话…"
 "dashboard.location.path_label" = " 路径："
@@ -2773,6 +2774,7 @@
 "startup.failure.display.timed_out" = "启动超时（等待 {waited}）"
 "startup.failure.display.cancelled" = "在 agent 就绪前启动已取消"
 "status.check_usage_on_url" = "请在 {url} 上查看您的用量"
+"status.coding_data_sharing_team_admin" = "请联系团队管理员修改此设置。"
 "status.coding_data_sharing_update_failed" = "✗ 无法更新编码数据共享：{error}"
 "status.gboom_no_graphics" = "这里没有恶魔 — GBOOM 需要支持图形的终端（kitty、Ghostty、WezTerm、iTerm2）"
 "status.no_tasks" = "无后台任务。"
@@ -3226,6 +3228,7 @@
 "update.reinstall.github_releases" = "请从此分支的 GitHub Releases 重新安装：\n  https://github.com/{repo}/releases/latest"
 "update.reinstall.manual" = "请手动重新安装：\n  {command}"
 "update.reinstall.npm_uses_github" = "此分支通过 GitHub Releases 更新，而不是通过官方 npm 包。"
+"update.reinstall.winget" = "请改用 WinGet 更新：\n  {command}"
 "update.restart_required" = "  请重启 Grok。"
 "update.restarting" = "正在重启 Grok..."
 "update.run_manual" = "请运行 `grok update` 获取最新版本。"
@@ -4710,6 +4713,9 @@ starting_session = "正在登录… 即将启动会话。"
 [minimal.commit]
 more_lines_footer = "… 还有 {count} 行 · 用 /transcript 查看"
 
+[minimal.reprint]
+earlier_blocks_footer = "… 还有 {count} 个较早区块 · 用 /transcript 查看"
+
 [minimal.feedback]
 band_too_small_hint = "反馈表单需要更大的终端，按 Esc 关闭"
 
@@ -5093,7 +5099,7 @@ help = "打开模型选择器以切换本会话使用的模型；该选择会作
 help = "固定或取消固定选中的 agent，使其无论排序或分组如何都留在列表顶部。\n让你关注的 agent 始终可见，不受其他 agent 增删的影响。\n固定状态在多次打开面板之间保留。"
 
 [actions.DashboardStop]
-help = "在忙碌的顶层行上，Ctrl+X 会取消正在运行的回合。该行空闲后，在 2s 内再按一次 Ctrl+X 会永久删除该会话。\n在子 agent 行上，Ctrl+X 会终止该子 agent。"
+help = "在忙碌的顶层行上，Ctrl+X 会取消正在运行的回合。\n该行空闲后，在 2s 内再按一次 Ctrl+X 会永久删除该会话。"
 
 [actions.DashboardCycleMode]
 help = "循环切换你从面板启动的 agent 的派发模式：Normal、Plan，然后是 Always-Approve。\nPlan 让新 agent 先做计划再改动文件；Always-Approve 不经询问就运行它们的工具。\n与会话内的 Shift+Tab 循环一致，只是作用于新派发的 agent。"

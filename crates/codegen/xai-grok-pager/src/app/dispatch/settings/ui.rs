@@ -61,6 +61,7 @@ pub(in crate::app::dispatch) fn save_value_toast(label: &str, value: &str) -> St
 /// snapshots by value; without this, toggles would appear stuck.
 pub(crate) fn refresh_open_settings_modals(app: &mut AppView) {
     use crate::views::modal::ActiveModal;
+    use crate::views::settings_modal::SettingsModalMode;
     // Early exit when no settings modal is open (common case).
     if !app.agents.values().any(|a| {
         matches!(
@@ -148,6 +149,14 @@ pub(crate) fn refresh_open_settings_modals(app: &mut AppView) {
                 },
                 subagent_model_inheritance: subagent_model_inheritance_from_app,
             };
+            if coding_data_sharing_lock_from_app.is_some()
+                && matches!(
+                    state.mode(),
+                    SettingsModalMode::PickingEnum { key, .. } if crate::settings::is_consent_chooser(key)
+                )
+            {
+                state.transition_to_browse();
+            }
         }
     }
 }

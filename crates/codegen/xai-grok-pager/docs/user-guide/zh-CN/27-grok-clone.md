@@ -106,4 +106,4 @@ cargo build -p grove --release
 
 在 Linux 上，clone 在启动守护进程前需要可用的 FUSE：`/dev/fuse` 必须存在，并且当前用户可以打开它，或 `PATH` 中有 setuid 的 `fusermount3` / `fusermount`（Grove 会通过任一方式挂载）。缺少 FUSE 会立即报错并给出安装命令，而不是挂起。守护进程已运行时会跳过检查，因为该守护进程可能拥有当前进程没有的权限。
 
-Windows 不支持此功能（没有 ProjFS 后端）。请使用 `git clone`，或在 macOS / Linux 上运行 `grok clone`。
+在 Windows 上，clone 通过 ProjFS（Windows 投影文件系统）挂载，无论该功能是否启用。`target`、`node_modules` 等构建产物目录会以 NTFS 联接（junction）重定向出投影树（`[redirects] windows_junction`，默认开启）。

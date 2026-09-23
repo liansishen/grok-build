@@ -190,6 +190,7 @@ fn test_app() -> AppView {
         team_name: None,
         is_zdr: false,
         team_role: None,
+        can_administer_team: None,
         coding_data_retention_opt_out: false,
         privacy_notice_rollout: false,
         privacy_banner_reshow_days: None,

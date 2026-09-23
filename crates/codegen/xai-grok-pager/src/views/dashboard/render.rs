@@ -146,7 +146,7 @@ pub(crate) fn render_dashboard(
         }
     }
 
-    render_header(
+    super::chrome::render_header(
         buf,
         layout.header,
         &theme,
@@ -155,7 +155,7 @@ pub(crate) fn render_dashboard(
         registry,
         upgrade_cta,
     );
-    render_actions_row(
+    super::chrome::render_actions_row(
         buf,
         layout.actions,
         &theme,
@@ -188,7 +188,7 @@ pub(crate) fn render_dashboard(
                 .get(id)
                 .map(|agent| crate::app::dashboard_stop_readiness(agent).action()),
             Some(DashboardRowId::Workspace { .. }) => Some(DashboardStopAction::Archive),
-            Some(DashboardRowId::Subagent { .. } | DashboardRowId::Roster { .. }) | None => None,
+            Some(DashboardRowId::Roster { .. }) | None => None,
         })
         .flatten();
     let peek_active = state.peek_owns_input();
@@ -207,25 +207,6 @@ pub(crate) fn render_dashboard(
         let peeked_row = state.peek.as_ref().map(|p| p.row.clone());
         let question_pending = state.peek.as_ref().is_some_and(|p| p.question.is_some());
         let (empty_hint, has_scrollback) = match peeked_row.as_ref() {
-            Some(DashboardRowId::Subagent {
-                parent,
-                child_session_id,
-            }) => {
-                let parent_ok = agents
-                    .get(parent)
-                    .is_some_and(|p| p.subagent_sessions.contains_key(child_session_id));
-                let loaded = agents
-                    .get(parent)
-                    .is_some_and(|p| p.has_subagent_view(child_session_id));
-                if parent_ok && !loaded {
-                    (
-                        Some(xai_grok_i18n::t("dashboard.subagent_not_loaded")),
-                        false,
-                    )
-                } else {
-                    (None, loaded)
-                }
-            }
             Some(row) => (
                 None,
                 super::state::scrollback_available_for_row(row, agents),
@@ -466,16 +447,15 @@ fn rename_cursor_pos(state: &DashboardState, rows: &[DashboardRow]) -> Option<(u
     let rn = state.rename.as_ref()?;
     let (_, rect) = state.row_rects.iter().find(|(id, _)| *id == rn.row)?;
     let row = rows.iter().find(|r| r.id == rn.row);
-    let (marker_width, indent_width, icon_width) = row
+    let (marker_width, icon_width) = row
         .map(|r| {
             (
                 UnicodeWidthStr::width(crate::glyphs::selection_bar()) as u16,
-                (r.indent as u16) * 2,
                 UnicodeWidthStr::width(state_icon(r.state, state.spinner_tick)) as u16,
             )
         })
-        .unwrap_or((1, 0, 1));
-    let chrome_width = marker_width + 1 + indent_width + icon_width + 1;
+        .unwrap_or((1, 1));
+    let chrome_width = marker_width + 1 + icon_width + 1;
     let content_x = rect.x.saturating_add(chrome_width);
     let content_width = rect.x.saturating_add(rect.width).saturating_sub(content_x);
     let (_, cursor_offset) = rename_editor_view(rn, content_width);
@@ -509,7 +489,7 @@ fn render_dashboard_banner(
     let mut total = 0usize;
     let mut working = 0usize;
     let mut needs_input = 0usize;
-    for r in rows.iter().filter(|r| r.indent == 0) {
+    for r in rows {
         total += 1;
         if r.state == RowState::Working {
             working += 1;
@@ -577,378 +557,6 @@ fn render_dashboard_banner(
     } else {
         render_rows_with_grouping(buf, inner, theme, rows, grouping, state);
     }
-}
-
-/// Render the dashboard header row:
-/// ```text
-///   main worktree ~/wt/wt1 (worktree of ~/proj) [Choose Ctrl+l]   ◆ 2 awaiting │ ⋮ 3 working │ ◇ 1 idle
-fn render_header(
-    buf: &mut Buffer,
-    area: Rect,
-    theme: &Theme,
-    rows: &[DashboardRow],
-    state: &mut DashboardState,
-    registry: &crate::actions::ActionRegistry,
-    upgrade_cta: Option<HeaderUpgradeCta<'_>>,
-) {
-    use crate::views::agent_status::AgentStatusBar;
-
-    if area.area() == 0 {
-        return;
-    }
-    let bg = Style::default().bg(theme.bg_base);
-    let dim = theme.dim().bg(theme.bg_base);
-    buf.set_style(area, bg);
-
-    // Count top-level rows per state. Subagents inherit their parent's group so we explicitly skip `indent > 0` rows.
-    let mut awaiting = 0usize;
-    let mut working = 0usize;
-    let mut idle = 0usize;
-    let mut done = 0usize;
-    let mut failed = 0usize;
-    for r in rows.iter().filter(|r| r.indent == 0) {
-        match r.state {
-            RowState::NeedsInput => awaiting += 1,
-            RowState::Working => working += 1,
-            RowState::Idle => idle += 1,
-            // Inactive (roster-only) sessions get no header chip; the chips show actionable local state
-            // The section header already carries the inactive count
-            RowState::Inactive => {}
-            RowState::Completed => done += 1,
-            RowState::Failed => failed += 1,
-        }
-    }
-
-    // Right-aligned chips, ordered like `RowState::group_priority` (awaiting leftmost).
-    // Glyphs match per-row markers; the label keeps each chip readable when colour
-    // is the only other cue.
-    let frames = crate::glyphs::dot_spinner_frames();
-    let spinner = frames[(state.spinner_tick / SPINNER_DIVISOR) as usize % frames.len()];
-    let chip_specs = [
-        (
-            xai_grok_i18n::t("dashboard.state.awaiting"),
-            crate::glyphs::diamond_filled(),
-            theme.warning,
-            awaiting,
-        ),
-        (
-            xai_grok_i18n::t("dashboard.state.working"),
-            spinner,
-            theme.accent_running,
-            working,
-        ),
-        (
-            xai_grok_i18n::t("dashboard.state.idle"),
-            crate::glyphs::diamond_hollow(),
-            theme.gray_dim,
-            idle,
-        ),
-        (
-            xai_grok_i18n::t("dashboard.state.done"),
-            crate::glyphs::diamond_filled(),
-            theme.accent_success,
-            done,
-        ),
-        (
-            xai_grok_i18n::t("dashboard.state.failed"),
-            crate::glyphs::diamond_filled(),
-            theme.accent_error,
-            failed,
-        ),
-    ];
-    let mut status = AgentStatusBar::new(theme);
-    for (label, glyph, color, count) in chip_specs.into_iter().filter(|(_, _, _, count)| *count > 0)
-    {
-        status.push(
-            label,
-            Line::from(vec![
-                Span::styled(glyph, bg.fg(color)),
-                Span::styled(format!(" {count} {label}"), bg.fg(theme.gray)),
-            ]),
-        );
-    }
-    // Chips render right-aligned within the header so they share a right edge with the actions row below
-    // Capture the per-chip rects so the left label's width budget stops short of the leftmost chip instead of painting over it
-    let chip_rects = status.render(buf, area);
-
-    // Paint the current location (git branch and cwd, with worktree label) on the left, mirroring the
-    // welcome top bar and the agent status bar.
-    let full_label_budget = chip_rects
-        .values()
-        .map(|r| r.x)
-        .min()
-        .map(|min_x| min_x.saturating_sub(3).saturating_sub(area.x))
-        .unwrap_or(area.width) as usize;
-    // Reserve the upgrade CTA (a lead space, the `[label]`, and the pinned-only `cta.caption`) so the location label truncates first
-    // The shared painter then clamps to the space left, so it can't overpaint chips
-    // The caption shows only for pinned CTAs
-    let upgrade_caption = upgrade_cta.and_then(|cta| cta.pinned.then_some(cta.caption).flatten());
-    let upgrade_reserve = upgrade_cta.map_or(0usize, |cta| {
-        1 + crate::views::announcements::upgrade_cta_reserve(cta.label, upgrade_caption) as usize
-    });
-    let label_budget = full_label_budget.saturating_sub(upgrade_reserve);
-
-    let crate::views::location::LocationParts {
-        branch,
-        is_worktree,
-        cwd_display,
-    } = crate::views::location::location_parts(&state.cwd);
-    let mut location_spans: Vec<Span<'static>> = Vec::new();
-    if let Some(branch) = branch {
-        location_spans.push(Span::styled(branch, dim));
-        location_spans.push(Span::styled(" ", bg));
-    }
-    if is_worktree {
-        location_spans.push(crate::views::location::worktree_badge(theme).patch_style(bg));
-    }
-    location_spans.push(Span::styled(cwd_display, bg.fg(theme.text_secondary)));
-    let mut location = truncate_line(Line::from(location_spans), label_budget);
-    // Underline on hover so the label reads as a click target (opens the location picker)
-    // Underline only visible text: the whitespace separator between the branch and path parts stays bare
-    // Hover is mouse-driven on the prior frame
-    if state.location_hit.hovered {
-        location.spans = underline_location_on_hover(std::mem::take(&mut location.spans));
-    }
-    let location_w = location.width() as u16;
-    buf.set_line(area.x, area.y, &location, location_w);
-
-    let mut choose_hint = hint_line(
-        Span::styled(xai_grok_i18n::t("dashboard.location.choose"), dim),
-        chord_hint(
-            theme,
-            registry,
-            crate::actions::ActionId::DashboardOpenLocationPicker,
-        ),
-    );
-    choose_hint.spans.insert(0, Span::styled(" [", dim));
-    choose_hint.spans.push(Span::styled("]", dim));
-    let choose_hint_w = choose_hint.width() as u16;
-    let hint_w = if (location_w + choose_hint_w) as usize <= label_budget {
-        buf.set_line(area.x + location_w, area.y, &choose_hint, choose_hint_w);
-        choose_hint_w
-    } else {
-        0
-    };
-
-    // Record the painted label (path plus hint) as a click target so the mouse handler can open the location picker
-    // Width is clamped to the label budget so the hit area never extends under the chips
-    let label_w = location_w + hint_w;
-    let hit_w = label_w.min(label_budget as u16);
-    if hit_w > 0 {
-        state.location_hit.set(Some(Rect {
-            x: area.x,
-            y: area.y,
-            width: hit_w,
-            height: 1,
-        }));
-    }
-
-    // Upgrade CTA painted right after the location label (free-tier upsell), clamped to the space left before the chips
-    // The paint is a lead space then the shared clamping button painter
-    // A pointer click opens it with the `Dashboard` CTA surface; Ctrl+O with `Keyboard`
-    if let Some(HeaderUpgradeCta { label, .. }) = upgrade_cta {
-        let avail = full_label_budget.saturating_sub(label_w as usize);
-        if avail > 1 {
-            let cta_x = area.x + label_w;
-            buf.set_span(cta_x, area.y, &Span::styled(" ", bg), 1);
-            let painted = crate::views::announcements::render_cta_button(
-                buf,
-                theme,
-                cta_x + 1,
-                area.y,
-                (avail - 1) as u16,
-                label,
-                upgrade_caption,
-                state.upgrade_cta_hit.hovered,
-            );
-            state.upgrade_cta_hit.set(painted);
-        }
-    }
-}
-
-/// Opacity that blends `gray_dim` toward the background for key hints: on GrokNight this lands on the palette's `FG_GUTTER` (`#414141`),
-/// one step fainter than `gray_dim`, which is the colour the design uses for shortcut keys.
-const KEY_HINT_BLEND: f32 = 0.66;
-
-/// Style for the key part of a `label Key` hint: a shade fainter than `gray_dim` so the label reads first.
-/// Falls back to the polarity-safe dim style on palettes that can't blend (named ANSI colours, the bandless terminal theme's `Reset` slots).
-fn key_hint_style(theme: &Theme) -> Style {
-    crate::render::color::blend_color(theme.bg_base, theme.gray_dim, KEY_HINT_BLEND)
-        .map_or(theme.dim(), |c| Style::default().fg(c))
-        .bg(theme.bg_base)
-}
-
-/// `{label} {hint}` from two pre-styled spans: the label, then the hint (a chord or a slash command, normally in [`key_hint_style`]).
-/// A `None` hint paints only the label. Static labels and hints are borrowed, so a frame allocates only for chord displays.
-fn hint_line(label: Span<'static>, hint: Option<Span<'static>>) -> Line<'static> {
-    let mut spans = vec![label];
-    if let Some(hint) = hint {
-        spans.push(Span::styled(" ", hint.style));
-        spans.push(hint);
-    }
-    Line::from(spans)
-}
-
-/// The dashboard chord bound to `id` as a key-hint span, or `None` when the action has no binding.
-fn chord_hint(
-    theme: &Theme,
-    registry: &crate::actions::ActionRegistry,
-    id: crate::actions::ActionId,
-) -> Option<Span<'static>> {
-    registry
-        .key_for(id)
-        .map(|key| Span::styled(key.display(), key_hint_style(theme)))
-}
-
-/// Apply the header location label's hover underline: underline only the visible text.
-/// Whitespace-only spans (the separator between the branch and path parts) stay bare.
-fn underline_location_on_hover(spans: Vec<Span<'static>>) -> Vec<Span<'static>> {
-    spans
-        .into_iter()
-        .map(|span| {
-            if span.content.chars().any(|c| !c.is_whitespace()) {
-                span.patch_style(Style::default().add_modifier(Modifier::UNDERLINED))
-            } else {
-                span
-            }
-        })
-        .collect()
-}
-
-/// Render the primary actions row below the header:
-/// ```text
-///   + New Agent                           Open Previous /resume │ Worktree Ctrl+w
-fn render_actions_row(
-    buf: &mut Buffer,
-    area: Rect,
-    theme: &Theme,
-    state: &mut DashboardState,
-    registry: &crate::actions::ActionRegistry,
-    workspace_dashboard_enabled: bool,
-) {
-    if area.area() == 0 {
-        // No row means no `Open Previous` button under a cursor parked there
-        if state.open_session_button_focused() {
-            state.focus_new_agent_button();
-        }
-        return;
-    }
-    let bg = Style::default().bg(theme.bg_base);
-    let key_style = key_hint_style(theme);
-    buf.set_style(area, bg);
-
-    // Focused: light green `accent_success` (the affirmative "create a new session" colour), so the focus is obvious
-    // Hovered (mouse over, not focused): brighter `text_primary` foreground so the button stands out under the cursor
-    // Only the text colour changes on hover (no background fill)
-    let button_fg = |focused: bool, hovered: bool, resting: Color| {
-        if focused {
-            theme.accent_success
-        } else if hovered {
-            theme.text_primary
-        } else {
-            resting
-        }
-    };
-
-    // When worktree mode is on and the cwd is a git repo (so it can actually take effect), the next session goes in a fresh git worktree
-    let worktree_armed = state.dispatch_worktree && state.cwd_has_git_ancestor;
-    let new_agent_label = if worktree_armed {
-        xai_grok_i18n::t("dashboard.new_worktree_action")
-    } else {
-        xai_grok_i18n::t("dashboard.new_agent_action")
-    };
-    let new_agent_w = (UnicodeWidthStr::width(new_agent_label) as u16).min(area.width);
-
-    // Right-hand items are laid out before `+ New Agent` so a focus fallback (below) can still colour that button in the same frame
-    // Each right-hand item keeps a 2-cell gap from the `+ New Agent` button so the two sides never touch
-    let mut right_edge = area.x + area.width;
-    let left_limit = area.x + new_agent_w + 2;
-    let fits = |right_edge: u16, w: u16| right_edge.checked_sub(w).is_some_and(|x| x >= left_limit);
-    let place_right =
-        |right_edge: &mut u16, line: &Line<'static>, buf: &mut Buffer| -> Option<Rect> {
-            let w = line.width() as u16;
-            if !fits(*right_edge, w) {
-                return None;
-            }
-            let x = *right_edge - w;
-            buf.set_line(x, area.y, line, w);
-            *right_edge = x;
-            Some(Rect {
-                x,
-                y: area.y,
-                width: w,
-                height: 1,
-            })
-        };
-
-    let worktree_label = if worktree_armed {
-        xai_grok_i18n::t("dashboard.worktree_disable")
-    } else {
-        xai_grok_i18n::t("dashboard.worktree")
-    };
-    let worktree_hint = hint_line(
-        Span::styled(
-            worktree_label,
-            bg.fg(button_fg(
-                false,
-                state.worktree_toggle_hit.hovered,
-                theme.gray,
-            )),
-        ),
-        chord_hint(
-            theme,
-            registry,
-            crate::actions::ActionId::DashboardToggleWorktree,
-        ),
-    );
-    let worktree_rect = place_right(&mut right_edge, &worktree_hint, buf);
-    state.worktree_toggle_hit.set(worktree_rect);
-
-    // Strict right-to-left priority: once the worktree toggle is out, nothing to its left is tried either, so a narrower
-    // `Open Previous` can never take the place of the (wider, armed) toggle
-    if workspace_dashboard_enabled && worktree_rect.is_some() {
-        // The session picker has no dashboard chord (`Ctrl+R` is rename here), so the hint names the slash command that opens it
-        let open_previous = hint_line(
-            Span::styled(
-                xai_grok_i18n::t("dashboard.open_previous"),
-                bg.fg(button_fg(
-                    state.open_session_button_focused(),
-                    state.open_session_button_hit.hovered,
-                    theme.gray,
-                )),
-            ),
-            Some(Span::styled("/resume", key_style)),
-        );
-        let divider = Line::from(Span::styled(" │ ", key_style));
-        let needed = (open_previous.width() + divider.width()) as u16;
-        let open_rect = fits(right_edge, needed).then(|| {
-            place_right(&mut right_edge, &divider, buf);
-            place_right(&mut right_edge, &open_previous, buf)
-        });
-        state.open_session_button_hit.set(open_rect.flatten());
-    }
-    // A cursor parked on `Open Previous` needs a painted button under it; when the row dropped it, fall back to `+ New Agent`
-    if state.open_session_button_focused() && state.open_session_button_hit.rect.is_none() {
-        state.focus_new_agent_button();
-    }
-
-    let new_agent_fg = button_fg(
-        state.new_agent_button_focused(),
-        state.new_agent_button_hit.hovered,
-        theme.text_secondary,
-    );
-    buf.set_string(
-        area.x,
-        area.y,
-        crate::util::truncate_to_width(new_agent_label, new_agent_w as usize),
-        bg.fg(new_agent_fg),
-    );
-    state.new_agent_button_hit.set(Some(Rect {
-        x: area.x,
-        y: area.y,
-        width: new_agent_w,
-        height: 1,
-    }));
 }
 
 /// Render the location picker modal over the dashboard.
@@ -1180,7 +788,7 @@ fn render_location_picker(
 
 /// One line in the dashboard's vertical stack: either a state-group header or a content row. The
 /// per-row dot and state colour alone don't show at a glance how many sessions are awaiting input,
-/// working, idle, or done. Subagent rows inherit their parent's group and never trigger a header.
+/// working, idle, or done.
 enum DashboardLine<'a> {
     /// Cross-cutting "Pinned" section header (with count), emitted above the pinned block when grouping is ON.
     PinnedHeader {
@@ -1216,20 +824,16 @@ fn build_dashboard_lines<'a>(
     let groups_on = matches!(grouping, Grouping::State);
     let emit_state_headers = groups_on && !matches!(filter, Filter::State(_));
 
-    // Pinned top-level agents are sorted to the front (see `sort_rows`), so they form a contiguous prefix of clusters
+    // Pinned top-level agents are sorted to the front (see `sort_rows`), so they form a contiguous prefix
     // Split that prefix off as a dedicated "Pinned" section above the state / directory groups
     // That way a pinned (say) idle agent reads as pinned rather than landing under an "Idle" header
     let mut pinned_end = 0usize;
     let mut pinned_count = 0usize;
     {
         let mut i = 0usize;
-        while i < rows.len() && rows.get(i).is_some_and(|r| r.indent == 0 && r.pinned) {
+        while i < rows.len() && rows.get(i).is_some_and(|r| r.pinned) {
             pinned_count += 1;
             i += 1;
-            // Glue the pinned parent's subagents into the section.
-            while i < rows.len() && rows.get(i).is_some_and(|r| r.indent != 0) {
-                i += 1;
-            }
             pinned_end = i;
         }
     }
@@ -1260,7 +864,7 @@ fn build_dashboard_lines<'a>(
         return out;
     }
     let mut last_top_state: Option<RowState> = None;
-    // Whether the section currently being emitted is collapsed; when so its rows (and their subagents) are skipped but the header stays
+    // Whether the section currently being emitted is collapsed; when so its rows are skipped but the header stays
     let mut current_collapsed = false;
     // Idle-overflow cap bookkeeping for the group currently being emitted. Without the `search_active`
     // check, an empty search query would leave old idle agents folded.
@@ -1268,23 +872,17 @@ fn build_dashboard_lines<'a>(
     let now = std::time::SystemTime::now();
     let mut idle_limit: Option<usize> = None;
     let mut idle_top_seen = 0usize;
-    let mut idle_capping = false;
     let mut pending_overflow: Option<(usize, bool)> = None;
     for (i, row) in rest.iter().enumerate() {
-        if row.indent == 0 && Some(row.state) != last_top_state {
+        if Some(row.state) != last_top_state {
             // Emit the overflow row of the group we're leaving before the new header, so it lands at the bottom of the Idle group
             if let Some((hidden, expanded)) = pending_overflow.take() {
                 out.push(DashboardLine::IdleOverflow { hidden, expanded });
             }
-            // Subagents are skipped over rather than breaking the count, since they share their parent's
-            // group. The count reflects the true group size even when collapsed or capped `recent` tracks how
-            // many are inside the freshness window (Idle only).
+            // `recent` tracks how many Idle rows are inside the freshness window.
             let mut count = 0usize;
             let mut recent = 0usize;
             for r in rest.iter().skip(i) {
-                if r.indent != 0 {
-                    continue;
-                }
                 if r.state == row.state {
                     count += 1;
                     if idle_row_is_recent(r, now) {
@@ -1303,7 +901,6 @@ fn build_dashboard_lines<'a>(
             // Reset or set the Idle cap for the new group
             idle_limit = None;
             idle_top_seen = 0;
-            idle_capping = false;
             if row.state == RowState::Idle && idle_cap_active && !current_collapsed {
                 // Keep the freshest agents: at least MAX_VISIBLE_IDLE, extended to cover everything still inside the freshness window
                 // Only fold when it hides at least MIN_IDLE_FOLD rows (a single folded row saves no space)
@@ -1318,13 +915,10 @@ fn build_dashboard_lines<'a>(
         if current_collapsed {
             continue;
         }
-        // Idle cap: once past the limit, skip over-cap top-level rows and their subagents (idle_capping latches until the next group)
+        // Idle cap: once past the limit, skip the rest of the group until the next header resets the count.
         if let Some(limit) = idle_limit {
-            if row.indent == 0 {
-                idle_top_seen += 1;
-                idle_capping = idle_top_seen > limit;
-            }
-            if idle_capping {
+            idle_top_seen += 1;
+            if idle_top_seen > limit {
                 continue;
             }
         }
@@ -1378,7 +972,7 @@ pub(crate) fn focusables(
     .filter_map(|line| match line {
         DashboardLine::PinnedHeader { .. } => Some(Focusable::Section(SectionKey::Pinned)),
         DashboardLine::Header { state, .. } => Some(Focusable::Section(SectionKey::State(state))),
-        DashboardLine::Row(row) if !row.is_more_placeholder => Some(Focusable::Row(row.id.clone())),
+        DashboardLine::Row(row) => Some(Focusable::Row(row.id.clone())),
         DashboardLine::IdleOverflow { .. } => Some(Focusable::IdleOverflow),
         _ => None,
     })
@@ -1603,17 +1197,15 @@ fn render_rows_with_grouping(
                 for dy in content_top..(content_top + content_h).min(render_h) {
                     mark(&mut line_bg, dy, bg);
                 }
-                if !row.is_more_placeholder {
-                    // Full-height hit rect (content and spacer lines): no hover/click dead zone between items
-                    // The highlight covers the content plus half-cell halos on the neighbouring spacer lines
-                    let hit = Rect {
-                        x: area.x,
-                        y,
-                        width: body_width,
-                        height: render_h,
-                    };
-                    state.row_rects.push((row.id.clone(), hit));
-                }
+                // Full-height hit rect (content and spacer lines): no hover/click dead zone between items
+                // The highlight covers the content plus half-cell halos on the neighbouring spacer lines
+                let hit = Rect {
+                    x: area.x,
+                    y,
+                    width: body_width,
+                    height: render_h,
+                };
+                state.row_rects.push((row.id.clone(), hit));
             }
             DashboardLine::IdleOverflow { hidden, expanded } => {
                 render_idle_overflow(
@@ -1813,7 +1405,7 @@ fn render_idle_overflow(
         xai_grok_i18n::t_fmt("dashboard.more_count", &[("count", &hidden.to_string())])
     };
     // A `+` / `-` expand indicator in the icon column and the label in the agent-name column, so the row aligns with the Idle rows above
-    // Columns: marker (1) + gap (1) + icon + gap (1); the Idle group is top-level, so indent is 0
+    // Columns: marker (1) + gap (1) + icon + gap (1)
     let indicator = if expanded { "-" } else { "+" };
     let icon_w = unicode_width::UnicodeWidthStr::width(state_icon(RowState::Idle, 0)) as u16;
     let indicator_x = rect.x.saturating_add(2);
@@ -1972,15 +1564,13 @@ fn render_row(
         buf.set_string(rect.x, rect.y + dy, &fill, Style::default().bg(bg));
     }
 
-    // Layout columns: marker (1) | gap (1) | indent (2*n) | icon (1-2)
-    //                | gap (1) | label/secondary start.
+    // Layout columns: marker (1) | gap (1) | icon (1-2) | gap (1) | label/secondary start.
     let marker = if selected {
         crate::glyphs::selection_bar()
     } else {
         " "
     };
     let marker_w = UnicodeWidthStr::width(marker) as u16;
-    let indent_w = (row.indent as u16) * 2;
     let icon = state_icon(row.state, state.spinner_tick);
     let icon_color = if row.state == RowState::NeedsInput {
         needs_input_bullet_color(state.spinner_tick, theme)
@@ -1998,7 +1588,7 @@ fn render_row(
     // Title-row paint cursor. Title-only rows sit padded above and below, while 2-line rows stay
     // top-aligned (2 lines cannot center in a 3-cell row).
     let title_y = rect.y + row_content_offset(rect.height, row);
-    let content_start_x = rect.x + marker_w + 1 + indent_w + icon_w + 1;
+    let content_start_x = rect.x + marker_w + 1 + icon_w + 1;
 
     // Rename overlay: keep the row's chrome (marker and state icon) in place and swap ONLY the title text for `rename: {draft}`
     // It is painted at the title's own column so the row stays visually aligned with its neighbours while editing
@@ -2029,7 +1619,7 @@ fn render_row(
         }
         // State icon stays put (same column and colour as the normal row)
         buf.set_string(
-            rect.x + marker_w + 1 + indent_w,
+            rect.x + marker_w + 1,
             title_y,
             icon,
             Style::default().fg(icon_color).bg(bg),
@@ -2078,7 +1668,7 @@ fn render_row(
         }
     }
 
-    let icon_x = rect.x + marker_w + 1 + indent_w;
+    let icon_x = rect.x + marker_w + 1;
     buf.set_string(
         icon_x,
         title_y,
@@ -2087,9 +1677,7 @@ fn render_row(
     );
 
     let armed_delete = state.armed_delete_row_ref();
-    let show_delete = !row.is_more_placeholder
-        && !row.id.is_subagent()
-        && (!row.id.is_workspace() || state.workspace_membership_mode)
+    let show_delete = (!row.id.is_workspace() || state.workspace_membership_mode)
         && row.state.allows_delete()
         && !state.row_is_conversation(&row.id)
         && (state.hovered_row.as_ref() == Some(&row.id) || armed_delete == Some(&row.id));
@@ -2367,8 +1955,7 @@ fn render_narrow_rows_with_grouping(
                 " "
             };
             let icon = state_icon(row.state, state.spinner_tick);
-            let indent = "  ".repeat(row.indent as usize);
-            let chrome = format!("{marker} {indent}{icon} ");
+            let chrome = format!("{marker} {icon} ");
             let chrome_w = UnicodeWidthStr::width(chrome.as_str()) as u16;
             buf.set_string(
                 area.x,
@@ -2396,14 +1983,10 @@ fn render_narrow_rows_with_grouping(
             let marker_w = UnicodeWidthStr::width(marker) as u16;
             let icon = state_icon(row.state, state.spinner_tick);
             let icon_w = UnicodeWidthStr::width(icon) as u16;
-            let indent = "  ".repeat(row.indent as usize);
-            let indent_w = UnicodeWidthStr::width(indent.as_str()) as u16;
             let gap_after_marker = 1u16;
-            let chrome = marker_w + gap_after_marker + indent_w + icon_w + 1;
+            let chrome = marker_w + gap_after_marker + icon_w + 1;
             let armed_here = state.armed_delete_row_ref() == Some(&row.id);
-            let show_delete = !row.is_more_placeholder
-                && !row.id.is_subagent()
-                && (!row.id.is_workspace() || state.workspace_membership_mode)
+            let show_delete = (!row.id.is_workspace() || state.workspace_membership_mode)
                 && row.state.allows_delete()
                 && !state.row_is_conversation(&row.id)
                 && (hovered || armed_here);
@@ -2412,7 +1995,7 @@ fn render_narrow_rows_with_grouping(
             let label_budget = body_width
                 .saturating_sub(chrome)
                 .saturating_sub(if show_delete { delete_w + 1 } else { 0 });
-            let line = format!("{marker} {indent}{icon} ");
+            let line = format!("{marker} {icon} ");
             buf.set_string(
                 area.x,
                 y,
@@ -2443,9 +2026,7 @@ fn render_narrow_rows_with_grouping(
                 Style::default().add_modifier(ratatui::style::Modifier::REVERSED),
             );
         }
-        if !row.is_more_placeholder {
-            state.row_rects.push((row.id.clone(), line_rect));
-        }
+        state.row_rects.push((row.id.clone(), line_rect));
         y += 1;
     }
 

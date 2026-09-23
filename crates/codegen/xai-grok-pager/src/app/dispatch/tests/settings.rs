@@ -729,8 +729,8 @@ fn dispatch_open_settings_focus_reopens_when_already_open() {
         "focused re-entry must arm close_on_picker_exit"
     );
 }
-/// Chooser when editable, browse row when locked. The team-admin arm ensures
-/// team identity alone does not lock an administrator out.
+/// Chooser when editable, browse row when locked.
+/// The team arms pin that the lock keys on the capability, not on team name or role.
 #[test]
 fn dispatch_open_settings_focus_skips_the_chooser_only_when_locked() {
     use crate::views::modal::ActiveModal;
@@ -770,22 +770,24 @@ fn dispatch_open_settings_focus_skips_the_chooser_only_when_locked() {
     let mut app = test_app_with_agent();
     app.is_team_principal = true;
     app.team_name = Some("acme".to_string());
-    app.team_role = Some("member".to_string());
+    app.can_administer_team = Some(false);
     assert!(
         matches!(open_focused(&mut app), SettingsModalMode::Browse),
         "a team-managed lock must stop at the row that says so"
     );
-    let mut app = test_app_with_agent();
-    app.is_team_principal = true;
-    app.team_name = Some("acme".to_string());
-    app.team_role = Some("admin".to_string());
-    assert!(
-        matches!(
-            open_focused(&mut app),
-            SettingsModalMode::PickingEnum { .. }
-        ),
-        "a team admin is not locked"
-    );
+    for capability in [Some(true), None] {
+        let mut app = test_app_with_agent();
+        app.team_name = Some("acme".to_string());
+        app.team_role = Some("member".to_string());
+        app.can_administer_team = capability;
+        assert!(
+            matches!(
+                open_focused(&mut app),
+                SettingsModalMode::PickingEnum { .. }
+            ),
+            "{capability:?} is not locked"
+        );
+    }
 }
 /// Focused open that enters the chooser sets `close_on_picker_exit` so Esc
 /// dismisses the modal (GB-4470). Locked landings stay in Browse with the

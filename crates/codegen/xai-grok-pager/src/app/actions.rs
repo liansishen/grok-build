@@ -454,11 +454,6 @@ pub enum Action {
     DemoteToBackground,
     /// Request current bundle cache status via `x.ai/bundle/status`.
     RequestBundleStatus,
-    /// View a catalog entry's raw content in the block viewer.
-    ViewCatalogEntry {
-        kind: String,
-        name: String,
-    },
     /// Hide the announcements banner.
     AnnouncementsHide,
     /// Show the announcements banner.
@@ -896,14 +891,12 @@ pub enum Action {
     /// Open the Agent Dashboard view (`/dashboard`, `Ctrl+\`, `grok dashboard`).
     OpenDashboard,
     /// Close the dashboard, returning to the previous `ActiveView`.
-    /// Close the dashboard session picker.
+    ExitDashboard,
+    /// Attach to a dashboard row: switches to that agent's view.
+    DashboardAttach(crate::views::dashboard::DashboardRowId),
     DashboardCloseSessionPicker,
     /// Select a dashboard session-picker entry.
     DashboardPickSession(usize),
-    ExitDashboard,
-    /// Attach to a dashboard row — switches to the parent agent and
-    /// (for subagent rows) sets the parent's `active_subagent`.
-    DashboardAttach(crate::views::dashboard::DashboardRowId),
     /// Submit the dispatch-input contents: either a filter, a new
     /// top-level agent, or a no-op when too short.
     /// `attach` mirrors Ctrl+S (dispatch + attach / "send + open").
@@ -2213,8 +2206,6 @@ pub enum Effect {
     },
     /// Fetch current bundle cache status via `x.ai/bundle/status`.
     FetchBundleStatus,
-    /// Fetch a bundled entry's raw content via `x.ai/bundle/entry/get`.
-    FetchCatalogEntry { kind: String, name: String },
     /// Send feedback about the current session (fire-and-forget POST).
     /// `origin` rides through to the completion so a modal send's parked consent can be matched or dropped.
     SendFeedback {
@@ -2315,6 +2306,10 @@ pub enum Effect {
     /// `verify` scopes the result to a deferred-gate verification (see
     /// [`crate::app::subscription`]); `None` for generic checks.
     CheckSubscription { verify: Option<u64> },
+    /// `x.ai/auth/hydrate_team_capability` for `identity`; the answer is dropped if the account changed meanwhile.
+    HydrateTeamCapability {
+        identity: crate::app::app_view::AuthIdentity,
+    },
     /// One-shot subscription re-check triggered by a credit-limit 403.
     /// If the tier changed, the stashed prompt is retried instead of
     /// showing the upsell modal.
@@ -3316,16 +3311,6 @@ pub enum TaskResult {
     BundleStatusFailed {
         error: String,
     },
-    /// Catalog entry content fetched successfully.
-    CatalogEntryReady {
-        kind: String,
-        name: String,
-        content: String,
-    },
-    /// Catalog entry fetch failed.
-    CatalogEntryFailed {
-        error: String,
-    },
     /// Side question (/btw) response received.
     BtwResponse {
         agent_id: AgentId,
@@ -3382,8 +3367,13 @@ pub enum TaskResult {
         verify: Option<u64>,
         meta: Option<serde_json::Value>,
     },
-    /// Result of the credit-limit subscription re-check. If the tier
-    /// changed the stashed prompt is retried; otherwise the upsell is shown.
+    /// `None` is unresolved or a failed RPC; the next launch asks again.
+    TeamCapabilityHydrated {
+        identity: crate::app::app_view::AuthIdentity,
+        can_administer_team: Option<bool>,
+    },
+    /// Result of the credit-limit subscription re-check.
+    /// If the tier changed the stashed prompt is retried; otherwise the upsell is shown.
     CreditLimitRecheckComplete {
         agent_id: AgentId,
         meta: Option<serde_json::Value>,

@@ -73,6 +73,14 @@ grok --version
 随后重新运行 `grok`。默认通道为稳定版；`grok update --alpha` 可显式选择预发布版，
 `grok update --stable` 可切回稳定版。
 
+如果你使用 WinGet 安装 Grok Build，请改用 WinGet 更新：先退出 Grok，然后运行：
+
+```powershell
+winget upgrade --id xAI.GrokBuild -e
+```
+
+WinGet 安装下运行 `grok update` 只会打印这条命令，不会做任何改动。WinGet 包只跟随稳定通道，新版本可能需要几天才会同步到该通道。
+
 要通过 Grove 提取仓库（macOS 使用 NFS，Linux 使用 FUSE），可在 Grove 配置中启用 `grok clone` 的 `[clone] enabled = true`，设置 `GROK_CLONE=1`，或在 `~/.grok/config.toml` 中使用同时启用两者的便捷设置 `GROK_GROVE=1` / `[cli] grove = true`：
 
 ```bash

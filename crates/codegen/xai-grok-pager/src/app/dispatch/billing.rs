@@ -433,6 +433,20 @@ pub(super) fn handle_gate_refreshed(
     }
 }
 
+/// A re-check snapshot built before hydration can land after it, so for the same account a resolved capability is kept. A genuine loss (removed from the team mid-session) then waits for the next launch, the right way to be wrong: the value is advisory and the row is editable when unknown.
+fn apply_recheck_meta(app: &mut AppView, mut meta: xai_grok_login::AuthMeta) -> bool {
+    let same_account = crate::app::app_view::AuthIdentity {
+        email: meta.email.clone(),
+        team_id: meta.team_id.clone(),
+        team_principal: meta.is_team_principal,
+    }
+    .matches(&app.auth_identity());
+    if same_account && meta.can_administer_team.is_none() {
+        meta.can_administer_team = app.can_administer_team;
+    }
+    app.apply_auth_meta(&meta)
+}
+
 /// `x.ai/auth/check_subscription` completed. Meta is authoritative
 /// (`apply_auth_meta` also drops any deferred gate). A failed check only
 /// promotes the deferred gate it was verifying (`verify` generation);
@@ -448,7 +462,7 @@ pub(super) fn handle_check_subscription_complete(
         Some(meta_val) => {
             match serde_json::from_value::<xai_grok_login::AuthMeta>(meta_val) {
                 Ok(auth_meta) => {
-                    billing_refresh_needed = app.apply_auth_meta(&auth_meta);
+                    billing_refresh_needed = apply_recheck_meta(app, auth_meta);
                     true
                 }
                 Err(e) => {
@@ -522,7 +536,7 @@ pub(super) fn handle_credit_limit_recheck_complete(
     if let Some(meta_val) = meta
         && let Ok(auth_meta) = serde_json::from_value::<xai_grok_login::AuthMeta>(meta_val)
     {
-        billing_refresh_needed = app.apply_auth_meta(&auth_meta);
+        billing_refresh_needed = apply_recheck_meta(app, auth_meta);
     }
     let tier_changed = app.subscription_tier != old_tier && app.subscription_tier.is_some();
 

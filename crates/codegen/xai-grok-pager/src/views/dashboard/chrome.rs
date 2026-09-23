@@ -44,13 +44,12 @@ pub(super) fn render_header(
     let dim = theme.dim().bg(theme.bg_base);
     buf.set_style(area, bg);
 
-    // Subagents inherit the parent's group; skip `indent > 0` so they are not counted twice.
     let mut awaiting = 0usize;
     let mut working = 0usize;
     let mut idle = 0usize;
     let mut done = 0usize;
     let mut failed = 0usize;
-    for r in rows.iter().filter(|r| r.indent == 0) {
+    for r in rows {
         match r.state {
             RowState::NeedsInput => awaiting += 1,
             RowState::Working => working += 1,
@@ -68,38 +67,52 @@ pub(super) fn render_header(
         .get((state.spinner_tick / SPINNER_DIVISOR) as usize % frames.len())
         .copied()
         .unwrap_or("");
+    // The first element is the stable chip key (`chip_rects` lookups); the second is the translated label.
     let chip_specs = [
         (
             "awaiting",
+            "dashboard.state.awaiting",
             crate::glyphs::diamond_filled(),
             theme.warning,
             awaiting,
         ),
-        ("working", spinner, theme.accent_running, working),
+        (
+            "working",
+            "dashboard.state.working",
+            spinner,
+            theme.accent_running,
+            working,
+        ),
         (
             "idle",
+            "dashboard.state.idle",
             crate::glyphs::diamond_hollow(),
             theme.gray_dim,
             idle,
         ),
         (
             "done",
+            "dashboard.state.done",
             crate::glyphs::diamond_filled(),
             theme.accent_success,
             done,
         ),
         (
             "failed",
+            "dashboard.state.failed",
             crate::glyphs::diamond_filled(),
             theme.accent_error,
             failed,
         ),
     ];
     let mut status = AgentStatusBar::new(theme);
-    for (label, glyph, color, count) in chip_specs.into_iter().filter(|(_, _, _, count)| *count > 0)
+    for (key, label_key, glyph, color, count) in chip_specs
+        .into_iter()
+        .filter(|(_, _, _, _, count)| *count > 0)
     {
+        let label = xai_grok_i18n::t(label_key);
         status.push(
-            label,
+            key,
             Line::from(vec![
                 Span::styled(glyph, bg.fg(color)),
                 Span::styled(format!(" {count} {label}"), bg.fg(theme.gray)),
