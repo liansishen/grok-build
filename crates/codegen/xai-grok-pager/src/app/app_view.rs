@@ -6349,7 +6349,7 @@ impl AppView {
     /// Also clears the permission notification flag when no permissions
     /// remain queued, so the next batch fires a fresh bell/popup.
     pub fn update_notifications(&mut self) {
-        let (session_name, model, activity, has_perms, turn_elapsed, is_busy) =
+        let (session_name, model, activity, needs_input, turn_elapsed, is_busy) =
             if let ActiveView::Agent(id) = self.active_view
                 && let Some(agent) = self.agents.get(&id)
             {
@@ -6364,10 +6364,11 @@ impl AppView {
                 } else {
                     agent.resolve_turn_activity()
                 };
-                let has_perms = !agent.permission_queue.is_empty();
+                let needs_input =
+                    !agent.permission_queue.is_empty() || agent.question_view.is_some();
                 let elapsed = if parked { None } else { agent.turn_elapsed() };
                 let is_busy = agent.session.state.is_busy() && !parked;
-                (name, model, activity, has_perms, elapsed, is_busy)
+                (name, model, activity, needs_input, elapsed, is_busy)
             } else {
                 (None, None, None, false, None, false)
             };
@@ -6380,7 +6381,7 @@ impl AppView {
             session_name,
             model: model.as_deref(),
             activity: activity.as_ref(),
-            has_pending_permissions: has_perms,
+            has_pending_permissions: needs_input,
             cwd: Some(&cwd_str),
             turn_elapsed,
             is_busy,

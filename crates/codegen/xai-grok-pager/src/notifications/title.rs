@@ -22,6 +22,7 @@ pub struct TitleState<'a> {
     pub session_name: Option<&'a str>,
     pub model: Option<&'a str>,
     pub activity: Option<&'a TurnActivity>,
+    /// Whether permissions or questions await user input.
     pub has_pending_permissions: bool,
     pub cwd: Option<&'a str>,
     pub turn_elapsed: Option<std::time::Duration>,

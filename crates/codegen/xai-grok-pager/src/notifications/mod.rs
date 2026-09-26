@@ -91,7 +91,7 @@ impl NotificationService {
     }
 
     /// Notifications bypass the frame pipeline: rare one-shot events that must not wait for the next draw (16ms away,
-    /// or indefinitely while a frame ack is outstanding). For `ApprovalRequired` events, the caller must check
+    /// or indefinitely while a frame ack is outstanding). For queued permission requests, the caller must check
     /// [`should_suppress_permission_notification`] first.
     pub fn notify(&self, event: NotificationEvent) {
         if !self.is_event_enabled(&event.kind) {

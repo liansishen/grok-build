@@ -1,5 +1,43 @@
 # Changelog
 
+# 1.0.41-fork.3 — 2026-09-27
+
+本版为 Fork 问题修复，产品版本仍为 **1.0.41**。修复 Grok Build 收到 Ask（`ask_user_question`）提问后等待用户回答期间没有发送通知的问题。
+
+### 问题修复
+
+- Ask 到来时复用现有通知服务发送通用的「等待你的输入」提醒，遵循 `approval_required` 事件开关、焦点条件、失焦阈值和通知方式配置。
+- 通知不包含提问正文、选项或其它敏感内容。相同待处理请求的重放保持静默；新的提问、问题替换以及关闭后出现的新提问按需再次提醒。
+- 当前活动会话的 Ask 纳入标题的 `Action Required` 状态；问题提交、取消或由对端解决后清除该状态。后台会话仍按通知配置提醒，且不会改变当前活动会话标题。
+- 权限审批通知的既有队列去重和清理逻辑保持独立。
+
+### 兼容性
+
+- 发布标签 `v1.0.41-fork.3` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的产品版本 `1.0.41`。
+- 通知继续通过 Grok Build 现有终端通知协议发送。OxideTerm/herdr 对 `TERM_PROGRAM=oxideterm` 的识别属于独立的终端适配问题，本版未修改该集成。
+
+### 国际化
+
+- 沿用已有目录键 `dashboard.awaiting_input`，未新增用户可见翻译键；英文和简体中文继续使用现有翻译。
+
+### 验证
+
+- Ask 通知聚焦测试：7 项通过，覆盖通用文案、敏感内容隔离、事件与焦点条件、后台会话、标题状态、问题替换、关闭流程、重复提醒及权限通知隔离。
+- ACP interaction 测试：31 项通过。
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`i18n_audit`：16 项通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；`target/release/xai-grok-pager --version` 输出 `grok 1.0.41-fork.3 (2ad74d0f81c2) [fork]`，包含本版版本号。
+- pager 全量库测试中唯一失败项为未修改的 `fs_size::tests::later_sibling_is_visited_after_another_filesystem`，其断言依赖本机 root 容器中的目录项顺序；该失败与本次改动无关，CI 环境在无法挂载 tmpfs 时提前返回。
+
+### 产物
+
+- `grok-1.0.41-fork.3-linux-x86_64`
+- `grok-1.0.41-fork.3-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.41-fork.2...v1.0.41-fork.3
+
 # 1.0.41-fork.2 — 2026-09-24
 
 同步上游 monorepo `f0e3be11` / Source-Revision `036a5d8348cd744767cd0b08518ab17bf608fa7f`，产品版本仍为 **1.0.41**（上游本次未升版本）。发布范围覆盖上一版 `v1.0.41-fork.1` 之后的上游更新：1 个上游同步提交、187 个文件、+5955/−4764 行，以及吸收该更新所需的合并适配与本地化修复（23 个冲突文件、44 个冲突块，其中 3 个 cosmetic 块自动采用上游）。
