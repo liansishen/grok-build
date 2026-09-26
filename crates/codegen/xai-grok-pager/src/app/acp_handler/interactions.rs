@@ -145,6 +145,12 @@ pub(crate) fn handle_ask_user_question(
         crate::views::feedback_modal::FeedbackModalDisplacement::AcpQuestion,
     );
 
+    // Replays of the same pending request must stay quiet; a new tool call is a new input need.
+    let should_notify = agent
+        .question_view
+        .as_ref()
+        .is_none_or(|q| q.local_kind.is_some() || q.tool_call_id != ext_req.tool_call_id);
+
     // If a question is already active, cancel it before replacing.
     if let Some(mut old_qv) = agent.question_view.take() {
         agent.record_question_pause(&old_qv);
@@ -226,6 +232,15 @@ pub(crate) fn handle_ask_user_question(
     // dashboard's NeedsInput row reflects "time since this question
     // arrived" rather than the previous turn's end time.
     agent.last_active_at = Some(std::time::Instant::now());
+
+    if should_notify {
+        app.notification_service.notify(NotificationEvent {
+            kind: NotificationEventKind::ApprovalRequired,
+            title: "Grok".into(),
+            body: xai_grok_i18n::t("dashboard.awaiting_input").to_owned(),
+            session_id: Some(ext_req.session_id.clone()),
+        });
+    }
 
     tracing::info!(
         mode = ?ext_req.mode,

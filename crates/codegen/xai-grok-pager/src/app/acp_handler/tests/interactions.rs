@@ -211,6 +211,187 @@
         );
     }
 
+    mod ask_notifications {
+        use super::*;
+        use crate::notifications::{NotificationCondition, NotificationConfig, NotificationMethod, NotificationService};
+        use crate::render::draw::{EscapeWriter, WriterPayload, WriterSync};
+
+        fn capture(app: &mut AppView, config: NotificationConfig) -> std::sync::mpsc::Receiver<WriterPayload> {
+            let (tx, rx) = std::sync::mpsc::channel();
+            app.notification_service = NotificationService::new(config, EscapeWriter::new(tx, WriterSync::new()));
+            rx
+        }
+
+        fn config() -> NotificationConfig {
+            NotificationConfig {
+                method: NotificationMethod::Osc777,
+                condition: NotificationCondition::Always,
+                ..Default::default()
+            }
+        }
+
+        fn ask(app: &mut AppView, session: &str, tool: &str) -> tokio::sync::oneshot::Receiver<xai_acp_lib::AcpResult<acp::ExtResponse>> {
+            let (response_tx, rx) = tokio::sync::oneshot::channel();
+            let raw = serde_json::value::to_raw_value(&serde_json::json!({
+                "sessionId": session,
+                "toolCallId": tool,
+                "questions": [{
+                    "question": "sensitive question",
+                    "options": [{"label": "sensitive option", "description": "sensitive description"}]
+                }],
+                "mode": "default",
+            })).unwrap();
+            handle(AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
+                request: acp::ExtRequest::new("x.ai/ask_user_question", raw.into()),
+                response_tx,
+            }), app);
+            rx
+        }
+
+        fn notification(rx: &std::sync::mpsc::Receiver<WriterPayload>) -> String {
+            String::from_utf8(rx.try_recv().expect("Ask must emit a notification").data().to_vec()).unwrap()
+        }
+
+        #[test]
+        fn emits_generic_localized_input_notification() {
+            let mut app = make_app_with_agent("sess-1");
+            let rx = capture(&mut app, config());
+            xai_grok_i18n::with_pseudo_locale(|| {
+                let _reply = ask(&mut app, "sess-1", "call-q");
+                let text = notification(&rx);
+                assert!(text.contains("⟦dashboard.awaiting_input⟧"));
+                assert!(!text.contains("sensitive"));
+                assert!(rx.try_recv().is_err());
+            });
+        }
+
+        #[test]
+        fn respects_event_focus_threshold_and_method_settings() {
+            let cases = [
+                (NotificationCondition::Always, true, 3, true, NotificationMethod::Bel, true),
+                (NotificationCondition::Never, false, 0, true, NotificationMethod::Bel, false),
+                (NotificationCondition::Unfocused, true, 0, true, NotificationMethod::Bel, false),
+                (NotificationCondition::Unfocused, false, 0, true, NotificationMethod::Bel, true),
+                (NotificationCondition::Unfocused, false, 3600, true, NotificationMethod::Bel, false),
+                (NotificationCondition::Always, false, 0, false, NotificationMethod::Bel, false),
+                (NotificationCondition::Always, false, 0, true, NotificationMethod::None, false),
+            ];
+            for (condition, focused, threshold, enabled, method, expected) in cases {
+                let mut app = make_app_with_agent("sess-1");
+                let mut cfg = config();
+                cfg.condition = condition;
+                cfg.idle_threshold_secs = threshold;
+                cfg.method = method;
+                if !enabled {
+                    cfg.events = vec![NotificationEventKind::TurnComplete];
+                }
+                let rx = capture(&mut app, cfg);
+                if !focused {
+                    app.notification_service.focus_tracker.on_focus_lost();
+                }
+                let _reply = ask(&mut app, "sess-1", "call-q");
+                assert!(test_agent(&app, AgentId(0)).question_view.is_some());
+                assert_eq!(rx.try_recv().is_ok(), expected, "{condition:?}, focused={focused}, threshold={threshold}, enabled={enabled}, method={method:?}");
+            }
+        }
+
+        #[test]
+        fn background_session_notifies_from_another_session_or_dashboard() {
+            for active_view in [ActiveView::Agent(AgentId(0)), ActiveView::AgentDashboard] {
+                let mut app = make_app_with_agent("sess-A");
+                insert_agent(&mut app, AgentId(1), Some("sess-B"));
+                app.active_view = active_view;
+                let rx = capture(&mut app, config());
+                let _reply = ask(&mut app, "sess-B", "call-q");
+                assert!(test_agent(&app, AgentId(1)).question_view.is_some());
+                assert!(test_agent(&app, AgentId(0)).question_view.is_none());
+                notification(&rx);
+                app.update_notifications();
+                app.update_notifications();
+                assert!(rx.try_recv().is_err(), "ticks must not repeat the alert");
+                let title = app.pending_notification_escapes.take().unwrap();
+                assert!(!title.contains(xai_grok_i18n::t("notification.title.action_required")));
+                switch_active_to(&mut app, AgentId(1));
+                app.update_notifications();
+                let title = app.pending_notification_escapes.take().unwrap();
+                assert!(title.contains(xai_grok_i18n::t("notification.title.action_required")));
+                assert!(rx.try_recv().is_err(), "switching views must not repeat the alert");
+            }
+        }
+
+        #[test]
+        fn replay_is_quiet_and_replacement_notifies() {
+            let mut app = make_app_with_agent("sess-1");
+            let rx = capture(&mut app, config());
+            let mut first = ask(&mut app, "sess-1", "call-q");
+            notification(&rx);
+            let mut replay = ask(&mut app, "sess-1", "call-q");
+            assert!(rx.try_recv().is_err(), "same pending request must not alert twice");
+            assert!(first.try_recv().unwrap().is_ok());
+            let _replacement = ask(&mut app, "sess-1", "call-next");
+            notification(&rx);
+            let cancelled = replay.try_recv().unwrap().unwrap();
+            let response: serde_json::Value = serde_json::from_str(cancelled.0.get()).unwrap();
+            assert_eq!(response["outcome"], "cancelled");
+        }
+
+        #[test]
+        fn closure_clears_title_and_allows_next_notification() {
+            for close in ["submit", "cancel", "peer"] {
+                let mut app = make_app_with_agent("sess-1");
+                let rx = capture(&mut app, config());
+                let _reply = ask(&mut app, "sess-1", "call-q");
+                app.update_notifications();
+                let title = app.pending_notification_escapes.take().unwrap();
+                assert!(title.contains(xai_grok_i18n::t("notification.title.action_required")));
+                notification(&rx);
+                if close == "peer" {
+                    handle_session_notification(&interaction_resolved_ext("sess-1", "call-q"), &mut app);
+                } else {
+                    app.agents.get_mut(&AgentId(0)).unwrap().submit_question_answers_for_test(close == "cancel");
+                }
+                assert!(test_agent(&app, AgentId(0)).question_view.is_none());
+                app.update_notifications();
+                let title = app.pending_notification_escapes.take().unwrap();
+                assert!(!title.contains(xai_grok_i18n::t("notification.title.action_required")));
+                assert!(rx.try_recv().is_err(), "closure must not alert");
+                let _next = ask(&mut app, "sess-1", "call-next");
+                notification(&rx);
+            }
+        }
+
+        #[test]
+        fn ask_and_permission_deduplication_are_independent() {
+            let mut app = make_app_with_agent("sess-1");
+            let rx = capture(&mut app, config());
+            let (perm, _perm_reply) = make_permission_message("sess-1");
+            handle(perm, &mut app);
+            notification(&rx);
+            let _reply = ask(&mut app, "sess-1", "call-q");
+            notification(&rx);
+            app.update_notifications();
+            assert!(app.notification_service.should_suppress_permission_notification());
+            let (perm, _second_reply) = make_permission_message("sess-1");
+            handle(perm, &mut app);
+            assert!(rx.try_recv().is_err(), "permission batch still deduplicates");
+            app.agents.get_mut(&AgentId(0)).unwrap().permission_queue.clear();
+            app.update_notifications();
+            assert!(!app.notification_service.should_suppress_permission_notification());
+            let (perm, _third_reply) = make_permission_message("sess-1");
+            handle(perm, &mut app);
+            notification(&rx);
+        }
+
+
+        #[test]
+        fn unknown_session_does_not_notify() {
+            let mut app = make_app_with_agent("sess-1");
+            let rx = capture(&mut app, config());
+            let _reply = ask(&mut app, "unknown", "call-q");
+            assert!(rx.try_recv().is_err());
+        }
+    }
+
     #[test]
     fn mcp_elicit_opens_elicitation_view_and_parks_response() {
         let mut app = make_app_with_agent("sess-A");
