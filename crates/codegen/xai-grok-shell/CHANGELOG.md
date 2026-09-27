@@ -1,5 +1,53 @@
 # Changelog
 
+# 1.0.41-fork.4 — 2026-09-27
+
+本版为 Fork 问题修复，产品版本仍为 **1.0.41**。修复回复中的货币金额被当作行内数学、导致加粗标记 `**` 原样显示的问题。
+
+### 问题修复
+
+- 同一行出现两个 `$` 金额时，pulldown-cmark 只按「定界符内侧不是空白」判定，会把第二个 `$` 当作前一个 `$` 的闭合定界符，将两者之间的正文连同第一对的闭标记、第二对的开标记一起吞进行内数学跨度。数学内容不参与 markdown 解析、`math` 样式也不带隐藏效果，因此这两个 `**` 被原样打印，两个 `$` 则被数学转换消费。用户可见的例子：
+
+  ```text
+  三次合计费用为启用组 **$0.06861016**、关闭组 **$0.05646648**；
+  ```
+
+  修复前渲染为 `三次合计费用为启用组 0.06861016**、关闭组 **0.05646648；`，修复后是两个加粗金额。
+- 现在补齐 Pandoc / GitHub / markdown-it-katex 既有规则里的第三条：`$` 若会被用作某个尚未闭合的数学跨度的闭合定界符、且其后紧跟数字，就按货币处理——在该 `$` 前插入反斜杠转义，pulldown 随后把它当普通 `$` 输出（转义字节不显示）。
+- 该判断必须在解析前完成：pulldown 一旦把 `$…$` 配成数学跨度，强调的配对关系已被破坏，事后无法还原。
+
+### 边界与兼容性
+
+- 发布标签 `v1.0.41-fork.4` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的产品版本 `1.0.41`。
+- 只有会被当作**闭合**定界符的 `$` 才转义，所以以数字开头的数学不受影响：`$1 + x = 2$`、`有$3$个`、`，$2x$` 继续按数学渲染。
+- `$5-$10`、`**$5**…**$10**` 等紧邻标点的货币不再配对；`Tickets cost $10 or $20.`（第二个 `$` 前是空格）行为不变。
+- 与 Pandoc 一致，闭合标记后紧跟数字的跨度（`$x$2`）退化为字面文本，需要空格分隔。
+- `$$…$$` 展示公式不受影响；作者自己写的 `\$` 按字面成对输出，不会被重复转义。
+- 空行结束配对范围：上一段落的 `$` 不会把下一段的 `$` 拉进同一个跨度。代码围栏与行内代码内的 `$` 依旧原样保留。
+- raw 模式查看源码会看到 `\$`，这是 `$` 的合法转义；渲染文本与 pretty 模式复制都不含反斜杠。
+- 该改动落在上游文件，已按仓库约定加 `LOCAL-PATCH(upstream-dollar-currency-math)` 标记并登记到 `LOCAL_PATCHES.md` 与 `FORK_FEATURES.md`，待上游补齐该规则后按 revert 清单移除。
+
+### 国际化
+
+- 未新增用户可见字符串，翻译目录与审计无变化。
+
+### 验证
+
+- `cargo +1.92.0 test --locked -p xai-grok-markdown --lib`：502 项通过，含新增的货币用例、幂等用例与逐字节切分不变性用例（输出与一次性渲染一致）。
+- pager 层回归用例 `scrollback::blocks::markdown_content::tests::currency_amounts_render_without_literal_markers`：通过（断言渲染行不含 `**` 与反斜杠，raw 源保留转义）。
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`i18n_audit`：16 项通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；提交前本地构建的 `target/release/xai-grok-pager --version` 输出 `grok 1.0.41-fork.4 (ea67faef1978) [fork]`，包含本版版本号。
+
+### 产物
+
+- `grok-1.0.41-fork.4-linux-x86_64`
+- `grok-1.0.41-fork.4-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.41-fork.3...v1.0.41-fork.4
+
 # 1.0.41-fork.3 — 2026-09-27
 
 本版为 Fork 问题修复，产品版本仍为 **1.0.41**。修复 Grok Build 收到 Ask（`ask_user_question`）提问后等待用户回答期间没有发送通知的问题。

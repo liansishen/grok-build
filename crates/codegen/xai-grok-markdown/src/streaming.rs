@@ -2617,6 +2617,14 @@ The frozen lines are **never re-rendered**, making streaming O(N) instead of O(N
         "The end.\n",
     );
 
+    /// Currency amounts must render the same whether the text arrives whole or in chunks.
+    #[test]
+    fn test_currency_amounts_streaming_matches_full() {
+        let text = "三次合计费用为启用组 **$0.06861016**、关闭组 **$0.05646648**；\n\n";
+        assert_streaming_matches_full_both(text);
+        assert_streaming_chunks_match_full(text, true, &[1, 2, 3]);
+    }
+
     /// Math content must render identically whether it arrives whole or split at ANY byte boundary (checkpoint/tail re-render interplay).
     #[test]
     fn test_math_doc_2way_splits_match_full() {
