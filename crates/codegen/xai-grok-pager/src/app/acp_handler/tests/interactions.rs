@@ -211,7 +211,7 @@
         );
     }
 
-    mod ask_notifications {
+    mod interaction_notifications {
         use super::*;
         use crate::notifications::{NotificationCondition, NotificationConfig, NotificationMethod, NotificationService};
         use crate::render::draw::{EscapeWriter, WriterPayload, WriterSync};
@@ -250,6 +250,57 @@
 
         fn notification(rx: &std::sync::mpsc::Receiver<WriterPayload>) -> String {
             String::from_utf8(rx.try_recv().expect("Ask must emit a notification").data().to_vec()).unwrap()
+        }
+
+        fn exit_plan_mode(
+            app: &mut AppView,
+            session: &str,
+            tool: &str,
+        ) -> tokio::sync::oneshot::Receiver<xai_acp_lib::AcpResult<acp::ExtResponse>> {
+            let (response_tx, rx) = tokio::sync::oneshot::channel();
+            let ext_req = crate::views::plan_approval_view::ExitPlanModeExtRequest {
+                session_id: session.into(),
+                tool_call_id: tool.into(),
+                plan_content: Some("# Plan\n".into()),
+            };
+            let raw = serde_json::value::to_raw_value(&ext_req).unwrap();
+            handle(
+                AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
+                    request: acp::ExtRequest::new("x.ai/exit_plan_mode", raw.into()),
+                    response_tx,
+                }),
+                app,
+            );
+            rx
+        }
+
+        fn elicit(
+            app: &mut AppView,
+            session: &str,
+            tool: &str,
+        ) -> tokio::sync::oneshot::Receiver<xai_acp_lib::AcpResult<acp::ExtResponse>> {
+            let (response_tx, rx) = tokio::sync::oneshot::channel();
+            let raw = serde_json::value::to_raw_value(&serde_json::json!({
+                "sessionId": session,
+                "toolCallId": tool,
+                "serverName": "demo-mcp",
+                "message": "Need your email",
+                "mode": "form",
+                "requestedSchema": {
+                    "type": "object",
+                    "properties": { "email": { "type": "string" } },
+                    "required": ["email"]
+                }
+            }))
+            .unwrap();
+            handle(
+                AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
+                    request: acp::ExtRequest::new("x.ai/mcp/elicit", raw.into()),
+                    response_tx,
+                }),
+                app,
+            );
+            rx
         }
 
         #[test]
@@ -389,6 +440,115 @@
             let rx = capture(&mut app, config());
             let _reply = ask(&mut app, "unknown", "call-q");
             assert!(rx.try_recv().is_err());
+        }
+
+        #[test]
+        fn plan_approval_notifies_and_lights_the_title() {
+            let mut app = make_app_with_agent("sess-1");
+            let rx = capture(&mut app, config());
+            xai_grok_i18n::with_pseudo_locale(|| {
+                let _reply = exit_plan_mode(&mut app, "sess-1", "call-plan");
+                assert!(test_agent(&app, AgentId(0)).plan_approval_view.is_some());
+                let text = notification(&rx);
+                assert!(text.contains("⟦plan.waiting_approval⟧"));
+                assert!(rx.try_recv().is_err(), "one alert per opened approval");
+                app.update_notifications();
+                let title = app.pending_notification_escapes.take().unwrap();
+                assert!(title.contains(xai_grok_i18n::t("notification.title.action_required")));
+            });
+        }
+
+        #[test]
+        fn plan_approval_replay_of_the_same_tool_call_stays_quiet() {
+            let mut app = make_app_with_agent("sess-1");
+            let rx = capture(&mut app, config());
+            let _first = exit_plan_mode(&mut app, "sess-1", "call-plan");
+            notification(&rx);
+            let _replay = exit_plan_mode(&mut app, "sess-1", "call-plan");
+            assert!(rx.try_recv().is_err(), "same pending approval must not alert twice");
+            let _next = exit_plan_mode(&mut app, "sess-1", "call-plan-2");
+            notification(&rx);
+        }
+
+        #[test]
+        fn background_plan_approval_notifies_without_lifting_another_sessions_title() {
+            let mut app = make_app_with_agent("sess-A");
+            insert_agent(&mut app, AgentId(1), Some("sess-B"));
+            let rx = capture(&mut app, config());
+            let _reply = exit_plan_mode(&mut app, "sess-B", "call-plan");
+            notification(&rx);
+            app.update_notifications();
+            let title = app.pending_notification_escapes.take().unwrap();
+            assert!(!title.contains(xai_grok_i18n::t("notification.title.action_required")));
+            switch_active_to(&mut app, AgentId(1));
+            app.update_notifications();
+            let title = app.pending_notification_escapes.take().unwrap();
+            assert!(title.contains(xai_grok_i18n::t("notification.title.action_required")));
+        }
+
+        #[test]
+        fn mcp_elicitation_notifies_and_lights_the_title() {
+            let mut app = make_app_with_agent("sess-A");
+            let rx = capture(&mut app, config());
+            xai_grok_i18n::with_pseudo_locale(|| {
+                let _reply = elicit(&mut app, "sess-A", "mcp-elicit-1");
+                assert!(test_agent(&app, AgentId(0)).elicitation_view.is_some());
+                let text = notification(&rx);
+                assert!(text.contains("⟦dashboard.awaiting_input⟧"));
+                app.update_notifications();
+                let title = app.pending_notification_escapes.take().unwrap();
+                assert!(title.contains(xai_grok_i18n::t("notification.title.action_required")));
+            });
+        }
+
+        #[test]
+        fn mcp_elicitation_replay_stays_quiet_and_a_new_call_alerts() {
+            let mut app = make_app_with_agent("sess-A");
+            let rx = capture(&mut app, config());
+            let _first = elicit(&mut app, "sess-A", "mcp-elicit-1");
+            notification(&rx);
+            let _replay = elicit(&mut app, "sess-A", "mcp-elicit-1");
+            assert!(rx.try_recv().is_err(), "same pending elicitation must not alert twice");
+            let _next = elicit(&mut app, "sess-A", "mcp-elicit-2");
+            notification(&rx);
+        }
+
+        #[test]
+        fn url_waiting_chrome_swap_stays_quiet() {
+            let mut app = make_app_with_agent("sess-A");
+            let rx = capture(&mut app, config());
+            let (tx, _reply) = tokio::sync::oneshot::channel();
+            let raw = serde_json::value::to_raw_value(&serde_json::json!({
+                "sessionId": "sess-A",
+                "toolCallId": "mcp-elicit-url",
+                "serverName": "demo-mcp",
+                "message": "Open login",
+                "mode": "url",
+                "url": "https://example.com/login",
+                "elicitationId": "eid-1"
+            }))
+            .unwrap();
+            handle(
+                AcpClientMessage::ExtMethod(xai_acp_lib::AcpArgs {
+                    request: acp::ExtRequest::new("x.ai/mcp/elicit", raw.into()),
+                    response_tx: tx,
+                }),
+                &mut app,
+            );
+            notification(&rx);
+            {
+                let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+                let ev = agent.elicitation_view.as_mut().unwrap();
+                assert!(ev.send_response(
+                    xai_grok_tools::mcp_elicitation::McpElicitExtResponse::Accept { content: None },
+                ));
+                ev.begin_url_waiting();
+            }
+            let _parked = elicit(&mut app, "sess-A", "mcp-elicit-form");
+            assert!(
+                rx.try_recv().is_err(),
+                "a request that only parks behind the waiting chrome must not re-alert"
+            );
         }
     }
 
