@@ -1,5 +1,43 @@
 # Changelog
 
+# 1.0.41-fork.6 — 2026-09-28
+
+本版为 Fork 问题修复，产品版本仍为 **1.0.41**。补齐两处在用户离开终端时没有任何提醒的“等待用户操作”状态：计划审批（`exit_plan_mode`）与 MCP elicitation，并让终端标题的 action-required 指示覆盖这两类状态。
+
+### 问题修复
+
+- 工具权限请求与 `ask_user_question` 会经 `approval_required` 通知提醒用户，但同为阻塞式反向请求的两类状态不会：`exit_plan_mode` 计划审批、MCP elicitation（表单，或等待用户在浏览器完成 OAuth 的 URL 模式）。agent 的工具循环在这两种状态下都挂在内存 oneshot 上等待回答，没有超时；用户切到别的窗口后既收不到通知，终端标题也不会亮起 action-required（此前只看权限队列和 question_view），只有仪表盘那一行显示 NeedsInput。
+- 现在 `handle_exit_plan_mode` 与 `handle_mcp_elicit` 在挂出等待卡时发出 `approval_required` 通知：计划审批正文用已有的 `plan.waiting_approval`（“Waiting on plan approval”/“等待计划批准”），MCP elicitation 用 `dashboard.awaiting_input`（“Awaiting your input”/“等待你的输入”），标题沿用 `status.notification_title`。
+- 终端标题的 action-required 判定（`AppView::update_notifications`）从“权限队列非空或 question_view 存在”扩展为同时覆盖 `plan_approval_view` 与 `elicitation_view`。
+- 去重：同一个 `tool_call_id` 的重放（例如重连后 leader 重放未答复的请求）不再重复提醒，换成新的 tool call 才提醒。URL 等待期间只把新请求挂起到 `pending_elicitation` 的路径不提醒，因为屏幕上已有的卡片没有变化。
+- 后台会话同样提醒：审批或 elicitation 落在非当前会话时照常通知，标题等切到该会话后才点亮。
+
+### 兼容性
+
+- 通知仍受 `[ui.notifications]` 约束：事件需在 `events` 列表内（默认 `turn_complete`、`approval_required`），`condition` 默认 `unfocused` 且终端需失焦满 `idle_threshold_secs`（默认 3 秒），`method = "none"` 或不支持的协议不发送。权限请求按批去重、YOLO 模式自动批准等既有行为不变。
+- 发布标签 `v1.0.41-fork.6` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的产品版本 `1.0.41`。
+
+### 国际化
+
+- 未新增用户可见字符串：复用现有的 `status.notification_title`、`plan.waiting_approval`、`dashboard.awaiting_input`，英文与简体中文目录均已有对应条目，翻译目录与审计无变化。
+
+### 验证
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib`：10247 项通过；仅 `fs_size::tests::later_sibling_is_visited_after_another_filesystem` 失败，该用例在本机 root 容器可挂载 tmpfs 时才真正运行、断言依赖目录列举顺序，是已知的本机漂移，本次改动未触及 `fs_size`。
+- 新增 6 项通知用例（`app::acp_handler::tests::interactions::interaction_notifications`）通过：计划审批与 MCP elicitation 各发一次通知并点亮标题、同一 tool call 重放保持安静、新 tool call 再提醒、后台会话提醒但不点亮其它会话的标题、URL 等待期间的挂起请求不重复提醒。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`--test i18n_audit`：16 项通过（含无条件的当前源码与 Markdown 覆盖审计）。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；提交前本地构建的 `target/release/xai-grok-pager --version` 输出 `grok 1.0.41-fork.6 (17d49635cac6) [fork]`。
+
+### 产物
+
+- `grok-1.0.41-fork.6-linux-x86_64`
+- `grok-1.0.41-fork.6-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.41-fork.5...v1.0.41-fork.6
+
 # 1.0.41-fork.5 — 2026-09-27
 
 本版为 Fork 问题修复，产品版本仍为 **1.0.41**。修复中文/日文标点紧邻强调标记时加粗不生效、`**` 被原样显示的问题，并把解析器钉到包含上游对应实现的那次提交。

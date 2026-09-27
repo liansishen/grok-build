@@ -6364,8 +6364,10 @@ impl AppView {
                 } else {
                     agent.resolve_turn_activity()
                 };
-                let needs_input =
-                    !agent.permission_queue.is_empty() || agent.question_view.is_some();
+                let needs_input = !agent.permission_queue.is_empty()
+                    || agent.question_view.is_some()
+                    || agent.plan_approval_view.is_some()
+                    || agent.elicitation_view.is_some();
                 let elapsed = if parked { None } else { agent.turn_elapsed() };
                 let is_busy = agent.session.state.is_busy() && !parked;
                 (name, model, activity, needs_input, elapsed, is_busy)

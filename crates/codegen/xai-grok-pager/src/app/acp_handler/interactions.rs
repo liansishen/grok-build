@@ -29,6 +29,7 @@ pub(crate) fn handle_mcp_elicit(
         }
     };
 
+    let session_id = ext_req.session_id.clone();
     let Some(id) = interaction_target_agent(app, &ext_req.session_id) else {
         tracing::info!(
             session_id = %ext_req.session_id,
@@ -64,6 +65,12 @@ pub(crate) fn handle_mcp_elicit(
         crate::views::feedback_modal::FeedbackModalDisplacement::McpElicitation,
     );
 
+    // Replays of the same pending request must stay quiet; a new tool call is a new input need.
+    let should_notify = agent
+        .elicitation_view
+        .as_ref()
+        .is_none_or(|ev| ev.tool_call_id != ext_req.tool_call_id);
+
     if let Some(mut old) = agent.elicitation_view.take() {
         if let Some(old_tx) = old.take_response_tx() {
             cancel_elicitation_request(old_tx);
@@ -78,6 +85,16 @@ pub(crate) fn handle_mcp_elicit(
         Some(ext.response_tx),
     ));
     agent.last_active_at = Some(std::time::Instant::now());
+
+    if should_notify {
+        // The MCP server is parked until this form or consent is answered.
+        app.notification_service.notify(NotificationEvent {
+            kind: NotificationEventKind::ApprovalRequired,
+            title: xai_grok_i18n::t("status.notification_title").into(),
+            body: xai_grok_i18n::t("dashboard.awaiting_input").into(),
+            session_id: Some(session_id),
+        });
+    }
 
     tracing::info!(
         target_active = is_active,
@@ -280,6 +297,7 @@ pub(super) fn handle_exit_plan_mode(
             return false;
         }
     };
+    let session_id = params.session_id.clone();
 
     // 2. Route by the request's session id (like `session/update`), so a
     // plan-approval raised by a BACKGROUND session lands on its own view even
@@ -307,6 +325,12 @@ pub(super) fn handle_exit_plan_mode(
     agent.displace_feedback_modal(
         crate::views::feedback_modal::FeedbackModalDisplacement::PlanApproval,
     );
+
+    // Replays of the same pending approval must stay quiet; a new tool call is a new input need.
+    let should_notify = agent
+        .plan_approval_view
+        .as_ref()
+        .is_none_or(|p| p.tool_call_id != params.tool_call_id);
 
     if let Some(mut old) = agent.unmount_plan_review() {
         tracing::warn!(
@@ -397,6 +421,16 @@ pub(super) fn handle_exit_plan_mode(
         }
     } else if !permission_still_open && let Some(ref mut pav) = agent.plan_approval_view {
         pav.focus = crate::views::plan_approval_view::PlanApprovalFocus::Prompt;
+    }
+
+    if should_notify {
+        // The turn stays parked until this approval is answered.
+        app.notification_service.notify(NotificationEvent {
+            kind: NotificationEventKind::ApprovalRequired,
+            title: xai_grok_i18n::t("status.notification_title").into(),
+            body: xai_grok_i18n::t("plan.waiting_approval").into(),
+            session_id: Some(session_id),
+        });
     }
 
     tracing::info!(
