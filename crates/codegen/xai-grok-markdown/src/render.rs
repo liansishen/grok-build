@@ -2615,6 +2615,21 @@ mod math_tests {
         );
     }
 
+    /// Regression: two bold currency amounts on one line must not print their `**` markers.
+    /// pulldown pairs the two `$` into one inline-math span (the second `$` is preceded by `*`, so it may close),
+    /// and the span then swallows the closing marker of the first `**` pair and the opening marker of the second.
+    #[test]
+    fn currency_amounts_keep_bold_markers_hidden() {
+        let lines = pretty_lines("三次合计费用为启用组 **$0.06861016**、关闭组 **$0.05646648**；\n\n");
+        let text = lines.join("\n");
+        assert!(!text.contains("**"), "markers must stay hidden: {lines:#?}");
+        assert_eq!(
+            first_str(&lines).unwrap_or(""),
+            "三次合计费用为启用组 $0.06861016、关闭组 $0.05646648；",
+            "got: {lines:#?}"
+        );
+    }
+
     #[test]
     fn dollar_inline_math_hides_delimiters_in_pretty_mode() {
         let lines = pretty_lines("So $x_1 + x_2$ holds.\n\n");

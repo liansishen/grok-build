@@ -591,6 +591,24 @@ mod tests {
         ));
     }
 
+    /// Regression for the reported case: two bold currency amounts on one line printed their `**` markers.
+    /// pulldown paired the two `$` into one inline-math span (the second `$` is preceded by `*`, so it may close)
+    /// and the span swallowed the closing marker of the first `**` pair and the opening marker of the second.
+    #[test]
+    fn currency_amounts_render_without_literal_markers() {
+        let md = MarkdownContent::new("三次合计费用为启用组 **$0.06861016**、关闭组 **$0.05646648**；");
+        let out = md.output(80);
+        let text: String = out.lines.iter().map(|l| l.content.to_string()).collect();
+        assert!(!text.contains("**"), "markers must stay hidden: {text:?}");
+        assert!(!text.contains('\\'), "the escape byte must not be drawn: {text:?}");
+        // The raw source keeps the escape, which is valid markdown for a literal `$`.
+        assert!(
+            md.text().contains("\\$0.05646648"),
+            "raw source must keep the escape: {:?}",
+            md.text()
+        );
+    }
+
     /// Verify that incremental wrapping during streaming produces the same output as creating a fresh MarkdownContent with the full text.
     #[test]
     fn incremental_wrap_matches_full_wrap() {

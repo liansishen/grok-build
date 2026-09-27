@@ -15,6 +15,7 @@
 //! | `\[ … \]` / `$$ … $$` / `\begin{equation} … \end{equation}` | `$$…$$`, interior newlines joined |
 //! | `\[` / `\]` (unmatched) | `$$` |
 //! | `\begin{equation[*]}` / `\end{equation[*]}` (unmatched) | `$$` |
+//! | `$` that would close a span while the next byte is a digit | `\$` (kept literal: the Pandoc/GitHub currency rule) |
 //!
 //! Inline `\( … \)` is converted span-at-once: the matching unescaped `\)` is located; the ASCII whitespace just inside the delimiters is trimmed.
 //! The trim matters because pulldown-cmark's dollar-math flanking rule rejects `$ … $` and would leave a padded span as raw text.
@@ -36,7 +37,12 @@
 //! And it gives up at a line starting with `>`: blockquoted math carries `>` markers that must not become span content.
 //! Pulldown already handles the quoted multi-line span after marker stripping.
 //!
-//! Bare single `$` is left untouched (so the pass is **idempotent**).
+//! # Currency amounts are not math
+//!
+//! Pandoc, GitHub, and markdown-it-katex all refuse to let a `$` *close* a math span when the next byte is a digit; that keeps `$20,000 and $30,000` and `$5-$10` as prose.
+//! pulldown-cmark only checks whitespace adjacency, so this pass escapes such a closer as `\$` and pulldown then leaves the `$` literal (the escape byte is not drawn).
+//! A `$` may still *open* a span when a digit follows it, so `$1 + x = 2$` stays math, while a span closed immediately before a digit (`$x$2`) degrades to literal text exactly as it does in Pandoc.
+//! Bare single `$` is otherwise left untouched (so the pass is **idempotent**).
 //! Escaped openers (`\\(`, `\\[`, `\$`) are left literal via backslash-pair consumption, matching the old scanner's even/odd parity rule.
 //! Content inside inline code spans and fenced code blocks is left verbatim, so LaTeX-in-backticks stays raw as before.
 //! Inner LaTeX environments such as `\begin{aligned}` / `\begin{pmatrix}` are *not* touched.
@@ -55,6 +61,8 @@
 //! - 4-space *indented* code blocks are not treated as code, so math inside them converts. Rare in model output.
 //! - Inline code spans are treated as single-line: an unterminated `` ` `` reverts to normal at the newline.
 //!   This only changes behavior next to a stray, unmatched backtick.
+//! - A `$` that would close a math span immediately before a digit is escaped (`\$`) so pulldown leaves it literal.
+//!   Math next to a following digit therefore needs a separating space (`$x$ 2`).
 //!
 //! Streaming-vs-one-shot equivalence is pinned by an exhaustive byte-split test.
 
@@ -93,6 +101,13 @@ pub struct LatexDelimiterNormalizer {
     at_line_start: bool,
     /// Raw bytes held back from a previous `push` because they may be the prefix of a construct that needs more input to classify.
     pending: String,
+    /// Last byte consumed from the source, i.e. the byte immediately before `pending`.
+    /// pulldown decides whether a `$` may close from the source byte before it, so the currency rule below needs the same view.
+    prev_byte: Option<u8>,
+    // LOCAL-PATCH(upstream-dollar-currency-math): pairing state for the currency rule
+    /// True while an unescaped single `$` earlier in the current paragraph can still open a span.
+    /// The currency rule escapes only a `$` that pulldown would pair as a closer, so digit-leading math (`有$3$个`) is left alone.
+    inline_math_open: bool,
 }
 
 impl Default for LatexDelimiterNormalizer {
@@ -107,6 +122,8 @@ impl LatexDelimiterNormalizer {
             state: State::Normal,
             at_line_start: true,
             pending: String::new(),
+            prev_byte: None,
+            inline_math_open: false,
         }
     }
 
@@ -115,6 +132,8 @@ impl LatexDelimiterNormalizer {
         self.state = State::Normal;
         self.at_line_start = true;
         self.pending.clear();
+        self.prev_byte = None;
+        self.inline_math_open = false;
     }
 
     /// Push a raw chunk; returns the finalized normalized prefix.
@@ -146,6 +165,25 @@ impl LatexDelimiterNormalizer {
     /// Returns the emitted text and the number of bytes consumed.
     /// Bytes `[consumed..]` are the held-back ambiguous suffix (always empty when `final_flush`).
     fn process(&mut self, buf: &str, final_flush: bool) -> (String, usize) {
+        let (out, consumed) = self.process_inner(buf, final_flush);
+        if consumed > 0 {
+            self.prev_byte = buf.as_bytes().get(consumed - 1).copied();
+        }
+        (out, consumed)
+    }
+
+    /// The source byte immediately before `i`, falling back to the carried-over byte when `i` is the first byte of the buffer.
+    fn byte_before(&self, bytes: &[u8], i: usize) -> Option<u8> {
+        if i == 0 {
+            self.prev_byte
+        } else {
+            bytes.get(i - 1).copied()
+        }
+    }
+
+    /// Body of [`process`](Self::process).
+    /// The caller records the last consumed byte, which the held-back suffix keeps available as `prev_byte`.
+    fn process_inner(&mut self, buf: &str, final_flush: bool) -> (String, usize) {
         let bytes = buf.as_bytes();
         let n = bytes.len();
         let mut out = String::with_capacity(n + 8);
@@ -163,6 +201,8 @@ impl LatexDelimiterNormalizer {
                                 out.push_str(s);
                                 i = end;
                                 self.state = State::Fenced { ch, len };
+                                // LOCAL-PATCH(upstream-dollar-currency-math): a code fence clears the pairing state
+                                self.inline_math_open = false;
                                 self.at_line_start = false;
                                 continue;
                             }
@@ -174,6 +214,11 @@ impl LatexDelimiterNormalizer {
                     };
                     match bi {
                         b'\n' => {
+                            // LOCAL-PATCH(upstream-dollar-currency-math): paragraph end clears the pairing state
+                            // (pulldown cannot pair a `$` across a blank line)
+                            if self.byte_before(bytes, i) == Some(b'\n') {
+                                self.inline_math_open = false;
+                            }
                             out.push('\n');
                             i += 1;
                             self.at_line_start = true;
@@ -293,7 +338,27 @@ impl LatexDelimiterNormalizer {
                                     DisplayClose::NeedMore => break,
                                 }
                             } else {
-                                // Single `$` (inline math / currency) passes through verbatim; pulldown handles it
+                                // Single `$`: an inline-math opener, or currency.
+                                // LOCAL-PATCH(upstream-dollar-currency-math): Pandoc/GitHub refuse to let a `$` CLOSE a span
+                                // when the next byte is a digit, which keeps `$5-$10` and `**$0.06**、…**$0.05**` as prose.
+                                // pulldown only checks whitespace adjacency, so approximate that rule here: escape the closer
+                                // (pulldown draws an escaped `$` literally) when a span is open, and otherwise track whether
+                                // this `$` opens one, so digit-leading math stays math.
+                                let can_close = self
+                                    .byte_before(bytes, i)
+                                    .is_some_and(|b| !b.is_ascii_whitespace());
+                                let next = bytes.get(i + 1).copied();
+                                let can_open = next.is_some_and(|b| !b.is_ascii_whitespace());
+                                if can_close && self.inline_math_open {
+                                    if next.is_some_and(|b| b.is_ascii_digit()) {
+                                        out.push('\\');
+                                    } else {
+                                        // Closes the pending span.
+                                        self.inline_math_open = false;
+                                    }
+                                } else {
+                                    self.inline_math_open = can_open;
+                                }
                                 out.push('$');
                                 i += 1;
                             }
@@ -570,7 +635,10 @@ fn classify_backslash(buf: &str, i: usize, final_flush: bool) -> Bs {
             // Not one of our envs (e.g. `\begin{aligned}`): emit just the `\` and let the rest be copied as ordinary text (verbatim).
             EnvScan::No => Bs::Literal { len: 1 },
         },
-        // `\$`, `\x`, etc: emit the `\`, process the next char normally.
+        // `\$` is a literal dollar: emit the pair so the currency rule cannot re-escape the `$` and break idempotency
+        // LOCAL-PATCH(upstream-dollar-currency-math): the escape must stay a pair (see the currency rule)
+        b'$' => Bs::Literal { len: 2 },
+        // `\x`, `\*`, etc: emit the `\`, process the next char normally.
         _ => Bs::Literal { len: 1 },
     }
 }
@@ -965,6 +1033,11 @@ mod tests {
             "a $$ x = y",
             "> $$\n> x\n> $$",
             "Tickets cost $$.\n\nDinner cost $$.",
+            // Currency: the escaped closer must be a fixed point.
+            "Prices range from $5-$10.",
+            "三次合计费用为启用组 **$0.06861016**、关闭组 **$0.05646648**；",
+            "$x$2",
+            "price \\$5-$10",
         ] {
             let once = norm(s);
             let twice = norm(&once);
@@ -991,6 +1064,37 @@ mod tests {
     fn currency_not_misconverted() {
         assert_eq!(norm("$5 and $10"), "$5 and $10");
         assert_eq!(norm("\\(a\\) costs $5"), "$a$ costs $5");
+    }
+
+    #[test]
+    fn currency_closer_before_digit_is_escaped() {
+        // The reported shape: pulldown would otherwise pair the two `$` into one inline-math span that swallows
+        // the closing marker of the first `**` pair and the opening marker of the second.
+        assert_eq!(
+            norm("三次合计费用为启用组 **$0.06861016**、关闭组 **$0.05646648**；"),
+            "三次合计费用为启用组 **$0.06861016**、关闭组 **\\$0.05646648**；"
+        );
+        // A punctuation-adjacent range: the second `$` may close, but a digit follows it.
+        assert_eq!(norm("Prices range from $5-$10."), "Prices range from $5-\\$10.");
+    }
+
+    #[test]
+    fn currency_rule_leaves_openers_and_math_alone() {
+        // A `$` preceded by whitespace cannot close, so a spaced amount is untouched.
+        assert_eq!(norm("Tickets cost $10 or $20."), "Tickets cost $10 or $20.");
+        // A span may still OPEN before a digit, so digit-leading math survives.
+        assert_eq!(norm("$1 + x = 2$"), "$1 + x = 2$");
+        // A closer immediately before a digit degrades to literal text, exactly as it does in Pandoc.
+        assert_eq!(norm("$x$2"), "$x\\$2");
+        // Display `$$…$$` is exempt from the digit clause.
+        assert_eq!(norm("$$x$$2"), "$$x$$2");
+        // An author-written escape is emitted as a pair and never re-escaped, and it does not open a span.
+        assert_eq!(norm("price \\$5-$10"), "price \\$5-$10");
+        // Digit-leading math keeps its role: only a `$` that would pair as a closer is escaped.
+        assert_eq!(norm("有$3$个"), "有$3$个");
+        assert_eq!(norm("，$2x$ 更大"), "，$2x$ 更大");
+        // A blank line ends the pairing scope: an earlier `$5` cannot pull a later closer into a span.
+        assert_eq!(norm("价格 $5\n\n公式 $2x$"), "价格 $5\n\n公式 $2x$");
     }
 
     // ── Code is left verbatim ────────────────────────────────────────────
@@ -1050,6 +1154,7 @@ mod tests {
         "List:\n- item \\(p\\to q\\)\n- plain\n\n",
         "> quote \\[E=mc^2\\]\n\n",
         "## Heading \\(h=x^3\\)\n",
+        "Currency $5-$10 and $20,000 and $30,000 stay prose.\n\n",
     );
 
     fn assert_split_invariant(doc: &str) {
@@ -1122,6 +1227,14 @@ mod tests {
             "$$\r\nx\r\n$$",
             "\\(a\n=\nb\\)",
             "text $5 and $$ x $$ and $10",
+            "三次合计费用为启用组 **$0.06861016**、关闭组 **$0.05646648**；",
+            "Prices range from $5-$10.",
+            "$5-$10 then $$ x $$",
+            "$x$2",
+            "price \\$5-$10",
+            "有$3$个",
+            "价格 $5\n\n公式 $2x$",
+            "**$0.06**、**$0.05** 与 有$3$个",
         ] {
             assert_split_invariant(doc);
             assert_char_by_char(doc);
