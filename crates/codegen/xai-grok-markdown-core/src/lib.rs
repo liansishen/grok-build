@@ -21,6 +21,9 @@ pub fn parser_options() -> Options {
         | Options::ENABLE_MATH
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_TABLES
+        // LOCAL-PATCH(upstream-pulldown-unreleased): emphasis next to CJK punctuation (CommonMark #650);
+        // needs the pinned pulldown rev, see the `[workspace.dependencies]` entry in the workspace root
+        | Options::ENABLE_CJK_FRIENDLY_EMPHASIS
 }
 
 /// Returns Grok's parser events with source byte ranges, single-tilde strikethrough already demoted.

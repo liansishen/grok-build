@@ -2625,6 +2625,15 @@ The frozen lines are **never re-rendered**, making streaming O(N) instead of O(N
         assert_streaming_chunks_match_full(text, true, &[1, 2, 3]);
     }
 
+    /// CJK-punctuation emphasis must render the same whether the text arrives whole or in chunks:
+    /// the CJK flanking classification looks at the surrounding characters, across chunk boundaries included.
+    #[test]
+    fn test_cjk_emphasis_streaming_matches_full() {
+        let text = "**验证结果：**3 项回归测试、前端类型检查和代码风格检查均通过。\n\n";
+        assert_streaming_matches_full_both(text);
+        assert_streaming_chunks_match_full(text, true, &[1, 2, 3]);
+    }
+
     /// Math content must render identically whether it arrives whole or split at ANY byte boundary (checkpoint/tail re-render interplay).
     #[test]
     fn test_math_doc_2way_splits_match_full() {

@@ -1,5 +1,44 @@
 # Changelog
 
+# 1.0.41-fork.5 — 2026-09-27
+
+本版为 Fork 问题修复，产品版本仍为 **1.0.41**。修复中文/日文标点紧邻强调标记时加粗不生效、`**` 被原样显示的问题，并把解析器钉到包含上游对应实现的那次提交。
+
+### 问题修复
+
+- 中文（及日文、韩文）正文不用空格，标点直接贴住后续文字。例如 `**验证结果：**3 项回归测试…`：闭标记 `**` 前面是标点 `：`、后面紧跟 `3`，按 CommonMark 的右翼（right-flanking）规则这个 `**` 不能闭合，整对标记退化为普通文本、原样打印。这是规范行为（commonmark/commonmark-spec#650），GitHub 与 pandoc 同样如此。
+- 现在启用上游为此提供的可选开关 `Options::ENABLE_CJK_FRIENDLY_EMPHASIS`（pulldown-cmark PR #1059，实现社区修订案 markdown-cjk-friendly），区分 CJK 标点与非 CJK 标点：`**验证结果：**3 项…`、`**テスト。**テスト`、`これは**「重要」**です` 都正常加粗。
+- 该开关目前仅存在于上游 main（crates.io 最新 0.13.4 不含此代码），因此本版把 workspace 的 `pulldown-cmark` 钉到含该实现的提交 `f978fb051404b483b344813d4b0235414b5e4f8f`。
+- 作用范围：ASCII 标点的写法（`**result:**3 items`）仍按 CommonMark 保持字面，与 GitHub/pandoc 一致；`$…$` / `$$…$$` 数学与其它既有渲染不受影响。
+
+### 兼容性
+
+- 发布标签 `v1.0.41-fork.5` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的产品版本 `1.0.41`。
+- 依赖形态使用 `[workspace.dependencies]` 中的直接 git 依赖，而不是 `[patch.crates-io]`：`prost-build` 作为构建依赖以 `default-features = false` 依赖 pulldown-cmark，resolver v2 会单独解析其特性集，而该提交把 `std` 纳入特性门控，patch 会替换构建依赖那份副本并触发 pulldown 自身的 `compile_error!`。现在图中共存两份副本（`prost-build` 继续用 registry 0.13.0，本仓库三个 crate 用 git 0.13.1），两者之间没有类型传递（没有自有 crate 使用 `pulldown-cmark-to-cmark`）。
+- 该提交同时包含上游的「闭合 `$` 后不能紧跟数字」数学规则（PR #1098）。fork.4 的 `LOCAL-PATCH(upstream-dollar-currency-math)` 与之重叠但行为等价，本版保留它作为摘 pin 前的保险；raw 模式复制货币文本时仍会看到 `\$`。
+- 已按仓库约定登记 `LOCAL-PATCH(upstream-pulldown-unreleased)`，`scripts/upstream_merge.py audit-markers` 通过；`THIRD-PARTY-NOTICES` 中 pulldown-cmark 条目同步为 0.13.1。
+
+### 国际化
+
+- 未新增用户可见字符串，翻译目录与审计无变化。
+
+### 验证
+
+- `cargo +1.92.0 test --locked -p xai-grok-markdown --lib`：506 项通过，含新增的 `cjk_emphasis_tests`（`：`/`。`/`）` 形状与 ASCII 对照组）与流式一致性用例 `test_cjk_emphasis_streaming_matches_full`。
+- pager 回归用例 `scrollback::blocks::markdown_content::tests::cjk_punctuation_before_closer_renders_bold`：通过（断言无 `**`、文本正确、确实带 BOLD 修饰）。
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：268 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`i18n_audit`：16 项通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；提交前本地构建的 `target/release/xai-grok-pager --version` 输出 `grok 1.0.41-fork.5 (423baa8b1363) [fork]`，包含本版版本号。
+
+### 产物
+
+- `grok-1.0.41-fork.5-linux-x86_64`
+- `grok-1.0.41-fork.5-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.41-fork.4...v1.0.41-fork.5
+
 # 1.0.41-fork.4 — 2026-09-27
 
 本版为 Fork 问题修复，产品版本仍为 **1.0.41**。修复回复中的货币金额被当作行内数学、导致加粗标记 `**` 原样显示的问题。
