@@ -3218,3 +3218,79 @@ mod entity_tests {
         }
     }
 }
+
+/// CJK emphasis flanking (CommonMark #650): emphasis next to CJK punctuation pairs only with
+/// `Options::ENABLE_CJK_FRIENDLY_EMPHASIS`, which `xai-grok-markdown-core::parser_options` enables.
+#[cfg(test)]
+mod cjk_emphasis_tests {
+    use crate::render_markdown_ratatui_full;
+    use crate::style::test_style;
+    use ratatui::style::Modifier;
+
+    fn pretty_lines(text: &str) -> Vec<String> {
+        let (output, _) = render_markdown_ratatui_full(text, test_style::STYLE, true, None);
+        output
+            .lines
+            .iter()
+            .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect())
+            .collect()
+    }
+
+    fn first_line_has_bold(text: &str) -> bool {
+        let (output, _) = render_markdown_ratatui_full(text, test_style::STYLE, true, None);
+        output.lines.first().is_some_and(|line| {
+            line.spans
+                .iter()
+                .any(|span| span.style.add_modifier.contains(Modifier::BOLD))
+        })
+    }
+
+    /// Regression: a bold label whose colon sits inside the markers, with the sentence continuing right after them
+    /// (session `01a0e1b8`, message text was `**验证结果：**3 项回归测试…`).
+    #[test]
+    fn colon_before_closer_still_bolds() {
+        let text = "**验证结果：**3 项回归测试、前端类型检查和代码风格检查均通过。\n\n";
+        let lines = pretty_lines(text);
+        assert!(
+            !lines.join("\n").contains("**"),
+            "markers must stay hidden: {lines:#?}"
+        );
+        assert_eq!(
+            lines.first().map(String::as_str).unwrap_or(""),
+            "验证结果：3 项回归测试、前端类型检查和代码风格检查均通过。",
+            "got: {lines:#?}"
+        );
+        assert!(first_line_has_bold(text), "label must be bold: {lines:#?}");
+    }
+
+    /// A CJK period or a closing bracket before the closer takes the same path.
+    #[test]
+    fn other_cjk_punctuation_before_closer_bolds() {
+        assert_eq!(
+            pretty_lines("**テスト。**テスト\n\n")
+                .first()
+                .map(String::as_str)
+                .unwrap_or(""),
+            "テスト。テスト"
+        );
+        assert_eq!(
+            pretty_lines("これは**「重要」**です\n\n")
+                .first()
+                .map(String::as_str)
+                .unwrap_or(""),
+            "これは「重要」です"
+        );
+    }
+
+    /// The amendment is scoped to CJK punctuation; the ASCII shape stays literal, as on GitHub and in pandoc.
+    #[test]
+    fn ascii_punctuation_before_closer_stays_literal() {
+        assert_eq!(
+            pretty_lines("**result:**3 items\n\n")
+                .first()
+                .map(String::as_str)
+                .unwrap_or(""),
+            "**result:**3 items"
+        );
+    }
+}

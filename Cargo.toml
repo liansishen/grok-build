@@ -229,7 +229,12 @@ prometheus = { version = "0.14", features = ["process"] }
 prost = "0.14"
 prost-build = "0.14"
 prost-reflect = "0.16"
-pulldown-cmark = "0.13"
+# LOCAL-PATCH(upstream-pulldown-unreleased): the rev that added ENABLE_CJK_FRIENDLY_EMPHASIS (PR #1059)
+# and the closing-`$`-before-digit math rule (PR #1098); no release carries either yet. This is a direct git
+# dependency rather than a `[patch.crates-io]` entry: prost-build (build-dependency) consumes pulldown-cmark with
+# `default-features = false`, which resolver v2 keeps in a separate feature set, and the rev requires the `std`
+# feature there. Return to `pulldown-cmark = "0.13"` once a release carries both behaviors.
+pulldown-cmark = { git = "https://github.com/pulldown-cmark/pulldown-cmark", rev = "f978fb051404b483b344813d4b0235414b5e4f8f" }
 quick-xml = "0.41"
 rand = "0.9"
 ratatui = { version = "0.29" }

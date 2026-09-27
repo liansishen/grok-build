@@ -609,6 +609,27 @@ mod tests {
         );
     }
 
+    /// Regression for a bold label whose CJK colon sits inside the markers with the sentence continuing right after
+    /// them (CommonMark #650; paired only because `parser_options` enables `ENABLE_CJK_FRIENDLY_EMPHASIS`).
+    #[test]
+    fn cjk_punctuation_before_closer_renders_bold() {
+        let md = MarkdownContent::new("**验证结果：**3 项回归测试、前端类型检查和代码风格检查均通过。");
+        let out = md.output(80);
+        let text: String = out.lines.iter().map(|l| l.content.to_string()).collect();
+        assert!(!text.contains("**"), "markers must stay hidden: {text:?}");
+        assert!(
+            text.starts_with("验证结果：3 项回归测试"),
+            "label text must survive: {text:?}"
+        );
+        let bold = out.lines.iter().any(|line| {
+            line.content
+                .spans
+                .iter()
+                .any(|span| span.style.add_modifier.contains(ratatui::style::Modifier::BOLD))
+        });
+        assert!(bold, "the label must be bold: {text:?}");
+    }
+
     /// Verify that incremental wrapping during streaming produces the same output as creating a fresh MarkdownContent with the full text.
     #[test]
     fn incremental_wrap_matches_full_wrap() {
