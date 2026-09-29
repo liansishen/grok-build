@@ -13805,7 +13805,6 @@ dependencies = [
  "tracing",
  "xai-grok-config",
  "xai-grok-sandbox",
- "xai-grok-version",
 ]
 
 [[package]]
@@ -13857,6 +13856,21 @@ version = "0.1.0"
 dependencies = [
  "tracing",
  "url",
+]
+
+[[package]]
+name = "xai-grok-external-agent-migration"
+version = "0.1.0"
+dependencies = [
+ "dunce",
+ "git2",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "toml",
+ "tracing",
+ "xai-dirs",
+ "xai-grok-config",
 ]
 
 [[package]]
@@ -14320,6 +14334,7 @@ dependencies = [
  "xai-grok-cloud-config",
  "xai-grok-config",
  "xai-grok-dashboard-store",
+ "xai-grok-external-agent-migration",
  "xai-grok-extra-ca",
  "xai-grok-feedback",
  "xai-grok-foreign-sessions",
@@ -14538,8 +14553,10 @@ version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
  "dunce",
+ "fs2",
  "git2",
  "glob",
+ "rusqlite",
  "serde",
  "serde_json",
  "tempfile",
@@ -14553,6 +14570,8 @@ dependencies = [
  "xai-dirs",
  "xai-grok-config",
  "xai-grok-paths",
+ "xai-grok-version",
+ "xai-sqlite-journal",
 ]
 
 [[package]]
@@ -14826,6 +14845,7 @@ dependencies = [
  "xai-grok-config",
  "xai-grok-config-types",
  "xai-grok-env",
+ "xai-grok-external-agent-migration",
  "xai-grok-extra-ca",
  "xai-grok-feedback",
  "xai-grok-file-lock",

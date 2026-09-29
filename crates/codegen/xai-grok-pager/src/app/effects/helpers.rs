@@ -282,10 +282,8 @@ pub(super) fn format_acp_error(err: &acp::Error, is_api_key_auth: bool) -> Strin
             &format_rate_limited_user_message(detail.as_deref(), is_api_key_auth),
         );
     }
-    if err.code == acp::ErrorCode::InvalidParams && let Some(data) = &err.data
-        && let Some(msg) = error_detail_from_data(data) && !msg.is_empty()
-    {
-        return sanitize_user_error(&msg);
+    if let Some(detail) = invalid_params_detail(err) {
+        return sanitize_user_error(&detail);
     }
     let raw = err
         .data
@@ -300,8 +298,16 @@ pub(super) fn format_acp_error(err: &acp::Error, is_api_key_auth: bool) -> Strin
         )
         .message()
 }
+/// The sentence an invalid-params error carries for the user, if any.
+pub(super) fn invalid_params_detail(err: &acp::Error) -> Option<String> {
+    if err.code != acp::ErrorCode::InvalidParams {
+        return None;
+    }
+    let detail = err.data.as_ref().and_then(error_detail_from_data)?;
+    (!detail.is_empty()).then_some(detail)
+}
+
 /// Error text for the manual `/compact` result.
-///
 /// Typed compact errors are already normalized by the shell. Older shells may
 /// still return a plain ACP error, which receives the pager's normal cleanup.
 pub(crate) fn compact_error_message(err: &acp::Error) -> String {
