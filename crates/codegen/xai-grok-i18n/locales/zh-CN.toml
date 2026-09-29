@@ -5182,3 +5182,8 @@ plugin = " 插件 "
 
 [voice]
 transcribing_toast = "语音：仍在转写上一段录音…（Esc 丢弃）"
+
+[cli.update]
+installed_run = "更新已安装。请运行 `{grok}` 启动。"
+
+incomplete_retry_run = "更新未完成。请运行 `{grok} update` 重试。"

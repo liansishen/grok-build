@@ -5192,3 +5192,8 @@ plugin = " plugin "
 
 [voice]
 transcribing_toast = "Voice: still transcribing the last recording… (Esc to discard)"
+
+[cli.update]
+installed_run = "Update installed. Run `{grok}` to start."
+
+incomplete_retry_run = "Update did not complete. Run `{grok} update` to retry."

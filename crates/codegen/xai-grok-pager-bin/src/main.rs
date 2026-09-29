@@ -2646,9 +2646,15 @@ async fn async_main(mut args: PagerArgs) -> Result<()> {
             let adopted = bg_update_wait.lock().await.take();
             let grok = "grok";
             if finish_update_on_exit(adopted, &update_config).await {
-                eprintln!("Update installed. Run `{grok}` to start.");
+                eprintln!(
+                    "{}",
+                    t_fmt("cli.update.installed_run", &[("grok", grok)])
+                );
             } else {
-                eprintln!("Update did not complete. Run `{grok} update` to retry.");
+                eprintln!(
+                    "{}",
+                    t_fmt("cli.update.incomplete_retry_run", &[("grok", grok)])
+                );
             }
             Ok(())
         }
