@@ -723,13 +723,22 @@ impl AgentView {
         let appearance = self.scrollback.appearance().clone();
         let layout_cfg = &appearance.scrollback.layout;
         let scrollbar_cfg = &appearance.scrollback.scrollbar;
-        let model_id = self
-            .session
-            .models
-            .current_model_name()
-            .unwrap_or_else(|| "unknown".to_string());
+        let model_label = self.session.models.footer_label().unwrap_or_else(|| {
+            if self.session_starting_since.is_some() {
+                String::new()
+            } else {
+                "unknown".to_owned()
+            }
+        });
         let effective_plan = self.plan_mode_pending.unwrap_or(self.plan_mode_active);
         let casual_commenting = self.is_casual_commenting();
+        let mode_accent = if effective_plan || casual_commenting {
+            Some(theme.accent_plan)
+        } else if self.effective_session_mode() == xai_grok_tools::types::SessionMode::Ask {
+            Some(theme.accent_success)
+        } else {
+            None
+        };
         let prompt_focused = if self.plan_approval_view.is_some() {
             self.plan_approval_view
                 .as_ref()
@@ -750,17 +759,12 @@ impl AgentView {
             bg: PromptBg::Default,
             accent_color_override: if let Some(c) = self.prompt_input_mode.accent_color(&theme) {
                 Some(c)
-            } else if effective_plan || casual_commenting {
-                Some(theme.accent_plan)
             } else {
-                None
+                mode_accent
             },
-            border_color_override: if effective_plan || casual_commenting {
-                crate::render::color::blend_color(theme.bg_base, theme.accent_plan, 0.4)
-                    .or(Some(theme.accent_plan))
-            } else {
-                None
-            },
+            border_color_override: mode_accent.map(|accent| {
+                crate::render::color::blend_color(theme.bg_base, accent, 0.4).unwrap_or(accent)
+            }),
             prefix_override: if let Some(p) = self.prompt_input_mode.prefix_override(&theme) {
                 Some(p)
             } else if casual_commenting
@@ -1111,6 +1115,12 @@ impl AgentView {
             1
         };
         let voice_recording_height = if voice_listening { 1 } else { 0 };
+        let model_notice = self.session.models.current_notice();
+        let model_notice_height = model_notice.as_ref().map_or(0, |notice| {
+            let text_width =
+                inner_width.saturating_sub(layout_cfg.block_pad_left + layout_cfg.block_pad_right);
+            crate::views::model_notice_banner::height(notice, text_width)
+        });
         let _tool_usage_height = 0u16;
         let btw_height =
             crate::views::btw_overlay::btw_panel_height(self.btw_state.as_ref(), inner_width);
@@ -1152,6 +1162,7 @@ impl AgentView {
             follow_ups_height,
             dock_height,
             prompt_gap,
+            model_notice_height,
             voice_recording_height,
             shortcuts_height: u16::from(show_shortcuts_bar),
             status_line_height: status_line.height(),
@@ -1428,37 +1439,27 @@ impl AgentView {
             }),
             dropdown_open,
         );
-        let short = crate::util::display_location_path(&self.session.cwd);
+        let location_path = self.location_path().to_string_lossy();
+        let location_path = crate::views::session_title::sanitize_display_text(&location_path);
+        let short = crate::util::display_location_path(std::path::Path::new(location_path.as_ref()));
         let cwd_style = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
         use unicode_width::UnicodeWidthStr;
         let mut parts: Vec<Span> = Vec::new();
         let mut path_offset: u16 = 0;
         let lazy_git = crate::git_info::cwd_git_info_lazy(&self.session.cwd);
-        let branch = self
-            .current_branch
-            .clone()
-            .or_else(|| lazy_git.as_ref().and_then(|i| i.branch.clone()));
+        let branch = self.current_branch.clone().or_else(|| lazy_git.as_ref().and_then(|i| i.branch.clone()));
         let git_text = branch.map(|b| {
             let icon = crate::git_info::branch_icon();
-            if b.is_empty() {
-                format!("{icon} {}", xai_grok_i18n::t("git.detached"))
-            } else {
-                format!("{icon} {b}")
-            }
+            if b.is_empty() { format!("{icon} {}", xai_grok_i18n::t("git.detached")) } else { format!("{icon} {b}") }
         });
         if let Some(git_text) = git_text {
-            let git_style = Style::default()
-                .fg(theme.text_primary)
-                .bg(theme.bg_base)
-                .add_modifier(ratatui::style::Modifier::DIM);
+            let git_style = Style::default().fg(theme.text_primary).bg(theme.bg_base).add_modifier(ratatui::style::Modifier::DIM);
             path_offset += git_text.width() as u16;
             parts.push(Span::styled(git_text, git_style));
             path_offset += 1;
             parts.push(Span::styled(" ", Style::default().bg(theme.bg_base)));
         }
-        let show_worktree_label = self.is_worktree
-            || self.session.is_worktree
-            || lazy_git.as_ref().is_some_and(|i| i.is_worktree);
+        let show_worktree_label = self.is_worktree || self.session.is_worktree || lazy_git.as_ref().is_some_and(|i| i.is_worktree);
         if show_worktree_label {
             let label_style = Style::default().fg(theme.accent_user).bg(theme.bg_base);
             let worktree_label = xai_grok_i18n::t("actions.DashboardToggleWorktree.label");
@@ -1473,21 +1474,11 @@ impl AgentView {
             parts.push(Span::styled(sandbox_text, sandbox_style));
         }
         let path_width = short.width() as u16;
-        let path_style = if self.hit_cwd.hovered {
-            Style::default().fg(theme.text_primary).bg(theme.bg_base)
-        } else {
-            cwd_style
-        };
+        let path_style = if self.hit_cwd.hovered { Style::default().fg(theme.text_primary).bg(theme.bg_base) } else { cwd_style };
         parts.push(Span::styled(short.clone(), path_style));
-        let main_repo_display = self
-            .main_repo
-            .clone()
-            .or_else(|| lazy_git.as_ref().and_then(|i| i.main_repo.clone()));
+        let main_repo_display = self.main_repo.clone().or_else(|| lazy_git.as_ref().and_then(|i| i.main_repo.clone()));
         if let Some(main_repo) = main_repo_display {
-            let worktree_suffix = xai_grok_i18n::t_fmt(
-                "git.worktree_of",
-                &[("main_repo", main_repo.as_str())],
-            );
+            let worktree_suffix = xai_grok_i18n::t_fmt("git.worktree_of", &[("main_repo", main_repo.as_str())]);
             parts.push(Span::styled(format!(" {worktree_suffix}"), cwd_style));
         }
         let cwd_line = Line::from(parts);
@@ -1504,7 +1495,10 @@ impl AgentView {
         });
         let location_budget = left_budget.saturating_sub(upgrade_reserve);
         let mut location: Vec<Span> = Vec::new();
-        let lazy_git = crate::git_info::cwd_git_info_lazy(&self.session.cwd);
+        let probe_local_git = true;
+        let lazy_git = probe_local_git
+            .then(|| crate::git_info::cwd_git_info_lazy(&self.session.cwd))
+            .flatten();
         let branch = self
             .current_branch
             .clone()
@@ -2138,14 +2132,7 @@ impl AgentView {
                         .tracker
                         .running_execute_tool_call_id()
                         .is_some();
-                let is_pending_user_input = matches!(
-                    self.blocking_card(),
-                    Some(
-                        BlockingCard::Permission
-                            | BlockingCard::Question
-                            | BlockingCard::McpElicitation
-                    )
-                );
+                let is_pending_user_input = self.is_awaiting_user_answer();
                 let goal_verifying = self
                     .goal_state
                     .as_ref()
@@ -2279,6 +2266,17 @@ impl AgentView {
             }
         }
         self.draw_plugin_cta(buf, layout.plugin_cta, &theme);
+        if let Some(notice) = &model_notice {
+            let row = layout.model_notice;
+            let inset = Rect {
+                x: row.x.saturating_add(layout_cfg.block_pad_left),
+                width: row
+                    .width
+                    .saturating_sub(layout_cfg.block_pad_left + layout_cfg.block_pad_right),
+                ..row
+            };
+            crate::views::model_notice_banner::render(inset, buf, notice);
+        }
         if voice_listening && layout.voice_recording.height > 0 && layout.voice_recording.width > 0
         {
             let rec_area = layout.voice_recording;
@@ -2348,7 +2346,7 @@ impl AgentView {
             .plan_approval_view
             .as_ref()
             .is_some_and(|pav| pav.focus == PlanApprovalFocus::Commenting);
-        let plan_label: Option<&str> = if effective_plan || casual_commenting {
+        let mode_label: Option<&str> = if effective_plan || casual_commenting {
             let commenting_range: Option<&std::ops::Range<usize>> = if approval_is_commenting {
                 self.plan_approval_view
                     .as_ref()
@@ -2383,17 +2381,26 @@ impl AgentView {
             self.published_mode_label()
         };
         let flags: Vec<PromptFlag> =
-            mode_flags(plan_label, self.session.permission_label(), &theme);
+            mode_flags(mode_label, self.session.permission_label(), &theme);
         let multiline = self.multiline_mode;
-        let model_label = match self.session.models.reasoning_effort {
-            Some(eff) => format!("{model_id} ({eff})"),
-            None => model_id,
-        };
+        let warning = self.credit_balance.as_ref().and_then(|bal| {
+            crate::views::credit_bar::usage_warning_for_session(
+                bal,
+                self.auto_topup.as_ref(),
+                self.billing_surface_visible,
+                self.chat_kind,
+            )
+        });
+        let usage_warning_text: Option<String> = warning.as_ref().map(|(t, _)| t.clone());
+        let usage_warning = usage_warning_text.as_deref();
+        let usage_warning_critical = warning.is_some_and(|(_, critical)| critical);
         let info = match &self.prompt_mode {
             PromptMode::Normal => PromptInfo {
                 model_name: &model_label,
                 flags: &flags,
                 multiline,
+                usage_warning,
+                usage_warning_critical,
             },
             PromptMode::EditingQueued { id, .. } => {
                 let pos = self.session.queue_position(*id).map(|i| i + 1).unwrap_or(1);
@@ -2407,6 +2414,8 @@ impl AgentView {
                     model_name: &editing_label,
                     flags: &flags,
                     multiline,
+                    usage_warning,
+                    usage_warning_critical,
                 }
             }
         };
@@ -2415,6 +2424,8 @@ impl AgentView {
                 model_name: label,
                 flags: &[],
                 multiline: false,
+                usage_warning: None,
+                usage_warning_critical: false,
             }
         } else {
             info
@@ -3321,6 +3332,8 @@ impl AgentView {
                 .is_some_and(|p| p.focus != PlanApprovalFocus::Preview);
             let overlay_bottom = if layout.turn_status.height > 0 {
                 layout.turn_status.y
+            } else if layout.model_notice.height > 0 {
+                layout.model_notice.y
             } else if layout.voice_recording.height > 0 {
                 layout.voice_recording.y
             } else {

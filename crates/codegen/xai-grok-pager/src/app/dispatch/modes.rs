@@ -498,9 +498,7 @@ pub(super) fn permission_mode_toast(kind: crate::app::actions::PermissionModeKin
         PermissionModeKind::AlwaysApprove => yolo_toast(true),
         PermissionModeKind::Auto => xai_grok_i18n::t("toast.permission_mode_auto").to_string(),
         PermissionModeKind::Ask => xai_grok_i18n::t("toast.permission_mode_ask").to_string(),
-        PermissionModeKind::Default => {
-            xai_grok_i18n::t("toast.permission_mode_default").to_string()
-        }
+        PermissionModeKind::Default => xai_grok_i18n::t("toast.permission_mode_default").to_string(),
     }
 }
 
@@ -909,7 +907,13 @@ fn mode_choices(
 ) -> Vec<(ModeChoice, String)> {
     let mut choices = published_mode_choices(agent);
     if choices.is_empty() {
-        choices = builtin_mode_choices(auto_gate);
+        choices = vec![
+            (ModeChoice::Session(SessionMode::Default), "Normal".into()),
+            (ModeChoice::Session(SessionMode::Plan), "Plan".into()),
+        ];
+    }
+    if auto_gate {
+        choices.push((ModeChoice::Auto, "Auto-review".into()));
     }
     choices.push((
         ModeChoice::AlwaysApprove,
@@ -941,7 +945,6 @@ fn builtin_mode_choices(auto_gate: bool) -> Vec<(ModeChoice, String)> {
     }
     choices
 }
-
 /// The next choice, plus the warning when policy refuses Always-Approve.
 fn next_choice<'a>(
     choices: &'a [(ModeChoice, String)],

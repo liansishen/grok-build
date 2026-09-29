@@ -218,7 +218,7 @@ Drafts 标签页：
 | `Ctrl+O` | 智能体界面 | 切换始终批准（YOLO）模式 |
 | `F3` | 智能体界面 | 打开会话选择器（恢复之前的会话，等同于 `/resume`） |
 | `Ctrl+;`（替代：`Ctrl+'`） | 智能体界面 | 切换提示队列面板（非空时）。仅限**本地 macOS** VS Code 系列：主按键为 **`Ctrl+4`**（`;` / `'` 仍为替代键）。SSH 和非 Mac 仍使用 **`Ctrl+;`** / **`Ctrl+'`**。 |
-| `Shift+Tab` | 提示框聚焦 | 循环切换模式（Normal → Plan → Auto（启用时）→ Always-approve） |
+| `Shift+Tab` | 提示框聚焦 | 循环切换模式（Normal → Plan → Auto-review（启用时）→ Always-approve） |
 | `Ctrl+B` | 智能体界面 | 将正在运行的前台命令发送到后台 |
 | `Ctrl+T` | 智能体界面 | 切换 todos 面板 |
 | `Ctrl+G` | 智能体界面（完整 TUI） | 切换任务面板 |

@@ -71,7 +71,9 @@ pub(crate) fn handle_mcp_elicit(
         .as_ref()
         .is_none_or(|ev| ev.tool_call_id != ext_req.tool_call_id);
 
-    if let Some(mut old) = agent.elicitation_view.take() {
+    if let Some(mut old) =
+        agent.take_unanswered_elicitation(crate::app::agent_view::UnansweredElicitation::Superseded)
+    {
         if let Some(old_tx) = old.take_response_tx() {
             cancel_elicitation_request(old_tx);
         }

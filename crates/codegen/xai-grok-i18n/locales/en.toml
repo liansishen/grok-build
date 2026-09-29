@@ -1593,7 +1593,7 @@
 "modal.tutorial" = "Tutorial"
 "modal.view_plan" = "View Plan"
 "mode.flag.always_approve" = "always-approve"
-"mode.flag.auto" = "auto"
+"mode.flag.auto" = "auto-review"
 "mode.flag.commenting" = "commenting"
 "mode.flag.commenting_line" = "commenting L{n}"
 "mode.flag.commenting_range" = "commenting L{start}-{end}"
@@ -2964,7 +2964,7 @@
 "toast.nothing_to_jump" = "Nothing to jump to yet"
 "toast.opening_app" = "Opening in default app…"
 "toast.permission_mode_ask" = "✓ Permission mode: Ask"
-"toast.permission_mode_auto" = "✓ Permission mode: Auto (classifier)"
+"toast.permission_mode_auto" = "✓ Permission mode: Auto-review"
 "toast.permission_mode_default" = "✓ Permission mode: Default"
 "toast.plan_feedback_sent" = "Plan feedback sent."
 "toast.plan_mode" = "Plan mode"
@@ -5069,7 +5069,7 @@ help = "Moves focus from the prompt to the scrollback so you can navigate the tr
 help = "Interrupts the agent's current turn and stops generation, keeping the session open.\nCtrl+C cancels when the prompt is empty; with a non-empty draft it clears the prompt first and leaves the turn running.\nEsc never cancels a turn; pressed mid-turn it shows a reminder to use Ctrl+C.\nIt stops the turn, not the app; use the quit shortcut to exit."
 
 [actions.CycleMode]
-help = "Steps the session mode: Normal -> Plan -> Always-Approve -> Normal.\nPlan keeps the agent planning first and writes no files; Always-Approve runs every tool call without asking.\nCtrl+O toggles auto-approve directly."
+help = "Steps the session mode: Normal -> Plan -> Auto-review (when enabled) -> Always-Approve -> Normal.\nPlan keeps the agent planning first and writes no files; Auto-review has a classifier approve safe tool calls; Always-Approve runs every tool call without asking.\nCtrl+O toggles auto-approve directly."
 
 [actions.ToggleTodos]
 help = "Shows or hides the todo pane: the agent's live task checklist for the current work.\nWatch what it plans to do and what's left as the turn runs.\nA side pane; toggle it off to reclaim width."
@@ -5088,7 +5088,7 @@ label = "stash"
 
 description = "Stash / pop prompt draft"
 
-help = "Stash your current prompt as a draft.\nCtrl+S sets the draft aside and clears the composer. Ctrl+S on an empty composer restores it, as does Ctrl+Z pressed right after the stash. The draft also restores by itself after you send your next prompt. Use Alt+S if your terminal swallows Ctrl+S.\nOne draft at a time: a new stash replaces the old one."
+help = "Stash your current prompt as a draft.\nCtrl+S sets the draft aside and clears the composer. Ctrl+S on an empty composer pops the draft back (unstash), as does Ctrl+Z pressed right after the stash. The draft also restores by itself after you send your next prompt. Use Alt+S if your terminal swallows Ctrl+S.\nOne draft at a time: a new stash replaces the old one."
 
 [actions.BashMode]
 help = "Runs a shell command without leaving the chat: type ! at the start of an empty prompt, then the command.\nThe command output is captured into the scrollback.\nDelete the leading ! to go back to a normal prompt."
@@ -5173,3 +5173,32 @@ fallback = "subagent"
 label = "Subagent model inheritance"
 
 description = "On: Grok cannot set models for subagents\nOff: Grok may choose a different model for a subagent. Takes effect after restart.\nNOTE: This setting only applies when all models are xAI \"model_family\". You likely don't need to configure this setting."
+
+[usage.session]
+model_row_tokens = "    {model}: {tokens} Tokens · {cost}"
+
+model_row_tokens_no_cost = "    {model}: {tokens} Tokens"
+
+[session]
+context_window_set_failed = "Couldn't set context window to {window}: {error}"
+
+context_window_set = "Context window set to {window}"
+
+context_window_applies_after_start = "Context window applies once the session starts; run /context-window then"
+
+load_failed_notice = "This session didn't open. Open it again with /resume, or start a new one with /new."
+[agents.badge]
+plugin = " plugin "
+
+[voice]
+transcribing_toast = "Voice: still transcribing the last recording… (Esc to discard)"
+
+[cli.update]
+installed_run = "Update installed. Run `{grok}` to start."
+
+incomplete_retry_run = "Update did not complete. Run `{grok} update` to retry."
+
+[turn.wait]
+waiting_for_subagent = "Waiting for subagent"
+
+waiting_for_subagents = "Waiting for {n} subagents"

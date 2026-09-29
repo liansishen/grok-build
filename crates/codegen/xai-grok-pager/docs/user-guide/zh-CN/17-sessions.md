@@ -187,15 +187,11 @@ Yes, and don't ask again / No）。“Yes, and don't ask again”会关闭该设
 
 ```
 /compact
-/compact [context]
 ```
-
-可选的 `context` 参数允许你提供关于压缩期间应保留哪些内容的附加说明。
 
 ### 自动压缩
 
-当上下文窗口接近上限时，Grok 会自动压缩对话。自动压缩触发时你会看到通知。模型
-配置中的 `context_window` 设置控制达到此阈值的时机。
+当上下文窗口接近上限时，Grok 会自动压缩对话。自动压缩触发时你会看到通知。模型配置中的 `context_window` 设置控制达到此阈值的时机。用 `[session] auto_compact_threshold_percent` 调整触发点。若要用**同一提供商**下的另一个模型 id 生成压缩摘要，设置 `[model.<id>] compaction_model`（留空或未设置则使用会话模型）。
 
 ---
 
@@ -336,6 +332,8 @@ Worktree 会话在内部通过 `x.ai/git/worktree/*` 扩展方法管理。关键
 - **Remove**：会话结束后清理 worktree
 
 使用 `grok -w -r <session-id>` 在新的 worktree 中恢复会话。
+
+`grok worktree create [NAME]` 会创建与 `grok -w [NAME]` 相同的 worktree，但不启动会话。它只把会话本会打开的目录打印到 stdout，因此 `cd "$(grok worktree create my-fix)"` 可用。默认从 HEAD 开始并复制未提交的改动。传入 `--ref <ref>` 则从某分支、标签或提交的干净检出开始。如果新 worktree 里没有你运行命令时所在的目录（例如 `--ref` 检出早于该目录，或目录被忽略），命令会打印 worktree 根目录。
 
 ### 管理 Grove 重定向
 

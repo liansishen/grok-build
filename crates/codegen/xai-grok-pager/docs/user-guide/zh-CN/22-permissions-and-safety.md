@@ -99,11 +99,11 @@ grok -p "Deploy the service" --always-approve --deny 'Bash(rm -rf *)'
 
 Deny 始终优先于 allow，也优先于 always-approve 的常规直通行为。参见[配置权限](#configuring-permissions)。
 
-### Auto 模式
+### Auto-review 模式
 
-在许多工具调用运行前先进行检查，以减少交互提示。日常本地工作通常会继续；其他调用可能被阻止或升级。在非交互会话中，被阻止的调用会失败并报告给模型（例如 Auto mode blocked this action …）。grok -p、agent stdio 和 agent serve 的行为相同。
+`permission_mode = "auto"`、`/auto` 或 `Shift+Tab`。在许多工具调用运行前先进行检查，以减少交互提示。日常本地工作通常会继续。分类器不会自动放行的调用会弹出权限提示，供你允许或拒绝。在非交互会话中（`grok -p`、未标识的 stdio），同样的调用会失败并报告给模型（例如 `Auto mode blocked this action …`）。
 
-若自动化必须在无交互批准的情况下运行工具，请使用 always-approve（如需硬阻止则添加 deny 规则），不要只使用 auto。
+若自动化必须在无交互批准的情况下运行工具，请使用 always-approve（如需硬阻止则添加 deny 规则），不要只使用 Auto-review。
 
 ### 禁用 Always-approve（管理员）
 

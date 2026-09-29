@@ -494,6 +494,14 @@ impl SessionEvent {
             SessionEvent::RequestFailed {
                 headline, detail, ..
             } => crate::app::error_display::banner_message(headline, detail),
+            SessionEvent::ReAuthRequired
+                if !xai_grok_config::Distribution::current()
+                    .allows(xai_grok_config::Capability::AccountLogin) =>
+            {
+                "Authentication failed: the model endpoint rejected this build's credential. \
+                 Check its key, then resend your message."
+                    .to_string()
+            }
             SessionEvent::ReAuthRequired => {
                 xai_grok_i18n::t("session.reauth_required").to_string()
             }
@@ -565,7 +573,7 @@ impl SessionEvent {
             SessionEvent::PlanModeEnteredByAgent { permission } => {
                 xai_grok_i18n::t_fmt(
                     "session.plan_mode_entered_by_agent",
-                    &[("permission", permission.as_canonical())],
+                    &[("permission", permission.display_name())],
                 )
             }
             SessionEvent::PlanReviewClosed {
@@ -578,7 +586,7 @@ impl SessionEvent {
                 };
                 xai_grok_i18n::t_fmt(
                     "session.plan_review_closed",
-                    &[("verdict", verdict), ("permission", permission.as_canonical())],
+                    &[("verdict", verdict), ("permission", permission.display_name())],
                 )
             }
         }
@@ -1407,7 +1415,7 @@ mod tests {
                     outcome: PlanReviewOutcome::Approved,
                     permission: PermissionLabel::Auto,
                 },
-                "Plan approved · plan mode off · active permission mode: auto",
+                "Plan approved · plan mode off · active permission mode: auto-review",
             ),
             (
                 SessionEvent::PlanReviewClosed {

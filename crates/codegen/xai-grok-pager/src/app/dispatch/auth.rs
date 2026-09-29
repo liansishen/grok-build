@@ -1,6 +1,6 @@
 //! Login, logout, account switching, and auth-code submission dispatchers.
 
-use super::ctx::{restore_auth_return_view, show_welcome};
+use super::ctx::{refuse_withheld, restore_auth_return_view, show_welcome};
 use super::queue::{maybe_drain_queue, note_peek_page_flip};
 use super::router::dispatch;
 use super::session::lifecycle::{clear_startup_actions, drain_startup_actions};
@@ -10,6 +10,7 @@ use crate::app::agent_view::AgentView;
 use crate::app::app_view::{ActiveView, AppView, AuthMode, AuthState};
 use crate::scrollback::block::RenderBlock;
 use crate::scrollback::blocks::SessionEvent;
+use xai_grok_config::Capability;
 
 // ---------------------------------------------------------------------------
 // Auth dispatch
@@ -17,6 +18,9 @@ use crate::scrollback::blocks::SessionEvent;
 
 /// `/logout` -- ask the shell to clear auth, then return to the login screen.
 pub(super) fn dispatch_logout(app: &mut AppView) -> Vec<Effect> {
+    if refuse_withheld(app, Capability::AccountLogin) {
+        return vec![];
+    }
     app.usage_visible = false;
     // The single visible→hidden transition below owns the billing-generation bump and also sets the
     // controller's surface flag, so logout clears the account state without a second bump.
@@ -26,6 +30,7 @@ pub(super) fn dispatch_logout(app: &mut AppView) -> Vec<Effect> {
     app.auto_topup = None;
     app.sync_billing_cache_to_agents();
     app.sync_billing_surface_to_agents();
+    app.logout_pending = true;
     vec![Effect::Logout]
 }
 
@@ -94,6 +99,9 @@ fn abort_prior_auth(app: &mut AppView) {
 
 /// Log out, then start a new login flow in a single sequential task.
 pub(super) fn dispatch_switch_account(app: &mut AppView) -> Vec<Effect> {
+    if refuse_withheld(app, Capability::AccountLogin) {
+        return vec![];
+    }
     ensure_login_method(app);
 
     let Some(method_id) = app.login_method_id.clone() else {
@@ -237,17 +245,14 @@ pub(super) fn strip_trailing_auth_error_blocks(agent: &mut AgentView) {
     }
 }
 
-/// Start an interactive login flow. Triggered by pressing 'l' on the
-/// welcome screen or by the `/login` slash command.
-///
-/// When invoked mid-session (the active view is an agent/dashboard rather
-/// than the welcome screen), the auth UI — including the external auth
-/// provider's sign-in URL and status — is only rendered by the welcome
-/// view. We therefore stash the caller's view in `auth_return_view` and
-/// switch to `Welcome` so the flow is actually visible; the prior view is
-/// restored once auth completes or is cancelled. Without this, `/login`
-/// with an external auth provider configured appeared to do nothing.
+/// Start an interactive login flow. Triggered by pressing 'l' on the welcome screen or by the `/login` slash command.
+/// Only the welcome view renders the auth UI (the external auth provider's sign-in URL and status).
+/// A mid-session invocation therefore stashes the caller's view in `auth_return_view` and switches to `Welcome` so the flow is visible.
+/// A build without account logins refuses it from every surface: a slash command, a menu, startup.
 pub(super) fn dispatch_login(app: &mut AppView) -> Vec<Effect> {
+    if refuse_withheld(app, Capability::AccountLogin) {
+        return vec![];
+    }
     ensure_login_method(app);
     let Some(method_id) = app.login_method_id.clone() else {
         app.auth_state = AuthState::Pending {

@@ -1,22 +1,14 @@
 //! `/debug` — debug-overlay toggles (scroll HUD, FPS HUD, scroll log).
 //!
-//! Registration/visibility split: the command is registered on EVERY binary
-//! and fully functional in release — like the hidden diagnostics it fronts
-//! (`/scroll-debug`, `/gboom`) — but it is LISTED (dropdown, completion,
-//! recognized-token highlight via `visible()`) only on debug binaries
-//! (`cfg(debug_assertions)`). Discoverable where developers live, out of
-//! sight for users, yet still typeable in the field when support asks.
+//! The command is registered on every binary and fully functional in release, like the hidden diagnostic `/gboom`.
+//! It is listed (dropdown, completion, recognized-token highlight via `visible()`) only on debug binaries (`cfg(debug_assertions)`).
+//! Release users never see it in a menu, but support can still ask them to type it.
 //!
 //! Subcommands (args-based; a popup menu can come later):
-//! - `/debug` bare — print the toggles and their state to the transcript.
-//! - `/debug scroll` — the scroll-diagnostics HUD; same
-//!   [`Action::ToggleScrollDebugHud`] as `/scroll-debug`, which stays
-//!   registered as the hidden long-form alias.
-//! - `/debug fps` — the release-safe FPS HUD
-//!   ([`crate::views::fps_hud`]).
-//! - `/debug log` — the scroll flight recorder
-//!   ([`crate::input::scroll_log`]), runtime-constructed to a fresh
-//!   timestamped path.
+//! - `/debug` bare: print the toggles and their state to the transcript.
+//! - `/debug scroll`: the scroll-diagnostics HUD ([`Action::ToggleScrollDebugHud`]).
+//! - `/debug fps`: the release-safe FPS HUD ([`crate::views::fps_hud`]).
+//! - `/debug log`: the scroll flight recorder (`input::scroll_log` in xai-grok-pager-render), constructed at runtime to a fresh timestamped path.
 
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
@@ -108,7 +100,6 @@ impl SlashCommand for DebugCommand {
 mod tests {
     use super::*;
     use crate::acp::model_state::ModelState;
-    use crate::slash::commands::scroll_debug::ScrollDebugCommand;
     use crate::slash::commands::tests::make_ctx;
 
     fn app_ctx(models: &ModelState) -> AppCtx<'_> {
@@ -143,22 +134,6 @@ mod tests {
             "visible() must track the binary profile"
         );
         assert_eq!(listed, LISTED_IN_COMPLETIONS);
-    }
-
-    /// `/debug scroll` and `/scroll-debug` must stay routed to the SAME
-    /// action — the HUD has one toggle, two spellings.
-    #[test]
-    fn debug_scroll_routes_to_same_action_as_scroll_debug() {
-        let models = ModelState::default();
-        let mut ctx = make_ctx(&models);
-        assert!(matches!(
-            DebugCommand.run(&mut ctx, "scroll"),
-            CommandResult::Action(Action::ToggleScrollDebugHud)
-        ));
-        assert!(matches!(
-            ScrollDebugCommand.run(&mut ctx, ""),
-            CommandResult::Action(Action::ToggleScrollDebugHud)
-        ));
     }
 
     #[test]

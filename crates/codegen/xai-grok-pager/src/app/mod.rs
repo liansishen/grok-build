@@ -47,6 +47,7 @@ pub(crate) mod status_line;
 mod status_line_policy;
 pub mod subagent;
 pub mod subscription;
+pub(crate) mod voice_state;
 pub(crate) mod worktree_session;
 pub(crate) use dispatch::dashboard_stop_readiness;
 /// Display-refresh probe + motion cadence + terminal telemetry at startup.
@@ -54,7 +55,7 @@ mod display_refresh_startup;
 pub(crate) mod effects;
 pub(crate) mod error_display;
 mod x10_filter;
-pub(crate) use effects::{cancel_notification_meta, sanitize_user_error};
+pub(crate) use effects::{CancelMeta, cancel_notification_meta, sanitize_user_error};
 mod event_loop;
 mod event_loop_stall;
 mod exit_timeout;
@@ -309,16 +310,34 @@ pub(crate) fn voice_mode_requirement_pin() -> Option<bool> {
 pub(crate) fn voice_mode_config_value() -> Option<bool> {
     voice_mode_in(&xai_grok_shell::config::load_effective_config().ok()?)
 }
-/// The registry owns the precedence and the default. One rule has no row there:
-/// with `is_api_key`, a remote-only off is forced back on. A requirement, env,
-/// or config `false` still wins.
+/// The registry owns the precedence and the default.
+/// One rule has no row there: with `is_api_key`, a remote-only off is forced back on.
+/// A requirement, env, or config `false` still wins, and so does a distribution without voice.
 pub(crate) fn resolve_voice_mode_enabled(
     requirement: Option<bool>,
     config: Option<bool>,
     remote: Option<bool>,
     is_api_key: bool,
 ) -> bool {
+    resolve_voice_mode_enabled_as(
+        xai_grok_config::Distribution::current(),
+        requirement,
+        config,
+        remote,
+        is_api_key,
+    )
+}
+fn resolve_voice_mode_enabled_as(
+    distribution: xai_grok_config::Distribution,
+    requirement: Option<bool>,
+    config: Option<bool>,
+    remote: Option<bool>,
+    is_api_key: bool,
+) -> bool {
     use xai_grok_shell::agent::config::{ConfigSource, Feature, FeatureSources};
+    if !distribution.allows(xai_grok_config::Capability::Voice) {
+        return false;
+    }
     let resolved = Feature::VoiceMode.resolve(FeatureSources {
         pin: requirement,
         config,
@@ -341,7 +360,27 @@ pub(crate) fn resolve_voice_mode_live(remote: Option<bool>, is_api_key: bool) ->
 }
 #[cfg(test)]
 mod voice_gate_tests {
-    use super::resolve_voice_mode_enabled;
+    use super::{resolve_voice_mode_enabled, resolve_voice_mode_enabled_as};
+    use xai_grok_config::Distribution;
+    #[test]
+    fn a_distribution_without_voice_outranks_every_tier_and_the_api_key_force_on() {
+        for remote in [None, Some(false), Some(true)] {
+            assert!(!resolve_voice_mode_enabled_as(
+                Distribution::withholding(&[xai_grok_config::Capability::Voice]),
+                Some(true),
+                Some(true),
+                remote,
+                true
+            ));
+        }
+        assert!(resolve_voice_mode_enabled_as(
+            Distribution::STOCK,
+            None,
+            None,
+            Some(false),
+            true
+        ));
+    }
     #[test]
     fn api_key_force_on_over_remote_kill_only() {
         assert!(resolve_voice_mode_enabled(None, None, Some(false), true));
@@ -642,10 +681,14 @@ struct ConnectFailure {
     timeout_secs: Option<u64>,
     longest_step: Option<crate::acp::StartupPhase>,
 }
+/// Slice the connect wait so a launch-profile escalation can extend the budget
+/// without parking on the original timeout.
+const CONNECT_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
 /// Bound connect so a hung leader/spawn cannot blank-screen forever.
 async fn bounded_connect(
     cancel: &CancellationToken,
     timeout: std::time::Duration,
+    connect_ui_timeout_env: Option<&str>,
     target: crate::acp::AgentKind,
     attempt: startup_failure::ConnectAttempt,
     timer: &crate::acp::StartupTimer,
@@ -661,44 +704,70 @@ async fn bounded_connect(
         ),
         log_path: xai_grok_telemetry::unified_log::path(),
     };
-    tokio::select! {
-        biased;
-        () = cancel.cancelled() => Err(ConnectFailure {
-            outcome: StartupOutcome::Cancelled,
-            error: anyhow::Error::new(startup_failure::StartupFailure::cancelled(context())),
-            timeout_secs: None,
-            longest_step: None,
-        }),
-        connected = connect => connected.map_err(|error| ConnectFailure {
-            outcome: StartupOutcome::Error,
-            error,
-            timeout_secs: None,
-            longest_step: None,
-        }),
-        () = tokio::time::sleep(timeout) => {
-            let timings = timer.phase_snapshot();
-            let longest_step = timings.longest_step();
-            // `connect_target`: tracing reserves bare `target=`.
-            tracing::error!(
-                connect_target = target.label(),
-                stuck_in = timings.stuck_in(),
-                phases = %timings.summary(),
-                timeout_secs = timeout.as_secs(),
-                "connect timed out"
-            );
-            Err(ConnectFailure {
-                outcome: StartupOutcome::Timeout,
-                error: anyhow::Error::new(startup_failure::StartupFailure::timed_out(
-                    context(),
-                    // Measured, not the budget: a synchronous step can overrun it.
-                    timer.elapsed(),
-                    timings,
-                )),
-                timeout_secs: Some(timeout.as_secs()),
-                longest_step,
-            })
+    let started = std::time::Instant::now();
+    let mut deadline = started + timeout;
+    let mut connect = std::pin::pin!(connect);
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        let slice = remaining.min(CONNECT_POLL_INTERVAL);
+        tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(ConnectFailure {
+                outcome: StartupOutcome::Cancelled,
+                error: anyhow::Error::new(startup_failure::StartupFailure::cancelled(context())),
+                timeout_secs: None,
+                longest_step: None,
+            }),
+            connected = connect.as_mut() => {
+                return connected.map_err(|error| ConnectFailure {
+                    outcome: StartupOutcome::Error,
+                    error,
+                    timeout_secs: None,
+                    longest_step: None,
+                });
+            }
+            () = tokio::time::sleep(slice) => {
+                let profile = xai_grok_cloud_config::managed_config::startup_profile();
+                let floor = connect_timeout::resolve(connect_ui_timeout_env, profile);
+                let escalated = started + floor;
+                if escalated > deadline {
+                    tracing::info!(
+                        timeout_secs = floor.as_secs(),
+                        "connect budget extended after launch profile escalated to managed"
+                    );
+                    deadline = escalated;
+                }
+            }
         }
     }
+    let timings = timer.phase_snapshot();
+    let longest_step = timings.longest_step();
+    let timeout_secs = timeout.as_secs();
+    tracing::error!(
+        connect_target = target.label(),
+        stuck_in = timings.stuck_in(),
+        phases = %timings.summary(),
+        timeout_secs,
+        "connect timed out"
+    );
+    Err(ConnectFailure {
+        outcome: StartupOutcome::Timeout,
+        error: anyhow::Error::new(startup_failure::StartupFailure::timed_out(
+            context(),
+            timer.elapsed(),
+            timings,
+        )),
+        timeout_secs: Some(
+            deadline
+                .saturating_duration_since(started)
+                .as_secs()
+                .max(timeout_secs),
+        ),
+        longest_step,
+    })
 }
 /// Main entry point: connect to agent, init terminal, run event loop, restore.
 ///
@@ -1044,9 +1113,9 @@ pub async fn run(
     let connect_ui_timeout_env = std::env::var(connect_timeout::CONNECT_UI_TIMEOUT_ENV).ok();
     let connect_ui_timeout = connect_timeout::resolve(
         connect_ui_timeout_env.as_deref(),
-        xai_grok_shell::managed_config::startup_profile(),
+        xai_grok_cloud_config::managed_config::startup_profile(),
     );
-    if let Some(raw) = connect_ui_timeout_env {
+    if let Some(ref raw) = connect_ui_timeout_env {
         crate::unified_log::write_direct_info(
             "startup connect budget from env",
             Some(serde_json::json!({
@@ -1077,6 +1146,7 @@ pub async fn run(
     let connect_result = bounded_connect(
         &cancel,
         connect_ui_timeout,
+        connect_ui_timeout_env.as_deref(),
         primary_target,
         startup_failure::ConnectAttempt::First,
         &timer,
@@ -1102,6 +1172,7 @@ pub async fn run(
             let fallback = bounded_connect(
                 &cancel,
                 connect_ui_timeout,
+                connect_ui_timeout_env.as_deref(),
                 target,
                 startup_failure::ConnectAttempt::AfterFallback(startup_failure::EarlierAttempt {
                     target: primary_target,
