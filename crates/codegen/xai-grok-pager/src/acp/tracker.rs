@@ -92,9 +92,12 @@ pub fn clamp_activity_subject(s: &str) -> String {
 pub fn waiting_on_subagents_subject(n: usize) -> String {
     let n = n.max(1);
     if n == 1 {
-        "Waiting for subagent".to_string()
+        xai_grok_i18n::t("turn.wait.waiting_for_subagent").to_string()
     } else {
-        format!("Waiting for {n} subagents")
+        xai_grok_i18n::t_fmt(
+            "turn.wait.waiting_for_subagents",
+            &[("n", &n.to_string())],
+        )
     }
 }
 /// Shared in-progress subject label (clamped description/command) used by turn-status, title bar, and dashboard/subagent activity columns.

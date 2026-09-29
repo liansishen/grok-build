@@ -187,11 +187,11 @@ Yes, and don't ask again / No）。“Yes, and don't ask again”会关闭该设
 
 ```
 /compact
+```
 
 ### 自动压缩
 
-当上下文窗口接近上限时，Grok 会自动压缩对话。自动压缩触发时你会看到通知。模型
-配置中的 `context_window` 设置控制达到此阈值的时机。
+当上下文窗口接近上限时，Grok 会自动压缩对话。自动压缩触发时你会看到通知。模型配置中的 `context_window` 设置控制达到此阈值的时机。用 `[session] auto_compact_threshold_percent` 调整触发点。若要用**同一提供商**下的另一个模型 id 生成压缩摘要，设置 `[model.<id>] compaction_model`（留空或未设置则使用会话模型）。
 
 ---
 

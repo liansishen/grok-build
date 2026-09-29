@@ -1120,7 +1120,7 @@ impl AgentView {
             }
             TurnActivity::Waiting(WaitingReason::Subagent { .. }) => {
                 TurnActivity::Waiting(WaitingReason::Subagent {
-                    display: self.subagent_wait_subject(),
+                    display: Some(self.subagent_wait_subject()),
                 })
             }
             other => other,
@@ -1217,41 +1217,11 @@ impl AgentView {
             s.is_running() && !s.attempt.is_background && s.attempt.workflow_run_id.is_none()
         })
     }
-    /// Display subject for a foreground-subagent wait; `None` when no running child has a description.
-    fn subagent_wait_subject(&self) -> Option<String> {
-        use crate::acp::tracker::{MAX_ACTIVITY_SUBJECT_CHARS, clamp_activity_subject};
-        let mut running: Vec<_> = self.running_foreground_subagents().collect();
-        running.sort_by_key(|info| info.attempt.started_at);
-        let description = running.iter().find_map(|info| {
-            let (_, desc) = crate::app::subagent::parse_tag_prefix(info.description.trim());
-            let desc = clamp_activity_subject(desc);
-            (!desc.is_empty()).then_some(desc)
-        })?;
-        if running.len() > 1 {
-            let n = running.len();
-            return Some(budgeted_subject(
-                &xai_grok_i18n::t_fmt("session.subject.subagents", &[("count", &n.to_string())]),
-                &description,
-                &format!(" +{}", n - 1),
-            ));
-        }
-        let activity = running.first()
-            .and_then(|info| info.attempt.activity_label.as_deref())
-            .map(|label| label.trim_end_matches('…').trim())
-            .filter(|label| !label.is_empty());
-        match activity {
-            Some(activity) => {
-                let prefix = xai_grok_i18n::t("session.subject.subagent_prefix");
-                let suffix_head = xai_grok_i18n::t("session.subject.subagent_suffix");
-                // Localized copy can be wider or narrower than the English, so the affix budget is measured from the strings actually painted.
-                let subagent_affix_chars = prefix.width() + suffix_head.width();
-                const ACTIVITY_FLOOR: usize = 8;
-                let desc_claim = description.chars().count().min(MAX_ACTIVITY_SUBJECT_CHARS.saturating_sub(subagent_affix_chars + ACTIVITY_FLOOR));
-                let activity: String = activity.chars().take(MAX_ACTIVITY_SUBJECT_CHARS.saturating_sub(subagent_affix_chars + desc_claim)).collect();
-                Some(budgeted_subject(prefix, &description, &format!("{suffix_head}{activity}")))
-            }
-            None => Some(budgeted_subject(xai_grok_i18n::t("session.subject.subagent"), &description, "")),
-        }
+    /// Display subject for a foreground-subagent wait: `Waiting for subagent` or `Waiting for N subagents`.
+    fn subagent_wait_subject(&self) -> String {
+        crate::acp::tracker::waiting_on_subagents_subject(
+            self.running_foreground_subagents().count(),
+        )
     }
     /// Update context state with a full snapshot from live callers.
     ///

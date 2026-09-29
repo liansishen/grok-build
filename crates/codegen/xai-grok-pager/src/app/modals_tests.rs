@@ -59,7 +59,7 @@ fn arg_picker_effort_phase_opens_on_default_row() {
     );
 }
 
-/// Ctrl+M, then Enter twice on a multi-window reasoning model: model, then window, then the effort sub-menu.
+/// Alt+M, then Enter twice on a multi-window reasoning model: model, then window, then the effort sub-menu.
 #[test]
 fn arg_picker_chains_through_the_window_phase_to_effort() {
     let mut agent = make_agent();
@@ -81,7 +81,7 @@ fn arg_picker_chains_through_the_window_phase_to_effort() {
     let enter = Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
 
     agent.handle_input(
-        &Event::Key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::CONTROL)),
+        &Event::Key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::ALT)),
         &registry,
     );
     agent.handle_input(&enter, &registry);

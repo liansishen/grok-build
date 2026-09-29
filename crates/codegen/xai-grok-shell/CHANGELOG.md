@@ -1,6 +1,6 @@
 # Changelog
 
-# 1.0.45-fork.1 — 2026-09-29
+# 1.0.45-fork.1 — 2026-09-30
 
 同步上游 monorepo `97f190f6` / Source-Revision `f589e31cc17fbf9a41072a379dba4673f6aa0861`，产品版本随上游从 **1.0.41** 升至 **1.0.45**。发布范围覆盖上一版 `v1.0.41-fork.6` 之后的上游更新：1 个上游同步提交、962 个文件、+123822/−23019 行，以及吸收该更新所需的合并适配与本地化修复（51 个冲突文件、102 个冲突块，其中 18 个 cosmetic 块自动采用上游）。
 
@@ -24,6 +24,7 @@
 - 英文用户指南本批 9 处改动同步到简体中文：`/context-window`、Auto-review、MCP `bearer_token_file`、模型 notice、`features.file_acceleration`、memory_v2 batch dream 等。
 - 合并后 lockfile 带回的 `cc 1.2.48` 在 rustc 1.92 Windows 上无法编译：`find-msvc-tools` 把 `FILE_ATTRIBUTE_TEMPORARY` 定为 `i32`，而 1.92 的 `OpenOptionsExt::custom_flags` 要 `u32`。钉回上一版已验证的 `cc 1.4.7`（内部 `try_into`）。
 - 测试编译：pager `--lib` 去掉 `effects` 重复 `AgentId`、补上 `BillingRequestId`、欢迎页 `PromptInfo` 补齐 `usage_warning`；shell `--lib` 去掉合并留下的第二份 `test_model_entry`（缺 `cpa_management`）。
+- 合并留下的文案与测试对齐：目录 `mode.flag.auto` / `toast.permission_mode_auto` 改为 Auto-review；`CycleMode` / `StashPrompt` 帮助文案跟上游 `long_help`；子代理等待标签改为上游的计数形式并走目录；简体中文 `17-sessions.md` 补回 `/compact` 代码块结束标记；模型选择器测试按 fork 绑定用 Alt+M。
 
 ### 兼容性
 
@@ -32,7 +33,7 @@
 
 ### 国际化
 
-- 本版新增 10 个键（含上下文窗口消息、用量按模型行、会话打开失败通知、语音转写提示、插件 agent 徽章、更新完成后的重启提示），`en.toml` 与 `zh-CN.toml` 各从 4351 个键增至 4361 个键，两侧键集合与 `{placeholder}` 完全一致。
+- 本版新增 12 个键（含上下文窗口消息、用量按模型行、会话打开失败通知、语音转写提示、插件 agent 徽章、更新完成后的重启提示、子代理等待计数文案），并更新 Auto-review 与 `CycleMode`/`StashPrompt` 帮助文案共 4 个键。`en.toml` 与 `zh-CN.toml` 各从 4351 个键增至 4363 个键，两侧键集合与 `{placeholder}` 完全一致。
 
 ### 验证
 

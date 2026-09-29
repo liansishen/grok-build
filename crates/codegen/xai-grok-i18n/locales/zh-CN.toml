@@ -1594,7 +1594,7 @@
 "modal.tutorial" = "教程"
 "modal.view_plan" = "查看计划"
 "mode.flag.always_approve" = "始终批准"
-"mode.flag.auto" = "自动"
+"mode.flag.auto" = "自动审阅"
 "mode.flag.commenting" = "评论中"
 "mode.flag.commenting_line" = "评论 L{n}"
 "mode.flag.commenting_range" = "评论 L{start}-{end}"
@@ -2964,7 +2964,7 @@
 "toast.nothing_to_jump" = "暂无可跳转内容"
 "toast.opening_app" = "正在用默认应用打开…"
 "toast.permission_mode_ask" = "✓ 权限模式：询问"
-"toast.permission_mode_auto" = "✓ 权限模式：自动"
+"toast.permission_mode_auto" = "✓ 权限模式：自动审阅"
 "toast.permission_mode_default" = "✓ 权限模式：默认"
 "toast.plan_feedback_sent" = "计划反馈已发送。"
 "toast.plan_mode" = "计划模式"
@@ -5059,7 +5059,7 @@ help = "把焦点从提示输入框移到回滚区，以便浏览对话记录。
 help = "中断 agent 当前的回合并停止生成，会话保持打开。\n提示为空时 Ctrl+C 会取消；草稿非空时它会先清空提示，回合继续运行。\nEsc 从不取消回合；在回合进行中按下只会提示你改用 Ctrl+C。\n它停止的是回合，不是应用；要退出请使用退出快捷键。"
 
 [actions.CycleMode]
-help = "依次切换会话模式：Normal -> Plan -> Always-Approve -> Normal。\nPlan 让 agent 先做计划且不写文件；Always-Approve 不经询问就执行每次工具调用。\nCtrl+O 可直接切换自动批准。"
+help = "依次切换会话模式：Normal -> Plan -> Auto-review（启用时）-> Always-Approve -> Normal。\nPlan 让 agent 先做计划且不写文件；Auto-review 由分类器批准安全的工具调用；Always-Approve 不经询问就执行每次工具调用。\nCtrl+O 可直接切换自动批准。"
 
 [actions.ToggleTodos]
 help = "显示或隐藏待办窗格：agent 针对当前工作的实时任务清单。\n在回合运行过程中查看它计划做什么、还剩什么。\n这是侧边窗格；关掉可收回宽度。"
@@ -5078,7 +5078,7 @@ label = "暂存"
 
 description = "暂存/取回提示草稿"
 
-help = "把当前提示暂存为草稿。\nCtrl+S 会把草稿放到一边并清空输入框。在空的输入框上按 Ctrl+S 可恢复它，暂存后立刻按 Ctrl+Z 也可以。发送下一条提示后，草稿也会自行恢复。如果你的终端吞掉了 Ctrl+S，请改用 Alt+S。\n一次只能有一份草稿：新的暂存会替换掉旧的。"
+help = "把当前提示暂存为草稿。\nCtrl+S 会把草稿放到一边并清空输入框。在空的输入框上按 Ctrl+S 可取回草稿（unstash），暂存后立刻按 Ctrl+Z 也可以。发送下一条提示后，草稿也会自行恢复。如果你的终端吞掉了 Ctrl+S，请改用 Alt+S。\n一次只能有一份草稿：新的暂存会替换掉旧的。"
 
 [actions.BashMode]
 help = "不必离开对话即可运行 shell 命令：在空提示的开头输入 !，然后输入命令。\n命令输出会采集到回滚区。\n删掉开头的 ! 即可回到普通提示。"
@@ -5187,3 +5187,8 @@ transcribing_toast = "语音：仍在转写上一段录音…（Esc 丢弃）"
 installed_run = "更新已安装。请运行 `{grok}` 启动。"
 
 incomplete_retry_run = "更新未完成。请运行 `{grok} update` 重试。"
+
+[turn.wait]
+waiting_for_subagent = "等待子代理"
+
+waiting_for_subagents = "等待 {n} 个子代理"
