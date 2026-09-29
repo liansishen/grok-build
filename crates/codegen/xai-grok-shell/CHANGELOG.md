@@ -1,5 +1,44 @@
 # Changelog
 
+# 1.0.45-fork.2 — 2026-09-30
+
+同步上游 monorepo `2bdd1d6a` / Source-Revision `559751fdcec02d413e4c57c8832ab275e4f44980`。产品版本维持 **1.0.45**；相对 `v1.0.45-fork.1`，本次吸收 1 个上游同步提交（68 个文件，+6184/−5369 行），并处理 4 处 fork 合并冲突。
+
+### 上游更新
+
+- **Claude 设置导入**：将导入、转换、写入和报告逻辑抽出到 `xai-grok-external-agent-migration`；弹窗和 shell 改用新 crate，继续支持按条目审阅和导入权限、MCP、hooks 等配置。
+- **配置与权限**：把 `requirements.toml` 的各配置段解析为类型化设置；相对路径权限规则同时按实际工作目录与词法路径匹配。文件夹信任与工作树权限逻辑集中到 `xai-grok-permission-rules`。
+- **远程设置**：模型目录的预取、缓存与提交逻辑进一步迁到 `xai-grok-cloud-config`，保留请求期间配置或身份变化时的缓存判定。
+
+### 本 Fork
+
+- 合并 4 处冲突：导入弹窗的 allow / deny / ask 标签继续使用现有英中翻译；发送插话失败时保留上游拒绝详情，并经现有本地化键显示；手动 `/compact` 的错误详情清理逻辑继续适配类型化错误；预取模型项继续填充 fork 的 `cpa_management` 字段。
+- `Cargo.lock` 保留与 Rust 1.92 Windows 构建兼容的 `cc 1.4.7`，以及 fork 的 `pulldown-cmark` git pin；`SOURCE_REV` 更新为这次上游修订。
+
+### 兼容性
+
+- 发布标签 `v1.0.45-fork.2` 与 `crates/codegen/xai-grok-version/Cargo.toml` 的产品版本 `1.0.45` 匹配；原有配置和翻译目录保持可用。
+
+### 国际化
+
+- 本次没有新增 fork 翻译键；英文与简体中文目录均保持 4363 个键。Claude 导入弹窗标签和插话错误复用现有翻译，目录配对和当前源码/Markdown 覆盖审计通过。
+
+### 验证
+
+本地使用 Rust 1.92.0、Protoc 29.3、`GROK_VERSION=1.0.45-fork.2` 和 `--locked`：
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin` 与 `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；合并提交本地二进制显示 `grok 1.0.45-fork.2 (9244188645d2) [fork]`。
+- shell 库 7065 项、workspace 库 2089 项、sampler 库 271 项和新导入 crate 24 项测试通过；i18n 库 14 项、`i18n_audit` 16 项通过；catalog 与 `LOCAL-PATCH` 登记检查通过。
+- pager 库 10362 项通过；本机 `fs_size::tests::later_sibling_is_visited_after_another_filesystem` 仍因文件系统目录枚举顺序失败，属于此前已记录的本机漂移。Linux/Windows CI 进一步验证发布源。
+
+### 产物
+
+- `grok-1.0.45-fork.2-linux-x86_64`
+- `grok-1.0.45-fork.2-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.45-fork.1...v1.0.45-fork.2
+
 # 1.0.45-fork.1 — 2026-09-30
 
 同步上游 monorepo `97f190f6` / Source-Revision `f589e31cc17fbf9a41072a379dba4673f6aa0861`，产品版本随上游从 **1.0.41** 升至 **1.0.45**。发布范围覆盖上一版 `v1.0.41-fork.6` 之后的上游更新：1 个上游同步提交、962 个文件、+123822/−23019 行，以及吸收该更新所需的合并适配与本地化修复（51 个冲突文件、102 个冲突块，其中 18 个 cosmetic 块自动采用上游）。
