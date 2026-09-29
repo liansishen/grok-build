@@ -22,6 +22,7 @@
   - 上游删除 `slash/commands/scroll_debug.rs`，`/debug scroll` 仍可切换 HUD。
   - 托管配置同步走 `xai_grok_cloud_config`，并保留 `t("update.managed_config.applied")`；更新烟测在上游 `probe_version` 之上保留 fork 版本匹配。
 - 英文用户指南本批 9 处改动同步到简体中文：`/context-window`、Auto-review、MCP `bearer_token_file`、模型 notice、`features.file_acceleration`、memory_v2 batch dream 等。
+- 合并后 lockfile 带回的 `cc 1.2.48` 在 rustc 1.92 Windows 上无法编译：`find-msvc-tools` 把 `FILE_ATTRIBUTE_TEMPORARY` 定为 `i32`，而 1.92 的 `OpenOptionsExt::custom_flags` 要 `u32`。钉回上一版已验证的 `cc 1.4.7`（内部 `try_into`）。
 
 ### 兼容性
 
