@@ -40,9 +40,7 @@ use crate::app::agent::AgentId;
 use crate::app::session_startup::stamp_span_traceparent;
 use crate::views::usage_modal::SessionInfoField;
 #[cfg(test)]
-use actions::PermissionModePersist;
-#[cfg(test)]
-use agent::AgentId;
+use actions::{BillingRequestId, PermissionModePersist};
 use crate::unified_log as ulog;
 use xai_grok_shell::sampling::error::http_status_from_error;
 use xai_grok_shell::sampling::types::{

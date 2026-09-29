@@ -8596,24 +8596,3 @@ fn external_auth_with_a_models_endpoint_ignores_model_tables_and_allowed_models(
         standard.models.allowed_models
     );
 }
-fn test_model_entry(
-    model: &str,
-    base_url: &str,
-    api_key: Option<&str>,
-    env_key: Option<&str>,
-    api_base_url: Option<&str>,
-) -> ModelEntry {
-    ModelEntry {
-        info: ModelInfo {
-            model: model.to_string(),
-            base_url: base_url.to_string(),
-            context_window: NonZeroU64::new(200_000).unwrap(),
-            ..Default::default()
-        },
-        mtls_cert_dir: None,
-        api_key: api_key.map(|s| s.to_string()),
-        env_key: env_key.map(EnvKeys::single),
-        auth_provider: None,
-        api_base_url: api_base_url.map(|s| s.to_string()),
-    }
-}
