@@ -207,6 +207,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `features.dock` | `boolean` | `pin` | `user` | 启用或禁用 `dock`；默认 false。也对应 `GROK_DOCK`。 |
 | `features.feedback` | `boolean` | `pin` | `user` | 启用或禁用反馈弹窗、`/feedback` 命令和 `send_feedback` 工具；默认 true。也对应 `GROK_FEEDBACK_ENABLED`。 |
 | `features.feedback_trace_card` | `boolean` | `pin` | `user` | `/feedback` 后显示跟踪上传同意问题；默认 false。也对应 `GROK_FEEDBACK_TRACE_CARD`。 |
+| `features.file_acceleration` | `boolean` | `pin` | `user` | 本机构建安装了文件加速器时，把本地会话的文件系统交给它。默认 false。也对应 `GROK_FILE_ACCELERATION`。 |
 | `features.image_edit_model_override` | `string` | `yes` | `user` | `image_edit` 使用的 Imagine 模型 ID。 |
 | `features.image_gen` | `boolean` | `pin` | `user` | 启用 `image_gen` / `/imagine`。 |
 | `features.image_gen_model_override` | `string` | `yes` | `user` | `image_gen` 使用的 Imagine 模型 ID；空值回退到远程默认值。 |
@@ -332,6 +333,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | --- | --- | --- | --- | --- |
 | `mcp_servers.<name>.args` | `string[]` | `yes` | `user` | stdio 或 HTTP MCP 服务器的 `args`。 |
 | `mcp_servers.<name>.bearer_token_env_var` | `string` | `yes` | `user` | stdio 或 HTTP MCP 服务器的 `bearer_token_env_var`。 |
+| `mcp_servers.<name>.bearer_token_file` | `string` | `yes` | `user` | HTTP MCP 服务器的 `bearer_token_file`：绝对路径或 `~/` 路径，每次请求重新读取 bearer token。 |
 | `mcp_servers.<name>.command` | `string` | `yes` | `user` | stdio 或 HTTP MCP 服务器的 `command`。 |
 | `mcp_servers.<name>.cwd` | `string` | `yes` | `user` | stdio 或 HTTP MCP 服务器的 `cwd`。 |
 | `mcp_servers.<name>.enabled` | `boolean` | `yes` | `user` | stdio 或 HTTP MCP 服务器的 `enabled`。 |
@@ -360,6 +362,11 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `memory_v2.capture_enabled` | `boolean` | — | `user` | 启用 memory-v2 提取和观测捕获。默认：`true`。 |
 | `memory_v2.automatic_dream_enabled` | `boolean` | — | `user` | 启用事件驱动的 memory-v2 Dream。默认：`true`。 |
 | `memory_v2.manual_dream_enabled` | `boolean` | — | `user` | 启用显式请求的 memory-v2 Dream。默认：`true`。 |
+| `memory_v2.batch_dream_enabled` | `boolean` | — | `user` | 把活动的 memory-v2 Dream 作为 batch Dream 运行：按批次把笔记折进主题，并带上完整主题目录；本地值优先于远程 `memory_v2.batch_dream_enabled`，再默认 `false`。 |
+| `memory_v2.batch_dream_max_run_secs` | `number` | — | `user` | 一次 batch Dream 运行的秒数上限，默认 `1800`，限制在 `60`–`3600`；未完成的笔记留在收件箱。本地值优先于远程。 |
+| `memory_v2.batch_dream_max_calls_per_batch` | `number` | — | `user` | 每批 batch Dream 的模型调用上限，默认 `6`，限制在 `2`–`16`。本地值优先于远程。 |
+| `memory_v2.batch_dream_max_batch_note_bytes` | `number` | — | `user` | 一批 batch Dream 的笔记字节上限，默认 `98304`，限制在 `16384`–`262144`。本地值优先于远程。 |
+| `memory_v2.compact_index_enabled` | `boolean` | — | `user` | 向系统提示注入仅含标题的记忆索引（无主题描述、无待处理观测），以便更多主题挤进 8 KiB 预算；带标题的条目按代理读取该主题的次数排序，磁盘上的 `MEMORY.md` 也按同样方式渲染。本地值优先于远程。默认：`false`。 |
 | `memory_v2.file_writes_enabled` | `boolean` | — | `user` | 启用所有 memory-v2 文件变更；`false` 会在创建骨架前安全拒绝。默认：`true`。 |
 | `memory_v2.archived_retention_days` | `number` | — | `user` | 归档 memory-v2 观测文件的保留天数。默认：`30`。 |
 | `memory_v2.job_retention_days` | `number` | — | `user` | 终态 memory-v2 捕获作业元数据的保留天数。默认：`14`。 |
@@ -392,6 +399,7 @@ Grok Build 还会按以下层级读取配置；后列层级优先，但 requirem
 | `model.<id>.model_family` | `string` | `yes` | `user` | 用于压缩和能力分组的模型家族 ID。 |
 | `model.<id>.model_provider` | `string` | `yes` | `user` | 该模型使用的命名 `[model_providers.<name>]` 提供方 ID。 |
 | `model.<id>.name` | `string` | `yes` | `user` | 模型选择器中显示的标签。 |
+| `model.<id>.notice` | `table`（`severity` = `info / warning / critical`，`text`，`label`） | `yes` | `user` | 选中该模型时显示在提示框上方的消息；`text` 为空则清除该模型的提示。 |
 | `model.<id>.query_params` | `map<string,string>` | `yes` | `user` | 该模型请求的额外查询参数。 |
 | `model.<id>.reasoning_effort` | `string` | `yes` | `user` | 已弃用的单模型推理强度；优先使用 `reasoning_efforts`。 |
 | `model.<id>.reasoning_efforts` | `array of tables` | `yes` | `user` | 该模型允许的推理强度取值。省略时，菜单来自端点的 `/v1/models` 行（`reasoning_efforts`；若没有该字段，则使用 `capabilities.reasoning_effort`）。 |

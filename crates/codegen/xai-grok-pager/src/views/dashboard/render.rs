@@ -13,6 +13,7 @@ use super::state::{
     DashboardRowId, DashboardState, DashboardStopAction, Filter, Focusable, Grouping,
     LocationPickerState, RenameDraft, RowState, SectionKey,
 };
+use crate::app::actions::PermissionLabel;
 use crate::app::agent::AgentId;
 use crate::app::agent_view::AgentView;
 use crate::render::line_utils::{truncate_line, truncate_str};
@@ -2173,6 +2174,8 @@ fn paint_dispatch_config_badge(
         model_name: &model_label,
         flags: &flags,
         multiline: state.multiline_mode,
+        usage_warning: None,
+        usage_warning_critical: false,
     };
     // Bottom border row, inside the corners: the same content rect the chat prompt uses for its info line
     let info_rect = Rect {

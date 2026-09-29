@@ -1,5 +1,55 @@
 # Changelog
 
+# 1.0.45-fork.1 — 2026-09-29
+
+同步上游 monorepo `97f190f6` / Source-Revision `f589e31cc17fbf9a41072a379dba4673f6aa0861`，产品版本随上游从 **1.0.41** 升至 **1.0.45**。发布范围覆盖上一版 `v1.0.41-fork.6` 之后的上游更新：1 个上游同步提交、962 个文件、+123822/−23019 行，以及吸收该更新所需的合并适配与本地化修复（51 个冲突文件、102 个冲突块，其中 18 个 cosmetic 块自动采用上游）。
+
+### 上游更新
+
+- **远程控制与 Agent Host**：每台电脑只跑一条 Remote Control 隧道；失败只推一次状态，声明在一处释放，重连保留也可捡起别处保存的记录。另一台设备上的回合显示为 running 并与提问卡绑在一起；队列操作可作用到被挡住的提示；可在远程会话里回答问题、传图。工作区守护进程接管每目录沙箱；宿主能力开启时随 host server 启动 Agent Host。
+- **权限、沙箱与网络出口**：权限规则类型/解析器/编译策略/加载器拆到 `xai-grok-permission-rules`。网络出口先拦住再询问；沙箱关掉跟随符号链接的路径，Always-reject 会钉住。文件夹信任判定迁到共享配置类型；托管策略信任含篡改分类。
+- **模型与压缩**：模型选择收成一种类型；选择器顺序变成 **模型 → 上下文窗口 → effort**。新增 `/context-window`。grok-4.5 低 effort：session recap 发压缩 transcript，turn summary 只发上一回合。`/compact` 不再接受 keep 笔记。
+- **子代理与 MCP**：父回合被挡住时显示 “Waiting on N subagent(s)”；spawn 重新暴露 subagent type。多来源合并 MCP server 配置；HTTP MCP 每次请求从 `bearer_token_file` 重读 token。
+- **云配置与新 crate**：`xai-grok-cloud-config`、`xai-grok-egress-proxy`、`xai-grok-lifecycle`、`xai-grok-permission-rules`。托管云配置同步；远程设置缓存迁入云配置。
+- **界面**：Ask 模式 composer 旗标和边框改绿色；`/auto` 文案改为 Auto-review；选中模型可在提示框上方显示 notice 横幅。
+
+### 本 Fork
+
+- 合并适配：
+  - 保留 fork.6 的计划审批 / MCP elicitation `approval_required` 通知与 `tool_call_id` 去重，并接上游 `take_unanswered_elicitation`。
+  - `AppView::apply_auth_meta` 继续返回 bool；声音状态机迁采用上游 `voice_state` 模块。
+  - `pulldown-cmark` git pin（CJK 强调）与 `LOCAL-PATCH(upstream-pulldown-unreleased)` / `upstream-dollar-currency-math` / `upstream-fork-secondary-model` 保留。
+  - 上游删除 `slash/commands/scroll_debug.rs`，`/debug scroll` 仍可切换 HUD。
+  - 托管配置同步走 `xai_grok_cloud_config`，并保留 `t("update.managed_config.applied")`；更新烟测在上游 `probe_version` 之上保留 fork 版本匹配。
+- 英文用户指南本批 9 处改动同步到简体中文：`/context-window`、Auto-review、MCP `bearer_token_file`、模型 notice、`features.file_acceleration`、memory_v2 batch dream 等。
+
+### 兼容性
+
+- 产品版本为 **1.0.45**，发布标签 `v1.0.45-fork.1` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的 `1.0.45`。
+- 本地化目录的查找、回退与语言解析机制未改动；未提供翻译的键继续回退英文。
+
+### 国际化
+
+- 本版新增 8 个键（含上下文窗口消息、用量按模型行、会话打开失败通知、语音转写提示、插件 agent 徽章），`en.toml` 与 `zh-CN.toml` 各从 4351 个键增至 4359 个键，两侧键集合与 `{placeholder}` 完全一致。
+
+### 验证
+
+本地等 CI 验证（Rust 1.92.0、Protoc 29.3、全部 `--locked`，`GROK_VERSION=1.0.45-fork.1`）：
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：271 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`--test i18n_audit`：16 项通过。
+- `python3 scripts/upstream_merge.py audit-markers`：通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；提交前本地构建的 `target/release/xai-grok-pager --version` 输出 `grok 1.0.45-fork.1` 且含 `[fork]`。
+
+### 产物
+
+- `grok-1.0.45-fork.1-linux-x86_64`
+- `grok-1.0.45-fork.1-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.41-fork.6...v1.0.45-fork.1
+
 # 1.0.41-fork.6 — 2026-09-28
 
 本版为 Fork 问题修复，产品版本仍为 **1.0.41**。补齐两处在用户离开终端时没有任何提醒的“等待用户操作”状态：计划审批（`exit_plan_mode`）与 MCP elicitation，并让终端标题的 action-required 指示覆盖这两类状态。

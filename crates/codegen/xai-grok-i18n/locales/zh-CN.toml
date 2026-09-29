@@ -5163,3 +5163,22 @@ fallback = "子代理"
 label = "子代理模型继承"
 
 description = "开启：Grok 不能为子代理指定模型\n关闭：Grok 可以为子代理选择不同的模型。重启后生效。\n注意：此设置仅在所有模型都属于 xAI「model_family」时适用。通常不需要配置此项。"
+
+[usage.session]
+model_row_tokens = "    {model}：{tokens} Tokens · {cost}"
+
+model_row_tokens_no_cost = "    {model}：{tokens} Tokens"
+
+[session]
+context_window_set_failed = "无法将上下文窗口设为 {window}：{error}"
+
+context_window_set = "上下文窗口已设为 {window}"
+
+context_window_applies_after_start = "上下文窗口会在会话开始后生效；届时再运行 /context-window"
+
+load_failed_notice = "这个会话没有打开。用 /resume 再打开，或用 /new 开始新会话。"
+[agents.badge]
+plugin = " 插件 "
+
+[voice]
+transcribing_toast = "语音：仍在转写上一段录音…（Esc 丢弃）"

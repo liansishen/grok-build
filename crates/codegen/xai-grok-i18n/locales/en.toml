@@ -5173,3 +5173,22 @@ fallback = "subagent"
 label = "Subagent model inheritance"
 
 description = "On: Grok cannot set models for subagents\nOff: Grok may choose a different model for a subagent. Takes effect after restart.\nNOTE: This setting only applies when all models are xAI \"model_family\". You likely don't need to configure this setting."
+
+[usage.session]
+model_row_tokens = "    {model}: {tokens} Tokens · {cost}"
+
+model_row_tokens_no_cost = "    {model}: {tokens} Tokens"
+
+[session]
+context_window_set_failed = "Couldn't set context window to {window}: {error}"
+
+context_window_set = "Context window set to {window}"
+
+context_window_applies_after_start = "Context window applies once the session starts; run /context-window then"
+
+load_failed_notice = "This session didn't open. Open it again with /resume, or start a new one with /new."
+[agents.badge]
+plugin = " plugin "
+
+[voice]
+transcribing_toast = "Voice: still transcribing the last recording… (Esc to discard)"

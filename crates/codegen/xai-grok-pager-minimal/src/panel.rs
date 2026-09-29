@@ -87,8 +87,6 @@ pub(super) fn render(
     }
 }
 
-// ─────────────────────────────── chrome ─────────────────────────────────────
-
 /// Split `area` into (title_row, second_row, divider_row, list_area, footer_row).
 /// `second_row` hosts the subtitle (mcps) or the search bar (resume).
 fn chrome_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect) {
@@ -147,8 +145,6 @@ fn render_footer(buf: &mut Buffer, row: Rect, theme: &Theme, text: &str) {
 fn render_divider(buf: &mut Buffer, row: Rect, theme: &Theme) {
     picker::render_divider(buf, row.x, row.y, row.width, theme, None);
 }
-
-// ─────────────────────────────── resume ─────────────────────────────────────
 
 /// Exact body height (display rows) for the session-picker list.
 fn resume_body_rows(agent: &AgentView, width: u16) -> u16 {
@@ -296,8 +292,6 @@ fn render_resume(
     render_footer(buf, footer_row, theme, resume_footer());
     None
 }
-
-// ──────────────────────────────── mcps ──────────────────────────────────────
 
 /// Exact body height (display rows) for the MCP list: one line per row.
 fn mcps_body_rows(agent: &AgentView) -> u16 {
@@ -536,8 +530,6 @@ fn render_mcps(
     render_footer(buf, footer_row, theme, mcps_footer());
     None
 }
-
-// ─────────────────────────────── helpers ────────────────────────────────────
 
 /// Sum the display height of grouped picker entries.
 /// A header is one row, plus the blank spacer `render_picker_content` draws before non-first headers.

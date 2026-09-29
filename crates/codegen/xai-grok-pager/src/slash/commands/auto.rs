@@ -9,22 +9,16 @@
 //! hard-hidden when the auto permission-mode feature is off.
 
 use crate::app::actions::{Action, PermissionModeKind};
-use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
+use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand, slash_meta};
 
 /// Toggle auto permission mode (LLM classifier).
 pub struct AutoCommand;
 
 impl SlashCommand for AutoCommand {
-    fn name(&self) -> &str {
-        "auto"
-    }
-
-    fn description(&self) -> &str {
-        xai_grok_i18n::t("slash.auto.description")
-    }
-
-    fn usage(&self) -> &str {
-        "/auto"
+    slash_meta! {
+        name: "auto",
+        description: "Toggle Auto-review (classifier approves safe tools)",
+        usage: "/auto",
     }
 
     fn run(&self, ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {

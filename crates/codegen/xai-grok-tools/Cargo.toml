@@ -19,6 +19,7 @@ xai-tty-utils = { workspace = true }
 xai-grok-auth = { workspace = true }
 xai-grok-config = { path = "../xai-grok-config" }
 xai-grok-i18n = { workspace = true }
+xai-grok-permission-rules = { workspace = true }
 xai-grok-extra-ca = { workspace = true }
 xai-grok-feedback = { workspace = true }
 xai-grok-tools-api = { path = "../xai-grok-tools-api" }
@@ -29,6 +30,7 @@ xai-message-delivery-core = { workspace = true }
 xai-token-estimation = { workspace = true }
 async-lsp = { workspace = true }
 async-stream = { workspace = true }
+bstr = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 xai-grok-image = { workspace = true }

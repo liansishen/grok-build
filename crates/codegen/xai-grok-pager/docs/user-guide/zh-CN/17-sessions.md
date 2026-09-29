@@ -187,10 +187,6 @@ Yes, and don't ask again / No）。“Yes, and don't ask again”会关闭该设
 
 ```
 /compact
-/compact [context]
-```
-
-可选的 `context` 参数允许你提供关于压缩期间应保留哪些内容的附加说明。
 
 ### 自动压缩
 
@@ -336,6 +332,8 @@ Worktree 会话在内部通过 `x.ai/git/worktree/*` 扩展方法管理。关键
 - **Remove**：会话结束后清理 worktree
 
 使用 `grok -w -r <session-id>` 在新的 worktree 中恢复会话。
+
+`grok worktree create [NAME]` 会创建与 `grok -w [NAME]` 相同的 worktree，但不启动会话。它只把会话本会打开的目录打印到 stdout，因此 `cd "$(grok worktree create my-fix)"` 可用。默认从 HEAD 开始并复制未提交的改动。传入 `--ref <ref>` 则从某分支、标签或提交的干净检出开始。如果新 worktree 里没有你运行命令时所在的目录（例如 `--ref` 检出早于该目录，或目录被忽略），命令会打印 worktree 根目录。
 
 ### 管理 Grove 重定向
 

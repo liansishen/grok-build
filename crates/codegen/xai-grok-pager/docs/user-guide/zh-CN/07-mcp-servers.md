@@ -300,6 +300,18 @@ enabled = true
 headers = { "Authorization" = "Bearer ${INTERNAL_MCP_TOKEN}" }
 ```
 
+当另一个进程把短期 token 写在文件里（凭证助手、侧车或定时任务）时，用 `bearer_token_file` 指向该文件。Grok 每次向该服务器发请求都会读取该文件，发送 `Authorization: Bearer <contents>`，并去掉两端空白，因此轮换后的 token 会在下一次请求生效，无需重启 Grok 或重连服务器：
+
+```toml
+[mcp_servers.internal-tools]
+url = "https://mcp.internal.example.com/mcp"
+bearer_token_file = "~/.config/internal-tools/token"
+```
+
+路径必须是绝对路径或以 `~/` 开头，也可以引用 `${VAR}`；其他形式会让该服务器失败并报错。`bearer_token_file` 适用于 HTTP 和 SSE 服务器，并会取代 `Authorization` 头或 `bearer_token_env_var`。配了 token 文件的服务器会跳过 OAuth 发现。文件缺失、为空、大于 16 KiB、不是 UTF-8，或含有 HTTP 头不允许的字符时，请求会失败并在错误里写出路径。
+
+替换 token 文件时要原子写入：先写到同目录的临时文件，再 rename 覆盖旧文件。若直接截断重写原文件，可能与请求竞态，导致失败或发出不完整的 token。
+
 ### Local stdio
 
 Use stdio for tools that must run locally (filesystem access, local databases, in-house servers).

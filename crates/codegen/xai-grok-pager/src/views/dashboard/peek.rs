@@ -375,6 +375,8 @@ fn paint_peek_config_badge(
         model_name: &model_label,
         flags: &flags,
         multiline,
+        usage_warning: None,
+        usage_warning_critical: false,
     };
     // Bottom border row, inside the corners: the same content rect the chat prompt and dispatch box use for their info line
     let info_rect = Rect {
@@ -1169,16 +1171,16 @@ mod tests {
         planp.auto_approve = false;
         let plan_auto_bottom = badge_row(&planp, 6);
         assert!(
-            plan_auto_bottom.contains("Grok 4 Fast · plan · auto"),
-            "plan must not hide auto: {plan_auto_bottom:?}",
+            plan_auto_bottom.contains("Grok 4 Fast · plan · auto-review"),
+            "plan must not hide auto-review: {plan_auto_bottom:?}",
         );
 
         planp.mode_label = None;
         planp.auto_approve = true;
         let yolo_bottom = badge_row(&planp, 6);
         assert!(
-            yolo_bottom.contains("always-approve") && !yolo_bottom.contains("auto"),
-            "always-approve wins over auto: {yolo_bottom:?}",
+            yolo_bottom.contains("always-approve") && !yolo_bottom.contains("auto-review"),
+            "always-approve wins over auto-review: {yolo_bottom:?}",
         );
     }
 
