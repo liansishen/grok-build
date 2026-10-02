@@ -1,5 +1,44 @@
 # Changelog
 
+# 1.0.45-fork.4 — 2026-10-02
+
+本版为 Fork 问题修复与审计加固，产品版本仍为 **1.0.45**。把输入框上方 dock 的文案接入翻译目录，并让本地化审计覆盖此前看不到的几种数据流形态。
+
+### 问题修复
+
+- **dock（输入框上方的监视器/子代理面板）文案没有国际化**：分区标题（`Workflows` / `Subagents` / `Tasks` / `Watchers` / `Queued`）、行的停止按钮 `[stop]`、行种类（`Workflow` / `Run` / `Loop`）以及工作流行活动（`running` / `1 agent` / `{n} agents` / `{phase} · {agents}`）此前都是硬编码英文；同一区域里子代理活动、`show N more`、`next in …` 本来已走目录，所以界面呈中英混排。这些文案现在全部经 `xai_grok_i18n::t` / `t_fmt` 读取，目录新增 13 个键：`dock.section.*`（5 个分区标题）、`dock.stop`、`dock.kind.*`（3 个行种类）、`dock.workflow_activity.*`（4 个活动文案）。
+- **审计盲区**：全量审计只沿语法祖先找 sink，因此“经函数返回值、结构体字段、常量或把值交给会绘制的 helper”再抵达终端的文案都看不到——dock 的问题正是这样漏掉的。新增 paint-flow 分析（`crates/codegen/xai-grok-i18n/tests/i18n_audit_paint_flow.rs`）：建立跨文件的四类节点图（`bind:` / `field:` / `fn:` / `param:`），从“被可见 sink 绘制”的取值反向推导，命中即报告。
+
+### 兼容性与边界
+
+- 发布标签 `v1.0.45-fork.4` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的产品版本 `1.0.45`。
+- 新规则只作用于**变更行**：全量审计维持既有基线（历史遗留的中英混排不会被一次性报出），但任何新增或改动行上的新文案只要落入这四种形态就会被拦住。上游同步 PR 若带入这类英文文案，需按既有流程补 key 或加入 `i18n-opaque.toml` 的 `[allow]`。
+- 精度取舍：`bind:`、`fn:`、`param:` 键均带文件前缀，避免 `x.len()` 这类同名方法把全仓库的 `len` helper 全部标记为已绘制；`field:` 键保持全局，因为字段在 A 文件写入、在 B 文件读回（`DockRow.kind` 正是本功能要覆盖的形态）。同名仍可能造成少量过度报告，用 `[allow]` 处理。
+- 分析在每个节点只下钻一次：初版“arm 内下钻 + 共用子节点遍历”使 `a.b().c()` 这类链式调用按链长指数膨胀，一个 35 KB 文件就能让扫描停滞；修正后全量 2555 个文件约 20 秒（release）。
+- 既有行为不变：dock 的分区顺序、折叠、`show N more`、停止按钮宽度仍按新文案重新计算（`kill_label().width()`）；英文语言下的渲染与之前逐字节相同。
+
+### 国际化
+
+- 新增 13 个目录键，`en.toml` 与 `zh-CN.toml` 同步；`scripts/i18n_catalog.py` 检查 `missing_keys` / `extra_keys` / `placeholder_mismatches` 均为空。英文原文逐字节保留，默认（英文）界面输出不变。
+
+### 验证
+
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --test i18n_audit`：17 项通过，含新增的 `fixture_reports_copy_that_flows_through_returns_fields_and_helpers`（覆盖“返回值经 helper 参数→sink”“字面量存入被绘制的结构体字段”“常量标签由被绘制的 helper 返回”三个正例与只用做逻辑判断的反例）。
+- 用 `GROK_I18N_AUDIT_BASE` 指向引入 dock 的提交之前，diff 审计能报出当初漏掉的 dock 文案，确认新规则确实覆盖该形态；指向最近一次上游同步则报 0 条（该同步文案已在同批 PR 内本地化）。
+- `cargo +1.92.0 test --locked -p xai-grok-markdown --lib`：511 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib views::dock`：通过（dock 的渲染断言在英文下不变）。
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；`target/release/xai-grok-pager --version` 输出包含 `1.0.45-fork.4`。
+
+### 产物
+
+- `grok-1.0.45-fork.4-linux-x86_64`
+- `grok-1.0.45-fork.4-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.45-fork.3...v1.0.45-fork.4
+
 # 1.0.45-fork.3 — 2026-10-02
 
 本版为 Fork 问题修复，产品版本仍为 **1.0.45**。修复三处链接/图片渲染问题：链接文字（含图片替代文字）里的内联标记被原样打印、图片多出一个 `!`、引用式链接不转换。

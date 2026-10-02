@@ -29,7 +29,10 @@ const MORE_INDENT: &str = "   ";
 /// starts in. The header spends three columns on its chevron and the queue pane
 /// already insets its own content by two, so the dock adds the last one.
 const QUEUE_BODY_INDENT: u16 = 1;
-const STOP_LABEL: &str = "[stop]";
+/// Kill-button label every killable dock row paints, subagents included.
+fn stop_label() -> &'static str {
+    xai_grok_i18n::t("dock.stop")
+}
 
 /// Seeded at startup and on `x.ai/settings/update` from Feature::Dock.
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -97,22 +100,22 @@ impl Section {
 
     fn label(self) -> &'static str {
         match self {
-            Section::Workflows => "Workflows",
-            Section::Subagents => "Subagents",
-            Section::Tasks => "Tasks",
-            Section::Watchers => "Watchers",
-            Section::Queued => "Queued",
+            Section::Workflows => xai_grok_i18n::t("dock.section.workflows"),
+            Section::Subagents => xai_grok_i18n::t("dock.section.subagents"),
+            Section::Tasks => xai_grok_i18n::t("dock.section.tasks"),
+            Section::Watchers => xai_grok_i18n::t("dock.section.watchers"),
+            Section::Queued => xai_grok_i18n::t("dock.section.queued"),
         }
     }
 
-    /// Every killable dock row paints `[stop]`, including subagents.
+    /// Every killable dock row paints the stop button, including subagents.
     pub fn kill_label(self) -> &'static str {
         match self {
             Section::Workflows
             | Section::Subagents
             | Section::Tasks
             | Section::Watchers
-            | Section::Queued => STOP_LABEL,
+            | Section::Queued => stop_label(),
         }
     }
 }
@@ -527,7 +530,7 @@ mod tests {
     }
 
     fn subagent_hover_actions() -> String {
-        format!("{}{STOP_LABEL}", crate::glyphs::enlarge_button())
+        format!("{}{}", crate::glyphs::enlarge_button(), stop_label())
     }
 
     fn row(kind: &str, description: &str, meta: &str, killable: bool) -> DockRow {
@@ -727,7 +730,7 @@ mod tests {
         let mut buf = Buffer::empty(area);
         render(&mut buf, area, &theme, &data);
         let hovered = row_text(&buf, 2);
-        let task_actions = format!("{}{STOP_LABEL}", crate::glyphs::enlarge_button());
+        let task_actions = format!("{}{}", crate::glyphs::enlarge_button(), stop_label());
         assert!(hovered.trim_end().ends_with(&task_actions), "{hovered}");
 
         let mut data = sample();
@@ -775,7 +778,7 @@ mod tests {
         let mut buf = Buffer::empty(area);
         render(&mut buf, area, &theme, &data);
         let linked = row_text(&buf, data.cursor as u16);
-        let loop_actions = format!("{}{STOP_LABEL}", crate::glyphs::enlarge_button());
+        let loop_actions = format!("{}{}", crate::glyphs::enlarge_button(), stop_label());
         assert!(linked.trim_end().ends_with(&loop_actions), "{linked}");
     }
 
