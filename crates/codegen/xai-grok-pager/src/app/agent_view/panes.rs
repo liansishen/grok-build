@@ -293,7 +293,7 @@ impl AgentView {
                 (
                     run.run_id.clone(),
                     crate::views::dock::DockRow {
-                        kind: "Workflow".into(),
+                        kind: xai_grok_i18n::t("dock.kind.workflow").into(),
                         description: run.name.clone(),
                         activity: (!activity.is_empty()).then_some(activity),
                         meta: crate::views::dock::fmt_elapsed(run.live_elapsed_ms() / 1000),
@@ -369,7 +369,7 @@ impl AgentView {
                 (
                     t.task_id.clone(),
                     crate::views::dock::DockRow {
-                        kind: "Run".into(),
+                        kind: xai_grok_i18n::t("dock.kind.run").into(),
                         description,
                         activity: None,
                         meta: crate::views::dock::fmt_elapsed(elapsed),
@@ -421,7 +421,7 @@ impl AgentView {
             (
                 DockWatcherId::Loop(s.task_id.clone()),
                 crate::views::dock::DockRow {
-                    kind: "Loop".into(),
+                    kind: xai_grok_i18n::t("dock.kind.loop").into(),
                     description: s.prompt.clone(),
                     activity: None,
                     meta: format!(

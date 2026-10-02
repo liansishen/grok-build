@@ -4799,6 +4799,8 @@ result_count_many = "{count} results"
 [dock]
 show_more = "{indent}{arrow} show {hidden} more"
 
+stop = "[stop]"
+
 [elicitation.url]
 punycode_warning = "Punycode host: check it is the site you expect"
 
@@ -5202,3 +5204,30 @@ incomplete_retry_run = "Update did not complete. Run `{grok} update` to retry."
 waiting_for_subagent = "Waiting for subagent"
 
 waiting_for_subagents = "Waiting for {n} subagents"
+
+[dock.section]
+workflows = "Workflows"
+
+subagents = "Subagents"
+
+tasks = "Tasks"
+
+watchers = "Watchers"
+
+queued = "Queued"
+
+[dock.kind]
+workflow = "Workflow"
+
+run = "Run"
+
+loop = "Loop"
+
+[dock.workflow_activity]
+one_agent = "1 agent"
+
+agents = "{n} agents"
+
+phase_and_agents = "{phase} · {agents}"
+
+running = "running"

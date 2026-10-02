@@ -140,14 +140,20 @@ impl WorkflowRunSnapshot {
                 .filter(|p| !p.is_empty());
             let agents = match self.active_agent_count() {
                 0 => None,
-                1 => Some("1 agent".to_owned()),
-                n => Some(format!("{n} agents")),
+                1 => Some(xai_grok_i18n::t("dock.workflow_activity.one_agent").to_owned()),
+                n => Some(xai_grok_i18n::t_fmt(
+                    "dock.workflow_activity.agents",
+                    &[("n", &n.to_string())],
+                )),
             };
             match (phase, agents) {
-                (Some(p), Some(a)) => format!("{p} · {a}"),
+                (Some(p), Some(a)) => xai_grok_i18n::t_fmt(
+                    "dock.workflow_activity.phase_and_agents",
+                    &[("phase", p), ("agents", &a)],
+                ),
                 (Some(p), None) => p.to_owned(),
                 (None, Some(a)) => a,
-                (None, None) => "running".to_owned(),
+                (None, None) => xai_grok_i18n::t("dock.workflow_activity.running").to_owned(),
             }
         } else {
             self.status.replace('_', " ")

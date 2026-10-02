@@ -4789,6 +4789,8 @@ result_count_many = "{count} 个结果"
 [dock]
 show_more = "{indent}{arrow} 再显示 {hidden} 条"
 
+stop = "[停止]"
+
 [elicitation.url]
 punycode_warning = "Punycode 主机：请确认这正是你预期的网站"
 
@@ -5192,3 +5194,30 @@ incomplete_retry_run = "更新未完成。请运行 `{grok} update` 重试。"
 waiting_for_subagent = "等待子代理"
 
 waiting_for_subagents = "等待 {n} 个子代理"
+
+[dock.section]
+workflows = "工作流"
+
+subagents = "子代理"
+
+tasks = "任务"
+
+watchers = "监视器"
+
+queued = "排队中"
+
+[dock.kind]
+workflow = "工作流"
+
+run = "运行"
+
+loop = "循环"
+
+[dock.workflow_activity]
+one_agent = "1 个代理"
+
+agents = "{n} 个代理"
+
+phase_and_agents = "{phase} · {agents}"
+
+running = "运行中"

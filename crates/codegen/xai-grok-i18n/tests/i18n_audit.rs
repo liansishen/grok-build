@@ -5,6 +5,11 @@ use std::process::Command;
 
 use tree_sitter::{Node, Parser};
 
+#[path = "i18n_audit_paint_flow.rs"]
+mod paint_flow;
+
+use paint_flow::PaintFlow;
+
 #[derive(Debug, Clone)]
 struct AuditConfig {
     roots: Vec<String>,
@@ -1078,7 +1083,7 @@ fn audit_current_full_scan(repo_root: &Path, config: &AuditConfig) -> Result<Vec
     }
     for configured in &config.current_full_scan_roots {
         for (path, source) in rust_files_under(&repo_root.join(configured), repo_root, config) {
-            findings.extend(scan_full_prose_source(&path, &source, config)?);
+            findings.extend(scan_full_prose_source(&path, &source, &config)?);
         }
     }
     for relative in &config.settings_files {
@@ -1430,18 +1435,36 @@ fn audit_revision_diff(
     let diff = git_diff(repo_root, old, new, &config.roots)?;
     let changed = changed_files_from_diff(&diff);
     let mut findings = Vec::new();
-    for (path, lines) in changed {
+    for (path, lines) in &changed {
         if !path.ends_with(".rs") || config.is_excluded(Path::new(&path)) {
             continue;
         }
-        let source = git_show(repo_root, new, &path)?;
-        findings.extend(scan_source(&path, &source, config, Some(&lines))?);
+        let source = git_show(repo_root, new, path)?;
+        findings.extend(scan_source(path, &source, config, Some(lines))?);
         findings.extend(scan_missing_translation_keys(
-            &path,
+            path,
             &source,
             config,
-            Some(&lines),
+            Some(lines),
         )?);
+    }
+    // Copy that leaves a file through a function return, a struct field, a const, or a helper that paints
+    // its parameter needs the workspace-wide graph, so it is built from the whole revision and then
+    // reported only for changed lines. Restricting the report to the diff keeps the existing backlog out
+    // of CI while every newly added literal in one of those shapes is still gated.
+    let mut paint_flow = PaintFlow::new(config.clone());
+    for configured in &config.current_full_scan_roots {
+        for (path, source) in rust_files_under(&repo_root.join(configured), repo_root, config) {
+            paint_flow.collect_file(&path, &source)?;
+        }
+    }
+    for finding in paint_flow.into_findings() {
+        let touched = changed
+            .iter()
+            .any(|(path, lines)| path == &finding.path && lines.contains(&finding.line));
+        if touched {
+            findings.push(finding);
+        }
     }
     Ok(findings)
 }
@@ -1844,6 +1867,83 @@ fn fixture_reports_copy_pushed_into_a_painted_buffer() {
     assert!(quiet.is_empty(), "a prompt builder is not UI copy: {quiet:?}");
 }
 
+/// Copy that leaves a file through a return value, a struct field, a const, or a helper that paints
+/// its parameter must be reported: that is the dock's shape (a method call argument into a helper
+/// that paints its parameter, or a field the renderer reads back).
+#[test]
+fn fixture_reports_copy_that_flows_through_returns_fields_and_helpers() {
+    fn findings(path: &str, source: &[u8]) -> Vec<Finding> {
+        let config = AuditConfig::load(&repo_root());
+        let mut flow = PaintFlow::new(config);
+        flow.collect_file(path, source).expect("fixture parses");
+        flow.into_findings()
+    }
+
+    // Literal in a method return value, passed as a call argument to a helper that paints its parameter.
+    let through_helper = br#"
+        impl Section { fn label(self) -> &'static str { "Workflows" } }
+        fn section_header(label: &str, count: usize) -> Line<'static> {
+            Line::from(vec![
+                Span::styled(label.to_string(), Style::default()),
+                Span::styled(format!(" {count}"), Style::default()),
+            ])
+        }
+        fn render(section: Section) {
+            let line = section_header(section.label(), 2);
+            drop(line);
+        }
+    "#;
+    let reported = findings("helper_fixture.rs", through_helper);
+    assert!(
+        reported
+            .iter()
+            .any(|finding| finding.literal == "Workflows"),
+        "a returned literal passed into a painting helper must be reported: {reported:?}"
+    );
+
+    // Literal assigned to a struct field that another function paints.
+    let through_field = br#"
+        struct Row { kind: String }
+        fn build() -> Row { Row { kind: "Workflow".into() } }
+        fn paint(row: Row) { let _ = Span::styled(row.kind.clone(), Style::default()); }
+    "#;
+    let reported = findings("field_fixture.rs", through_field);
+    assert!(
+        reported
+            .iter()
+            .any(|finding| finding.literal == "Workflow"),
+        "a literal stored in a painted struct field must be reported: {reported:?}"
+    );
+
+    // Const label returned from a helper the UI paints.
+    let through_const = br#"
+        const STOP: &str = "[stop]";
+        impl Row { fn kill(&self) -> &'static str { STOP } }
+        fn paint(row: &Row) { let _ = Span::styled(row.kill(), Style::default()); }
+    "#;
+    let reported = findings("const_fixture.rs", through_const);
+    assert!(
+        reported
+            .iter()
+            .any(|finding| finding.literal == "[stop]"),
+        "a const label a painted helper returns must be reported: {reported:?}"
+    );
+
+    // The same shapes used for logic only stay out.
+    let logic_only = br#"
+        impl Section { fn label(self) -> &'static str { "Workflows" } }
+        fn same(section: Section) -> bool { section.label() == "Workflows" }
+        struct Row { kind: String }
+        fn build() -> Row { Row { kind: "Workflow".into() } }
+        fn width(row: &Row) -> usize { row.kind.len() }
+    "#;
+    let quiet = findings("logic_fixture.rs", logic_only);
+    assert!(
+        quiet.is_empty(),
+        "values used only for logic are not painted: {quiet:?}"
+    );
+}
+
 /// The scan scope must stay at workspace granularity: every first-party crate's sources are inside
 /// a configured root, so a new crate or a new render mode cannot silently fall outside the audit.
 #[test]
@@ -1993,4 +2093,5 @@ fn upstream_changed_user_visible_strings_use_translation_or_opaque_allowlist() {
         _ => panic!("GROK_I18N_UPSTREAM_OLD and GROK_I18N_UPSTREAM_NEW must be set together"),
     }
 }
+
 
