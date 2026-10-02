@@ -1,5 +1,53 @@
 # Changelog
 
+# 1.0.45-fork.3 — 2026-10-02
+
+本版为 Fork 问题修复，产品版本仍为 **1.0.45**。修复三处链接/图片渲染问题：链接文字（含图片替代文字）里的内联标记被原样打印、图片多出一个 `!`、引用式链接不转换。
+
+### 问题修复
+
+- **链接文字里的标记泄漏**：`Tag::Link`/`Tag::Image` 会把 `link_text` 整段盖在链接文字上（含内嵌标记），而内嵌加粗/斜体/删除线/行内代码又会把自己的隐藏标记样式盖在同一批字节上。pretty 模式的跳过判据要求「覆盖该字节的所有样式都隐藏」，判据因此失效、标记被画出：
+
+  ```text
+  [**Modernity-TomsStorage-0.2.2.zip**](build/resourcepacks/Modernity-TomsStorage-0.2.2.zip)
+  → **Modernity-TomsStorage-0.2.2.zip** (build/resourcepacks/…)
+  ```
+
+  现在按「推送位置」记录容器高亮索引（`MarkdownBuffers::link_container_highlights`），两个跳过判据先剔除这些索引；容器样式仍参与绘制，链接颜色/下划线与内嵌加粗都保留。按样式值比较不可行：主题里不同元素常常取值相同（测试主题中链接样式与正文样式一致），按值过滤会把代码块与正文一起隐藏。
+- **图片多出 `!`**：`![alt](url)` 之前渲染为 `!alt (url)`（只移除了 `[`）；现在开括号变换连 `!` 一起移除，渲染为 `alt (url)`，与行内链接一致。
+- **引用式链接不转换**：`[text][ref]`、`[text][]`、`[text]` 之前保持源码形态，因为目标地址不在标签范围内、行内分支（按 `](` 切分）找不到它。现在新增 `try_push_reference_link`：去掉开括号、把标签部分改写为 ` (url)`，链接文字仍为可点击范围（`LinkTarget` 覆盖文字本身）；图片形式的引用 `![alt][ref]` 同样处理。
+  - 实现细节：改写后的尾巴必须带一个高亮。否则它落在最后一个渲染事件之后，会走「尾随文本」路径——那条路径只应用 force 变换，非 force 变换会被忽略，源码形态就会漏出来。
+
+### 兼容性与边界
+
+- 发布标签 `v1.0.45-fork.3` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的产品版本 `1.0.45`。
+- raw 模式不变：它显示源码，因此标记、`!` 与引用标签在 raw 下照旧可见。
+- 引用定义行（`[ref]: https://e.com`）仍按源码文本渲染，只有链接本身被改写。
+- 链接的 title 与 url 仍是字面文本（那里的 `**` 本来就不是语法）。
+- 表格单元格里的链接走另一条渲染路径，本来就正确，未受影响。
+- 三处改动都在上游文件，统一登记为 `LOCAL-PATCH(upstream-link-rendering)`（`LOCAL_PATCHES.md` 含 revert 条件、`FORK_FEATURES.md` 一行、代码中 9 处标记）。
+
+### 国际化
+
+- 未新增用户可见字符串，翻译目录与审计无变化。
+
+### 验证
+
+- `cargo +1.92.0 test --locked -p xai-grok-markdown --lib`：511 项通过，含新增的 `test_pretty_reference_links_rewritten`、`test_pretty_reference_link_hides_inner_markers`、`test_pretty_image_bracket_removed`（断言精确输出）、`reference_link_text_is_the_clickable_span`、`markers_inside_link_text_are_hidden`。
+- pager 回归用例 `markers_inside_link_text_render_hidden`、`image_and_reference_link_forms_render_rewritten`：通过。
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：271 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`i18n_audit`：16 项通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；`target/release/xai-grok-pager --version` 输出包含 `1.0.45-fork.3`。
+
+### 产物
+
+- `grok-1.0.45-fork.3-linux-x86_64`
+- `grok-1.0.45-fork.3-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.45-fork.2...v1.0.45-fork.3
+
 # 1.0.45-fork.2 — 2026-09-30
 
 同步上游 monorepo `2bdd1d6a` / Source-Revision `559751fdcec02d413e4c57c8832ab275e4f44980`。产品版本维持 **1.0.45**；相对 `v1.0.45-fork.1`，本次吸收 1 个上游同步提交（68 个文件，+6184/−5369 行），并处理 4 处 fork 合并冲突。

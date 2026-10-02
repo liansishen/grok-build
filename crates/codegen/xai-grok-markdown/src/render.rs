@@ -352,6 +352,8 @@ impl<'a, 'b> ParsedMarkdown<'a, 'b> {
                     && all_hidden(
                         hl_ids
                             .iter()
+                            // LOCAL-PATCH(upstream-link-rendering): containers must not decide marker visibility
+                            .filter(|&&i| !self.buffers.link_container_highlights.contains(&i))
                             .filter_map(|&i| self.buffers.highlights.get(i).map(|h| h.style)),
                     );
 
@@ -642,6 +644,8 @@ impl<'a, 'b> ParsedMarkdown<'a, 'b> {
                             self.buffers
                                 .active_highlights
                                 .iter()
+                                // LOCAL-PATCH(upstream-link-rendering): containers must not decide marker visibility
+                                .filter(|&&i| !self.buffers.link_container_highlights.contains(&i))
                                 .filter_map(|&i| self.buffers.highlights.get(i).map(|h| h.style)),
                         );
 
@@ -1222,7 +1226,7 @@ mod tests {
         );
     }
 
-    /// Same regression for images: `![img](src)` should not show `[img`.
+    /// Same regression for images: `![img](src)` must render as `img (src)`, with neither `!` nor `[` left over.
     #[test]
     fn test_pretty_image_bracket_removed() {
         let text = "An ![image](src.png) here.\n\n";
@@ -1237,6 +1241,59 @@ mod tests {
             "Pretty mode should remove '[' from image. Got: {:?}",
             img_line
         );
+        assert_eq!(
+            img_line, "An image (src.png) here.",
+            "the image marker `!` must not survive. Got: {img_line:?}"
+        );
+    }
+
+    /// Reference-style links (`[text][label]`, `[text][]`, `[text]`) render like inline ones: the opener and the
+    /// label become ` (url)`. Regression: they kept their source form, so `[text][ref]` stayed literal.
+    #[test]
+    fn test_pretty_reference_links_rewritten() {
+        for (md, expected_first_line) in [
+            (
+                "[text][ref]\n\n[ref]: https://e.com\n\n",
+                "text (https://e.com)",
+            ),
+            (
+                "[text][]\n\n[text]: https://e.com\n\n",
+                "text (https://e.com)",
+            ),
+            ("[text]\n\n[text]: https://e.com\n\n", "text (https://e.com)"),
+            (
+                "[**bold**][ref]\n\n[ref]: https://e.com\n\n",
+                "bold (https://e.com)",
+            ),
+            (
+                "See [text][ref] here.\n\n[ref]: https://e.com\n\n",
+                "See text (https://e.com) here.",
+            ),
+            (
+                "![alt][ref]\n\n[ref]: https://e.com/a.png\n\n",
+                "alt (https://e.com/a.png)",
+            ),
+        ] {
+            let (output, _) = render_markdown_ratatui_full(md, test_style::STYLE, true, None);
+            let lines = lines_to_text(&output.lines);
+            assert_eq!(
+                lines.first().map(String::as_str).unwrap_or(""),
+                expected_first_line,
+                "in {md:?} got {lines:#?}"
+            );
+        }
+    }
+
+    /// Reference-style links must not print their emphasis markers either.
+    #[test]
+    fn test_pretty_reference_link_hides_inner_markers() {
+        let md = "[**bold** and *it*][ref]\n\n[ref]: https://e.com\n\n";
+        let (output, _) = render_markdown_ratatui_full(md, test_style::STYLE, true, None);
+        let first = lines_to_text(&output.lines)
+            .first()
+            .cloned()
+            .unwrap_or_default();
+        assert_eq!(first, "bold and it (https://e.com)", "got: {first:?}");
     }
 
     /// Regression: `count_newlines_in_range` panics when a checkpoint byte offset from a thematic break falls inside a multi-byte character in subsequent content.

@@ -710,6 +710,106 @@ mod hyperlink_tests {
         }
     }
 
+    /// Inline markup inside link text must not print its syntax markers.
+    /// Regression: the `link_text` container highlight spans the whole link interior, so the `**` bytes of a nested
+    /// emphasis carried the hidden `strong_outer` *and* the visible `link_text`, and the pretty-mode skip decision
+    /// (all covering styles hidden) then drew the markers instead of hiding them.
+    #[test]
+    fn markers_inside_link_text_are_hidden() {
+        for md in [
+            "[**Modernity-TomsStorage-0.2.2.zip**](build/resourcepacks/Modernity-TomsStorage-0.2.2.zip)\n\n",
+            "[**click**](https://x.com)\n\n",
+            "[*italic*](https://x.com)\n\n",
+            "[~~struck~~](https://x.com)\n\n",
+            "[`code`](https://x.com)\n\n",
+            "[**a** and *b* and `c`](https://x.com)\n\n",
+            "- [**item**](https://x.com)\n\n",
+            "![**alt**](https://x.com/a.png)\n\n",
+        ] {
+            let (out, _) = render_markdown_ratatui_full(md, test_style::STYLE, true, None);
+            let rendered: String = out
+                .lines
+                .iter()
+                .map(line_to_string)
+                .collect::<Vec<_>>()
+                .join("\n");
+            for marker in ["**", "~~", "`", "*"] {
+                assert!(
+                    !rendered.contains(marker),
+                    "in {md:?} the marker {marker:?} must stay hidden; got {rendered:?}",
+                );
+            }
+            assert!(
+                !rendered.contains('['),
+                "in {md:?} the link brackets must be rewritten; got {rendered:?}",
+            );
+        }
+    }
+
+    /// The container marking must not stop the link target, the link styling, or the nested formatting reaching the text.
+    #[test]
+    fn link_text_inside_emphasis_keeps_target_and_styling() {
+        use crate::MarkdownStyle;
+        use anstyle::{AnsiColor, Color, Style as AStyle};
+        use ratatui::style::Modifier;
+
+        let style = MarkdownStyle {
+            link_text: AStyle::new()
+                .fg_color(Some(Color::Ansi(AnsiColor::Blue)))
+                .underline(),
+            ..test_style::STYLE
+        };
+        let md = "[**click**](https://x.com)\n\n";
+        let (out, _) = render_markdown_ratatui_full(md, style, true, None);
+
+        let target = parser_link_text(&out, "click");
+        assert_eq!(target.url, "https://x.com");
+
+        let click_span = line_at(&out.lines, 0)
+            .spans
+            .iter()
+            .find(|s| s.content == "click")
+            .unwrap_or_else(|| panic!("expected a span for the link text; got {:#?}", out.lines));
+        assert!(
+            click_span.style.add_modifier.contains(Modifier::BOLD),
+            "the nested strong must still bold the link text; got {:?}",
+            click_span.style,
+        );
+        assert!(
+            click_span.style.add_modifier.contains(Modifier::UNDERLINED),
+            "the link text must keep link_text's underline; got {:?}",
+            click_span.style,
+        );
+        assert_eq!(
+            click_span.style.fg,
+            Some(ratatui::style::Color::Blue),
+            "the link text must keep link_text's color; got {:?}",
+            click_span.style,
+        );
+    }
+
+    /// Reference-style links get the same treatment as inline ones: the link text is the clickable span (the
+    /// rewrite to ` (url)` is handled by the renderer, so the target must cover the text, not the source form).
+    #[test]
+    fn reference_link_text_is_the_clickable_span() {
+        for md in [
+            "[text][ref]\n\n[ref]: https://e.com\n\n",
+            "[text][]\n\n[text]: https://e.com\n\n",
+            "[text]\n\n[text]: https://e.com\n\n",
+            "[**text**][ref]\n\n[ref]: https://e.com\n\n",
+        ] {
+            let (out, _) = render_markdown_ratatui_full(md, test_style::STYLE, true, None);
+            let target = parser_link_text(&out, "text");
+            assert_eq!(target.url, "https://e.com", "in {md:?}");
+            let rendered = line_to_string(line_at(&out.lines, 0));
+            assert!(
+                !rendered.contains('['),
+                "in {md:?} the brackets must be rewritten; got {rendered:?}"
+            );
+            assert_eq!(rendered, "text (https://e.com)", "in {md:?}");
+        }
+    }
+
     // Soft break inside link text: the link stays on one rendered line and the fragments sharing this link's id cover exactly "link text"
     // SoftBreak splits a link into multiple HyperlinkTargets with the same id (OSC 8 wrapped-link grouping), so we check the union
     #[test]

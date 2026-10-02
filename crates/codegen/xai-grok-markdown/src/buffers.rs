@@ -293,6 +293,15 @@ pub struct RenderEvent {
 pub struct MarkdownBuffers {
     // Parse output buffers (written by run(), read by render())
     pub highlights: Vec<Highlight>,
+    // LOCAL-PATCH(upstream-link-rendering): container highlights are recorded so the render skip decision can ignore them
+    /// Indices into [`highlights`](Self::highlights) for link/image *container* styles (link text, image alt text,
+    /// and the whole-range fallback for a link whose destination cannot be split out).
+    ///
+    /// A container covers a whole link interior, so it also covers the bytes of nested syntax markers. It must not
+    /// decide marker visibility: in `[**a**](url)` the `**` bytes carry the hidden `strong_outer` *and* the visible
+    /// `link_text`, and `all_hidden` alone would then draw the markers instead of skipping them.
+    /// Container styles still reach the drawn style through `merge_styles`; only the skip decision ignores them.
+    pub link_container_highlights: Vec<usize>,
     pub replaces: Vec<Replace>,
     pub transforms: Vec<Transform>,
     pub untagged_code_ranges: Vec<Range<usize>>,
@@ -312,6 +321,7 @@ impl MarkdownBuffers {
     pub fn new() -> Self {
         Self {
             highlights: Vec::new(),
+            link_container_highlights: Vec::new(),
             replaces: Vec::new(),
             transforms: Vec::new(),
             untagged_code_ranges: Vec::new(),
@@ -328,6 +338,7 @@ impl MarkdownBuffers {
     /// Clear all buffers, keeping allocated capacity.
     pub fn clear(&mut self) {
         self.highlights.clear();
+        self.link_container_highlights.clear();
         self.replaces.clear();
         self.transforms.clear();
         self.untagged_code_ranges.clear();
