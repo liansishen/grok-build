@@ -6,6 +6,61 @@ Track temporary fork-only fixes that should be **reverted** when upstream
 
 The broader disposition of Fork features (including candidates that should be upstreamed or removed) is tracked in [`FORK_FEATURES.md`](FORK_FEATURES.md). Every remaining code marker must use a patch id documented here; features that are not temporary patches belong in the feature ledger rather than receiving an untracked marker.
 
+## `upstream-link-rendering` (2026-09-27)
+
+### Problems (present on upstream; not introduced by this fork)
+
+1. **Markers inside a link or image alt text are printed.** `Tag::Link`/`Tag::Image` push `link_text` over the
+   whole link interior, so the `**` bytes of a nested emphasis carry the hidden `strong_outer` *and* the visible
+   `link_text` at once. The pretty-mode skip decision (`all_hidden`: every covering style must be hidden) then
+   fails and the markers are drawn:
+
+   ```text
+   [**Modernity-TomsStorage-0.2.2.zip**](build/resourcepacks/Modernity-TomsStorage-0.2.2.zip)
+   → **Modernity-TomsStorage-0.2.2.zip** (build/resourcepacks/Modernity-TomsStorage-0.2.2.zip)
+   ```
+
+   Nested emphasis, strikethrough, and inline code leak the same way; table cells take a different path and were
+   already correct.
+
+2. **An image keeps its `!`.** `![alt](url)` renders as `!alt (url)`; only the `[` was removed.
+
+3. **Reference-style links keep their source form.** `[text][ref]`, `[text][]`, and `[text]` render literally,
+   because the destination is not inside the tag range and the inline splitter (which looks for `](`) cannot find
+   it.
+
+### Local fix (revert when upstream ships)
+
+| Area | Change |
+|------|--------|
+| `buffers.rs` | `MarkdownBuffers::link_container_highlights: Vec<usize>` records container highlight indices |
+| `parse.rs` | `push_link_container_highlight` records the index; used for the `link_text` interior, the degenerate whole-range fallback, and the reference-form text |
+| `parse.rs` | the opener transform drops `![` for images, not only `[` |
+| `parse.rs` | `try_push_reference_link` rewrites `[text][label]` / `[text][]` / `[text]` to `text (url)`: opener removed, label replaced, `link_text` container over the text, `link_url` over the rewritten tail |
+| `render.rs` | both skip decisions (`render_ansi` and `render_ratatui`) drop container highlights before `all_hidden`, so a hidden marker stays hidden while the container still reaches the drawn style through `merge_styles` |
+| tests | `hyperlinks::hyperlink_tests::markers_inside_link_text_are_hidden`, `link_text_inside_emphasis_keeps_target_and_styling`, `reference_link_text_is_the_clickable_span`, `render::tests::test_pretty_image_bracket_removed`, `test_pretty_reference_links_rewritten`, `test_pretty_reference_link_hides_inner_markers`, pager `markers_inside_link_text_render_hidden` |
+
+Marking by *index* is required: comparing style values misfires because themes legitimately give several elements
+the same style (in the crate's `test_style` the link styles equal the plain text style), and dropping those
+highlights collapses code blocks and plain text.
+
+The rewritten tail also has to carry a highlight: text after the last render event is emitted by the trailing
+path, which applies force transforms only, so an unstyled tail would keep its raw source.
+
+### Revert condition
+
+Revert when upstream hides syntax markers inside a link/image container, drops the image `!`, and renders
+reference-style links like inline ones (for example by applying link styling per content event instead of over
+the whole interior, and by resolving every `LinkType` to the same `text (url)` shape).
+
+### Notes (local)
+
+- Container styles still contribute to the drawn style; only the skip decision ignores them.
+- Raw mode is unchanged: it shows the source, so markers, the `!`, and the reference label stay visible there.
+- A reference *definition* line (`[ref]: https://e.com`) is still drawn as source text; only the link itself is
+  rewritten.
+- Link titles and urls remain literal text, where markers are not syntax.
+
 ## `upstream-pulldown-unreleased` (2026-09-27)
 
 ### Problem (present on upstream; not introduced by this fork)

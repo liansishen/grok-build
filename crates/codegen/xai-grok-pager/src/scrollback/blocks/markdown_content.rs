@@ -630,6 +630,39 @@ mod tests {
         assert!(bold, "the label must be bold: {text:?}");
     }
 
+    /// Regression for the reported resource-pack line: a bold file name inside a link printed its `**` markers,
+    /// because the link's container highlight covers the whole interior, including the emphasis delimiters.
+    #[test]
+    fn markers_inside_link_text_render_hidden() {
+        let md = MarkdownContent::new(
+            "材质包已就绪，打包任务和 ZIP 内容核验均通过：\n\n[**Modernity-TomsStorage-0.2.2.zip**](build/resourcepacks/Modernity-TomsStorage-0.2.2.zip)",
+        );
+        let out = md.output(120);
+        let text: String = out.lines.iter().map(|l| l.content.to_string()).collect();
+        assert!(!text.contains("**"), "markers must stay hidden: {text:?}");
+        assert!(
+            text.contains("Modernity-TomsStorage-0.2.2.zip"),
+            "the file name must survive: {text:?}"
+        );
+    }
+
+    /// Regression for the image and reference-link forms: an image must not keep its `!`, and a reference-style
+    /// link must be rewritten to `text (url)` instead of staying literal.
+    #[test]
+    fn image_and_reference_link_forms_render_rewritten() {
+        let md = MarkdownContent::new("An ![image](src.png) and a [docs][ref].\n\n[ref]: https://e.com\n");
+        let out = md.output(120);
+        let first = out
+            .lines
+            .first()
+            .map(|l| l.content.to_string())
+            .unwrap_or_default();
+        assert_eq!(
+            first, "An image (src.png) and a docs (https://e.com).",
+            "got: {first:?}"
+        );
+    }
+
     /// Verify that incremental wrapping during streaming produces the same output as creating a fresh MarkdownContent with the full text.
     #[test]
     fn incremental_wrap_matches_full_wrap() {

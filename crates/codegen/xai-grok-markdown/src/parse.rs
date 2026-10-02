@@ -9,7 +9,7 @@
 use std::ops::Range;
 
 use anstyle::Style;
-use pulldown_cmark::{CodeBlockKind, CowStr, Event, Tag, TagEnd, TextMergeWithOffset};
+use pulldown_cmark::{CodeBlockKind, CowStr, Event, LinkType, Tag, TagEnd, TextMergeWithOffset};
 use ratatui::style::Stylize as RatatuiStylize;
 use ratatui::text::{Line, Span};
 use unicode_segmentation::UnicodeSegmentation;
@@ -550,6 +550,91 @@ impl<'a, 'b, 'syn, 'oc> MarkdownParser<'a, 'b, 'syn, 'oc> {
         });
     }
 
+    // LOCAL-PATCH(upstream-link-rendering): record container highlights (see the buffers field docs)
+    /// Push a link/image *container* style and record its index in
+    /// [`MarkdownBuffers::link_container_highlights`], which the render skip decision ignores so that nested
+    /// syntax markers stay hidden (see the field docs for why).
+    fn push_link_container_highlight(&mut self, style: Style, range: &Range<usize>) {
+        self.buffers.link_container_highlights.push(self.buffers.highlights.len());
+        self.push_highlight(Some(style), range);
+    }
+
+    // LOCAL-PATCH(upstream-link-rendering): reference/collapsed/shortcut links and the image `!`
+    /// Rewrite a reference-style link (`[text][label]`, `[text][]`, `[text]`) the way the inline path renders
+    /// `[text](url)`: drop the opener and turn the label into ` (url)`, keeping the text as the clickable span.
+    ///
+    /// pulldown reports these forms with the same `dest_url` as inline links, but the destination is not inside the
+    /// tag range, so the inline splitter cannot find it. Returns `false` (without touching any buffer) when the
+    /// shape does not match, so the caller can fall back to the whole-range treatment.
+    fn try_push_reference_link(
+        &mut self,
+        link_type: LinkType,
+        dest_url: &str,
+        range: &Range<usize>,
+        tag_str: &str,
+    ) -> bool {
+        let open_bracket = usize::from(tag_str.starts_with("!["));
+        let text_start = range.start + open_bracket + 1;
+        let (text_end, tail_end) = match link_type {
+            LinkType::Reference => {
+                // `[text][label]`: the last `][` splits the text from the label (the text may contain `][` itself)
+                let Some(split) = tag_str.rfind("][") else {
+                    return false;
+                };
+                if split < open_bracket + 1 {
+                    return false;
+                }
+                (range.start + split, range.end)
+            }
+            // `[text][]`: pulldown's range covers only `[text]`, the `[]` sits right after the tag range
+            LinkType::Collapsed => {
+                let tail_end = if self.text.get(range.end..range.end + 2) == Some("[]") {
+                    range.end + 2
+                } else {
+                    range.end
+                };
+                (range.end.saturating_sub(1), tail_end)
+            }
+            // `[text]`: only the closing bracket is rewritten
+            LinkType::Shortcut => (range.end.saturating_sub(1), range.end),
+            _ => return false,
+        };
+        if text_end < text_start || text_end < range.start || tail_end < text_end {
+            return false;
+        }
+
+        self.buffers.transforms.push(Transform {
+            range: range.start..text_start,
+            to: String::new(),
+            force: false,
+        });
+        self.buffers.transforms.push(Transform {
+            range: text_end..tail_end,
+            to: format!(" ({dest_url})"),
+            force: false,
+        });
+        // Style the rewritten tail like an inline link destination and, because text after the last render event is
+        // emitted by the trailing path (which applies force transforms only), give the renderer an event at
+        // `tail_end` so this rewrite happens inside a normal chunk.
+        if tail_end > text_end {
+            self.buffers.highlights.push(Highlight {
+                style: Some(self.ms.link_url),
+                range: text_end..tail_end,
+            });
+        }
+        if text_end > text_start {
+            // LOCAL-PATCH(upstream-link-rendering): record the link-text container
+            self.push_link_container_highlight(self.ms.link_text, &(text_start..text_end));
+            self.buffers.link_targets.push(LinkTarget {
+                source_range: text_start..text_end,
+                url: dest_url.to_string(),
+                id: self.link_id_counter,
+            });
+            self.link_id_counter += 1;
+        }
+        true
+    }
+
     fn on_event(&mut self, event: Event<'a>, range: Range<usize>) {
         let mut parent_code_block = None;
 
@@ -1087,10 +1172,16 @@ impl<'a, 'b, 'syn, 'oc> MarkdownParser<'a, 'b, 'syn, 'oc> {
                 Some(self.ms.strikethrough_outer)
             }
             Tag::Link {
-                dest_url, title, ..
+                link_type,
+                dest_url,
+                title,
+                ..
             }
             | Tag::Image {
-                dest_url, title, ..
+                link_type,
+                dest_url,
+                title,
+                ..
             } => {
                 // Links inside a table cell go through the table renderer's own hyperlink path (TableHyperlink in TableReplace)
                 // The paragraph link path (LinkTarget + chunk_link_offsets) can't project links onto rendered table cells
@@ -1109,7 +1200,7 @@ impl<'a, 'b, 'syn, 'oc> MarkdownParser<'a, 'b, 'syn, 'oc> {
                         id: self.link_id_counter,
                     });
                     self.link_id_counter += 1;
-                    self.push_highlight(Some(self.ms.link_outer), &range);
+                    self.push_link_container_highlight(self.ms.link_outer, &range);
                     self.tag_stack.push(tag);
                     return;
                 };
@@ -1159,10 +1250,9 @@ impl<'a, 'b, 'syn, 'oc> MarkdownParser<'a, 'b, 'syn, 'oc> {
                     let text_start = range.start + open_bracket + 1;
                     let text_end = bracket_pos.start + range.start;
                     if text_end > text_start {
-                        more.push(Highlight {
-                            style: Some(self.ms.link_text),
-                            range: text_start..text_end,
-                        });
+                        // LOCAL-PATCH(upstream-link-rendering): record the link-text container
+                        // so the render skip decision ignores it (nested markers must stay hidden)
+                        self.push_link_container_highlight(self.ms.link_text, &(text_start..text_end));
                     }
                     let bracket_abs = bracket_pos.start + range.start;
                     more.push(Highlight {
@@ -1174,7 +1264,9 @@ impl<'a, 'b, 'syn, 'oc> MarkdownParser<'a, 'b, 'syn, 'oc> {
                         range: range.end - 1..range.end,
                     });
                     self.buffers.transforms.push(Transform {
-                        range: range.start + open_bracket..range.start + open_bracket + 1,
+                        // LOCAL-PATCH(upstream-link-rendering): the image `!` is dropped together with the opener
+                        // Remove the opener: `[` for links, `![` for images
+                        range: range.start..range.start + open_bracket + 1,
                         to: "".to_string(),
                         force: false,
                     });
@@ -1192,6 +1284,8 @@ impl<'a, 'b, 'syn, 'oc> MarkdownParser<'a, 'b, 'syn, 'oc> {
                         self.link_id_counter += 1;
                     }
                     None
+                } else if self.try_push_reference_link(*link_type, dest_url, &range, tag_str) {
+                    None
                 } else {
                     self.buffers.link_targets.push(LinkTarget {
                         source_range: range.clone(),
@@ -1199,7 +1293,10 @@ impl<'a, 'b, 'syn, 'oc> MarkdownParser<'a, 'b, 'syn, 'oc> {
                         id: self.link_id_counter,
                     });
                     self.link_id_counter += 1;
-                    Some(self.ms.link_outer)
+                    // LOCAL-PATCH(upstream-link-rendering): the whole range carries the container style
+                    // Degenerate link (no `](` to split on, e.g. an autolink)
+                    self.push_link_container_highlight(self.ms.link_outer, &range);
+                    None
                 }
             }
             _ => None,
