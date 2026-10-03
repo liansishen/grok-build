@@ -1,5 +1,45 @@
 # Changelog
 
+# 1.0.45-fork.5 — 2026-10-03
+
+本版为 Fork 问题修复，产品版本仍为 **1.0.45**。修正终端通知的触发范围：只有用户自己发起的回合真正结束时才发出 `turn_complete` 提醒，后台任务或后台子代理完成所触发的内部唤醒回合不再打扰用户。
+
+### 问题修复
+
+- **唤醒回合被当成回合结束提醒**：上游 `4247f661`（“Notify turn_complete on chatty monitor-wake EndTurn”）为合成唤醒回合（wake turn）增加了第二个 `TurnComplete` 通知产生点（`queue_wake_turn_complete_notification`，位于 `crates/codegen/xai-grok-pager/src/app/acp_handler/session_notification.rs`）。唤醒回合家族包括 `task-completed-*`（后台 shell 任务完成）、`subagent-completed-*`（后台子代理完成）、`notifications-*`（后台任务 / 监视器通知汇聚）、`workflow-completed-*` 与 `parent-message-*`。于是长时间任务在后台工作仍在跑时就会弹出「回合完成」，并在真实回合结束后紧接着再弹一条：本机日志中 2026-10-02 12:55:57 的主回合结束与其后 13 秒的 `notifications-…` 唤醒回合收尾正是这种「连响两条」的形态，用户也会把它读成「开始后台子代理时误报完成」。
+- 现在删除该产生点及其空闲标题转义：唤醒回合仍按原逻辑执行 `finish_wake_turn`（写回合结束标记、收尾 tracker 与 scrollback、处理 `running_wake_turn`），但不再排队通知；`app/dispatch/prompt.rs` 恢复为唯一的 `TurnComplete` 产生点，通知与用户自己发起的回合一一对应。
+
+### 兼容性与边界
+
+- 发布标签 `v1.0.45-fork.5` 必须匹配 `crates/codegen/xai-grok-version/Cargo.toml` 中的产品版本 `1.0.45`。
+- 真实回合结束的通知行为不变：正文仍使用带时长的 `notification.turn_complete_in`，仍延后 3 个 tick（≈99 ms）发出，以便 Ghostty 的 75 ms `setTitle` 去抖先应用空闲标题。
+- 一并删除的空闲标题转义与逐 tick 的标题路径重复：唤醒回合期间会话保持 idle，`AgentSession::turn_activity()` 返回 `None`，标签页标题与 OSC 9;4 进度条本就会回到空闲；唤醒回合从未进入 busy 状态，因此不存在被留下的进度指示。
+- 通知的开关与焦点条件仍由 `[ui.notifications]` 决定（`events` 默认含 `turn_complete`，`condition` 默认 `unfocused`）。唤醒回合照常执行，所以 `features.auto_wake` 可以保持开启以获得后台任务 / 子代理完成后的自动续跑，同时不再产生误报提醒。
+- 该行为是 Fork 的有意选择，登记在 `FORK_FEATURES.md`（“Turn-complete notification scope”，**Keep additive**），代码中不加 `LOCAL-PATCH` 标记；上游同步时需复查 `session_notification.rs`，避免重新引入新的唤醒回合通知产生点。
+
+### 国际化
+
+- 未新增用户可见字符串，翻译目录与 `scripts/i18n_catalog.py` 检查无变化；`en.toml` 与 `zh-CN.toml` 的键集合保持一致。
+- 用户手册 `crates/codegen/xai-grok-pager/docs/user-guide/05-configuration.md` 与 `zh-CN/05-configuration.md` 的通知一节同步补充：`turn_complete` 标记用户自己发起的回合结束，内部唤醒回合保持静默。
+
+### 验证
+
+- `cargo +1.92.0 check --locked -p xai-grok-pager-bin`：通过。
+- `cargo +1.92.0 test --locked -p xai-grok-pager --lib -- --test-threads=1`（CI 同款串行）：10364 项通过、1 项失败（既有的本机 `fs_size::tests::later_sibling_is_visited_after_another_filesystem` 目录枚举顺序漂移，与本版无关）、4 项忽略。
+- 聚焦 `app::acp_handler::tests::turn_completion`：99 项通过，含改写后的 `chatty_wake_turn_completed_pushes_one_marker_without_notification`（断言有可见输出的唤醒回合只写一个回合结束标记、不排队通知）；真实回合结束的通知仍由 `app::dispatch::tests::prompt` 的用例覆盖。
+- `cargo +1.92.0 test --locked -p xai-grok-sampler --lib`：271 项通过。
+- `cargo +1.92.0 test --locked -p xai-grok-i18n --lib`：14 项通过；`--test i18n_audit`：17 项通过。
+- `cargo +1.92.0 build --locked -p xai-grok-pager-bin --release`：通过；`target/release/xai-grok-pager --version` 输出包含 `1.0.45-fork.5`。
+- `python3 scripts/upstream_merge.py audit-markers --repo . --json`：无错误；`git diff --check`：干净。
+
+### 产物
+
+- `grok-1.0.45-fork.5-linux-x86_64`
+- `grok-1.0.45-fork.5-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.45-fork.4...v1.0.45-fork.5
+
 # 1.0.45-fork.4 — 2026-10-02
 
 本版为 Fork 问题修复与审计加固，产品版本仍为 **1.0.45**。把输入框上方 dock 的文案接入翻译目录，并让本地化审计覆盖此前看不到的几种数据流形态。
