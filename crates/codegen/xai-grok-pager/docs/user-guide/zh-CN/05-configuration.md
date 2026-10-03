@@ -449,7 +449,7 @@ fork_worktree_mode = "ask"             # /fork 工作树提示："ask" | "always
 <a id="notifications"></a>
 ### 通知
 
-在智能体完成一回合或需要审批时发送终端通知。通知使用终端原生协议（OSC 9、OSC 99、OSC 777 或 BEL），默认受焦点控制，因此只有在你没有查看终端时才会触发。
+在智能体完成一回合或需要审批时发送终端通知。通知使用终端原生协议（OSC 9、OSC 99、OSC 777 或 BEL），默认受焦点控制，因此只有在你没有查看终端时才会触发。`turn_complete` 标记你发起的回合结束；后台任务或后台子代理完成时 Grok 内部运行的唤醒回合保持静默。
 
 ```toml
 [ui.notifications]

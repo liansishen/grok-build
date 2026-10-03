@@ -470,7 +470,7 @@ fork_worktree_mode = "ask"             # /fork worktree prompt: "ask" | "always"
 
 ### Notifications
 
-Fire terminal notifications when the agent finishes a turn or needs approval. They use terminal-native protocols (OSC 9, OSC 99, OSC 777, or BEL) and are focus-gated by default, so they only fire when you're not looking at the terminal.
+Fire terminal notifications when the agent finishes a turn or needs approval. They use terminal-native protocols (OSC 9, OSC 99, OSC 777, or BEL) and are focus-gated by default, so they only fire when you're not looking at the terminal. `turn_complete` marks the end of a turn you started; the wake turns Grok runs internally when a background task or background subagent finishes stay silent.
 
 ```toml
 [ui.notifications]
