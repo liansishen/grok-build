@@ -357,7 +357,6 @@ pub(super) fn handle_session_notification_with_origin(
     let mut plugins_changed_needs_skills_refetch = false;
     let mut status_snapshot_applied = false;
     let mut terminal_outcome: Option<super::super::turn_completion::TerminalApply> = None;
-    let mut queue_wake_turn_complete = false;
     let mut pending_finish_for_spawn = None;
     let root_session_id: &str = session_notif.session_id.0.as_ref();
     let changed = match session_notif.update {
@@ -469,7 +468,9 @@ pub(super) fn handle_session_notification_with_origin(
                         false
                     }
                 } else {
-                    queue_wake_turn_complete = finish_wake_turn(
+                    // Fork: a synthetic wake turn is not a turn the user started, so closing
+                    // it stays silent. Only a real turn end raises a turn-complete notification.
+                    let _ = finish_wake_turn(
                         agent,
                         &prompt_id,
                         super::prompt_origin::WakeTerminal {
@@ -1580,9 +1581,6 @@ pub(super) fn handle_session_notification_with_origin(
         let deferred = acp::ExtNotification::new("x.ai/session/update", params.into());
         let _ = handle_session_notification_with_origin(&deferred, app, origin);
     }
-    if queue_wake_turn_complete {
-        queue_wake_turn_complete_notification(app, parent_id);
-    }
     if !app.reconnect_pending
         && let Some(agent) = app.agents.get(&parent_id)
         && agent.running_wake_turn.is_none()
@@ -1598,46 +1596,6 @@ pub(super) fn handle_session_notification_with_origin(
         );
     }
     changed && is_active
-}
-fn queue_wake_turn_complete_notification(app: &mut AppView, agent_id: AgentId) {
-    let (session_name, session_id, model) = {
-        let Some(agent) = app.agents.get(&agent_id) else {
-            return;
-        };
-        if !agent.session.pending_prompts.is_empty() {
-            return;
-        }
-        (
-            agent
-                .display_name
-                .as_deref()
-                .or(agent.generated_session_title.as_deref())
-                .map(str::to_string),
-            agent.session.session_id.as_ref().map(|s| s.0.to_string()),
-            agent.session.models.current_model_name(),
-        )
-    };
-    let cwd_str = app.cwd.to_string_lossy().into_owned();
-    let idle_title = crate::notifications::TitleState {
-        session_name: session_name.as_deref(),
-        model: model.as_deref(),
-        activity: None,
-        has_pending_permissions: false,
-        cwd: Some(cwd_str.as_str()),
-        turn_elapsed: None,
-        is_busy: false,
-        focused: true,
-    };
-    app.pending_notification_escapes = app.notification_service.build_idle_escapes(&idle_title);
-    app.deferred_notification = Some((
-        NotificationEvent {
-            kind: NotificationEventKind::TurnComplete,
-            title: session_name.unwrap_or_else(|| "Grok".into()),
-            body: xai_grok_i18n::t_or("notification.event.turn_complete", "Turn complete").into(),
-            session_id,
-        },
-        3,
-    ));
 }
 /// Handle an xAI session notification that targets a child (subagent) session.
 ///

@@ -327,7 +327,7 @@
     }
 
     #[test]
-    fn chatty_wake_turn_completed_pushes_one_marker() {
+    fn chatty_wake_turn_completed_pushes_one_marker_without_notification() {
         use crate::app::agent_view::test_fixtures::count_turn_markers;
 
         let mut app = make_app_with_agent("sess-wake");
@@ -355,12 +355,10 @@
                 Some(SessionEvent::TurnCompleted { .. })
             ));
         }
-        let (event, ticks) = app
-            .deferred_notification
-            .as_ref()
-            .expect("chatty wake EndTurn must queue TurnComplete");
-        assert_eq!(event.kind, crate::notifications::NotificationEventKind::TurnComplete);
-        assert_eq!(*ticks, 3);
+        assert!(
+            app.deferred_notification.is_none(),
+            "only a real turn end queues TurnComplete; a chatty wake stays silent"
+        );
     }
 
     #[test]
