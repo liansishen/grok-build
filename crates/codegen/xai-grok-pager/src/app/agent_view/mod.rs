@@ -953,6 +953,8 @@ pub struct AgentView {
     /// Set by `maybe_drain_queue` when a prompt is sent. Used to compute
     /// elapsed time for "Worked for Xm Ys" system messages.
     pub turn_started_at: Option<Instant>,
+    /// Most recent program-status turn result for this session.
+    pub(crate) program_status_result: Option<crate::notifications::program_status::ProgramStatus>,
     /// Turn-start anchor a `turn.first_activity` log was already emitted for (fire-once-per-turn guard).
     pub first_activity_logged_for: Option<Instant>,
     /// Accumulated duration the turn timer was paused (while the user was

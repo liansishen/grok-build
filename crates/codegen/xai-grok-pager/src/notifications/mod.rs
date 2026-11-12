@@ -2,6 +2,7 @@ pub mod config;
 pub mod focus;
 pub mod hooks;
 pub mod progress;
+pub mod program_status;
 pub mod protocol;
 pub mod sleep;
 pub mod title;
@@ -10,6 +11,7 @@ pub mod tmux;
 use std::time::{Duration, Instant};
 
 use crate::render::draw::EscapeWriter;
+use program_status::ProgramStatus;
 
 /// Ghostty resets the OSC 9;4 progress indicator after ~15 s of silence.
 /// Re-send the sequence at this interval to keep it alive.
@@ -44,6 +46,8 @@ pub struct NotificationService {
     permission_notified: bool,
     /// Out-of-band escape queue for notification/shutdown escapes; see [`EscapeWriter`](crate::render::draw::EscapeWriter).
     escape_writer: EscapeWriter,
+    program_status_route: Option<bool>,
+    last_program_status: Option<ProgramStatus>,
 }
 
 impl NotificationService {
@@ -56,6 +60,7 @@ impl NotificationService {
         );
         let sleep_inhibitor = sleep::SleepInhibitor::new(config.sleep_prevention);
         let title_manager = title::TitleManager::new(&config.title);
+        let program_status_route = program_status::route(config.program_status, terminal_ctx);
         Self {
             config,
             focus_tracker,
@@ -67,6 +72,8 @@ impl NotificationService {
             progress_last_sent: None,
             permission_notified: false,
             escape_writer,
+            program_status_route,
+            last_program_status: None,
         }
     }
 
@@ -76,6 +83,19 @@ impl NotificationService {
 
     pub fn protocol(&self) -> protocol::NotificationProtocol {
         self.protocol
+    }
+
+    pub fn update_program_status(&mut self, status: ProgramStatus) {
+        let Some(tmux) = self.program_status_route else {
+            return;
+        };
+        if self.last_program_status == Some(status) {
+            return;
+        }
+        let escape = program_status::report(status, tmux);
+        program_status::mark_reported(tmux);
+        self.escape_writer.emit(escape);
+        self.last_program_status = Some(status);
     }
 
     fn is_event_enabled(&self, kind: &NotificationEventKind) -> bool {
@@ -179,6 +199,10 @@ impl NotificationService {
     pub fn shutdown(&mut self) {
         let mut buf = self.title_manager.reset();
         self.clear_progress_into(&mut buf);
+        if let Some(clear) = program_status::take_teardown_escape() {
+            buf.push_str(&clear);
+        }
+        self.last_program_status = None;
         self.escape_writer.emit(buf);
     }
 
@@ -238,6 +262,8 @@ impl NotificationService {
             progress_last_sent: None,
             permission_notified: false,
             escape_writer: EscapeWriter::disconnected(),
+            program_status_route: None,
+            last_program_status: None,
         }
     }
 }

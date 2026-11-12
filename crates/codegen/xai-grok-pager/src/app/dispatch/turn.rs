@@ -649,6 +649,8 @@ pub(crate) fn reconcile_overdue_turn_ends(app: &mut AppView) -> Option<Vec<Effec
         } else {
             crate::app::turn_completion::TurnStopReason::from(pending.stop_reason.as_deref())
         };
+        agent.program_status_result =
+            Some(crate::app::turn_completion::program_status_for_stop(stop));
         let event = crate::app::turn_completion::terminal_marker(
             crate::app::turn_completion::TerminalMarkerInput {
                 stop,

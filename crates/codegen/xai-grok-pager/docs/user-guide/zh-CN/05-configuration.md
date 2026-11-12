@@ -459,6 +459,7 @@ idle_threshold_secs = 3   # 失去焦点后等待多少秒才发送通知
 events = ["turn_complete", "approval_required"]
 sleep_prevention = true   # 在智能体回合期间防止显示器休眠
 progress_bar = true       # 显示标签页进度条（OSC 9;4）
+program_status = "auto"   # 通过 OSC 7501 报告智能体状态：auto|on|off
 
 [ui.notifications.title]
 enabled = true
@@ -473,8 +474,16 @@ items = ["action-required", "spinner", "activity", "session-name", "grok"]
 | `events` | array | `["turn_complete", "approval_required"]` | 触发通知的事件。选项：`turn_complete`、`approval_required`、`session_ready`、`task_complete`、`agent_error`。 |
 | `sleep_prevention` | bool | `true` | 智能体工作时保持显示器唤醒（macOS/Linux）。 |
 | `progress_bar` | bool | `true` | 在终端标签页中显示进度指示器（OSC 9;4）。 |
+| `program_status` | string | `"auto"` | 通过 OSC 7501 报告智能体状态，独立于通知焦点和事件设置。 |
 | `title.enabled` | bool | `true` | 设置终端标题以反映智能体状态。 |
 | `title.items` | array | （见上文） | 标题栏中显示的项目。选项：`action-required`、`spinner`、`activity`、`session-name`、`cwd`、`model`、`turn-timer`、`grok`。 |
+
+<a id="program-status-osc-7501"></a>
+#### 程序状态（OSC 7501）
+
+Grok 为整个终端报告一条主状态记录：空闲、工作中、等待操作、完成或错误。herdr-app 等兼容终端可以据此列出 Grok 并显示何时需要处理。正常退出时清除记录。
+
+设置 `program_status = "on"` 可显式启用上报，适用于 SSH 场景；`"off"` 关闭上报。本 fork 的 `"auto"` 模式在未检测到内层终端复用器时，识别成对存在的 herdr-core 环境变量 `HC_TERMINAL_ID`、`HC_TERMINAL_SOCKET`，或 Rex 的 `REX_SESSION`、`REX_BLOCK`，并且不发送能力查询。tmux 内显式上报需要 tmux 3.3 或更新版本，并启用 `allow-passthrough`。当前只报告终端主状态，会话和子智能体的独立记录尚未实现。
 
 <a id="terminal-support-matrix"></a>
 #### 终端支持矩阵

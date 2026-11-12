@@ -38,6 +38,9 @@ impl AgentView {
     /// A stale cursor relies on exact-match failure for safety; a stale highwater could dedup-drop the new session's events outright.
     pub(crate) fn bind_session_id(&mut self, session_id: agent_client_protocol::SessionId) {
         if self.session.session_id.as_ref() != Some(&session_id) {
+            if self.session.session_id.is_some() {
+                self.program_status_result = None;
+            }
             self.session_binding_epoch = self.session_binding_epoch.wrapping_add(1);
             self.last_seen_event_id = None;
             self.last_seen_event_seq = None;
@@ -79,6 +82,7 @@ impl AgentView {
     /// Unbind this view from its current session identity.
     pub(crate) fn unbind_session_id(&mut self) {
         if self.session.session_id.take().is_some() {
+            self.program_status_result = None;
             self.session_binding_epoch = self.session_binding_epoch.wrapping_add(1);
             self.deferred_subagent_finishes.clear();
             self.clear_minimal_btw_lifecycle();
@@ -222,6 +226,7 @@ impl AgentView {
             turn_start_ms: None,
             turn_start_ms_prompt: None,
             turn_started_at: None,
+            program_status_result: None,
             first_activity_logged_for: None,
             turn_paused_duration: std::time::Duration::ZERO,
             turn_paused_wall: std::time::Duration::ZERO,
@@ -735,6 +740,7 @@ impl AgentView {
     /// Start a locally-tracked turn: enter TurnRunning with the turn-scoped bookkeeping every real turn start must apply, so no caller can miss it.
     /// Deliberately NOT used by server-initiated synthetic turns (auto-wake / actor runs): they never call `start_turn`.
     pub(crate) fn start_turn_boundary(&mut self, starting_prompt_id: Option<&str>) {
+        self.program_status_result = None;
         if self
             .expect_send_now_cancel
             .as_deref()
@@ -872,6 +878,7 @@ impl AgentView {
         {
             return;
         }
+        self.program_status_result = None;
         self.running_wake_turn = Some(super::RunningWakeTurn {
             prompt_id: prompt_id.to_string(),
             cancel_sent: false,

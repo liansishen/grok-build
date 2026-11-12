@@ -480,6 +480,7 @@ idle_threshold_secs = 3   # seconds unfocused before a notification fires
 events = ["turn_complete", "approval_required"]
 sleep_prevention = true   # prevent display sleep during agent turns
 progress_bar = true       # show tab progress bar (OSC 9;4)
+program_status = "auto"   # agent status over OSC 7501: auto|on|off
 
 [ui.notifications.title]
 enabled = true
@@ -494,8 +495,15 @@ items = ["action-required", "spinner", "activity", "session-name", "grok"]
 | `events` | array | `["turn_complete", "approval_required"]` | Events that trigger notifications. Options: `turn_complete`, `approval_required`, `session_ready`, `task_complete`, `agent_error`. |
 | `sleep_prevention` | bool | `true` | Keep the display awake while the agent works (macOS/Linux). |
 | `progress_bar` | bool | `true` | Show a progress indicator in the terminal tab (OSC 9;4). |
+| `program_status` | string | `"auto"` | Report agent status over OSC 7501 independently of notification focus and event settings. |
 | `title.enabled` | bool | `true` | Set the terminal title to reflect agent state. |
 | `title.items` | array | (see above) | Items shown in the title bar. Options: `action-required`, `spinner`, `activity`, `session-name`, `cwd`, `model`, `turn-timer`, `grok`. |
+
+#### Program status (OSC 7501)
+
+Grok reports one terminal-wide status record: idle, working, blocked, done, or error. Compatible terminals such as herdr-app can use it to list Grok and show when it needs attention. Normal exit clears the record.
+
+Set `program_status = "on"` to enable reporting explicitly, including over SSH, or `"off"` to disable it. This fork's `"auto"` mode recognizes herdr-core's `HC_TERMINAL_ID` and `HC_TERMINAL_SOCKET`, or Rex's `REX_SESSION` and `REX_BLOCK`, when both values are present and no inner multiplexer is detected. It does not send capability queries. In tmux, explicit reporting requires tmux 3.3 or newer with `allow-passthrough` enabled. Session and subagent child records are not emitted.
 
 #### Terminal support matrix
 
