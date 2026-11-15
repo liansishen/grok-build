@@ -427,6 +427,11 @@ pub(super) fn handle_session_notification_with_origin(
                 }
                 false
             } else if is_wake_prompt(&prompt_id) {
+                let current_wake = !meta.is_replay
+                    && agent
+                        .running_wake_turn
+                        .as_ref()
+                        .is_some_and(|wake| wake.prompt_id == prompt_id);
                 if agent
                     .running_wake_turn
                     .as_ref()
@@ -486,6 +491,15 @@ pub(super) fn handle_session_notification_with_origin(
                             ),
                         },
                     );
+                    if current_wake {
+                        agent.program_status_result = Some(
+                            crate::app::turn_completion::program_status_for_stop(
+                                crate::app::turn_completion::TurnStopReason::from(
+                                    stop_reason.as_str(),
+                                ),
+                            ),
+                        );
+                    }
                     true
                 }
             } else if is_server_initiated_prompt(&prompt_id)
@@ -501,6 +515,7 @@ pub(super) fn handle_session_notification_with_origin(
                     true
                 }
             } else {
+                let previous_program_status = agent.program_status_result;
                 terminal_outcome =
                     Some(super::super::turn_completion::finalize_turn_from_terminal(
                         agent,
@@ -523,6 +538,9 @@ pub(super) fn handle_session_notification_with_origin(
                             error_kind,
                         },
                     ));
+                if meta.is_replay {
+                    agent.program_status_result = previous_program_status;
+                }
                 false
             }
         }

@@ -1,6 +1,7 @@
 pub mod config;
 pub mod focus;
 pub mod hooks;
+pub mod program_status;
 pub mod progress;
 pub mod protocol;
 pub mod sleep;
@@ -10,6 +11,7 @@ pub mod tmux;
 use std::time::{Duration, Instant};
 
 use crate::render::draw::EscapeWriter;
+use program_status::ProgramStatus;
 
 /// Ghostty resets the OSC 9;4 progress indicator after ~15 s of silence.
 /// Re-send the sequence at this interval to keep it alive.
@@ -44,6 +46,8 @@ pub struct NotificationService {
     permission_notified: bool,
     /// Out-of-band escape queue for notification/shutdown escapes; see [`EscapeWriter`](crate::render::draw::EscapeWriter).
     escape_writer: EscapeWriter,
+    program_status_route: Option<program_status::Route>,
+    last_program_status: Option<ProgramStatus>,
 }
 
 impl NotificationService {
@@ -56,6 +60,11 @@ impl NotificationService {
         );
         let sleep_inhibitor = sleep::SleepInhibitor::new(config.sleep_prevention);
         let title_manager = title::TitleManager::new(&config.title);
+        let program_status_route = program_status::route(
+            config.program_status,
+            config.tern_agent_compat,
+            terminal_ctx,
+        );
         Self {
             config,
             focus_tracker,
@@ -67,6 +76,8 @@ impl NotificationService {
             progress_last_sent: None,
             permission_notified: false,
             escape_writer,
+            program_status_route,
+            last_program_status: None,
         }
     }
 
@@ -76,6 +87,27 @@ impl NotificationService {
 
     pub fn protocol(&self) -> protocol::NotificationProtocol {
         self.protocol
+    }
+
+    pub fn update_program_status(&mut self, status: ProgramStatus) {
+        if let Some((route, escape)) = self.build_program_status_update(status) {
+            program_status::mark_reported(route);
+            self.escape_writer.emit(escape);
+        }
+    }
+
+    fn build_program_status_update(
+        &mut self,
+        status: ProgramStatus,
+    ) -> Option<(program_status::Route, String)> {
+        let route = self.program_status_route?;
+        if self.last_program_status == Some(status) {
+            return None;
+        }
+        let escape =
+            program_status::update_escape(status, route, self.last_program_status.is_none());
+        self.last_program_status = Some(status);
+        Some((route, escape))
     }
 
     fn is_event_enabled(&self, kind: &NotificationEventKind) -> bool {
@@ -179,6 +211,10 @@ impl NotificationService {
     pub fn shutdown(&mut self) {
         let mut buf = self.title_manager.reset();
         self.clear_progress_into(&mut buf);
+        if let Some(clear) = program_status::take_teardown_escape() {
+            buf.push_str(&clear);
+        }
+        self.last_program_status = None;
         self.escape_writer.emit(buf);
     }
 
@@ -238,6 +274,8 @@ impl NotificationService {
             progress_last_sent: None,
             permission_notified: false,
             escape_writer: EscapeWriter::disconnected(),
+            program_status_route: None,
+            last_program_status: None,
         }
     }
 }
@@ -635,6 +673,48 @@ mod tests {
             "expected the title reset in the queued escape"
         );
         assert!(rx.try_recv().is_err(), "one combined payload expected");
+    }
+
+    #[test]
+    fn tern_registration_is_ordered_once_before_deduplicated_status_updates() {
+        let mut svc = NotificationService::new_for_test(NotificationConfig::default());
+        svc.program_status_route = Some(program_status::Route {
+            tmux: false,
+            tern_agent_compat: true,
+        });
+
+        let queued: Vec<String> = [
+            ProgramStatus::Idle,
+            ProgramStatus::Idle,
+            ProgramStatus::Working,
+            ProgramStatus::Blocked(program_status::BlockKind::Question),
+            ProgramStatus::Done,
+        ]
+        .into_iter()
+        .filter_map(|status| {
+            svc.build_program_status_update(status)
+                .map(|(_, escape)| escape)
+        })
+        .collect();
+        assert_eq!(queued.len(), 4);
+        assert_eq!(
+            queued[0],
+            "\x1b]133;C;cmdline=omp\x07\x1b]7501;state=idle:app=grok-build\x1b\\",
+        );
+        for escape in &queued[1..] {
+            assert!(!escape.contains("133;"));
+            assert!(escape.contains("app=grok-build"));
+        }
+        assert!(queued[2].contains("state=blocked:kind=question"));
+    }
+
+    #[test]
+    fn disabled_status_route_never_registers_tern() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut svc = NotificationService::new_for_test(NotificationConfig::default());
+        svc.escape_writer = EscapeWriter::new(tx, WriterSync::new());
+        svc.update_program_status(ProgramStatus::Working);
+        assert!(rx.try_recv().is_err());
     }
 
     #[test]

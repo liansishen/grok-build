@@ -1,5 +1,84 @@
 # Changelog
 
+# 1.0.45-fork.7 — 2026-11-15
+
+本版为 Fork 兼容性修复，产品版本仍为 **1.0.45**。在 Grok 一侧补齐闭源 Stencil Tern 的 Agents 识别，使前一版已有的 OSC 7501 状态上报能够驱动 Tern 的工作、等待操作和完成显示。本版基于已发布的 `v1.0.45-fork.6`，变更范围为 Tern 兼容、配置说明和对应回归测试。
+
+### 新增功能与修复
+
+- **自动识别 Tern**：`program_status = "auto"` 现在识别 `TERM_PROGRAM=tern`，或成对存在的 `TERN_PANE` 与 `TERN_PANE_SOCKET` / `TERN_WINDOW_SOCKET`。上报仍要求交互式输入与启动时保留的 TUI 输出句柄均为 TTY。
+- **进入 Agents 列表**：新增 `[ui.notifications]` 中的 `tern_agent_compat = true`，默认启用。在直接使用 Tern 的交互终端中，首条状态前发送一次 OSC 133 `cmdline=omp` 兼容识别标记，让 Tern 将当前窗格纳入 Agents。标记与首条状态按同一输出队列项投递，后续状态继续去重。
+- **沿用真实状态**：OSC 7501 报告继续携带 `app=grok-build`，并使用已有的空闲、工作中、等待操作、完成和错误状态及 `permission` / `question` / `auth` 阻塞类型。Tern 可以依次显示 Working、Needs you 和 Done。
+- **退出恢复**：正常退出清除状态记录，并将命令追踪字段恢复为固定的 `grok`；信号和 panic 路径复用既有的有界终端清理机制尽力恢复。恢复操作只在本进程使用过兼容识别后发送。
+
+### 兼容性与边界
+
+- 发布标签 `v1.0.45-fork.7` 与版本清单中的产品版本 `1.0.45` 匹配。
+- 兼容性已在 Tern **0.9.21** 验证。识别标记会使 Tern 的运行命令元数据或图标暂时显示为 `omp`；Grok 的终端标题用于显示当前活动，协议中的应用名仍为 `grok-build`。退出恢复使用固定的 `grok` 命令名。
+- 设置 `tern_agent_compat = false` 可保留 OSC 7501 状态上报并关闭兼容识别标记；`program_status = "off"` 关闭整个状态通道及兼容标记。该开关独立于桌面通知的协议、焦点条件和事件选择。
+- 兼容识别仅用于直接的 Tern 交互终端。内层复用器和嵌入式编辑器保持保守处理；tmux 中显式 `program_status = "on"` 沿用既有 OSC 7501 透传，需要 tmux 3.3 或更新版本及 `allow-passthrough`。管道和无 TTY 场景保持静默，herdr / Rex 的既有上报路径继续保留。
+- 每个终端窗格报告一条聚合状态，子智能体的活动汇入该记录。Tern Agents 兼容作为独立条目登记在 `FORK_FEATURES.md`，便于后续上游同步时保留其识别和退出约束。
+
+### 国际化
+
+- 新增的用户配置字段为机器键 `tern_agent_compat`；本版没有新增界面翻译键。英文与简体中文配置指南同步说明默认值、关闭方法、自动识别范围、显示限制和退出行为。
+- 国际化目录配对、当前源码及 Markdown 覆盖审计通过。
+
+### 验证
+
+本地使用 Rust **1.92.0**、Protoc **29.3**、`GROK_VERSION=1.0.45-fork.7`，所有 Cargo 命令均保留 `--locked`：
+
+- pager-bin 类型检查、release 构建和版本输出校验通过。
+- 通知回归测试 **161 项**、Linux sampler 库 **271 项**、国际化库 **14 项**及 `i18n_audit` **17 项**通过；审计同时覆盖当前源码、Markdown 和相对 PR 基线的差异。
+- 隔离网络与进程环境中，用真实 Grok 编译产物和 Tern 0.9.21 组件完成 **8 项端到端 / PTY 用例**：工作、等待回答、回答后完成、退出清除、同窗格重启保持一条记录，以及兼容开关、状态总开关和上报字节顺序等边界。非 Tern 与模拟 tmux 环境通过 PTY 验证，tmux 包装和版本边界由单元测试覆盖。
+- 用户已替换编译产物，并确认实际使用的 Tern Agents 组件能够正常显示 Grok。
+- Fork 标记与翻译目录结构检查、`git diff --check` 通过；Linux / Windows 发布构建和版本检查由 GitHub Actions 进一步验证。
+
+### 产物
+
+- `grok-1.0.45-fork.7-linux-x86_64`
+- `grok-1.0.45-fork.7-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.45-fork.6...v1.0.45-fork.7
+
+# 1.0.45-fork.6 — 2026-11-13
+
+本版为 Fork 新增功能，产品版本仍为 **1.0.45**。补齐 OSC 7501 程序状态上报，使 herdr-app 等兼容终端能够在 Agents 列表中识别 Grok 并显示其工作状态。本版基于 `v1.0.45-fork.5`，只包含此次状态上报移植及对应文档。
+
+### 新增功能与修复
+
+- **终端状态上报**：在 `[ui.notifications]` 中新增 `program_status = "auto" | "on" | "off"`，默认 `auto`。每份报告都携带 `app=grok-build`，报告空闲、工作中、等待操作、完成及错误。状态通道独立于桌面通知的协议、焦点条件和事件开关；无效配置只将此字段恢复为默认值，保留其他通知设置。
+- **真实会话状态**：聚合已打开会话和全局认证状态；权限或计划审批、用户问题、登录分别报告 `permission`、`question`、`auth` 类型的阻塞。切换页面时仍反映后台会话；依据回合结果记录完成、错误或取消，并覆盖 viewer、丢失 RPC 后的恢复和内部唤醒回合终态。新的回合清除旧结果，待执行队列和接管中的回合优先于完成状态。
+- **正确识别 TUI 输出句柄**：Grok 会将原生 `stderr` 重定向到 `/dev/null`，实际画面使用启动时保留的终端句柄。状态上报复用该句柄进行 TTY 检测，并通过现有输出队列发送，解决直接检查进程 `stderr` 导致上报被误关的问题。
+- **退出清理**：正常退出清除本进程的主状态记录；信号和 panic 路径复用既有的有界终端清理机制尽力清除。只有投递过状态的进程才投递清理序列。
+
+### 兼容性与边界
+
+- 发布标签 `v1.0.45-fork.6` 与 `crates/codegen/xai-grok-version/Cargo.toml` 的产品版本 `1.0.45` 匹配。
+- `auto` 识别成对存在的 herdr-core 环境变量 `HC_TERMINAL_ID` / `HC_TERMINAL_SOCKET`，或 Rex 的 `REX_SESSION` / `REX_BLOCK`，并保守处理内层终端复用器。该移植版不发送终端能力查询。
+- `on` 可用于 SSH 及明确支持协议的交互终端；tmux 使用现有透传封装，需要 tmux 3.3 或更新版本并启用 `allow-passthrough`。`off` 关闭此通道。
+- 当前报告每个终端的一条主记录，不提供会话、子代理的独立子记录，也不支持官方后续版本的配置表扩展。报告仅包含状态、应用名和阻塞类型，不包含提示词、路径或错误详情。
+- 登记在 `FORK_FEATURES.md`；后续同步含等价功能的上游源码时复查并移除重复实现。
+
+### 国际化
+
+- 未新增界面翻译键；新增状态值属于终端协议字段。英文及简体中文用户手册同步补充配置、自动识别范围和 tmux 条件。
+
+### 验证
+
+- 按用户要求只做最基础的本地验证：Rust 1.92.0、Protoc 29.3、`--locked` 的 release 编译通过，试用版本为 `1.0.45-fork.5+osc7501.local`。
+- 修正终端句柄检测后，隔离启动的试用二进制被 `herdr-core 0.1.20` 实际接收：`status.app = "grok-build"`、`status.state = "blocked"`、`status.kind = "auth"`、`reported = true`；测试会话已清理。
+- 用户已在实际 herdr-app 中确认 Grok 出现在 Agents 列表。本地未运行完整自动化套件，也未全面验证所有状态转换；Linux / Windows 编译、版本检查及仓库既有测试和审计由发布工作流执行。
+
+### 产物
+
+- `grok-1.0.45-fork.6-linux-x86_64`
+- `grok-1.0.45-fork.6-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.45-fork.5...v1.0.45-fork.6
+
 # 1.0.45-fork.5 — 2026-10-03
 
 本版为 Fork 问题修复，产品版本仍为 **1.0.45**。修正终端通知的触发范围：只有用户自己发起的回合真正结束时才发出 `turn_complete` 提醒，后台任务或后台子代理完成所触发的内部唤醒回合不再打扰用户。

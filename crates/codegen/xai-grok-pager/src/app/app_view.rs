@@ -6205,6 +6205,57 @@ impl AppView {
     /// Also clears the permission notification flag when no permissions
     /// remain queued, so the next batch fires a fresh bell/popup.
     pub fn update_notifications(&mut self) {
+        use crate::notifications::program_status::{BlockKind, ProgramStatus};
+
+        let auth_blocked = matches!(self.auth_state, AuthState::Pending { .. })
+            || matches!(
+                &self.auth_state,
+                AuthState::Authenticating {
+                    auth_url: Some(_),
+                    mode: AuthMode::Command | AuthMode::Loopback | AuthMode::Device,
+                    ..
+                }
+            );
+        let mut permission_blocked = false;
+        let mut question_blocked = false;
+        let mut working = false;
+        let mut error = false;
+        let mut done = false;
+        for (id, agent) in &mut self.agents {
+            permission_blocked |=
+                !agent.permission_queue.is_empty() || agent.plan_approval_view.is_some();
+            question_blocked |= agent.question_view.is_some()
+                || agent.elicitation_view.is_some()
+                || agent.pending_elicitation.is_some();
+            if agent.session.state.is_busy() || agent.wake_turn_active() {
+                agent.program_status_result = None;
+                working = true;
+            } else if !agent.session.pending_prompts.is_empty()
+                || self.pending_running_adoptions.contains_key(id)
+            {
+                working = true;
+            } else {
+                error |= agent.program_status_result == Some(ProgramStatus::Error);
+                done |= agent.program_status_result == Some(ProgramStatus::Done);
+            }
+        }
+        let status = if auth_blocked {
+            ProgramStatus::Blocked(BlockKind::Auth)
+        } else if permission_blocked {
+            ProgramStatus::Blocked(BlockKind::Permission)
+        } else if question_blocked {
+            ProgramStatus::Blocked(BlockKind::Question)
+        } else if working {
+            ProgramStatus::Working
+        } else if error {
+            ProgramStatus::Error
+        } else if done {
+            ProgramStatus::Done
+        } else {
+            ProgramStatus::Idle
+        };
+        self.notification_service.update_program_status(status);
+
         let (session_name, model, activity, needs_input, turn_elapsed, is_busy) =
             if let ActiveView::Agent(id) = self.active_view
                 && let Some(agent) = self.agents.get(&id)

@@ -1705,6 +1705,17 @@ pub(super) fn handle_prompt_response(
         );
 
         agent.session.finish_turn(&mut agent.scrollback);
+        let stop = if was_cancelling
+            || matches!(&result, Ok(response) if response.stop_reason == acp::StopReason::Cancelled)
+        {
+            crate::app::turn_completion::TurnStopReason::Cancelled
+        } else if result.is_err() {
+            crate::app::turn_completion::TurnStopReason::Error
+        } else {
+            crate::app::turn_completion::TurnStopReason::EndTurn
+        };
+        agent.program_status_result =
+            Some(crate::app::turn_completion::program_status_for_stop(stop));
 
         // Insert the session event message (skip TurnCompleted for bash-mode, which has no agent turn)
         let event = match (&result, was_cancelling) {

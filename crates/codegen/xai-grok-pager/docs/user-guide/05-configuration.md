@@ -480,6 +480,8 @@ idle_threshold_secs = 3   # seconds unfocused before a notification fires
 events = ["turn_complete", "approval_required"]
 sleep_prevention = true   # prevent display sleep during agent turns
 progress_bar = true       # show tab progress bar (OSC 9;4)
+program_status = "auto"   # agent status over OSC 7501: auto|on|off
+tern_agent_compat = true  # enable Tern Agents compatibility
 
 [ui.notifications.title]
 enabled = true
@@ -494,8 +496,20 @@ items = ["action-required", "spinner", "activity", "session-name", "grok"]
 | `events` | array | `["turn_complete", "approval_required"]` | Events that trigger notifications. Options: `turn_complete`, `approval_required`, `session_ready`, `task_complete`, `agent_error`. |
 | `sleep_prevention` | bool | `true` | Keep the display awake while the agent works (macOS/Linux). |
 | `progress_bar` | bool | `true` | Show a progress indicator in the terminal tab (OSC 9;4). |
+| `program_status` | string | `"auto"` | Report agent status over OSC 7501 independently of notification focus and event settings. |
+| `tern_agent_compat` | bool | `true` | Enable the Tern Agents compatibility marker without changing OSC 7501 reporting. |
 | `title.enabled` | bool | `true` | Set the terminal title to reflect agent state. |
 | `title.items` | array | (see above) | Items shown in the title bar. Options: `action-required`, `spinner`, `activity`, `session-name`, `cwd`, `model`, `turn-timer`, `grok`. |
+
+#### Program status (OSC 7501)
+
+Grok reports one status record per terminal pane: idle, working, blocked, done, or error. Compatible terminals such as herdr-app can use it to list Grok and show when it needs attention. Normal exit clears the record. Subagents do not have independent entries.
+
+Set `program_status = "on"` to enable reporting explicitly, including over SSH, or `"off"` to disable all status reports and compatibility markers. This fork's `"auto"` mode recognizes herdr-core's `HC_TERMINAL_ID` and `HC_TERMINAL_SOCKET`, Rex's `REX_SESSION` and `REX_BLOCK`, or Tern's `TERM_PROGRAM=tern` or `TERN_PANE` paired with `TERN_PANE_SOCKET` or `TERN_WINDOW_SOCKET`. Auto detection requires no inner multiplexer and sends no capability queries. In tmux, explicit reporting requires tmux 3.3 or newer with `allow-passthrough` enabled.
+
+For the closed-source Tern terminal, `tern_agent_compat = true` enables an identity marker only in a confirmed Tern environment with an interactive TTY and no inner multiplexer or editor. It sends an OSC 133 `cmdline=omp` marker once before the first OSC 7501 status so Tern Agents recognizes Grok. On normal exit, Grok clears the status and restores the command-tracking field with OSC 133 `cmdline=grok`; it does not restore the full original launch arguments. Set `tern_agent_compat = false` to disable the marker while retaining OSC 7501 reporting. The marker is not sent inside tmux, even when explicit `"on"` enables OSC 7501 passthrough.
+
+This compatibility has been verified with Tern 0.9.21 only. Tern command metadata or its icon may display `omp`; the existing Grok terminal title displays Grok. The actual process and binary remain unchanged, and OSC 7501 still uses `app=grok-build`.
 
 #### Terminal support matrix
 

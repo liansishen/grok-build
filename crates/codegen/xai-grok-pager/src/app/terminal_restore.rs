@@ -66,6 +66,9 @@ pub(super) fn emit_terminal_teardown_sequences(mode: ScreenMode, inline_cursor_r
     // Emitting a no-op clear to terminals that don't support it is harmless
     // This path runs from signal/panic handlers that cannot access NotificationService
     xai_grok_shell::util::with_locked_stderr(|stderr| {
+        if let Some(clear) = crate::notifications::program_status::take_teardown_escape() {
+            let _ = stderr.write_all(clear.as_bytes());
+        }
         let _ = stderr.write_all(crate::notifications::progress::OSC_CLEAR.as_bytes());
         let _ = stderr.flush();
     });

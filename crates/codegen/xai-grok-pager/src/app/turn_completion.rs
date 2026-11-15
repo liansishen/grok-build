@@ -72,6 +72,19 @@ impl From<Option<&str>> for TurnStopReason {
     }
 }
 
+pub(crate) fn program_status_for_stop(
+    stop: TurnStopReason,
+) -> crate::notifications::program_status::ProgramStatus {
+    use crate::notifications::program_status::ProgramStatus;
+    match stop {
+        TurnStopReason::Cancelled => ProgramStatus::Idle,
+        TurnStopReason::Error | TurnStopReason::RateLimit | TurnStopReason::Interrupted => {
+            ProgramStatus::Error
+        }
+        _ => ProgramStatus::Done,
+    }
+}
+
 pub(crate) struct TerminalMarkerInput<'a> {
     pub stop: TurnStopReason,
     pub elapsed_ms: Option<u64>,
@@ -643,6 +656,12 @@ pub(super) fn finalize_turn_from_terminal(
         cancellation_context,
     );
     agent.session.finish_turn(&mut agent.scrollback);
+    if !agent.session.loading_replay
+        && prompt_id.is_none_or(|pid| pid.is_empty() || ending_prompt_id.as_deref() == Some(pid))
+    {
+        agent.program_status_result =
+            Some(program_status_for_stop(TurnStopReason::from(stop_reason)));
+    }
 
     // Wire meta wins; else the client-side expectation (older-shell fallback).
     // Taken at every viewer finalize so it can't go stale.
@@ -743,6 +762,8 @@ pub(super) fn finalize_child_view_turn(
 
     if !other_prompt {
         child.session.finish_turn(&mut child.scrollback);
+        child.program_status_result =
+            Some(program_status_for_stop(TurnStopReason::from(stop_reason)));
         // `finish_turn` only reaches rows the tracker saw. A resumed transcript's running tools would otherwise spin under an idle footer.
         child.scrollback.finish_all_running();
     }

@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct NotificationConfig {
     pub method: NotificationMethod,
+    #[serde(deserialize_with = "deserialize_program_status", default)]
+    pub program_status: ProgramStatusMode,
+    pub tern_agent_compat: bool,
     pub condition: NotificationCondition,
     pub idle_threshold_secs: u64,
     pub events: Vec<NotificationEventKind>,
@@ -25,6 +28,8 @@ impl Default for NotificationConfig {
     fn default() -> Self {
         Self {
             method: NotificationMethod::default(),
+            program_status: ProgramStatusMode::default(),
+            tern_agent_compat: true,
             condition: NotificationCondition::default(),
             idle_threshold_secs: 3,
             events: vec![
@@ -51,6 +56,31 @@ pub enum NotificationMethod {
     Osc777,
     Bel,
     None,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ProgramStatusMode {
+    #[default]
+    Auto,
+    On,
+    Off,
+}
+
+fn deserialize_program_status<'de, D>(deserializer: D) -> Result<ProgramStatusMode, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = toml::Value::deserialize(deserializer)?;
+    match value.as_str() {
+        Some("auto") => Ok(ProgramStatusMode::Auto),
+        Some("on") => Ok(ProgramStatusMode::On),
+        Some("off") => Ok(ProgramStatusMode::Off),
+        _ => {
+            tracing::warn!("invalid ui.notifications.program_status; using auto");
+            Ok(ProgramStatusMode::Auto)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -191,6 +221,10 @@ events = [\"turn_complete\", \"approval_required\"]
 sleep_prevention = true
 # Show a progress indicator in the terminal tab (OSC 9;4).
 progress_bar = true
+# Program status protocol: auto|on|off.
+program_status = \"auto\"
+# Register Grok in Tern's Agents widget using compatible command metadata.
+tern_agent_compat = true
 # Show an automatic \"where was I\" session recap when you return after being away.
 # Shell session_recap is on by default; disable via [features] session_recap or
 # GROK_SESSION_RECAP=0. Manual /recap uses only the shell flag.
@@ -225,6 +259,8 @@ mod tests {
     fn config_round_trips_through_toml() {
         let config = NotificationConfig {
             method: NotificationMethod::Osc99,
+            program_status: ProgramStatusMode::Auto,
+            tern_agent_compat: false,
             condition: NotificationCondition::Always,
             idle_threshold_secs: 10,
             events: vec![
@@ -258,6 +294,8 @@ mod tests {
         let parsed: NotificationConfig = toml::from_str("").expect("deserialize empty");
 
         assert_eq!(parsed.method, NotificationMethod::Auto);
+        assert_eq!(parsed.program_status, ProgramStatusMode::Auto);
+        assert!(parsed.tern_agent_compat);
         assert_eq!(parsed.condition, NotificationCondition::Unfocused);
         assert_eq!(parsed.idle_threshold_secs, 3);
         assert_eq!(
@@ -390,6 +428,25 @@ mod tests {
             template.contains(&format!("enabled = {}", defaults.title.enabled)),
             "template title.enabled does not match default"
         );
+    }
+
+    #[test]
+    fn tern_compatibility_switch_preserves_notification_settings() {
+        let parsed: NotificationConfig = toml::from_str(
+            "program_status = \"auto\"\ntern_agent_compat = false\ncondition = \"never\"\n",
+        )
+        .expect("deserialize Tern compatibility switch");
+        assert!(!parsed.tern_agent_compat);
+        assert_eq!(parsed.program_status, ProgramStatusMode::Auto);
+        assert_eq!(parsed.condition, NotificationCondition::Never);
+    }
+
+    #[test]
+    fn generated_template_round_trips_with_tern_defaults() {
+        let template: toml::Value = toml::from_str(&NotificationConfig::to_toml_with_comments())
+            .expect("parse generated notification configuration");
+        let parsed = super::super::load_notification_config(&template);
+        assert_eq!(parsed, NotificationConfig::default());
     }
 
     #[test]
