@@ -460,6 +460,7 @@ events = ["turn_complete", "approval_required"]
 sleep_prevention = true   # 在智能体回合期间防止显示器休眠
 progress_bar = true       # 显示标签页进度条（OSC 9;4）
 program_status = "auto"   # 通过 OSC 7501 报告智能体状态：auto|on|off
+tern_agent_compat = true  # 启用 Tern Agents 兼容
 
 [ui.notifications.title]
 enabled = true
@@ -475,15 +476,20 @@ items = ["action-required", "spinner", "activity", "session-name", "grok"]
 | `sleep_prevention` | bool | `true` | 智能体工作时保持显示器唤醒（macOS/Linux）。 |
 | `progress_bar` | bool | `true` | 在终端标签页中显示进度指示器（OSC 9;4）。 |
 | `program_status` | string | `"auto"` | 通过 OSC 7501 报告智能体状态，独立于通知焦点和事件设置。 |
+| `tern_agent_compat` | bool | `true` | 启用 Tern Agents 兼容标记，不改变 OSC 7501 上报。 |
 | `title.enabled` | bool | `true` | 设置终端标题以反映智能体状态。 |
 | `title.items` | array | （见上文） | 标题栏中显示的项目。选项：`action-required`、`spinner`、`activity`、`session-name`、`cwd`、`model`、`turn-timer`、`grok`。 |
 
 <a id="program-status-osc-7501"></a>
 #### 程序状态（OSC 7501）
 
-Grok 为整个终端报告一条主状态记录：空闲、工作中、等待操作、完成或错误。herdr-app 等兼容终端可以据此列出 Grok 并显示何时需要处理。正常退出时清除记录。
+Grok 为每个终端窗格报告一条主状态记录：空闲、工作中、等待操作、完成或错误。herdr-app 等兼容终端可以据此列出 Grok 并显示何时需要处理。正常退出时清除记录。子智能体没有独立条目。
 
-设置 `program_status = "on"` 可显式启用上报，适用于 SSH 场景；`"off"` 关闭上报。本 fork 的 `"auto"` 模式在未检测到内层终端复用器时，识别成对存在的 herdr-core 环境变量 `HC_TERMINAL_ID`、`HC_TERMINAL_SOCKET`，或 Rex 的 `REX_SESSION`、`REX_BLOCK`，并且不发送能力查询。tmux 内显式上报需要 tmux 3.3 或更新版本，并启用 `allow-passthrough`。当前只报告终端主状态，会话和子智能体的独立记录尚未实现。
+设置 `program_status = "on"` 可显式启用上报，适用于 SSH 场景；`"off"` 关闭所有状态上报和兼容标记。本 fork 的 `"auto"` 模式识别成对存在的 herdr-core 环境变量 `HC_TERMINAL_ID`、`HC_TERMINAL_SOCKET`，Rex 的 `REX_SESSION`、`REX_BLOCK`，或 Tern 的 `TERM_PROGRAM=tern`，或 `TERN_PANE` 与 `TERN_PANE_SOCKET` 或 `TERN_WINDOW_SOCKET` 的组合。自动检测要求没有内层终端复用器，且不发送能力查询。tmux 内显式上报需要 tmux 3.3 或更新版本，并启用 `allow-passthrough`。
+
+对于闭源 Tern 终端，`tern_agent_compat = true` 仅在确认 Tern 环境、交互式 TTY 且没有内层复用器或编辑器时启用身份标记。首次 OSC 7501 状态前发送一次 OSC 133 `cmdline=omp` 标记，使 Tern Agents 识别 Grok。正常退出时，Grok 清除状态并通过 OSC 133 `cmdline=grok` 恢复命令追踪字段；该固定值不恢复完整的原始启动参数。设置 `tern_agent_compat = false` 可关闭标记，同时保留 OSC 7501 上报。即使显式设置 `"on"` 启用 OSC 7501 透传，tmux 内也不发送此标记。
+
+该兼容性仅在 Tern 0.9.21 验证。Tern 的命令元数据或图标可能显示 `omp`；现有 Grok 终端标题用于显示 Grok。真实进程和二进制文件不变，OSC 7501 仍使用 `app=grok-build`。
 
 <a id="terminal-support-matrix"></a>
 #### 终端支持矩阵

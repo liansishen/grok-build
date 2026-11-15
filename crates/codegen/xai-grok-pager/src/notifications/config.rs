@@ -6,6 +6,7 @@ pub struct NotificationConfig {
     pub method: NotificationMethod,
     #[serde(deserialize_with = "deserialize_program_status", default)]
     pub program_status: ProgramStatusMode,
+    pub tern_agent_compat: bool,
     pub condition: NotificationCondition,
     pub idle_threshold_secs: u64,
     pub events: Vec<NotificationEventKind>,
@@ -28,6 +29,7 @@ impl Default for NotificationConfig {
         Self {
             method: NotificationMethod::default(),
             program_status: ProgramStatusMode::default(),
+            tern_agent_compat: true,
             condition: NotificationCondition::default(),
             idle_threshold_secs: 3,
             events: vec![
@@ -221,6 +223,8 @@ sleep_prevention = true
 progress_bar = true
 # Program status protocol: auto|on|off.
 program_status = \"auto\"
+# Register Grok in Tern's Agents widget using compatible command metadata.
+tern_agent_compat = true
 # Show an automatic \"where was I\" session recap when you return after being away.
 # Shell session_recap is on by default; disable via [features] session_recap or
 # GROK_SESSION_RECAP=0. Manual /recap uses only the shell flag.
@@ -256,6 +260,7 @@ mod tests {
         let config = NotificationConfig {
             method: NotificationMethod::Osc99,
             program_status: ProgramStatusMode::Auto,
+            tern_agent_compat: false,
             condition: NotificationCondition::Always,
             idle_threshold_secs: 10,
             events: vec![
@@ -289,6 +294,8 @@ mod tests {
         let parsed: NotificationConfig = toml::from_str("").expect("deserialize empty");
 
         assert_eq!(parsed.method, NotificationMethod::Auto);
+        assert_eq!(parsed.program_status, ProgramStatusMode::Auto);
+        assert!(parsed.tern_agent_compat);
         assert_eq!(parsed.condition, NotificationCondition::Unfocused);
         assert_eq!(parsed.idle_threshold_secs, 3);
         assert_eq!(
@@ -421,6 +428,25 @@ mod tests {
             template.contains(&format!("enabled = {}", defaults.title.enabled)),
             "template title.enabled does not match default"
         );
+    }
+
+    #[test]
+    fn tern_compatibility_switch_preserves_notification_settings() {
+        let parsed: NotificationConfig = toml::from_str(
+            "program_status = \"auto\"\ntern_agent_compat = false\ncondition = \"never\"\n",
+        )
+        .expect("deserialize Tern compatibility switch");
+        assert!(!parsed.tern_agent_compat);
+        assert_eq!(parsed.program_status, ProgramStatusMode::Auto);
+        assert_eq!(parsed.condition, NotificationCondition::Never);
+    }
+
+    #[test]
+    fn generated_template_round_trips_with_tern_defaults() {
+        let template: toml::Value = toml::from_str(&NotificationConfig::to_toml_with_comments())
+            .expect("parse generated notification configuration");
+        let parsed = super::super::load_notification_config(&template);
+        assert_eq!(parsed, NotificationConfig::default());
     }
 
     #[test]

@@ -1,5 +1,47 @@
 # Changelog
 
+# 1.0.45-fork.7 — 2026-11-15
+
+本版为 Fork 兼容性修复，产品版本仍为 **1.0.45**。在 Grok 一侧补齐闭源 Stencil Tern 的 Agents 识别，使前一版已有的 OSC 7501 状态上报能够驱动 Tern 的工作、等待操作和完成显示。本版基于已发布的 `v1.0.45-fork.6`，变更范围为 Tern 兼容、配置说明和对应回归测试。
+
+### 新增功能与修复
+
+- **自动识别 Tern**：`program_status = "auto"` 现在识别 `TERM_PROGRAM=tern`，或成对存在的 `TERN_PANE` 与 `TERN_PANE_SOCKET` / `TERN_WINDOW_SOCKET`。上报仍要求交互式输入与启动时保留的 TUI 输出句柄均为 TTY。
+- **进入 Agents 列表**：新增 `[ui.notifications]` 中的 `tern_agent_compat = true`，默认启用。在直接使用 Tern 的交互终端中，首条状态前发送一次 OSC 133 `cmdline=omp` 兼容识别标记，让 Tern 将当前窗格纳入 Agents。标记与首条状态按同一输出队列项投递，后续状态继续去重。
+- **沿用真实状态**：OSC 7501 报告继续携带 `app=grok-build`，并使用已有的空闲、工作中、等待操作、完成和错误状态及 `permission` / `question` / `auth` 阻塞类型。Tern 可以依次显示 Working、Needs you 和 Done。
+- **退出恢复**：正常退出清除状态记录，并将命令追踪字段恢复为固定的 `grok`；信号和 panic 路径复用既有的有界终端清理机制尽力恢复。恢复操作只在本进程使用过兼容识别后发送。
+
+### 兼容性与边界
+
+- 发布标签 `v1.0.45-fork.7` 与版本清单中的产品版本 `1.0.45` 匹配。
+- 兼容性已在 Tern **0.9.21** 验证。识别标记会使 Tern 的运行命令元数据或图标暂时显示为 `omp`；Grok 的终端标题用于显示当前活动，协议中的应用名仍为 `grok-build`。退出恢复使用固定的 `grok` 命令名。
+- 设置 `tern_agent_compat = false` 可保留 OSC 7501 状态上报并关闭兼容识别标记；`program_status = "off"` 关闭整个状态通道及兼容标记。该开关独立于桌面通知的协议、焦点条件和事件选择。
+- 兼容识别仅用于直接的 Tern 交互终端。内层复用器和嵌入式编辑器保持保守处理；tmux 中显式 `program_status = "on"` 沿用既有 OSC 7501 透传，需要 tmux 3.3 或更新版本及 `allow-passthrough`。管道和无 TTY 场景保持静默，herdr / Rex 的既有上报路径继续保留。
+- 每个终端窗格报告一条聚合状态，子智能体的活动汇入该记录。Tern Agents 兼容作为独立条目登记在 `FORK_FEATURES.md`，便于后续上游同步时保留其识别和退出约束。
+
+### 国际化
+
+- 新增的用户配置字段为机器键 `tern_agent_compat`；本版没有新增界面翻译键。英文与简体中文配置指南同步说明默认值、关闭方法、自动识别范围、显示限制和退出行为。
+- 国际化目录配对、当前源码及 Markdown 覆盖审计通过。
+
+### 验证
+
+本地使用 Rust **1.92.0**、Protoc **29.3**、`GROK_VERSION=1.0.45-fork.7`，所有 Cargo 命令均保留 `--locked`：
+
+- pager-bin 类型检查、release 构建和版本输出校验通过。
+- 通知回归测试 **161 项**、Linux sampler 库 **271 项**、国际化库 **14 项**及 `i18n_audit` **17 项**通过；审计同时覆盖当前源码、Markdown 和相对 PR 基线的差异。
+- 隔离网络与进程环境中，用真实 Grok 编译产物和 Tern 0.9.21 组件完成 **8 项端到端 / PTY 用例**：工作、等待回答、回答后完成、退出清除、同窗格重启保持一条记录，以及兼容开关、状态总开关和上报字节顺序等边界。非 Tern 与模拟 tmux 环境通过 PTY 验证，tmux 包装和版本边界由单元测试覆盖。
+- 用户已替换编译产物，并确认实际使用的 Tern Agents 组件能够正常显示 Grok。
+- Fork 标记与翻译目录结构检查、`git diff --check` 通过；Linux / Windows 发布构建和版本检查由 GitHub Actions 进一步验证。
+
+### 产物
+
+- `grok-1.0.45-fork.7-linux-x86_64`
+- `grok-1.0.45-fork.7-windows-x86_64`
+- `SHA256SUMS`
+
+**Full Changelog**: https://github.com/liansishen/grok-build/compare/v1.0.45-fork.6...v1.0.45-fork.7
+
 # 1.0.45-fork.6 — 2026-11-13
 
 本版为 Fork 新增功能，产品版本仍为 **1.0.45**。补齐 OSC 7501 程序状态上报，使 herdr-app 等兼容终端能够在 Agents 列表中识别 Grok 并显示其工作状态。本版基于 `v1.0.45-fork.5`，只包含此次状态上报移植及对应文档。
